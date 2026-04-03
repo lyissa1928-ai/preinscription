@@ -1,0 +1,24 @@
+---
+description: Contexte du projet Gestion Scolaire - lire issa.txt pour la progression
+alwaysApply: true
+---
+
+# Projet Gestion Scolaire
+
+## Contexte obligatoire
+
+Au début de chaque session sur ce projet, **lis le fichier `issa.txt`** pour connaître :
+- L'étape de développement en cours (Étape 0 à 16)
+- Les tâches à réaliser (cases à cocher)
+- L'architecture et les spécifications
+
+## Comportement attendu
+
+- **Ne pas demander** à l'utilisateur ce qu'il faut faire à chaque étape
+- **Agir de manière autonome** en suivant le plan défini dans issa.txt
+- **Référence** : `fonctionnalites-a-developper.txt` pour les détails fonctionnels
+- **Stack** : Next.js (frontend), NestJS (backend), Prisma, PostgreSQL
+
+## Progression
+
+Consulte issa.txt pour savoir quelle étape est en cours et quelles tâches restent à faire.

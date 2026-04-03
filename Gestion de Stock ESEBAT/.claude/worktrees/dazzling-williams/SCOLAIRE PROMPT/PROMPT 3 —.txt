@@ -1,0 +1,440 @@
+PROMPT 3 — 
+
+Référentiel Académique (Socle) + UI Admin “dernier cri” + Imports
+
+Objectif : Implémenter le référentiel académique complet (Années, Semestres, Facultés/UFR, Départements, Programmes/Filières, Niveaux) avec API REST sécurisée + RBAC + audit, et un Backoffice UI moderne (table, filtres, modals, validation, pagination, empty states).
+Ce prompt doit livrer un module stable sur lequel tous les autres modules (UE, groupes, inscriptions, etc.) vont s’appuyer.
+
+0) Rôles autorisés (RBAC)
+
+CRUD complet : SUPER_ADMIN, ADMIN
+
+Consultation seule : SCOLARITE, DEPT_HEAD, AUDITOR
+
+Interdit : TEACHER, STUDENT, FINANCE (sauf endpoints “public read” si décidé plus tard)
+
+Toutes les opérations CREATE/UPDATE/DELETE doivent être audit-loggées.
+
+1) Backend (NestJS) — Modules & Structure
+1.1 Modules à créer
+
+Créer module academic contenant sous-domaines :
+
+academic-years
+
+semesters
+
+faculties
+
+departments
+
+programs
+
+levels
+
+Option : un module Nest unique academic avec plusieurs controllers/services, ou modules séparés dans academic/.
+
+2) Modèle de données (Prisma) — à implémenter
+2.1 AcademicYear
+
+Champs :
+
+id (uuid)
+
+name (ex: "2026-2027") unique
+
+startDate (date)
+
+endDate (date)
+
+isActive (bool) 1 seule active
+
+status enum: OPEN | CLOSED
+
+createdAt, updatedAt
+
+Contraintes :
+
+startDate < endDate
+
+CLOSED => interdit modification (sauf admin override option)
+
+Unicité name
+
+2.2 Semester
+
+Champs :
+
+id
+
+academicYearId (FK)
+
+name enum: S1 | S2
+
+startDate, endDate
+
+status enum: OPEN | CLOSED
+
+createdAt, updatedAt
+
+Contraintes :
+
+startDate < endDate
+
+Semestre dates incluses dans l’intervalle de l’année académique
+
+Unicité : (academicYearId, name) unique
+
+Si academicYear.status=CLOSED => semesters non modifiables
+
+2.3 Faculty (UFR/Institut)
+
+Champs :
+
+id
+
+code (unique, ex "UFRSET") unique
+
+name (unique recommandé)
+
+status enum: ACTIVE | INACTIVE
+
+createdAt, updatedAt
+
+2.4 Department
+
+Champs :
+
+id
+
+facultyId (FK)
+
+code (unique dans faculty) ou global unique (choisir global unique)
+
+name
+
+headUserId (nullable, FK User)
+
+status enum: ACTIVE | INACTIVE
+
+createdAt, updatedAt
+
+Contraintes :
+
+Unicité code (global)
+
+facultyId requis
+
+headUserId doit être role DEPT_HEAD (si fourni)
+
+2.5 Program (Filière/Programme)
+
+Champs :
+
+id
+
+departmentId (FK)
+
+code (unique)
+
+name
+
+cycle enum: LICENCE | MASTER | DOCTORAT | CERTIFICATE
+
+durationYears (int > 0)
+
+status enum: ACTIVE | INACTIVE
+
+createdAt, updatedAt
+
+Contraintes :
+
+Unicité code
+
+departmentId requis
+
+2.6 Level (Niveaux)
+
+Champs :
+
+id
+
+programId (FK)
+
+name (ex: "L1", "L2", "M1", "M2") (string)
+
+orderIndex (int) (ex L1=1)
+
+status enum: ACTIVE | INACTIVE
+
+createdAt, updatedAt
+
+Contraintes :
+
+Unicité : (programId, name) unique
+
+orderIndex unique par program
+
+Validation cohérence cycle :
+
+LICENCE => niveaux typiques L1..L3
+
+MASTER => M1..M2
+(ne pas bloquer totalement, mais avertissement possible)
+
+3) API REST — Endpoints requis (CRUD + pagination)
+3.1 Conventions
+
+Base: /api/v1
+
+Pagination standard : page, pageSize, q
+
+Réponse paginée :
+
+{ "items": [], "page": 1, "pageSize": 20, "total": 123 }
+3.2 AcademicYear
+
+GET /academic-years
+
+POST /academic-years
+
+GET /academic-years/:id
+
+PATCH /academic-years/:id
+
+POST /academic-years/:id/activate (désactive les autres)
+
+POST /academic-years/:id/close (status CLOSED)
+
+POST /academic-years/:id/reopen (optionnel)
+
+Règles :
+
+activate => une seule isActive=true
+
+close => bloque modifications (enforce)
+
+3.3 Semesters
+
+GET /semesters?academicYearId=...
+
+POST /semesters
+
+PATCH /semesters/:id
+
+POST /semesters/:id/close
+
+Règles :
+
+Auto-création S1/S2 possible lors création année (bonus)
+
+Validation dates inclues dans l’année
+
+3.4 Faculties
+
+GET /faculties
+
+POST /faculties
+
+PATCH /faculties/:id
+
+3.5 Departments
+
+GET /departments?facultyId=...
+
+POST /departments
+
+PATCH /departments/:id
+
+3.6 Programs
+
+GET /programs?departmentId=...
+
+POST /programs
+
+PATCH /programs/:id
+
+3.7 Levels
+
+GET /levels?programId=...
+
+POST /levels
+
+PATCH /levels/:id
+
+4) Import CSV/Excel (Bulk) — obligatoire
+
+Implémenter imports CSV (Excel support optionnel) pour :
+
+Faculties
+
+Departments
+
+Programs
+
+Levels
+
+4.1 Endpoint import
+
+Ex:
+
+POST /academic/import/faculties
+
+POST /academic/import/departments
+
+POST /academic/import/programs
+
+POST /academic/import/levels
+
+Payload : fichier multipart.
+
+4.2 Règles import
+
+Valider format + champs requis
+
+Dédupliquer par code
+
+Mode “dry-run” optionnel (retourne erreurs sans écrire)
+
+Retour :
+
+{
+  "created": 10,
+  "updated": 2,
+  "skipped": 1,
+  "errors": [{ "row": 4, "message": "..." }]
+}
+
+Audit log : ACADEMIC_IMPORT_*
+
+5) Audit & sécurité (backend)
+
+Pour chaque action CRUD :
+
+audit action ex: ACADEMIC_YEAR_CREATED, FACULTY_UPDATED, etc.
+
+Enregistrer before / after JSON
+
+Empêcher suppression physique (pas de DELETE)
+
+utiliser status=INACTIVE ou CLOSED
+
+6) Frontend (Next.js) — Backoffice UI moderne (Admin)
+6.1 Navigation & pages
+
+Ajouter au sidebar :
+
+Référentiel
+
+Années académiques
+
+Semestres
+
+Facultés/UFR
+
+Départements
+
+Programmes
+
+Niveaux
+
+Pages :
+
+/app/academic/years
+
+/app/academic/semesters
+
+/app/academic/faculties
+
+/app/academic/departments
+
+/app/academic/programs
+
+/app/academic/levels
+
+6.2 UI “dernier cri”
+
+Chaque page doit avoir :
+
+Header avec titre + description + bouton “Créer”
+
+Search bar + filtres (faculté, département, etc.)
+
+Table paginée
+
+Drawer/Modal création & édition
+
+Badges de statut (ACTIVE/INACTIVE, OPEN/CLOSED)
+
+Empty state élégante + CTA
+
+Skeleton loading
+
+Utiliser :
+
+shadcn/ui Table, Dialog/Drawer, DropdownMenu, Badge, Tabs
+
+TanStack Query
+
+react-hook-form + zod
+
+toasts
+
+6.3 UX spécifique Années académiques
+
+Sur la page years :
+
+Bouton “Activer” (si pas active)
+
+Bouton “Clôturer”
+
+Badge “Active” (isActive)
+
+Empêcher édition si CLOSED (UI + backend)
+
+Créer année : propose auto-créer S1/S2 avec dates (checkbox)
+
+6.4 Relations (cascades)
+
+Departments : filtre faculty
+
+Programs : filtre department
+
+Levels : filtre program
+UI doit guider l’utilisateur (select dépendants).
+
+7) Tests & qualité
+
+Backend :
+
+tests pour :
+
+unique active academic year
+
+close year bloque update
+
+import valide/erreurs
+
+RBAC bloque enseignants/étudiants
+
+Frontend :
+
+pages build OK
+
+lint OK
+
+8) Définition “DONE” (PROMPT 3)
+
+Terminé si :
+
+CRUD complet fonctionne pour years/semesters/faculties/departments/programs/levels
+
+Import CSV fonctionne avec rapport erreurs
+
+RBAC + audit intégrés partout
+
+UI moderne complète et utilisable
+
+Swagger à jour
+
+Docker compose fonctionne toujours

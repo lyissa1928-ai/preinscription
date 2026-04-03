@@ -1,0 +1,12 @@
+{
+  "name": "projet-ia",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "sync:auto": "node auto-sync.js",
+    "sync:start": "node auto-sync.js"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0"
+  }
+}

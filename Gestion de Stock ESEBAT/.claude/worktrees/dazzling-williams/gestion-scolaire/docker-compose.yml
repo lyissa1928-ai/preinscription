@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gestion-scolaire-db
+    environment:
+      POSTGRES_USER: gestion
+      POSTGRES_PASSWORD: gestion_secret
+      POSTGRES_DB: gestion_scolaire
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

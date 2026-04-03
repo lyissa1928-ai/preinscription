@@ -1,0 +1,302 @@
+PROMPT 8
+ — Emploi du Temps (EDT) + Détection Conflits + Vues Calendrier + Export PDF + Portails Étudiant/Enseignant
+
+Objectif : Implémenter la gestion complète de l’emploi du temps (backend + frontend) :
+
+Création de séances (CM/TD/TP)
+
+Affectation : UE + groupe + enseignant + salle
+
+Détection automatique des conflits (salle/enseignant/groupe)
+
+Vues calendrier modernes (semaine/jour)
+
+Export PDF (EDT groupe / enseignant)
+
+Portail enseignant : “mes séances”
+
+Portail étudiant : “EDT de mon groupe”
+
+Dépend de Prompts 3-4 (référentiel + UE + groupes + salles), 5 (enseignants/étudiants), 7 (IP utile mais pas strict), 2 (auth/audit).
+
+0) RBAC
+
+CRUD EDT :
+
+SCOLARITE, ADMIN, SUPER_ADMIN, DEPT_HEAD (option : seulement sur département)
+Lecture :
+
+TEACHER (ses séances)
+
+STUDENT (séances de son groupe)
+
+AUDITOR (lecture)
+Interdit :
+
+FINANCE
+
+Audit obligatoire.
+
+1) Modèle de données (Prisma)
+1.1 TimetableSession
+
+Créer table :
+
+id
+
+courseUnitId (FK CourseUnit) obligatoire
+
+groupId (FK Group) obligatoire
+
+teacherId (FK Teacher) obligatoire
+
+roomId (FK Room) obligatoire
+
+semesterId (FK Semester) obligatoire
+
+startAt (datetime)
+
+endAt (datetime)
+
+type enum: CM | TD | TP
+
+status enum: SCHEDULED | CANCELED | POSTPONED
+
+notes (string nullable)
+
+createdAt, updatedAt
+
+Contraintes :
+
+startAt < endAt
+
+Durée max configurable (option)
+
+courseUnit.semesterId == semesterId (cohérence)
+
+group doit correspondre program/level de l’UE (warning ou blocage)
+
+1.2 TimetableConflictLog (optionnel mais utile)
+
+Créer table :
+
+id
+
+sessionId nullable (si tentative création)
+
+conflictType enum: ROOM | TEACHER | GROUP
+
+conflictWithSessionId
+
+details JSON
+
+createdAt
+
+2) Backend — Détection Conflits (obligatoire)
+
+Lors création ou modification d’une séance, vérifier chevauchement :
+
+Deux séances A et B sont en conflit si :
+
+A.startAt < B.endAt AND A.endAt > B.startAt
+
+Conflits à détecter :
+
+même roomId
+
+même teacherId
+
+même groupId
+
+Réponse API en cas conflit :
+
+code TIMETABLE_CONFLICT
+
+details : liste conflits { type, sessionId, startAt, endAt, room/teacher/group }
+
+Prévoir mode force=true (admin only) pour override (avec audit + log).
+
+3) API REST — Endpoints
+
+Base /api/v1
+
+3.1 CRUD sessions
+
+GET /timetable/sessions?semesterId=&groupId=&teacherId=&roomId=&from=&to=
+
+GET /timetable/sessions/:id
+
+POST /timetable/sessions
+
+PATCH /timetable/sessions/:id
+
+POST /timetable/sessions/:id/cancel body {reason}
+
+POST /timetable/sessions/:id/postpone body {newStartAt,newEndAt,reason}
+
+3.2 Vues dédiées
+
+GET /timetable/group/:groupId?from=&to=
+
+GET /timetable/teacher/:teacherId?from=&to=
+
+GET /timetable/room/:roomId?from=&to=
+
+3.3 Export PDF
+
+GET /timetable/group/:groupId/pdf?from=&to=
+
+GET /timetable/teacher/:teacherId/pdf?from=&to=
+Retourne file via FileStorage (signed url) ou streaming.
+
+3.4 “Me”
+
+GET /me/timetable (étudiant => groupe, enseignant => teacherId)
+
+GET /me/timetable/pdf?from=&to=
+
+4) Audit (obligatoire)
+
+Actions :
+
+TIMETABLE_SESSION_CREATED
+
+TIMETABLE_SESSION_UPDATED
+
+TIMETABLE_SESSION_CANCELED
+
+TIMETABLE_SESSION_POSTPONED
+
+TIMETABLE_CONFLICT_DETECTED
+
+TIMETABLE_FORCE_OVERRIDE_USED
+
+Inclure before/after + raison.
+
+5) Frontend — UI Admin EDT (moderne)
+
+Créer pages :
+
+/app/timetable (vue principale admin)
+
+/app/timetable/sessions/new
+
+/app/timetable/sessions/[id]
+
+5.1 Vue calendrier admin
+
+Vue semaine + jour
+
+Filtre :
+
+semestre (obligatoire)
+
+groupe
+
+enseignant
+
+salle
+
+Affichage sessions en cartes
+
+Click session => drawer détails
+
+Bouton “Créer séance”
+
+Implémentation :
+
+utiliser un calendrier moderne (FullCalendar ou équivalent React)
+
+style cohérent shadcn
+
+Skeleton loading
+
+5.2 Création séance (form premium)
+
+Form :
+
+UE (select)
+
+groupe (select)
+
+enseignant (select)
+
+salle (select)
+
+type CM/TD/TP
+
+date/heure start/end
+
+notes option
+
+À submit :
+
+si conflit -> afficher modal listant conflits + proposer “forcer” si admin
+
+sinon -> succès toast + refresh calendrier
+
+5.3 Export PDF
+
+Bouton exporter :
+
+groupe
+
+enseignant
+
+période (semaine/mois)
+
+6) Frontend — Portail Enseignant
+
+Créer :
+
+/app/teacher/timetable
+Affiche :
+
+calendrier “mes séances”
+
+export PDF
+
+7) Frontend — Portail Étudiant
+
+Créer :
+
+/app/student/timetable
+Affiche :
+
+calendrier du groupe de l’étudiant (si groupId non défini => message “groupe non affecté”)
+
+export PDF
+
+8) Tests
+
+Backend :
+
+création séance sans conflit OK
+
+conflit salle/enseignant/groupe détecté
+
+override réservé admin
+
+“me” renvoie bonnes séances
+
+Frontend :
+
+calendrier admin fonctionne
+
+création séance + gestion conflits UI
+
+vues étudiant/enseignant affichent données
+
+9) Definition of Done (PROMPT 8)
+
+Terminé si :
+
+CRUD séances opérationnel
+
+conflits détectés
+
+calendrier admin + portails enseignant/étudiant OK
+
+export PDF opérationnel
+
+audit + swagger OK

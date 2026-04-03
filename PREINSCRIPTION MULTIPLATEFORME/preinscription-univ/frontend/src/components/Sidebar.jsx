@@ -1,0 +1,269 @@
+import { useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import toast from 'react-hot-toast'
+import { mediaUrl } from '../utils/mediaUrl'
+
+const BRAND_IMAGE = new URL('../../img/image-multisite.jpg', import.meta.url).href
+
+/* ─── Icônes SVG inline légères ─────────────────────────────────── */
+const Icon = ({ d, d2 }) => (
+  <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={d} />
+    {d2 && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={d2} />}
+  </svg>
+)
+
+const ICONS = {
+  accueil:     <Icon d="M3 12l9-9 9 9M4 10v10a1 1 0 001 1h5v-6h4v6h5a1 1 0 001-1V10" />,
+  dashboard:   <Icon d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />,
+  dossiers:    <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+  users:       <Icon d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
+  formations:  <Icon d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />,
+  etablissements: <Icon d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />,
+  finance:     <Icon d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
+  stats:       <Icon d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />,
+  audit:       <Icon d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" d2="M9 8h.01M12 8h.01M15 8h.01" />,
+  shield:      <Icon d="M12 3l8 4v5c0 5.25-3.5 9-8 10-4.5-1-8-4.75-8-10V7l8-4z" />,
+  settings:    <Icon d="M10.325 4.317a1.724 1.724 0 013.35 0 1.724 1.724 0 002.573 1.066 1.724 1.724 0 012.297 2.297 1.724 1.724 0 001.065 2.573 1.724 1.724 0 010 3.35 1.724 1.724 0 00-1.065 2.573 1.724 1.724 0 01-2.297 2.297 1.724 1.724 0 00-2.573 1.066 1.724 1.724 0 01-3.35 0 1.724 1.724 0 00-2.573-1.066 1.724 1.724 0 01-2.297-2.297 1.724 1.724 0 00-1.066-2.573 1.724 1.724 0 010-3.35 1.724 1.724 0 001.066-2.573 1.724 1.724 0 012.297-2.297 1.724 1.724 0 002.573-1.066z" d2="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />,
+  pulse:       <Icon d="M3 12h4l2-5 4 10 2-5h6" />,
+  controle:    <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />,
+  pedago:      <Icon d="M12 14l9-5-9-5-9 5 9 5z" d2="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />,
+  preinscription: <Icon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />,
+  identifiants: <Icon d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />,
+  logout:      <Icon d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />,
+  menu:        <Icon d="M4 6h16M4 12h16M4 18h16" />,
+  close:       <Icon d="M6 18L18 6M6 6l12 12" />,
+  chevron:     <Icon d="M9 5l7 7-7 7" />,
+}
+
+/* ─── Menus par rôle ─────────────────────────────────────────────── */
+const MENUS = {
+  admin: [
+    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
+    { label: 'Tableau de bord', to: '/admin', icon: ICONS.dashboard, exact: true },
+    { label: 'Établissements', to: '/admin/etablissements', icon: ICONS.etablissements },
+    { label: 'Demandes Proforma', to: '/admin/proforma', icon: ICONS.preinscription },
+    { label: 'Utilisateurs', to: '/admin/utilisateurs', icon: ICONS.users },
+    { label: 'Journal d’audit', to: '/admin/audit-logs', icon: ICONS.audit },
+    { label: 'Événements sécurité', to: '/admin/security-events', icon: ICONS.shield },
+    { label: 'Maintenance', to: '/admin/maintenance', icon: ICONS.settings },
+    { label: 'Monitoring runtime', to: '/admin/runtime-monitoring', icon: ICONS.pulse },
+    { label: 'Pédagogie', to: '/responsable', icon: ICONS.pedago },
+    { label: 'Adm. dossiers', to: '/agent-admin', icon: ICONS.controle },
+    { label: 'Finance', to: '/comptable', icon: ICONS.finance },
+  ],
+  responsable: [
+    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
+    { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Tableau de bord', to: '/responsable', icon: ICONS.dashboard, exact: true },
+    { label: 'Dossiers', to: '/responsable', icon: ICONS.dossiers, exact: true },
+  ],
+  agent_admin: [
+    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
+    { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Tableau de bord', to: '/agent-admin', icon: ICONS.dashboard, exact: true },
+    { label: 'Contrôle dossiers', to: '/agent-admin', icon: ICONS.controle, exact: true },
+  ],
+  comptable: [
+    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
+    { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Finance', to: '/comptable', icon: ICONS.finance, exact: true },
+  ],
+  directeur: [
+    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
+    { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Supervision', to: '/directeur', icon: ICONS.stats, exact: true },
+  ],
+  etudiant: [
+    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
+    { label: 'Mon espace', to: '/dashboard', icon: ICONS.dashboard },
+    { label: 'Filières & formations', to: '/mon-etablissement', icon: ICONS.formations },
+    { label: 'Mes identifiants', to: '/mes-acces', icon: ICONS.identifiants },
+    { label: 'Préinscription', to: '/preinscription', icon: ICONS.preinscription },
+  ],
+}
+
+const ROLE_CONFIG = {
+  admin:       { label: 'Administrateur',     color: 'from-purple-700 to-purple-900', badge: 'bg-purple-500' },
+  responsable: { label: 'Resp. Pédagogique', color: 'from-teal-700 to-teal-900',    badge: 'bg-teal-500' },
+  agent_admin: { label: 'Agent Administratif',color: 'from-orange-600 to-orange-800',badge: 'bg-orange-500' },
+  comptable:   { label: 'Comptable',          color: 'from-violet-700 to-violet-900',badge: 'bg-violet-500' },
+  directeur:   { label: 'Directeur',          color: 'from-blue-800 to-blue-950',    badge: 'bg-blue-600' },
+  etudiant:    { label: 'Étudiant',           color: 'from-blue-600 to-blue-800',    badge: 'bg-blue-500' },
+}
+
+/* ─── NavLink item ───────────────────────────────────────────────── */
+function NavItem({ item, collapsed, onClick }) {
+  const location = useLocation()
+  const isActive = item.exact
+    ? location.pathname === item.to
+    : location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+
+  return (
+    <Link
+      to={item.to}
+      onClick={onClick}
+      title={collapsed ? item.label : undefined}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group
+        ${isActive
+          ? 'bg-white/20 text-white shadow-inner'
+          : 'text-white/70 hover:bg-white/10 hover:text-white'
+        }`}
+    >
+      <span className={`transition-all ${isActive ? 'text-white' : 'text-white/60 group-hover:text-white'}`}>
+        {item.icon}
+      </span>
+      {!collapsed && <span className="truncate">{item.label}</span>}
+      {!collapsed && isActive && (
+        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />
+      )}
+    </Link>
+  )
+}
+
+/* ─── Sidebar principale ─────────────────────────────────────────── */
+export default function Sidebar() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  if (!user) return null
+
+  const menu = MENUS[user.role] || []
+  const cfg = ROLE_CONFIG[user.role] || { label: user.role, color: 'from-gray-700 to-gray-900', badge: 'bg-gray-500' }
+  const initials = `${user.prenom?.[0] || '?'}${user.nom?.[0] || ''}`
+  const homePath = '/accueil'
+  const etabLogoSrc = user?.etablissement_logo ? mediaUrl(user.etablissement_logo) : null
+
+  const handleLogout = () => {
+    logout()
+    toast.success('Déconnexion réussie')
+    navigate('/')
+  }
+
+  const SidebarContent = ({ isMobile = false }) => (
+    <div className={`flex flex-col h-full bg-gradient-to-b ${cfg.color} text-white`}>
+
+      {/* ── Logo + toggle ─────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-4 h-16 flex-shrink-0 border-b border-white/10">
+        {(!collapsed || isMobile) && (
+          <Link to={homePath} className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/30 bg-white flex items-center justify-center flex-shrink-0 p-0.5">
+              {etabLogoSrc
+                ? <img src={etabLogoSrc} alt="" className="w-full h-full object-contain" />
+                : <img src={BRAND_IMAGE} alt="UniPortail" className="w-full h-full object-cover" />}
+            </div>
+            <span className="font-bold text-sm truncate leading-tight">UniPortail</span>
+          </Link>
+        )}
+        {collapsed && !isMobile && (
+          <Link to={homePath} className="w-8 h-8 rounded-lg overflow-hidden border border-white/30 bg-white flex items-center justify-center mx-auto p-0.5">
+            {etabLogoSrc
+              ? <img src={etabLogoSrc} alt="" className="w-full h-full object-contain" />
+              : <img src={BRAND_IMAGE} alt="UniPortail" className="w-full h-full object-cover" />}
+          </Link>
+        )}
+        {!isMobile && (
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            className="ml-auto p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors flex-shrink-0"
+          >
+            <svg className={`w-4 h-4 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+        {isMobile && (
+          <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10 text-white/70">
+            {ICONS.close}
+          </button>
+        )}
+      </div>
+
+      {/* ── Profil utilisateur ────────────────────────────────── */}
+      <div className={`px-3 py-4 border-b border-white/10 flex-shrink-0 ${collapsed && !isMobile ? 'flex justify-center' : ''}`}>
+        {(!collapsed || isMobile) ? (
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-full ${cfg.badge} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm text-white truncate">{user.prenom} {user.nom}</p>
+              <p className="text-xs text-white/60 truncate">{cfg.label}</p>
+            </div>
+          </div>
+        ) : (
+          <div className={`w-9 h-9 rounded-full ${cfg.badge} flex items-center justify-center text-white font-bold text-xs`} title={`${user.prenom} ${user.nom}`}>
+            {initials}
+          </div>
+        )}
+      </div>
+
+      {/* ── Menu items ────────────────────────────────────────── */}
+      <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
+        {menu.map((item, i) => (
+          <NavItem
+            key={i}
+            item={item}
+            collapsed={collapsed && !isMobile}
+            onClick={() => isMobile && setMobileOpen(false)}
+          />
+        ))}
+      </nav>
+
+      {/* ── Déconnexion ───────────────────────────────────────── */}
+      <div className="px-2 py-3 border-t border-white/10 flex-shrink-0">
+        <button
+          onClick={handleLogout}
+          title={collapsed && !isMobile ? 'Déconnexion' : undefined}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-colors ${collapsed && !isMobile ? 'justify-center' : ''}`}
+        >
+          {ICONS.logout}
+          {(!collapsed || isMobile) && <span>Déconnexion</span>}
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      {/* ── Sidebar desktop ───────────────────────────────────── */}
+      <aside className={`hidden md:flex flex-col flex-shrink-0 h-screen sticky top-0 transition-all duration-200 ${collapsed ? 'w-16' : 'w-60'}`}>
+        <SidebarContent />
+      </aside>
+
+      {/* ── Topbar mobile ─────────────────────────────────────── */}
+      <div className={`md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-gradient-to-r ${cfg.color} flex items-center px-4 gap-3 shadow-lg`}>
+        <button onClick={() => setMobileOpen(true)} className="text-white p-1">
+          {ICONS.menu}
+        </button>
+        <Link to={homePath} className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-md overflow-hidden border border-white/30 bg-white/15">
+            <img src={BRAND_IMAGE} alt="UniPortail" className="w-full h-full object-cover" />
+          </div>
+          <span className="font-bold text-sm text-white">UniPortail</span>
+        </Link>
+        <div className="ml-auto flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-full ${cfg.badge} flex items-center justify-center text-white font-bold text-xs`}>
+            {initials}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Drawer mobile ─────────────────────────────────────── */}
+      {mobileOpen && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 z-50 bg-black/50"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="md:hidden fixed top-0 left-0 z-50 h-full w-72 flex flex-col shadow-2xl">
+            <SidebarContent isMobile />
+          </aside>
+        </>
+      )}
+    </>
+  )
+}

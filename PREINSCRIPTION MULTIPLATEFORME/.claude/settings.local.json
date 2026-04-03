@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell.exe -Command \"Get-ChildItem ''..\\\\..\\\\preinscription-univ'' -Recurse | Select-Object FullName\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem ''C:\\\\Users\\\\lyiss\\\\Documents'' | Select-Object Name\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem ''C:\\\\Users\\\\lyiss\\\\Documents\\\\preinscription-univ'' -Recurse -Directory | ForEach-Object { $_.FullName }\")",
+      "Bash(powershell.exe -Command \"Get-Content ''C:\\\\Users\\\\lyiss\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-lyiss-Documents-PROJET-SANTE-PROJET-SANTE\\\\baefc241-77f5-44d8-8e4d-3d979f3c376f\\\\tasks\\\\b8vw4l5zm.output'' -Tail 20 2>&1\")"
+    ]
+  }
+}

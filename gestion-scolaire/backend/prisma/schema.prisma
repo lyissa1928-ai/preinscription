@@ -1,23 +1,76 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  role         String   // SUPER_ADMIN, ADMIN, SCOLARITE, DEPT_HEAD, TEACHER, STUDENT, FINANCE, AUDITOR
-  firstName    String   @map("first_name")
-  lastName     String   @map("last_name")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String    @map("password_hash")
+  role              String    // SUPER_ADMIN, ADMIN | SERVICE_PEDAGOGIQUE (directeur), RESPONSABLE_PEDAGOGIQUE (par campus), AGENT_PEDAGOGIQUE (par campus) | SCOLARITE, DEPT_HEAD, TEACHER, STUDENT, AUDITOR, CAISSIER, CHEF_COMPTABLE, DAF
+  firstName         String    @map("first_name")
+  lastName          String    @map("last_name")
+  dateOfBirth       DateTime? @map("date_of_birth")
+  maritalStatus     String?   @map("marital_status")   // CELIBATAIRE, MARIE, DIVORCE, VEUF, PACS
+  numberOfChildren  Int?      @map("number_of_children")
+  matricule         String?   @unique
+  phone             String?
+  address           String?
+  // Profil pro étendu
+  gender            String?   @map("gender")          // M, F, AUTRE, NON_PRECISE
+  nationality       String?   @map("nationality")
+  service           String?   @map("service")         // Scolarité, Comptabilité, Pédagogie, etc.
+  jobTitle          String?   @map("job_title")       // Intitulé de poste
+  contractType      String?   @map("contract_type")   // CDI, CDD, VACATAIRE, STAGIAIRE, PRESTATAIRE
+  hireDate          DateTime? @map("hire_date")
+  accountStatus     String    @default("ACTIF") @map("account_status") // ACTIF, SUSPENDU, ARCHIVE
+  profilePhotoUrl   String?   @map("profile_photo_url")
+  profileValidated  Boolean   @default(false) @map("profile_validated")
+  badgeBarcode      String?   @unique @map("badge_barcode")
+  /// Badge physique / PDF : désactivation sans supprimer le compte (scans refusés).
+  badgeActive       Boolean   @default(true) @map("badge_active")
+  /// Incrémenter pour invalider les QR imprimés avant régénération.
+  badgeQrVersion    Int       @default(1) @map("badge_qr_version")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  person Person?
+  person                 Person?
+  badgeScanLogs          BadgeScanLog[]
+  paymentsValides        Payment[]
+  attendancesValides     Attendance[]
+  gradesSaisies          Grade[]           @relation("SaisiePar")
+  gradeModifications     GradeModificationRequest[] @relation("Demandeur")
+  gradeValidations       GradeModificationRequest[] @relation("ValidePar")
+  financialStatusValides DailyFinancialStatus[]
+  breachRequests         BreachRequest[]  @relation("DemandeurBreach")
+  breachApprovals        BreachRequest[]  @relation("ApprouveParBreach")
+  notifications          Notification[]
+  transactionsEnregistrees Transaction[]
+  cloturesJournalieres   ClotureJournaliere[]
+  demandesDecaissementInitiees   DemandeDecaissement[] @relation("InitiePar")
+  demandesDecaissementApprouvees DemandeDecaissement[] @relation("ApprouvePar")
+  demandesDeverrouillage         DemandeDeverrouillageMaquette[] @relation("DemandeDeverrouillage")
+  demandesDeverrouillageTraitees DemandeDeverrouillageMaquette[] @relation("TraiteDeverrouillage")
+  filieresDemandees              Filiere[] @relation("FiliereDemandeur")
+  filieresValidees               Filiere[] @relation("FiliereValidePar")
+  formationsDemandees            Formation[] @relation("FormationDemandeur")
+  formationsValidees             Formation[] @relation("FormationValidePar")
+  semestresDemandes              Semestre[] @relation("SemestreDemandeur")
+  semestresValides               Semestre[] @relation("SemestreValidePar")
+  maquettesDemandees             Maquette[] @relation("MaquetteDemandeur")
+  maquettesValidees              Maquette[] @relation("MaquetteValidePar")
+  uesDemandees                   UE[] @relation("UEDemandeur")
+  uesValidees                    UE[] @relation("UEValidePar")
+  seancesCreees                  SeancePlanning[] @relation("SeancesCreees")
+  campusResponsable              Campus[]         @relation("CampusResponsable")
+  campusAgentPedagogique         Campus[]         @relation("CampusAgentPedagogique")
+  classRollCallsRecorded         ClassRollCall[]  @relation("ClassRollRecordedBy")
+  @@index([role])
 }
 
 model Person {
@@ -29,5 +82,979 @@ model Person {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  teacher      Teacher?
+  student      Student?
+  inscriptions Inscription[]
+  payments     Payment[]
+  grades       Grade[]
+  attendances  Attendance[]
+  payrolls     Payroll[]
+  encadrements Encadrement[]
+  classRollCalls ClassRollCall[]
+  @@index([type])
+  @@index([matricule])
+}
+
+// Profil étudiant : identité complémentaire, parcours, urgence, système
+model Student {
+  id                    String   @id @default(cuid())
+  personId              String   @unique @map("person_id")
+  numeroCarteEtudiant   String   @unique @map("numero_carte_etudiant") // NIS / matricule (ETU-2026-XXXX)
+  cinOuPasseport        String?  @map("cin_ou_passeport") // CNI ou numéro passeport
+  photoProfil           String?  @map("photo_profil") // chemin fichier
+  lieuNaissance         String?  @map("lieu_naissance")
+  nationalite           String?
+  genre                 String?  // M, F, Autre
+  telephone             String?
+  adresse               String?
+  // Parcours académique
+  dernierDiplome       String?  @map("dernier_diplome") // ex: Bac
+  anneeObtention        Int?     @map("annee_obtention")
+  mention              String?
+  etablissementOrigine  String?  @map("etablissement_origine")
+  typeBac               String?  @map("type_bac")
+  // Contact urgence
+  nomTuteur             String?  @map("nom_tuteur")
+  telephoneParent       String?  @map("telephone_parent")
+  telephoneTuteur      String?  @map("telephone_tuteur")
+  lienParente           String?  @map("lien_parente") // Père, Mère, Tuteur, etc.
+  groupeSanguin         String?  @map("groupe_sanguin")
+  antecedentsMedicaux    String?  @map("antecedents_medicaux")
+  maladiesSignalees     String?  @map("maladies_signalees")
+  // Justificatifs (chemins)
+  justificatifBac       String?  @map("justificatif_bac")
+  justificatifCni       String?  @map("justificatif_cni")
+  // Système
+  statutInscription     String   @default("en_attente") @map("statut_inscription") // en_attente, valide, incomplet
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  @@index([numeroCarteEtudiant])
+  @@index([statutInscription])
+}
+
+// Classe / Cohorte : nom (ex. L1 Génie Civil), section (A/B), année académique, rattachée à un campus. Responsable = professeur principal.
+model Cohort {
+  id                    String   @id @default(cuid())
+  nom                   String
+  section               String   @default("")
+  formationId           String   @map("formation_id")
+  campusId              String?  @map("campus_id")
+  annee                 Int
+  effectifMax           Int?     @map("effectif_max")
+  responsableTeacherId  String?  @map("responsable_teacher_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  formation    Formation    @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  campus       Campus?      @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  responsable  Teacher?     @relation("CohortResponsable", fields: [responsableTeacherId], references: [id], onDelete: SetNull)
+  inscriptions Inscription[]
+  courses      Course[]
+  schedules    Schedule[]
+  classRollCalls ClassRollCall[]
+
+  @@unique([formationId, annee, nom, section])
+  @@index([campusId])
+  @@index([responsableTeacherId])
+}
+
+/// Statut inscription : PROVISOIRE | INSCRIT | CONFIRMEE | VALIDE | ANNULEE. campusId = critère obligatoire pour l'affectation automatique à une cohorte.
+model Inscription {
+  id           String   @id @default(cuid())
+  personId     String   @map("person_id")
+  formationId  String   @map("formation_id")
+  maquetteId   String   @map("maquette_id")
+  semestreId   String   @map("semestre_id")
+  cohortId     String?  @map("cohort_id")
+  campusId     String?  @map("campus_id")
+  anneeUniv    Int      @map("annee_univ")
+  statut       String   @default("INSCRIT")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  person    Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  formation Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  maquette  Maquette  @relation(fields: [maquetteId], references: [id], onDelete: Cascade)
+  semestre  Semestre  @relation(fields: [semestreId], references: [id], onDelete: Cascade)
+  cohort    Cohort?   @relation(fields: [cohortId], references: [id], onDelete: SetNull)
+  campus    Campus?   @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  payments  Payment[]
+
+  @@unique([personId, anneeUniv])
+  @@index([formationId, anneeUniv, statut])
+  @@index([cohortId])
+  @@index([campusId])
+}
+
+model Teacher {
+  id               String    @id @default(cuid())
+  personId         String    @unique @map("person_id")
+  typeContrat      String    @map("type_contrat") // VACATAIRE, PERMANENT
+  niveauEtude      String?   @map("niveau_etude")
+  articlesPublies  Int?      @map("articles_publies")
+  rangGrade        String?   @map("rang_grade")
+  bioAcademique    String?   @map("bio_academique") // Résumé de parcours académique (éditable par l'enseignant)
+  chargeMaxSemestre Float?   @map("charge_max_semestre")
+  chargeMaxAnnee   Float?    @map("charge_max_annee")
+  dateDebut        DateTime  @default(now()) @map("date_debut")
+  dateFin         DateTime?  @map("date_fin")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  // Prix horaire par EC/formation (TariffRate), pas sur l'enseignant
+  // Photo de profil : User.profilePhotoUrl (lien Person -> User)
+
+  person            Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  courses           Course[]
+  seances           SeancePlanning[]
+  encadrements      Encadrement[]
+  cohortsResponsable Cohort[] @relation("CohortResponsable")
+  scheduleSessions  ScheduleSession[]
+}
+
+// Encadrements (thèses, mémoires, projets) assignés à un enseignant
+model Encadrement {
+  id         String   @id @default(cuid())
+  teacherId  String   @map("teacher_id")
+  personId   String   @map("person_id")  // Étudiant encadré
+  type       String   // THESE, MEMOIRE, PROJET
+  titre      String
+  anneeUniv  Int?     @map("annee_univ")
+  statut     String   @default("EN_COURS") @map("statut") // EN_COURS, TERMINE, ABANDONNE
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  person  Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  @@index([teacherId])
+  @@index([personId])
+}
+
+// === Module Service Pédagogique : Groupes, Planning, Indisponibilités ===
+
+model TeachingGroup {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  libelle   String
+  niveau    String?
+  effectif  Int      @default(0)
+  filiereId String?  @map("filiere_id")
+  semestreId String? @map("semestre_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  filiere Filiere?  @relation("FiliereTeachingGroups", fields: [filiereId], references: [id], onDelete: SetNull)
+  semestre Semestre? @relation("SemestreTeachingGroups", fields: [semestreId], references: [id], onDelete: SetNull)
+  seances SeancePlanning[]
+  courses Course[]
+  scheduleSessions ScheduleSession[]
+}
+
+model TimeSlot {
+  id         String   @id @default(cuid())
+  dayOfWeek  Int      @map("day_of_week") // 1 = Lundi ... 7 = Dimanche
+  startTime  Int      @map("start_time")  // minutes depuis 00:00
+  endTime    Int      @map("end_time")    // minutes depuis 00:00
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  seances SeancePlanning[]
+}
+
+model SeancePlanning {
+  id          String   @id @default(cuid())
+  semaineRef  Int?     @map("semaine_ref")
+  date        DateTime? @map("date")
+  timeSlotId  String   @map("time_slot_id")
+  salleId     String   @map("salle_id")
+  courseId    String   @map("course_id")
+  groupId     String?  @map("group_id")
+  teacherId   String?  @map("teacher_id")
+  statut      String   @default("PLANIFIE") @map("statut") // PLANIFIE, ANNULE, REALISE
+  /// Contrôle entrée/sortie enseignant pour cette occurrence (après génération des séances).
+  pointageActif Boolean @default(false) @map("pointage_actif")
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  timeSlot TimeSlot @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+  salle    Salle    @relation(fields: [salleId], references: [id], onDelete: Cascade)
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  group    TeachingGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  teacher  Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  createdBy User   @relation("SeancesCreees", fields: [createdById], references: [id], onDelete: Cascade)
+}
+
+model Unavailability {
+  id         String   @id @default(cuid())
+  ownerType  String   @map("owner_type") // ENSEIGNANT, SALLE, GROUPE
+  ownerId    String   @map("owner_id")
+  dayOfWeek  Int?     @map("day_of_week")
+  dateStart  DateTime @map("date_start")
+  dateEnd    DateTime @map("date_end")
+  startTime  Int?     @map("start_time")
+  endTime    Int?     @map("end_time")
+  motif      String?  @map("motif")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+}
+
+// Structure académique : Filière → Formation → Semestre → Maquette → UE → EC
+model Filiere {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  nom         String
+  verrouille  Boolean  @default(false) @map("verrouille")
+  statut      String   @default("APPROVED") @map("statut") // APPROVED, PENDING, REJECTED
+  demandeurId String?  @map("demandeur_id")
+  valideParId String?  @map("valide_par_id")
+  dateValidation DateTime? @map("date_validation")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  demandeur User? @relation("FiliereDemandeur", fields: [demandeurId], references: [id], onDelete: SetNull)
+  validePar User? @relation("FiliereValidePar", fields: [valideParId], references: [id], onDelete: SetNull)
+  formations Formation[]
+  teachingGroups TeachingGroup[] @relation("FiliereTeachingGroups")
+}
+
+model Formation {
+  id            String   @id @default(cuid())
+  code          String
+  nom           String
+  cycle         String   // L, M, D
+  /// Code cycle « admission » (BT1, BTS1, L2, M1, …) pour résoudre les pièces attendues en préinscription. Optionnel.
+  admissionCycleCode String? @map("admission_cycle_code")
+  filiereId     String   @map("filiere_id")
+  dureeSemestres Int @map("duree_semestres")
+  /// Si true : nom/code/cycle/durée imposés par le système (Licence/Master auto) ; pas d’ajout manuel de semestres.
+  structureManaged Boolean @default(false) @map("structure_managed")
+  verrouille    Boolean  @default(false) @map("verrouille")
+  statut        String   @default("APPROVED") @map("statut") // APPROVED, PENDING, REJECTED
+  demandeurId   String?  @map("demandeur_id")
+  valideParId   String?  @map("valide_par_id")
+  dateValidation DateTime? @map("date_validation")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  demandeur User? @relation("FormationDemandeur", fields: [demandeurId], references: [id], onDelete: SetNull)
+  validePar User? @relation("FormationValidePar", fields: [valideParId], references: [id], onDelete: SetNull)
+  filiere     Filiere @relation(fields: [filiereId], references: [id], onDelete: Cascade)
+  semestres   Semestre[]
+  cohorts     Cohort[]
+  inscriptions Inscription[]
+  feeConfigs  FeeConfig[]
+  tariffRates TariffRate[]
+
+  @@unique([filiereId, code])
+}
+
+model Semestre {
+  id              String   @id @default(cuid())
+  numero          Int      // 1, 2, 3, 4, 5, 6 (S1 à S6 pour Licence)
+  formationId     String   @map("formation_id")
+  verrouille      Boolean  @default(false) @map("verrouille")
+  statut          String   @default("APPROVED") @map("statut") // APPROVED, PENDING, REJECTED
+  demandeurId     String?  @map("demandeur_id")
+  valideParId     String?  @map("valide_par_id")
+  dateValidation  DateTime? @map("date_validation")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  demandeur User? @relation("SemestreDemandeur", fields: [demandeurId], references: [id], onDelete: SetNull)
+  validePar User? @relation("SemestreValidePar", fields: [valideParId], references: [id], onDelete: SetNull)
+  formation Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  maquettes Maquette[]
+  teachingGroups TeachingGroup[] @relation("SemestreTeachingGroups")
+  inscriptions Inscription[]
+
+  @@unique([formationId, numero])
+}
+
+model Maquette {
+  id              String   @id @default(cuid())
+  code            String   // ex: S1-2024
+  anneeRef        Int      @map("annee_ref")
+  statut          String   @default("active") @map("statut") // active, archivee, PENDING
+  semestreId      String   @map("semestre_id")
+  verrouille      Boolean  @default(false) @map("verrouille")
+  statutValidation String  @default("APPROVED") @map("statut_validation") // APPROVED, PENDING, REJECTED
+  demandeurId     String?  @map("demandeur_id")
+  valideParId     String?  @map("valide_par_id")
+  dateValidation  DateTime? @map("date_validation")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  demandeur User? @relation("MaquetteDemandeur", fields: [demandeurId], references: [id], onDelete: SetNull)
+  validePar User? @relation("MaquetteValidePar", fields: [valideParId], references: [id], onDelete: SetNull)
+  semestre Semestre @relation(fields: [semestreId], references: [id], onDelete: Cascade)
+  ues      UE[]
+  inscriptions Inscription[]
+  demandesDeverrouillage DemandeDeverrouillageMaquette[]
+
+  @@unique([semestreId, anneeRef])
+}
+
+// Demande de déverrouillage : seul le SUPER_ADMIN peut déverrouiller
+model DemandeDeverrouillageMaquette {
+  id          String   @id @default(cuid())
+  maquetteId  String   @map("maquette_id")
+  demandeurId String   @map("demandeur_id")
+  motif       String?
+  statut      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  traiteParId String?  @map("traite_par_id")
+  dateTraitement DateTime? @map("date_traitement")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  maquette  Maquette @relation(fields: [maquetteId], references: [id], onDelete: Cascade)
+  demandeur User    @relation("DemandeDeverrouillage", fields: [demandeurId], references: [id], onDelete: Cascade)
+  traitePar User?   @relation("TraiteDeverrouillage", fields: [traiteParId], references: [id], onDelete: SetNull)
+}
+
+model UE {
+  id              String   @id @default(cuid())
+  code            String
+  nom             String
+  maquetteId      String   @map("maquette_id")
+  coefficient     Float    @default(1)
+  creditsEcts     Int      @default(0) @map("credits_ects")
+  statutValidation String  @default("APPROVED") @map("statut_validation") // APPROVED, PENDING, REJECTED
+  demandeurId     String?  @map("demandeur_id")
+  valideParId     String?  @map("valide_par_id")
+  dateValidation  DateTime? @map("date_validation")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  demandeur User? @relation("UEDemandeur", fields: [demandeurId], references: [id], onDelete: SetNull)
+  validePar User? @relation("UEValidePar", fields: [valideParId], references: [id], onDelete: SetNull)
+  maquette Maquette @relation(fields: [maquetteId], references: [id], onDelete: Cascade)
+  ecs      EC[]
+
+  @@unique([maquetteId, code])
+}
+
+model EC {
+  id         String   @id @default(cuid())
+  code       String
+  nom        String
+  ueId       String   @map("ue_id")
+  vhCm       Int      @default(0) @map("vh_cm")
+  vhTd       Int      @default(0) @map("vh_td")
+  vhTp       Int      @default(0) @map("vh_tp")
+  vhTpe      Int      @default(0) @map("vh_tpe")
+  coefficient Float   @default(1)
+  creditsEcts Int     @default(0) @map("credits_ects")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  ue      UE      @relation(fields: [ueId], references: [id], onDelete: Cascade)
+  courses Course[]
+  grades  Grade[]
+  tariffRates TariffRate[]
+
+  @@unique([ueId, code])
+}
+
+// Date limite saisie notes par session
+model SessionConfig {
+  id             String   @id @default(cuid())
+  anneeUniv      Int      @map("annee_univ")
+  session        Int      // 1 ou 2
+  dateLimite     DateTime @map("date_limite")
+  verrouilleJury Boolean  @default(false) @map("verrouille_jury") // une fois true : plus de modification directe ni via demande (sauf déverrouillage)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([anneeUniv, session])
+}
+
+// Notes étudiants
+model Grade {
+  id          String   @id @default(cuid())
+  personId    String   @map("person_id")
+  ecId        String   @map("ec_id")
+  session     Int      // 1 ou 2
+  anneeUniv   Int      @map("annee_univ")
+  /// Type d’évaluation : DEVOIR, EXAMEN, CONTROLE, etc.
+  evaluationType    String   @default("EXAMEN") @map("evaluation_type")
+  /// Libellé : ex. « Session », « Devoir 1 », « Partiel novembre »
+  evaluationLibelle String   @default("Session") @map("evaluation_libelle")
+  note        Float
+  saisieParId String?  @map("saisie_par_id")
+  dateSaisie  DateTime @default(now()) @map("date_saisie")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  person    Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  ec        EC        @relation(fields: [ecId], references: [id], onDelete: Cascade)
+  saisiePar User?     @relation("SaisiePar", fields: [saisieParId], references: [id], onDelete: SetNull)
+  modificationRequests GradeModificationRequest[]
+
+  @@unique([personId, ecId, session, anneeUniv, evaluationType, evaluationLibelle])
+  @@index([personId, anneeUniv, session])
+  @@index([ecId, session, anneeUniv])
+}
+
+// Demande de modification hors délai
+model GradeModificationRequest {
+  id          String   @id @default(cuid())
+  gradeId     String   @map("grade_id")
+  motif       String
+  demandeurId String   @map("demandeur_id")
+  statut      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  valideParId String?  @map("valide_par_id")
+  dateValidation DateTime? @map("date_validation")
+  nouvelleNote Float?  @map("nouvelle_note")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  grade     Grade  @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  demandeur User   @relation("Demandeur", fields: [demandeurId], references: [id], onDelete: Cascade)
+  validePar User?  @relation("ValidePar", fields: [valideParId], references: [id], onDelete: SetNull)
+}
+
+// Campus : site physique regroupant des salles et des classes (chaque campus a son emploi du temps).
+// Hiérarchie pédagogique : Directeur (SERVICE_PEDAGOGIQUE) fédère tout | Responsable (par campus) voit tout ce que fait l’agent | Agent (par campus) génère l’EDT du campus.
+// Unicité : (code + région) pour permettre le même code (ex. CAMPUS-A) dans des régions différentes.
+model Campus {
+  id                        String   @id @default(cuid())
+  code                      String
+  nom                       String
+  adresse                   String?
+  region                    String?  @map("region")        // code région Sénégal (ex: DK)
+  departement               String?  @map("departement")   // code département (filtré par région)
+  commune                   String?  @map("commune")      // code commune (filtrée par département)
+  telDirection              String?  @map("tel_direction")
+  responsablePedagogiqueId   String?  @map("responsable_pedagogique_id")  // voit tout ce que fait l’agent du campus
+  agentPedagogiqueId        String?  @map("agent_pedagogique_id")       // génère l’emploi du temps du campus
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  responsablePedagogique   User?     @relation("CampusResponsable", fields: [responsablePedagogiqueId], references: [id], onDelete: SetNull)
+  agentPedagogique         User?     @relation("CampusAgentPedagogique", fields: [agentPedagogiqueId], references: [id], onDelete: SetNull)
+  salles                   Salle[]
+  cohorts                  Cohort[]
+  inscriptions             Inscription[]
+  schedules                Schedule[]       @relation("ScheduleExecutionCampus")
+  scheduleSessions         ScheduleSession[] @relation("ScheduleSessionExecutionCampus")
+
+  @@unique([code, region])
+  @@index([responsablePedagogiqueId])
+  @@index([agentPedagogiqueId])
+}
+
+model Salle {
+  id        String   @id @default(cuid())
+  nom       String
+  code      String?  @unique(map: "salle_code_unique")
+  capacite  Int      @default(30)
+  campusId  String?  @map("campus_id")
+  typeSalle String?  @map("type_salle")
+  equipements String?  // JSON ou texte : vidéoprojecteur, tableau, etc.
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  campus            Campus?   @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  courses           Course[]
+  seances           SeancePlanning[]
+  scheduleSessions  ScheduleSession[]
+  @@unique([campusId, nom])
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  ecId        String   @map("ec_id")
+  teacherId   String   @map("teacher_id")
+  salleId     String   @map("salle_id") // Plusieurs cours / même salle OK si créneaux non chevauchants (même jour + heures)
+  cohortId    String?  @map("cohort_id")
+  groupId     String?  @map("group_id")
+  jour        Int      // 1=Lundi .. 6=Samedi
+  heureDebut  Int      @map("heure_debut") // 8..23 = 8h00 .. 23h00
+  heureFin    Int      @map("heure_fin")   // 9..23 = fin strictement après début
+  type        String   // CM, TD, TP, TPE
+  groupe      String?  // Groupe A, TD1, etc.
+  anneeUniv   Int      @map("annee_univ")
+  /// Autorise le pointage enseignant (arrivée/départ) quand aucune séance planifiée n’existe pour la date du jour.
+  pointageActif Boolean @default(false) @map("pointage_actif")
+  volumeHeures       Int?   @map("volume_heures")
+  nbSeances          Int?   @map("nb_seances")
+  dureeSeanceMinutes Int?   @map("duree_seance_minutes")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  ec         EC          @relation(fields: [ecId], references: [id], onDelete: Cascade)
+  teacher    Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  salle      Salle       @relation(fields: [salleId], references: [id], onDelete: Cascade)
+  cohort     Cohort?     @relation(fields: [cohortId], references: [id], onDelete: SetNull)
+  group      TeachingGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  attendances      Attendance[]
+  seances          SeancePlanning[]
+  scheduleSessions ScheduleSession[]
+  @@index([teacherId, anneeUniv, jour])
+  @@index([salleId, jour])
+  @@index([cohortId])
+}
+
+// Planification EDT par cohorte (Phase 2 refonte EDT). Une grille par cohorte/année ; statut DRAFT/PUBLISHED/MODIFIED/CANCELLED.
+model Schedule {
+  id                  String   @id @default(cuid())
+  cohortId            String   @map("cohort_id")
+  anneeUniv           Int      @map("annee_univ")
+  executionCampusId  String?  @map("execution_campus_id")
+  statut              String   @default("DRAFT") // DRAFT | PUBLISHED | MODIFIED | CANCELLED
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  cohort          Cohort           @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  executionCampus Campus?          @relation("ScheduleExecutionCampus", fields: [executionCampusId], references: [id], onDelete: SetNull)
+  sessions        ScheduleSession[]
+
+  @@unique([cohortId, anneeUniv])
+  @@index([executionCampusId])
+}
+
+// Une séance dans un Schedule : créneau précis (jour, heure, salle, enseignant). Optionnellement liée à un Course existant.
+model ScheduleSession {
+  id                  String   @id @default(cuid())
+  scheduleId          String   @map("schedule_id")
+  courseId            String?  @map("course_id")
+  teacherId           String   @map("teacher_id")
+  salleId             String   @map("salle_id")
+  groupId             String?  @map("group_id")
+  dayOfWeek           Int      @map("day_of_week") // 1 = Lundi .. 7 = Dimanche
+  startTime           Int      @map("start_time")  // minutes depuis 00:00 (ex: 480 = 8h00)
+  endTime             Int      @map("end_time")   // minutes depuis 00:00 (ex: 600 = 10h00)
+  statut              String   @default("DRAFT")  // DRAFT | PUBLISHED | MODIFIED | CANCELLED
+  mode                String   @default("PRESENTIEL") // PRESENTIEL | DISTANCIEL | HYBRIDE
+  executionCampusId   String?  @map("execution_campus_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  schedule         Schedule       @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  course           Course?        @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  teacher          Teacher        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  salle            Salle          @relation(fields: [salleId], references: [id], onDelete: Cascade)
+  group            TeachingGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  executionCampus  Campus?        @relation("ScheduleSessionExecutionCampus", fields: [executionCampusId], references: [id], onDelete: SetNull)
+
+  @@index([scheduleId])
+  @@index([teacherId])
+  @@index([salleId])
+  @@index([dayOfWeek])
+}
+
+// Pointage (arrivée/départ)
+model Attendance {
+  id           String    @id @default(cuid())
+  personId     String    @map("person_id")
+  courseId     String?   @map("course_id")
+  date         DateTime  @map("date")
+  heureArrivee DateTime  @map("heure_arrivee")
+  heureDepart  DateTime? @map("heure_depart")
+  statut       String    @default("PENDING") // PENDING, VALIDE, NON_REMUNERE, REFUSE
+  valideParId  String?   @map("valide_par_id")
+  /// COURSE = pointage lié à un cours ; BADGE_DAILY = présence jour via scan QR badge enseignant.
+  source       String    @default("COURSE") @map("source")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  person    Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  course    Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  validePar User?   @relation(fields: [valideParId], references: [id], onDelete: SetNull)
+
+  @@index([personId, date, source])
+}
+
+/// Journal des tentatives de scan de badge (présence / vérification).
+model BadgeScanLog {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  success     Boolean
+  messageCode String   @map("message_code")
+  detail      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+/// Feuille de présence journalière par classe (cohorte) — saisie par enseignants rattachés à la classe ou staff autorisé.
+model ClassRollCall {
+  id            String   @id @default(cuid())
+  cohortId      String   @map("cohort_id")
+  /// Jour concerné (normalisé à midi UTC pour éviter les décalages fuseau).
+  date          DateTime @map("date")
+  personId      String   @map("person_id")
+  status        String   @default("ABSENT") // PRESENT, ABSENT, RETARD, EXCUSE
+  comment       String?
+  recordedById  String?  @map("recorded_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  cohort     Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  person     Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  recordedBy User?  @relation("ClassRollRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@unique([cohortId, date, personId])
+  @@index([cohortId, date])
+}
+
+model TariffRate {
+  id           String   @id @default(cuid())
+  formationId  String?  @map("formation_id") // null = global
+  ecId         String?  @map("ec_id")        // optionnel : taux spécifique à un EC
+  tauxCm       Float    @default(0) @map("taux_cm")
+  tauxTd       Float    @default(0) @map("taux_td")
+  tauxTp       Float    @default(0) @map("taux_tp")
+  tauxTpe      Float    @default(0) @map("taux_tpe")
+  dateEffet    DateTime @default(now()) @map("date_effet")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  formation Formation? @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  ec        EC?        @relation(fields: [ecId], references: [id], onDelete: Cascade)
+}
+
+// Tarifs étudiants (frais inscription, mensualités, soutenances)
+model FeeConfig {
+  id                 String   @id @default(cuid())
+  formationId        String   @map("formation_id")
+  fraisInscription   Float    @default(0) @map("frais_inscription")
+  mensualite         Float    @default(0) @map("mensualite")
+  nbMois             Int      @default(10) @map("nb_mois")
+  fraisSoutenanceL3  Float    @default(0) @map("frais_soutenance_l3")
+  fraisSoutenanceM2  Float    @default(0) @map("frais_soutenance_m2")
+  anneeUniv          Int      @map("annee_univ")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  formation Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  @@unique([formationId, anneeUniv])
+}
+
+// Paiements étudiants
+model Payment {
+  id          String   @id @default(cuid())
+  personId    String   @map("person_id")
+  inscriptionId String @map("inscription_id")
+  montant     Float
+  type        String   // INSCRIPTION, MENSUALITE, SOUTENANCE_L3, SOUTENANCE_M2
+  mois        Int?     @map("mois") // 1-12 pour MENSUALITE
+  annee       Int?     @map("annee")
+  datePaiement DateTime @default(now()) @map("date_paiement")
+  statut      String   @default("PENDING") // PENDING, VALIDATED, REJECTED
+  valideParId String?  @map("valide_par_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  person       Person         @relation(fields: [personId], references: [id], onDelete: Cascade)
+  inscription  Inscription    @relation(fields: [inscriptionId], references: [id], onDelete: Cascade)
+  validePar    User?          @relation(fields: [valideParId], references: [id], onDelete: SetNull)
+  receipts     PaymentReceipt[]
+}
+
+// Reçus de paiement (PDF)
+model PaymentReceipt {
+  id              String   @id @default(cuid())
+  paymentId       String   @map("payment_id")
+  fichierPath     String   @map("fichier_path")
+  dateGeneration  DateTime @default(now()) @map("date_generation")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@unique([paymentId])
+}
+
+// Paie (enseignants)
+model Payroll {
+  id          String   @id @default(cuid())
+  personId    String   @map("person_id")
+  mois        Int
+  annee       Int
+  heuresCm    Float    @default(0) @map("heures_cm")
+  heuresTd    Float    @default(0) @map("heures_td")
+  heuresTp    Float    @default(0) @map("heures_tp")
+  heuresTpe   Float    @default(0) @map("heures_tpe")
+  montant     Float    @default(0)
+  statut      String   @default("DRAFT") // DRAFT, CALCULATED, GENERATED
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  person   Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  paySlips PaySlip[]
+
+  @@unique([personId, mois, annee])
+}
+
+// Bulletin de salaire (PDF, mot de passe = matricule)
+model PaySlip {
+  id             String   @id @default(cuid())
+  payrollId      String   @map("payroll_id")
+  fichierPath    String   @map("fichier_path")
+  dateGeneration DateTime @default(now()) @map("date_generation")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  payroll Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  @@unique([payrollId])
+}
+
+// État financier journalier (clôture)
+model DailyFinancialStatus {
+  id                  String    @id @default(cuid())
+  date                DateTime  @map("date")
+  totalEncaissements   Float      @default(0) @map("total_encaissements")
+  totalDepenses       Float      @default(0) @map("total_depenses")
+  solde               Float      @default(0) @map("solde")
+  statut              String     @default("DRAFT") // DRAFT, VALIDATED, BREACH_REQUESTED
+  valideParId         String?    @map("valide_par_id")
+  valideAt            DateTime?  @map("valide_at")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+
+  validePar    User?          @relation(fields: [valideParId], references: [id], onDelete: SetNull)
+  breachRequests BreachRequest[]
+
+  @@unique([date])
+}
+
+// Demande de brèche (correction après validation)
+model BreachRequest {
+  id                  String    @id @default(cuid())
+  financialStatusId   String    @map("financial_status_id")
+  justification       String    @map("justification")
+  demandeurId         String    @map("demandeur_id")
+  statut              String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  approuveParId       String?   @map("approuve_par_id")
+  dateApprobation     DateTime? @map("date_approbation")
+  commentaire         String?   @map("commentaire")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  financialStatus DailyFinancialStatus @relation(fields: [financialStatusId], references: [id], onDelete: Cascade)
+  demandeur       User                 @relation("DemandeurBreach", fields: [demandeurId], references: [id], onDelete: Cascade)
+  approuvePar     User?                @relation("ApprouveParBreach", fields: [approuveParId], references: [id], onDelete: SetNull)
+}
+
+// Log des passages vigile (contrôle d'accès)
+model CheckInLog {
+  id         String   @id @default(cuid())
+  matricule  String   @map("matricule")
+  dateHeure  DateTime @default(now()) @map("date_heure")
+  autorise   Boolean  @map("autorise")
+  message    String?  @map("message")
+  createdAt  DateTime @default(now()) @map("created_at")
+}
+
+// Journal d'audit (traçabilité)
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  action      String   @map("action")
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  oldValue    String?  @map("old_value")
+  newValue    String?  @map("new_value")
+  ip          String?  @map("ip")
+  createdAt   DateTime @default(now()) @map("created_at")
+}
+
+// Token device pour endpoints publics (vigile, badge) — hash stocké, pas le token en clair
+model DeviceToken {
+  id        String   @id @default(cuid())
+  name      String   @map("name")
+  tokenHash String   @unique @map("token_hash")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("device_tokens")
+}
+
+// === Module Gestion Financière Universitaire (DAF, Chef Comptable, Caissier) ===
+
+// Transaction caisse (brouillard, encaissements/décaissements)
+model Transaction {
+  id                String   @id @default(cuid())
+  sens              String   @map("sens") // ENCAISSEMENT, DECAISSEMENT
+  montant           Float    @map("montant")
+  date              DateTime @default(now()) @map("date")
+  libelle           String   @map("libelle")
+  statut            String   @default("BROUILLARD") // BROUILLARD, VALIDE, REJETE
+  typePaiement      String   @map("type_paiement") // ESPECES, VIREMENT, CHEQUE, CARTE
+  referenceExterne  String?  @map("reference_externe")
+  clotureJournaliereId String? @map("cloture_journaliere_id")
+  enregistreParId   String   @map("enregistre_par_id")
+  rapproche         Boolean  @default(false) @map("rapproche")
+  dateRapprochement DateTime? @map("date_rapprochement")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  enregistrePar     User     @relation(fields: [enregistreParId], references: [id], onDelete: Cascade)
+  clotureJournaliere ClotureJournaliere? @relation(fields: [clotureJournaliereId], references: [id], onDelete: SetNull)
+  receipt           TransactionReceipt?
+  ecritures         EcritureComptable[]
+  demandeDecaissement DemandeDecaissement?
+}
+
+// Reçu de transaction (UUID unique)
+model TransactionReceipt {
+  id            String   @id @default(uuid())
+  transactionId String   @unique @map("transaction_id")
+  dateGeneration DateTime @default(now()) @map("date_generation")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+}
+
+// Clôture journalière (transactions du jour rendues non modifiables)
+model ClotureJournaliere {
+  id         String   @id @default(cuid())
+  date       DateTime @unique @map("date")
+  clotureParId String  @map("cloture_par_id")
+  clotureAt  DateTime @default(now()) @map("cloture_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  cloturePar     User          @relation(fields: [clotureParId], references: [id], onDelete: Cascade)
+  transactions   Transaction[]
+}
+
+// Plan comptable
+model CompteComptable {
+  id            String   @id @default(cuid())
+  numeroCompte  String   @unique @map("numero_compte")
+  intitule      String   @map("intitule")
+  solde         Float    @default(0) @map("solde")
+  type          String   @map("type") // DEBIT, CREDIT
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  ecrituresDebit  EcritureComptable[] @relation("CompteDebit")
+  ecrituresCredit EcritureComptable[] @relation("CompteCredit")
+}
+
+// Écriture comptable (Débit/Crédit)
+model EcritureComptable {
+  id              String   @id @default(cuid())
+  transactionId    String   @map("transaction_id")
+  compteDebitId   String   @map("compte_debit_id")
+  compteCreditId  String   @map("compte_credit_id")
+  montant         Float    @map("montant")
+  dateEcriture    DateTime @default(now()) @map("date_ecriture")
+  libelle         String   @map("libelle")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  compteDebit  CompteComptable @relation("CompteDebit", fields: [compteDebitId], references: [id], onDelete: Cascade)
+  compteCredit CompteComptable @relation("CompteCredit", fields: [compteCreditId], references: [id], onDelete: Cascade)
+}
+
+// Budget par département et exercice
+model Budget {
+  id              String   @id @default(cuid())
+  exercice        Int      @map("exercice")
+  departement     String   @map("departement")
+  montantAlloue   Float    @map("montant_alloue")
+  montantConsomme Float    @default(0) @map("montant_consomme")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  demandesDecaissement DemandeDecaissement[]
+
+  @@unique([exercice, departement])
+}
+
+// Demande de décaissement (workflow DAF)
+model DemandeDecaissement {
+  id         String   @id @default(cuid())
+  transactionId String @unique @map("transaction_id")
+  budgetId   String   @map("budget_id")
+  montant    Float    @map("montant")
+  libelle    String   @map("libelle")
+  statut     String   @default("EN_ATTENTE") // EN_ATTENTE, APPROUVEE, REJETEE
+  initieParId String  @map("initie_par_id")
+  approuveParId String? @map("approuve_par_id")
+  dateDecision DateTime? @map("date_decision")
+  motifRejet String?  @map("motif_rejet")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  budget      Budget      @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  initiePar   User        @relation("InitiePar", fields: [initieParId], references: [id], onDelete: Cascade)
+  approuvePar User?       @relation("ApprouvePar", fields: [approuveParId], references: [id], onDelete: SetNull)
+}
+
+// Notifications utilisateur
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  type      String   @map("type") // VALIDATION_REQUISE, BREACH_REQUEST, PAYMENT_REMINDER, etc.
+  message   String   @map("message")
+  lu        Boolean  @default(false) @map("lu")
+  entityId  String?  @map("entity_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Paramètres d'apparence et thème (SUPER_ADMIN) — une seule ligne active
+model AppSettings {
+  id             String   @id @default(cuid())
+  /// Nom affiché de l'établissement / plateforme (connexion, en-têtes, PDF, titre du navigateur)
+  appName        String?  @map("app_name")
+  /// Site web affiché sur les badges (ex. www.etablissement.edu)
+  websiteUrl     String?  @map("website_url")
+  logoUrl        String?  @map("logo_url")
+  logoLoginUrl   String?  @map("logo_login_url")
+  /// Image cachet / sceau pour documents officiels (facture proforma, etc.)
+  stampUrl       String?  @map("stamp_url")
+  faviconUrl     String?  @map("favicon_url")
+  primaryColor   String?  @map("primary_color")
+  secondaryColor String?  @map("secondary_color")
+  successColor   String?  @map("success_color")
+  dangerColor    String?  @map("danger_color")
+  backgroundColor String? @map("background_color")
+  sidebarColor   String?  @map("sidebar_color")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
+// === Préinscription / candidature : pièces attendues par cycle (BT1 … M2) ===
+
+/// Type de document attendu dans un dossier (référentiel extensible).
+model AdmissionDocumentType {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  labelFr     String   @map("label_fr")
+  description String?
+  category    String   @default("OTHER") // IDENTITY, ACADEMIC, MOTIVATION, CV, OTHER
+  /// Si true : une attestation de réussite peut remplacer le diplôme lorsque celui-ci n’est pas encore disponible.
+  attestationAcceptedInsteadOfDiploma Boolean @default(false) @map("attestation_accepted_instead_of_diploma")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  rules AdmissionCycleDocumentRule[]
+}
+
+/// Règle : pour un cycle d’admission donné, quel type de pièce est exigé ou proposé.
+model AdmissionCycleDocumentRule {
+  id               String   @id @default(cuid())
+  cycleCode        String   @map("cycle_code") // BT1, BT2, BTS1, BTS2, L1, L2, L3, M1, M2
+  documentTypeId   String   @map("document_type_id")
+  requirement      String   @default("REQUIRED") // REQUIRED | OPTIONAL
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  documentType AdmissionDocumentType @relation(fields: [documentTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([cycleCode, documentTypeId])
+  @@index([cycleCode])
 }

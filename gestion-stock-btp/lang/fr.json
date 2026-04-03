@@ -1,0 +1,9 @@
+{
+    "Showing": "Affichage",
+    "to": "à",
+    "of": "sur",
+    "results": "résultats",
+    "passwords.sent": "Si ce compte existe, un lien de réinitialisation a été envoyé à votre adresse email.",
+    "passwords.throttled": "Veuillez patienter avant de réessayer.",
+    "passwords.user": "Aucun compte ne correspond à cette adresse email."
+}

@@ -1,0 +1,11 @@
+# En production : désindexation des pages applicatives (espace authentifié).
+# Les moteurs ne doivent pas indexer les URLs de l'application.
+# Consulter la doc : https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag
+
+User-agent: *
+Disallow: /
+
+# Autoriser uniquement les assets publics si nécessaire (optionnel)
+# Allow: /css/
+# Allow: /js/
+# Allow: /images/

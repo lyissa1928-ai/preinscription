@@ -1,0 +1,669 @@
+================================================================================
+                    GESTION SCOLAIRE - APPLICATION COMPLÈTE
+================================================================================
+        Description détaillée, étapes de développement et livrable exploitable
+                              Document de conception
+================================================================================
+
+
+################################################################################
+# SECTION 1 : VUE D'ENSEMBLE DE L'APPLICATION
+################################################################################
+
+--------------------------------------------------------------------------------
+1.1 PRÉSENTATION
+--------------------------------------------------------------------------------
+L'application "Gestion Scolaire" est un système d'information complet pour un
+établissement d'enseignement supérieur. Elle couvre :
+
+  - La gestion académique (formations LMD, inscriptions, notes, emplois du temps)
+  - La gestion financière (tarifs, paiements, gouvernance, clôture journalière)
+  - La gestion RH et paie (enseignants vacataires/permanents, pointage, bulletins)
+  - Le contrôle d'accès (vigile, statut en règle)
+  - Le self-service étudiant (documents PDF, factures, certificats)
+  - La supervision en temps réel (présences, tableau de bord Directeur)
+
+--------------------------------------------------------------------------------
+1.2 ARCHITECTURE GLOBALE
+--------------------------------------------------------------------------------
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                        FRONTEND (Next.js)                        │
+    │  Dashboards par rôle • Formulaires • Tableaux • Génération PDF   │
+    └────────────────────────────┬────────────────────────────────────┘
+                                 │ REST API / HTTPS
+    ┌────────────────────────────▼────────────────────────────────────┐
+    │                        BACKEND (NestJS)                          │
+    │  Contrôleurs • Services • Validation • Auth JWT • Logique métier │
+    └────────────────────────────┬────────────────────────────────────┘
+                                 │ Prisma ORM
+    ┌────────────────────────────▼────────────────────────────────────┐
+    │                    BASE DE DONNÉES (PostgreSQL)                  │
+    │  Utilisateurs • Formations • Inscriptions • Finances • Paie      │
+    └─────────────────────────────────────────────────────────────────┘
+
+--------------------------------------------------------------------------------
+1.3 UTILISATEURS CIBLES
+--------------------------------------------------------------------------------
+- Directeur : pilotage, validation, vigilance
+- Comptable : finances, paie, tarifs, clôture
+- Scolarité : inscriptions, notes, emplois du temps
+- Chef de département : validation pédagogique
+- Enseignants : saisie notes, pointage
+- Étudiants : self-service, documents
+- Auditeur : consultation, traçabilité
+- Vigile : contrôle d'accès (interface dédiée ou kiosque)
+
+
+################################################################################
+# SECTION 2 : DESCRIPTION DÉTAILLÉE DU PRODUIT FINI
+################################################################################
+
+--------------------------------------------------------------------------------
+2.1 ÉCRANS PAR RÔLE
+--------------------------------------------------------------------------------
+
+--- DIRECTEUR ---
+  - Tableau de bord : synthèse finances, alertes, états en attente
+  - Validation des demandes de brèche (liste, détail, approbation/rejet)
+  - Consultation des états financiers (historique, recherche)
+  - Tableau de bord Vigilance : présence temps réel (pastilles vertes/rouges)
+  - Rapports et statistiques (effectifs, recettes, taux réussite)
+  - Consultation du journal d'audit
+
+--- COMPTABLE (FINANCE) ---
+  - Tableau de bord : encaissements du jour, impayés, alertes
+  - Configuration des tarifs (inscription, mensualités, soutenance)
+  - Enregistrement des paiements, validation des transactions
+  - Clôture journalière : génération et validation état financier
+  - Demande de brèche (formulaire justification)
+  - Historique des états financiers
+  - Génération des bulletins de salaire (mensuel, PDF crypté)
+  - Consultation paie, pointages validés
+
+--- SCOLARITÉ ---
+  - Gestion des inscriptions (création, modification, cohortes)
+  - Gestion des notes (saisie, modification hors délai avec workflow)
+  - Emploi du temps (création cours, anti-conflit, salles)
+  - Liste des étudiants (filtres, statut financier)
+  - Gestion des formations, maquettes, UE, EC
+  - Convocations, certificats (déclenchement)
+
+--- CHEF DE DÉPARTEMENT (DEPT_HEAD) ---
+  - Validation des modifications de notes hors délai
+  - Consultation des effectifs, résultats
+  - Vue sur les enseignants et cours du département
+
+--- ENSEIGNANT (TEACHER) ---
+  - Saisie des notes (EC assignés, dans les délais)
+  - Pointage (arrivée/départ) lié à l'emploi du temps
+  - Consultation de son emploi du temps
+  - Historique de ses pointages et heures
+
+--- ÉTUDIANT (STUDENT) ---
+  - Tableau de bord : statut, prochains paiements, documents
+  - Génération Facture Proforma (PDF)
+  - Téléchargement Certificat de scolarité (si en règle)
+  - Téléchargement Reçus de paiement
+  - Consultation notes, emploi du temps
+  - Historique des paiements
+
+--- AUDITEUR ---
+  - Consultation du journal d'audit (filtres, export)
+  - Lecture seule sur les données sensibles
+
+--- VIGILE (interface kiosque ou borne) ---
+  - Écran de pointage : scan badge/carte/QR
+  - Affichage : AUTORISÉ (vert) / REFUSÉ (rouge) + message
+  - Pas de connexion utilisateur classique (mode kiosque)
+
+
+--------------------------------------------------------------------------------
+2.2 FONCTIONNALITÉS TRANSVERSALES
+--------------------------------------------------------------------------------
+- Authentification sécurisée (login, logout, refresh token)
+- Changement de mot de passe
+- Profil utilisateur (coordonnées, photo optionnelle)
+- Notifications in-app (alertes, validations en attente)
+- Recherche globale (selon rôle)
+- Export PDF/Excel (listes, rapports)
+- Responsive : utilisable sur tablette (vigile, enseignant mobile)
+- Thème clair/sombre (optionnel)
+- Multi-langue : français par défaut (extensible)
+
+
+--------------------------------------------------------------------------------
+2.3 SÉCURITÉ ET PERFORMANCE
+--------------------------------------------------------------------------------
+- HTTPS obligatoire en production
+- Protection CSRF, XSS, injection SQL
+- Rate limiting sur les API sensibles
+- Sauvegardes base de données planifiées
+- Logs d'erreur et monitoring
+- Cache (Redis optionnel) pour les données peu volatiles
+
+
+################################################################################
+# SECTION 3 : ÉTAPES DE DÉVELOPPEMENT COMPLÈTES
+################################################################################
+
+--------------------------------------------------------------------------------
+ÉTAPE 0 : PRÉPARATION (Jour 1)
+--------------------------------------------------------------------------------
+[ ] Créer le dépôt Git (structure monorepo ou séparée)
+[ ] Initialiser le projet backend (NestJS)
+[ ] Initialiser le projet frontend (Next.js)
+[ ] Configurer PostgreSQL (local + variables d'environnement)
+[ ] Configurer Prisma (schéma initial, migrations)
+[ ] Fichiers .env.example pour backend et frontend
+[ ] README avec instructions d'installation
+[ ] Scripts npm : dev, build, start, migrate
+
+Livrables : Projet vide qui démarre, BDD connectée
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 1 : AUTHENTIFICATION ET RÔLES (Jours 2-4)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle User (id, email, passwordHash, role, firstName, lastName, createdAt)
+[ ] Modèle Person (lien User, matricule, type: STUDENT|TEACHER|STAFF)
+[ ] Module Auth : register, login, refresh, logout
+[ ] JWT (access + refresh tokens)
+[ ] Guard par rôle (RolesGuard)
+[ ] Décoration @Roles() pour protéger les routes
+[ ] Endpoint GET /me (profil courant)
+[ ] Endpoint PATCH /users/me (modification profil)
+[ ] Hash bcrypt pour mots de passe
+
+Frontend :
+[ ] Page de login (formulaire, gestion erreurs)
+[ ] Stockage token (httpOnly cookie ou localStorage sécurisé)
+[ ] Intercepteur API (ajout Bearer token, refresh si 401)
+[ ] Layout avec menu selon rôle
+[ ] Redirection post-login vers dashboard selon rôle
+[ ] Page profil utilisateur
+[ ] Déconnexion
+
+Livrables : Connexion fonctionnelle, redirection par rôle
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 2 : STRUCTURE ACADÉMIQUE (Jours 5-8)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèles : Formation, Maquette, Semestre, UE, EC
+[ ] Modèle Salle (nom, capacité, équipements)
+[ ] Modèle TariffRate (taux horaire CM/TD/TP/TPE par formation ou global)
+[ ] CRUD Formation (admin, scolarité)
+[ ] CRUD Maquette, Semestre, UE, EC
+[ ] CRUD Salle
+[ ] API liste hiérarchique (formation → EC)
+[ ] Validation : unicité codes, contraintes
+
+Frontend :
+[ ] Pages CRUD Formations (liste, création, édition)
+[ ] Pages CRUD Maquettes, Semestres, UE, EC (navigation hiérarchique)
+[ ] Gestion des salles
+[ ] Configuration des taux horaires (si applicable)
+[ ] Arbre ou navigation par formation
+
+Livrables : Référentiel académique complet
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 3 : UTILISATEURS ET PERSONNES (Jours 9-11)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle Student (Person, inscription, formation, cohorte)
+[ ] Modèle Teacher (Person, contrat Vacataire/Permanent, taux)
+[ ] Modèle Staff (Person, pour personnel non enseignant)
+[ ] CRUD Students (scolarité)
+[ ] CRUD Teachers (admin, scolarité)
+[ ] CRUD Staff
+[ ] Génération matricule automatique
+[ ] Lien User ↔ Person (un User peut être Student, Teacher ou Staff)
+
+Frontend :
+[ ] Liste étudiants (filtres, recherche, pagination)
+[ ] Fiche étudiant (détails, inscription, statut financier)
+[ ] Liste enseignants (contrat, taux)
+[ ] Fiche enseignant
+[ ] Liste personnel
+[ ] Formulaire création utilisateur (avec rôle et type de personne)
+
+Livrables : Annuaire complet
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 4 : INSCRIPTIONS (Jours 12-15)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle Inscription (student, formation, maquette, semestre, année, statut)
+[ ] Modèle Cohort (nom, formation, année)
+[ ] Règle : pas d'enjambement entre cycles (L1/L2, M1/M2)
+[ ] Règle : affectation unique
+[ ] API inscription : création, validation des règles
+[ ] API liste inscriptions par cohorte, formation
+[ ] Statuts : PROVISOIRE, CONFIRMEE, ANNULEE
+
+Frontend :
+[ ] Formulaire inscription étudiant (sélection formation, cohorte, semestre)
+[ ] Vérification en temps réel (conflits, enjambement)
+[ ] Liste des inscrits par formation/cohorte
+[ ] Modification, annulation inscription
+[ ] Historique des inscriptions par étudiant
+
+Livrables : Processus d'inscription opérationnel
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 5 : CONFIGURATION TARIFS ET FINANCES (Jours 16-20)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle FeeConfig (formation, fraisInscription, mensualite, fraisSoutenanceL3, fraisSoutenanceM2)
+[ ] Modèle Payment (étudiant, montant, type, date, statut, validéPar)
+[ ] Modèle PaymentReceipt (payment, fichierPDF, dateGénération)
+[ ] Calcul statut "en règle" : au 10 du mois, paiements à jour
+[ ] API configuration tarifs (comptable)
+[ ] API enregistrement paiement (comptable)
+[ ] API validation paiement (comptable) → déclenche génération reçu PDF
+[ ] API statut financier étudiant
+[ ] Génération Reçu de paiement (PDF) après validation
+
+Frontend :
+[ ] Interface configuration tarifs (comptable) : formulaire par formation
+[ ] Enregistrement des paiements (formulaire, liste des impayés)
+[ ] Validation des paiements (workflow)
+[ ] Liste étudiants non en règle (alerte)
+[ ] Téléchargement reçu (étudiant, comptable)
+[ ] Affichage statut financier sur fiche étudiant
+
+Livrables : Cycle financier étudiant opérationnel
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 6 : DOCUMENTS ÉTUDIANTS (Jours 21-24)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Moteur PDF (pdf-lib, Puppeteer ou @react-pdf)
+[ ] Template Facture Proforma (inscription, mensualités, soutenance L3/M2)
+[ ] Template Certificat de scolarité
+[ ] API GET /students/me/proforma-invoice → génère et retourne PDF
+[ ] API GET /students/me/certificate → vérifie "en règle", génère PDF
+[ ] API GET /students/me/receipts → liste des reçus
+[ ] API GET /students/me/receipts/:id → téléchargement reçu
+[ ] Stockage fichiers (dossier uploads ou S3)
+[ ] Condition certificat : statut en règle = true
+
+Frontend :
+[ ] Bouton "Générer Facture Proforma" (espace étudiant)
+[ ] Bouton "Télécharger Certificat" (si en règle, sinon message)
+[ ] Liste des reçus de paiement avec téléchargement
+[ ] Affichage aperçu ou téléchargement direct PDF
+
+Livrables : Self-service documents fonctionnel
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 7 : EMPLOI DU TEMPS (Jours 25-29)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle Course (EC, teacher, salle, jour, heureDebut, heureFin, type, groupe)
+[ ] Modèle TimeSlot (jour semaine, heure début, heure fin)
+[ ] Règle anti-conflit : pas de chevauchement salle, professeur, groupe
+[ ] API création cours : vérification conflits avant enregistrement
+[ ] API liste cours (par formation, semestre, enseignant, salle)
+[ ] API modification, suppression cours
+[ ] Contraintes : salle existe, enseignant existe, EC existe
+
+Frontend :
+[ ] Vue calendrier/semaine (emploi du temps)
+[ ] Création cours (formulaire : EC, prof, salle, créneau, type)
+[ ] Détection conflits en temps réel (alerte avant enregistrement)
+[ ] Modification, suppression cours
+[ ] Filtres : formation, enseignant, salle
+[ ] Vue enseignant : mon emploi du temps
+[ ] Vue étudiant : emploi du temps de ma formation
+
+Livrables : Emploi du temps sans conflit
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 8 : NOTES (Jours 30-34)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle Grade (student, EC, session, note, dateSaisie, saisiePar)
+[ ] Modèle GradeModificationRequest (grade, motif, demandeur, statut, validéPar)
+[ ] Date limite de saisie par session (configurable)
+[ ] API saisie note (enseignant, dans délai)
+[ ] API modification hors délai : création GradeModificationRequest
+[ ] API validation modification (scolarité, dept_head)
+[ ] Règle : note entre 0 et 20 (ou barème configurable)
+[ ] Traçabilité : qui a modifié, quand, pourquoi
+
+Frontend :
+[ ] Saisie des notes par EC/session (enseignant)
+[ ] Grille notes : étudiants × EC
+[ ] Demande de modification hors délai (formulaire motif)
+[ ] File de validation (scolarité, chef dept) : liste demandes, approuver/refuser
+[ ] Historique des modifications
+[ ] Consultation notes (étudiant : ses notes)
+
+Livrables : Gestion des notes avec workflow de correction
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 9 : POINTAGE (Jours 35-39)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle Attendance (employee, date, heureArrivee, heureDepart, courseId, statut)
+[ ] Statuts : VALIDE, NON_REMUNERE, REFUSE
+[ ] Règle : pointage lié à un cours (emploi du temps) si enseignant
+[ ] Règle : pointage sans cours → NON_REMUNERE ou bloqué
+[ ] API pointage : enregistrement arrivée/départ
+[ ] API liste pointages (par employé, date, mois)
+[ ] Croisement avec Course : vérifier que l'employé a un cours à ce créneau
+[ ] Calcul des heures par pointage
+
+Frontend :
+[ ] Interface pointage enseignant (boutons Arrivée / Départ)
+[ ] Affichage créneaux du jour (emploi du temps)
+[ ] Historique des pointages (enseignant)
+[ ] Liste pointages à valider (comptable, admin)
+[ ] Validation des pointages (pour calcul paie)
+
+Livrables : Pointage opérationnel avec croisement EDT
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 10 : PAIE ET BULLETINS (Jours 40-45)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle Payroll (employé, mois, année, heuresCM, heuresTD, heuresTP, montant, statut)
+[ ] Modèle PaySlip (payroll, fichierPDF, motDePasse=matricule)
+[ ] Calcul : heures validées × taux horaire (par type CM/TD/TP)
+[ ] Génération bulletin PDF (template)
+[ ] Cryptage PDF avec matricule comme mot de passe (pdf-lib, qpdf, etc.)
+[ ] API génération bulletins (comptable, par mois)
+[ ] API téléchargement bulletin (employé : son bulletin ; admin : tous)
+[ ] Stockage bulletins chiffrés
+
+Frontend :
+[ ] Interface calcul paie (comptable) : sélection mois, liste employés, heures, montants
+[ ] Bouton "Générer bulletins du mois"
+[ ] Liste des bulletins générés
+[ ] Téléchargement bulletin (employé : espace personnel, avec saisie matricule pour ouvrir)
+[ ] Historique des paies
+
+Livrables : Paie et bulletins cryptés opérationnels
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 11 : TABLEAU DE BORD VIGILANCE (Jours 46-48)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] API présence temps réel : qui a pointé aujourd'hui (arrivée)
+[ ] Liste employés/enseignants avec statut : présent / absent
+[ ] WebSocket ou polling (toutes les 30 s) pour mise à jour
+[ ] Filtres : département, type (enseignant, personnel)
+
+Frontend :
+[ ] Tableau de bord Vigilance (Directeur)
+[ ] Liste du personnel avec pastille verte (présent) / rouge (absent)
+[ ] Mise à jour automatique (polling ou WebSocket)
+[ ] Filtres, recherche
+[ ] Indicateur : X présents / Y absents
+
+Livrables : Supervision présence en temps réel
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 12 : GOUVERNANCE FINANCIÈRE (Jours 49-54)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle DailyFinancialStatus (date, totalEncaissements, totalDepenses, solde, statut, validéPar, validéAt)
+[ ] Modèle BreachRequest (financialStatus, justification, demandeur, statut, approuvéPar, approuvéAt)
+[ ] Statuts DailyFinancialStatus : DRAFT, VALIDATED, BREACH_REQUESTED
+[ ] Statuts BreachRequest : PENDING, APPROVED, REJECTED
+[ ] API clôture journalière : création, validation par comptable
+[ ] API transmission au Directeur (automatique après validation)
+[ ] API demande de brèche (comptable)
+[ ] API validation brèche (Directeur) : approbation ou rejet
+[ ] Blocage modification état tant que brèche non validée
+[ ] API historique états financiers (filtres date)
+[ ] Notification Directeur : nouvelle demande de brèche
+
+Frontend :
+[ ] Interface clôture journalière (comptable) : formulaire, synthèse du jour
+[ ] Bouton "Valider et transmettre au Directeur"
+[ ] Formulaire demande de brèche (justification obligatoire)
+[ ] Tableau de bord Directeur : états validés, demandes de brèche en attente
+[ ] Validation/rejet demande de brèche (boutons, commentaire)
+[ ] Historique des états financiers (recherche, consultation)
+[ ] Historique des demandes de brèche
+
+Livrables : Gouvernance financière complète
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 13 : VIGILE / CONTRÔLE D'ACCÈS (Jours 55-58)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] API pointage entrée : POST /vigilance/check-in (matricule ou idBadge)
+[ ] Vérification : étudiant existe, statut en règle
+[ ] Réponse : { authorized: true/false, message }
+[ ] Log des passages : CheckInLog (matricule, date, heure, autorisé)
+[ ] Pas d'authentification classique : mode kiosque (token fixe ou QR session)
+
+Frontend :
+[ ] Interface kiosque vigile : écran plein, champ scan (badge, QR, matricule)
+[ ] Affichage résultat : grand écran AUTORISÉ (vert) / REFUSÉ (rouge)
+[ ] Message si refusé : "Étudiant non en règle"
+[ ] Rafraîchissement automatique pour prochain scan
+[ ] Mode dégradé : saisie manuelle matricule si lecteur HS
+
+Livrables : Contrôle d'accès opérationnel
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 14 : AUDIT ET TRAÇABILITÉ (Jours 59-61)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle AuditLog (userId, action, entityType, entityId, oldValue, newValue, ip, timestamp)
+[ ] Middleware ou interceptor : enregistrement des actions sensibles
+  - Modifications notes
+  - Validations financières
+  - Demandes de brèche
+  - Changements statut inscription
+  - Connexions (optionnel)
+[ ] API journal d'audit (AUDITOR, ADMIN) : liste avec filtres
+[ ] Export CSV/Excel du journal
+
+Frontend :
+[ ] Page journal d'audit (rôle Auditeur)
+[ ] Filtres : date, utilisateur, type d'action, entité
+[ ] Tableau paginé
+[ ] Export CSV
+
+Livrables : Traçabilité complète
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 15 : NOTIFICATIONS ET RAPPORTS (Jours 62-65)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Modèle Notification (userId, type, message, lu, createdAt)
+[ ] Types : VALIDATION_REQUISE, BREACH_REQUEST, PAYMENT_REMINDER, etc.
+[ ] API notifications (liste, marquer comme lu)
+[ ] API rapports : effectifs, recettes, taux réussite (agrégations)
+[ ] Génération rapports PDF/Excel
+
+Frontend :
+[ ] Cloche notifications (icône, badge nombre)
+[ ] Liste des notifications (dropdown ou page)
+[ ] Marquer comme lu
+[ ] Page rapports (Directeur, Comptable) : graphiques, tableaux
+[ ] Export PDF/Excel des rapports
+
+Livrables : Notifications et reporting
+
+
+--------------------------------------------------------------------------------
+ÉTAPE 16 : FINALISATION ET DÉPLOIEMENT (Jours 66-70)
+--------------------------------------------------------------------------------
+
+Backend :
+[ ] Tests unitaires (services critiques)
+[ ] Tests e2e (flux principaux)
+[ ] Documentation API (Swagger/OpenAPI)
+[ ] Script de migration BDD pour production
+[ ] Variables d'environnement (production)
+[ ] Logs structurés, gestion erreurs
+[ ] Health check endpoint
+
+Frontend :
+[ ] Tests des parcours critiques (login, inscription, paiement)
+[ ] Vérification responsive (tablette vigile)
+[ ] Gestion des erreurs (messages utilisateur)
+[ ] Optimisation (lazy loading, cache)
+[ ] Build de production
+
+Déploiement :
+[ ] Configuration Apache2 (reverse proxy, SSL)
+[ ] Déploiement backend (PM2 ou service systemd)
+[ ] Déploiement frontend (build static ou SSR)
+[ ] Base de données PostgreSQL (production)
+[ ] Sauvegardes automatiques
+[ ] Documentation déploiement (README)
+
+Livrables : Application déployée et exploitable
+
+
+################################################################################
+# SECTION 4 : CRITÈRES D'ACCEPTATION DU PRODUIT FINI
+################################################################################
+
+--------------------------------------------------------------------------------
+4.1 FONCTIONNEL
+--------------------------------------------------------------------------------
+[ ] Tous les rôles peuvent se connecter et accéder à leur dashboard
+[ ] Inscriptions avec règles (enjambement, affectation unique)
+[ ] Notes avec modification hors délai et workflow
+[ ] Finances : tarifs, paiements, statut en règle, sanctions
+[ ] Documents : Facture Proforma, Certificat, Reçu (PDF)
+[ ] Emploi du temps sans conflit
+[ ] Pointage avec croisement EDT
+[ ] Paie et bulletins cryptés (matricule)
+[ ] Gouvernance : clôture, validation, brèche
+[ ] Vigilance : présence temps réel
+[ ] Vigile : blocage si non en règle
+[ ] Audit : journal consultable
+
+--------------------------------------------------------------------------------
+4.2 TECHNIQUE
+--------------------------------------------------------------------------------
+[ ] API documentée (Swagger)
+[ ] Base de données migrée et cohérente
+[ ] Sécurité : HTTPS, JWT, protection des routes
+[ ] Pas de fuite de données sensibles dans les logs
+[ ] Performance acceptable (< 2 s pour les pages principales)
+
+--------------------------------------------------------------------------------
+4.3 EXPLOITABLE
+--------------------------------------------------------------------------------
+[ ] Installation documentée (README, .env.example)
+[ ] Déploiement sur serveur (Apache2) documenté
+[ ] Sauvegardes BDD planifiées
+[ ] Procédure de restauration en cas d'incident
+[ ] Formation utilisateurs (guide ou vidéo) optionnelle
+
+
+################################################################################
+# SECTION 5 : STRUCTURE DES DOSSIERS (PRODUIT FINI)
+################################################################################
+
+gestion-scolaire/
+├── backend/                 # NestJS
+│   ├── src/
+│   │   ├── auth/
+│   │   ├── users/
+│   │   ├── formations/
+│   │   ├── inscriptions/
+│   │   ├── finances/
+│   │   ├── grades/
+│   │   ├── courses/
+│   │   ├── attendance/
+│   │   ├── payroll/
+│   │   ├── governance/
+│   │   ├── vigilance/
+│   │   ├── documents/
+│   │   ├── audit/
+│   │   └── ...
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   └── migrations/
+│   ├── package.json
+│   └── ...
+├── frontend/                # Next.js
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── (auth)/
+│   │   │   ├── (dashboard)/
+│   │   │   │   ├── directeur/
+│   │   │   │   ├── comptable/
+│   │   │   │   ├── scolarite/
+│   │   │   │   ├── enseignant/
+│   │   │   │   ├── etudiant/
+│   │   │   │   └── ...
+│   │   │   └── vigile/
+│   │   ├── components/
+│   │   └── lib/
+│   ├── package.json
+│   └── ...
+├── docs/                    # Documentation
+├── .env.example
+├── README.md
+└── docker-compose.yml       # Optionnel : PostgreSQL + app
+
+
+################################################################################
+# SECTION 6 : ESTIMATION GLOBALE
+################################################################################
+
+Durée totale estimée : 70 jours de développement (environ 3,5 mois)
+Répartition :
+  - Fondations et auth       : 4 jours
+  - Référentiel académique   : 7 jours
+  - Inscriptions             : 4 jours
+  - Finances et tarifs       : 5 jours
+  - Documents étudiants      : 4 jours
+  - Emploi du temps          : 5 jours
+  - Notes                    : 5 jours
+  - Pointage                 : 5 jours
+  - Paie et bulletins        : 6 jours
+  - Vigilance                : 3 jours
+  - Gouvernance financière   : 6 jours
+  - Vigile                   : 4 jours
+  - Audit                    : 3 jours
+  - Notifications/rapports   : 4 jours
+  - Finalisation/déploiement : 5 jours
+
+================================================================================
+                    FIN DU DOCUMENT - APPLICATION GESTION SCOLAIRE
+================================================================================

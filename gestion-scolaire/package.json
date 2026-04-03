@@ -15,7 +15,8 @@
     "migrate": "cd backend && npx prisma migrate dev",
     "migrate:deploy": "cd backend && npx prisma migrate deploy",
     "db:push": "cd backend && npx prisma db push",
-    "db:studio": "cd backend && npx prisma studio"
+    "db:studio": "cd backend && npx prisma studio",
+    "seed": "cd backend && npx prisma db seed"
   },
   "devDependencies": {
     "concurrently": "^9.0.0"

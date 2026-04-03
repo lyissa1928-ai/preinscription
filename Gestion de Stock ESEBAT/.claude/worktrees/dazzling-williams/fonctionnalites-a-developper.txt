@@ -1,0 +1,613 @@
+================================================================================
+                    GESTION SCOLAIRE - FONCTIONNALITÉS À DÉVELOPPER
+================================================================================
+                    Projet IA - Spécifications Techniques Complètes
+                    Document de référence pour le développement
+================================================================================
+
+
+################################################################################
+# PARTIE 1 : FONDATIONS ET INFRASTRUCTURE
+################################################################################
+
+--------------------------------------------------------------------------------
+1.1 STACK TECHNIQUE
+--------------------------------------------------------------------------------
+- Frontend : Next.js (React)
+- Backend API : NestJS
+- Base de données : PostgreSQL (via Prisma ORM)
+- Authentification : JWT + rôles
+- Déploiement : Apache2
+
+--------------------------------------------------------------------------------
+1.2 AUTHENTIFICATION ET SÉCURITÉ
+--------------------------------------------------------------------------------
+- Connexion par identifiant / mot de passe
+- Tokens JWT avec expiration et refresh
+- Gestion des sessions par rôle
+- Protection des routes selon les permissions
+- Hash des mots de passe (bcrypt ou équivalent)
+
+--------------------------------------------------------------------------------
+1.3 SYSTÈME DE RÔLES ET REDIRECTION
+--------------------------------------------------------------------------------
+Rôles prévus :
+  - SUPER_ADMIN : accès total, configuration système
+  - ADMIN : administration de l'établissement
+  - SCOLARITE : gestion inscriptions, notes, emplois du temps
+  - DEPT_HEAD : chef de département, validation pédagogique
+  - TEACHER : enseignant, saisie notes, pointage
+  - STUDENT : étudiant, self-service, documents
+  - FINANCE : comptable, finances, paie, validation
+  - AUDITOR : consultation, audit, traçabilité
+
+Comportement :
+  - Redirection automatique vers le dashboard dédié après connexion
+  - Menu et fonctionnalités adaptés au rôle
+  - Blocage des accès non autorisés (403)
+
+--------------------------------------------------------------------------------
+1.4 MODÈLE DE DONNÉES DE BASE
+--------------------------------------------------------------------------------
+- User : id, email, passwordHash, role, firstName, lastName, createdAt, etc.
+- Person (étudiant ou personnel) : lien avec User, matricule, dateNaissance, etc.
+- AuditLog : traçabilité des actions sensibles (pour rôle AUDITOR)
+
+
+################################################################################
+# PARTIE 2 : STRUCTURE ACADÉMIQUE (LMD)
+################################################################################
+
+--------------------------------------------------------------------------------
+2.1 HIÉRARCHIE PÉDAGOGIQUE
+--------------------------------------------------------------------------------
+Formation (ex: Licence Informatique)
+  └── Maquette (version par année)
+        └── Semestre (S1, S2, S3, ...)
+              └── UE (Unité d'Enseignement)
+                    └── EC (Élément Constitutif)
+
+Chaque entité :
+  - Formation : nom, code, cycle (L/M/D), durée en semestres
+  - Maquette : année de référence, formation associée, statut (active/archivée)
+  - Semestre : numéro, maquette, crédits ECTS totaux
+  - UE : nom, code, semestre, coefficient, crédits ECTS
+  - EC : nom, code, UE, type (CM/TD/TP/TPE), vhCm, vhTd, vhTp, vhTpe, coefficient, crédits ECTS
+
+--------------------------------------------------------------------------------
+2.2 TARIFICATION PÉDAGOGIQUE
+--------------------------------------------------------------------------------
+- Taux horaire par type : CM, TD, TP, TPE (configurables par formation ou globalement)
+- Possibilité de taux par EC si besoin
+- Stockage : FeeConfig ou TariffRate lié à Formation/EC
+
+
+################################################################################
+# PARTIE 3 : INSCRIPTIONS ET AFFECTATIONS
+################################################################################
+
+--------------------------------------------------------------------------------
+3.1 RÈGLES D'INSCRIPTION
+--------------------------------------------------------------------------------
+RG-INS-01 : Un étudiant ne peut être affecté qu'à une seule formation/cohorte à la fois
+RG-INS-02 : Gestion des cohortes (promotion, année d'entrée)
+RG-INS-03 : Enjambement interdit entre cycles (ex: L1 et L2 simultanément, M1 et M2)
+RG-INS-04 : Inscription possible uniquement dans les formations ouvertes
+
+--------------------------------------------------------------------------------
+3.2 DONNÉES À GÉRER
+--------------------------------------------------------------------------------
+- Inscription : étudiant, formation, maquette, semestre, année universitaire, date, statut
+- Cohort : nom, formation, année, liste des inscrits
+- Vérification des conflits avant validation
+
+
+################################################################################
+# PARTIE 4 : GESTION DES NOTES
+################################################################################
+
+--------------------------------------------------------------------------------
+4.1 SAISIE DES NOTES
+--------------------------------------------------------------------------------
+- Saisie par EC ou par UE selon le mode de contrôle
+- Date limite de saisie configurable par session (ex: session 1, session 2)
+- Contrôle : note min/max, décimales
+- Enseignant ne peut saisir que pour ses EC assignés
+
+--------------------------------------------------------------------------------
+4.2 MODIFICATION HORS DÉLAI
+--------------------------------------------------------------------------------
+RG-NOT-01 : Après la date limite, toute modification nécessite un motif obligatoire
+RG-NOT-02 : Autorisation requise (SCOLARITE ou DEPT_HEAD selon configuration)
+RG-NOT-03 : Traçabilité : qui a modifié, quand, pourquoi
+- Workflow : demande de modification → validation → application
+
+
+################################################################################
+# PARTIE 5 : FINANCES ÉTUDIANTS
+################################################################################
+
+--------------------------------------------------------------------------------
+5.1 STATUT FINANCIER
+--------------------------------------------------------------------------------
+RG-FIN-01 : Calcul du statut "en règle" / "non en règle" au 10 de chaque mois
+RG-FIN-02 : Critères : paiement des frais d'inscription, mensualités à jour, frais de soutenance si L3/M2
+RG-FIN-03 : Mise à jour automatique quotidienne ou à chaque encaissement
+
+--------------------------------------------------------------------------------
+5.2 SANCTIONS
+--------------------------------------------------------------------------------
+RG-FIN-04 : Sanctions académiques si non en règle (ex: pas d'accès aux examens, pas de certificat)
+RG-FIN-05 : Sanctions physiques : blocage à l'entrée (vigile) si non en règle
+RG-FIN-06 : Liste des étudiants non en règle consultable par SCOLARITE, FINANCE, ADMIN
+
+
+################################################################################
+# PARTIE 6 : CONFIGURATION DES TARIFS (BACK-OFFICE COMPTABLE)
+################################################################################
+
+--------------------------------------------------------------------------------
+6.1 PARAMÈTRES CONFIGURABLES
+--------------------------------------------------------------------------------
+Le comptable pilote les finances depuis son tableau de bord :
+
+  - Frais d'inscription : par formation, montant fixe
+  - Mensualités : par formation, montant mensuel, nombre de mois
+  - Frais de soutenance : spécifiques L3 et M2 (montants différents possibles)
+
+--------------------------------------------------------------------------------
+6.2 INTERFACE
+--------------------------------------------------------------------------------
+- CRUD sur les tarifs
+- Historisation des changements (date d'effet)
+- Validation avant mise en production
+
+
+################################################################################
+# PARTIE 7 : EMPLOI DU TEMPS
+################################################################################
+
+--------------------------------------------------------------------------------
+7.1 RÈGLES ANTI-CONFLIT
+--------------------------------------------------------------------------------
+RG-EDT-01 : Pas de chevauchement sur un même créneau pour : salle, professeur, groupe
+RG-EDT-02 : Vérification à la création/modification de chaque cours
+RG-EDT-03 : Alertes en cas de conflit détecté
+
+--------------------------------------------------------------------------------
+7.2 DONNÉES
+--------------------------------------------------------------------------------
+- Cours : EC, enseignant, salle, créneau (jour, heure début, heure fin), groupe, type (CM/TD/TP/TPE)
+- Salle : nom, capacité, équipements (optionnel)
+- Créneau : jour de la semaine, heure début, heure fin
+- Lien avec pointage : un pointage doit correspondre à un cours assigné
+
+
+################################################################################
+# PARTIE 8 : POINTAGE
+################################################################################
+
+--------------------------------------------------------------------------------
+8.1 OBLIGATIONS
+--------------------------------------------------------------------------------
+RG-POI-01 : Pointage obligatoire (arrivée et départ) pour tout le personnel et enseignants
+RG-POI-02 : Pointage à l'entrée : horaire enregistré
+RG-POI-03 : Pointage au départ : horaire enregistré
+RG-POI-04 : Durée = différence entre départ et arrivée (par créneau ou global)
+
+--------------------------------------------------------------------------------
+8.2 CROISEMENT EMPLOI DU TEMPS
+--------------------------------------------------------------------------------
+RG-POI-05 : Un pointage doit correspondre à un cours assigné dans l'emploi du temps
+RG-POI-06 : Pointage sans cours assigné → bloqué ou marqué "temps non rémunéré"
+RG-POI-07 : Éviter les présences fictives : vérification créneau + salle + EC
+
+--------------------------------------------------------------------------------
+8.3 DONNÉES
+--------------------------------------------------------------------------------
+- Pointage : employé, date, heure arrivée, heure départ, cours (optionnel), statut (validé/non rémunéré/refusé)
+- Historique des pointages pour calcul paie
+
+
+################################################################################
+# PARTIE 9 : PAIE ENSEIGNANTS
+################################################################################
+
+--------------------------------------------------------------------------------
+9.1 CALCUL DU SALAIRE
+--------------------------------------------------------------------------------
+RG-PAI-01 : Salaire = Σ (heures validées × taux horaire)
+RG-PAI-02 : Heures validées = pointages croisés avec emploi du temps, type CM/TD/TP
+RG-PAI-03 : Taux horaire selon type de cours et/ou EC (voir structure académique)
+RG-PAI-04 : Calcul mensuel, génération en fin de mois
+
+--------------------------------------------------------------------------------
+9.2 TYPES DE CONTRATS
+--------------------------------------------------------------------------------
+RG-PAI-05 : Distinction claire : Vacataire vs Permanent
+  - Vacataire : rémunération à l'heure selon grille
+  - Permanent : possiblement grille fixe + compléments (à préciser)
+
+--------------------------------------------------------------------------------
+9.3 BULLETINS DE SALAIRE
+--------------------------------------------------------------------------------
+RG-PAI-06 : Génération mensuelle par le comptable en PDF
+RG-PAI-07 : PDF protégé par mot de passe = matricule de l'employé
+RG-PAI-08 : Cryptage appliqué dynamiquement à la création du fichier
+RG-PAI-09 : Envoi sécurisé (téléchargement depuis espace personnel ou email chiffré)
+
+--------------------------------------------------------------------------------
+9.4 DONNÉES
+--------------------------------------------------------------------------------
+- TeacherContract : enseignant, type (VACATAIRE/PERMANENT), date début, date fin, taux
+- Payroll : mois, année, employé, heures, montant, statut, bulletin généré
+- PaySlip : fichier PDF, employé, mois, année, date génération
+
+
+################################################################################
+# PARTIE 10 : GOUVERNANCE FINANCIÈRE
+################################################################################
+
+--------------------------------------------------------------------------------
+10.1 CLÔTURE JOURNALIÈRE
+--------------------------------------------------------------------------------
+RG-GOV-01 : Le comptable génère et valide un état financier quotidien à la fin de chaque journée
+RG-GOV-02 : État = synthèse des encaissements, dépenses, solde du jour
+RG-GOV-03 : Statuts : BROUILLON → VALIDÉ (par comptable)
+
+--------------------------------------------------------------------------------
+10.2 CIRCUIT DE VALIDATION
+--------------------------------------------------------------------------------
+RG-GOV-04 : Une fois validé par le comptable, l'état est transmis automatiquement au tableau de bord du Directeur
+RG-GOV-05 : Le Directeur consulte les états validés (notification possible)
+
+--------------------------------------------------------------------------------
+10.3 PROCÉDURE DE BRÈCHE (CORRECTION D'ERREUR)
+--------------------------------------------------------------------------------
+RG-GOV-06 : Si une erreur est détectée après validation, le comptable soumet une demande de modification
+RG-GOV-07 : Justification obligatoire dans la demande
+RG-GOV-08 : Le système bloque toute modification tant que le Directeur n'a pas validé la "demande de brèche"
+RG-GOV-09 : La validation se fait depuis le compte du Directeur
+RG-GOV-10 : Une fois validée, la brèche peut être appliquée (correction de l'état)
+
+--------------------------------------------------------------------------------
+10.4 HISTORIQUE
+--------------------------------------------------------------------------------
+RG-GOV-11 : Journal complet des états financiers passés
+RG-GOV-12 : Consultable par le Directeur et le Comptable
+RG-GOV-13 : Filtrage par date, recherche
+
+--------------------------------------------------------------------------------
+10.5 MODÈLES DE DONNÉES
+--------------------------------------------------------------------------------
+DailyFinancialStatus :
+  - id, date, status (DRAFT/VALIDATED/BREACH_REQUESTED)
+  - totalEncaissements, totalDepenses, solde
+  - validatedBy (comptable), validatedAt
+  - directorApprovedAt (optionnel)
+
+BreachRequest :
+  - id, financialStatusId, justification (obligatoire)
+  - requestedBy (comptable), requestedAt
+  - status (PENDING/APPROVED/REJECTED)
+  - approvedBy (directeur), approvedAt, commentaire
+
+
+################################################################################
+# PARTIE 11 : SERVICES AUX ÉTUDIANTS (SELF-SERVICE & DOCUMENTS)
+################################################################################
+
+--------------------------------------------------------------------------------
+11.1 FACTURE PROFORMA
+--------------------------------------------------------------------------------
+- Générateur : Étudiant (à la demande depuis son espace)
+- Contenu : détail des coûts
+  - Frais d'inscription
+  - Mensualités (liste et total)
+  - Frais de soutenance (si L3 ou M2)
+- Format : PDF dynamique
+- Pas de modification après génération (snapshot des tarifs au moment de la demande)
+
+--------------------------------------------------------------------------------
+11.2 CERTIFICAT DE SCOLARITÉ
+--------------------------------------------------------------------------------
+- Générateur : Système
+- Condition : étudiant en règle (financièrement + inscription validée)
+- Contenu : nom, formation, année, statut
+- Format : PDF
+- Blocage si non en règle avec message explicite
+
+--------------------------------------------------------------------------------
+11.3 REÇU DE PAIEMENT
+--------------------------------------------------------------------------------
+- Générateur : Système (automatique)
+- Condition : après chaque transaction validée par le comptable
+- Contenu : montant, date, motif, référence
+- Format : PDF non modifiable
+- Génération instantanée après validation
+
+--------------------------------------------------------------------------------
+11.4 TABLEAU RÉCAPITULATIF DES DOCUMENTS
+--------------------------------------------------------------------------------
+Document              | Générateur | Condition           | Format
+----------------------|------------|---------------------|---------------------------
+Facture Proforma      | Étudiant   | À la demande        | PDF dynamique
+Bulletin de salaire   | Comptable  | Fin de mois         | PDF verrouillé (matricule)
+État financier       | Comptable  | Quotidien           | Soumis validation Directeur
+Reçu de paiement     | Système    | Après encaissement  | PDF non modifiable
+Certificat scolarité | Système    | Étudiant en règle   | PDF
+
+
+################################################################################
+# PARTIE 12 : GESTION RH ET SUPERVISION
+################################################################################
+
+--------------------------------------------------------------------------------
+12.1 TYPES DE CONTRATS
+--------------------------------------------------------------------------------
+- Vacataire : enseignant contractuel, rémunération à l'heure
+- Permanent : enseignant titulaire
+- Gestion des dates de début/fin de contrat
+
+--------------------------------------------------------------------------------
+12.2 TABLEAU DE BORD VIGILANCE (DIRECTEUR)
+--------------------------------------------------------------------------------
+RG-RH-01 : Vue "Temps Réel" des présences
+RG-RH-02 : Affichage : qui (personnel et enseignants) a pointé à l'entrée, qui est absent
+RG-RH-03 : Interface visuelle : pastilles vertes (présent) / rouges (absent)
+RG-RH-04 : Mise à jour en temps réel (WebSocket ou polling court)
+RG-RH-05 : Filtrage par département, type de personnel
+RG-RH-06 : Liste des absents non justifiés (optionnel)
+
+
+################################################################################
+# PARTIE 13 : VIGILE / CONTRÔLE D'ACCÈS
+################################################################################
+
+--------------------------------------------------------------------------------
+13.1 LECTEUR
+--------------------------------------------------------------------------------
+- Lecteur Plug & Play (badge, carte, QR code selon équipement)
+- Interface de pointage à l'entrée (kiosque ou borne)
+- Identification : matricule ou carte étudiante
+
+--------------------------------------------------------------------------------
+13.2 RÈGLES
+--------------------------------------------------------------------------------
+RG-VIG-01 : Si étudiant en règle → accès autorisé, enregistrement du passage
+RG-VIG-02 : Si étudiant non en règle → blocage, message d'erreur, pas d'enregistrement
+RG-VIG-03 : Log des tentatives (autorisées et refusées) pour audit
+
+
+################################################################################
+# PARTIE 14 : MOTEUR PDF ET GÉNÉRATION DE DOCUMENTS
+################################################################################
+
+--------------------------------------------------------------------------------
+14.1 MOTEUR PDF
+--------------------------------------------------------------------------------
+- Bibliothèque : ReportLab (Python) ou Puppeteer / @react-pdf / pdf-lib (Node.js)
+- Templates : facture, reçu, certificat, bulletin
+- Données dynamiques injectées à la génération
+
+--------------------------------------------------------------------------------
+14.2 CRYPTAGE PDF
+--------------------------------------------------------------------------------
+- Pour bulletins de salaire uniquement
+- Mot de passe utilisateur = matricule de l'employé
+- Application dynamique à la création du fichier
+- Bibliothèque : pdf-lib, PyPDF2, ou outil système (qpdf, pdftk)
+
+--------------------------------------------------------------------------------
+14.3 STOCKAGE
+--------------------------------------------------------------------------------
+- Fichiers générés stockés (stockage local ou cloud)
+- Association : document type, entité (étudiant, employé), date
+- Téléchargement sécurisé (lien temporaire ou authentification)
+
+
+################################################################################
+# PARTIE 15 : AUDIT ET TRAÇABILITÉ
+################################################################################
+
+--------------------------------------------------------------------------------
+15.1 JOURNAL D'AUDIT
+--------------------------------------------------------------------------------
+- Enregistrement des actions sensibles :
+  - Modifications de notes (hors délai)
+  - Validations financières
+  - Demandes de brèche
+  - Changements de statut (inscription, finances)
+  - Connexions / échecs de connexion (optionnel)
+- Champs : utilisateur, action, entité, ancienne valeur, nouvelle valeur, date, IP
+
+--------------------------------------------------------------------------------
+15.2 CONSULTATION
+--------------------------------------------------------------------------------
+- Rôle AUDITOR : accès en lecture seule au journal
+- Filtres : date, utilisateur, type d'action, entité
+
+
+################################################################################
+# PARTIE 16 : FONCTIONNALITÉS COMPLÉMENTAIRES (PRÉVUES)
+################################################################################
+
+--------------------------------------------------------------------------------
+16.1 CALENDRIER ACADÉMIQUE
+--------------------------------------------------------------------------------
+- Dates : rentrée, examens, vacances, soutenances
+- Utilisation : emploi du temps, alertes, échéances
+- Gestion par année universitaire
+
+--------------------------------------------------------------------------------
+16.2 GESTION DES SALLES
+--------------------------------------------------------------------------------
+- Capacité, équipements (vidéoprojecteur, tableau, etc.)
+- Disponibilité par créneau
+- Réservation (optionnel)
+
+--------------------------------------------------------------------------------
+16.3 GESTION DES ABSENCES ÉTUDIANTS
+--------------------------------------------------------------------------------
+- Saisie des absences (enseignant ou scolarité)
+- Justificatifs (upload document)
+- Alertes si seuil dépassé
+- Impact sur certificat de scolarité (optionnel)
+
+--------------------------------------------------------------------------------
+16.4 CONVOCATIONS AUX EXAMENS
+--------------------------------------------------------------------------------
+- Génération PDF par session
+- Contenu : date, lieu, horaire, consignes
+- Envoi ou téléchargement par l'étudiant
+
+--------------------------------------------------------------------------------
+16.5 SUIVI DES SOUTENANCES
+--------------------------------------------------------------------------------
+- Planning des soutenances (L3, M2)
+- Composition du jury
+- Saisie des notes
+- PV de soutenance (PDF)
+- Lien avec frais de soutenance
+
+--------------------------------------------------------------------------------
+16.6 MESSAGERIE / NOTIFICATIONS
+--------------------------------------------------------------------------------
+- Alertes : échéances paiement, validation requise, demande de brèche
+- Notifications in-app et/ou email
+- Rappels configurables
+
+--------------------------------------------------------------------------------
+16.7 RAPPORTS ET STATISTIQUES
+--------------------------------------------------------------------------------
+- Taux de réussite par formation, EC
+- Effectifs (inscrits, présents, diplômés)
+- Recettes (encaissements, impayés)
+- Tableaux de bord Directeur (vue consolidée)
+- Export Excel/CSV
+
+--------------------------------------------------------------------------------
+16.8 EXPORT / IMPORT
+--------------------------------------------------------------------------------
+- Export : notes, effectifs, paie, finances (Excel, CSV)
+- Import : liste d'étudiants, notes en masse (avec validation)
+
+--------------------------------------------------------------------------------
+16.9 GESTION DES STAGES
+--------------------------------------------------------------------------------
+- Conventions de stage
+- Suivi (tuteur, entreprise)
+- Évaluations
+- Si formations en alternance
+
+--------------------------------------------------------------------------------
+16.10 ANNÉE UNIVERSITAIRE
+--------------------------------------------------------------------------------
+- Ouverture / fermeture des inscriptions
+- Bascule des promotions (L1→L2, etc.)
+- Archivage des données de l'année écoulée
+
+--------------------------------------------------------------------------------
+16.11 GESTION DES CONGÉS
+--------------------------------------------------------------------------------
+- Demandes de congés (personnel)
+- Validation par le responsable
+- Soldes de congés
+- Impact sur planning (optionnel)
+
+
+################################################################################
+# PARTIE 17 : PLANNING DE DÉVELOPPEMENT (PHASES)
+################################################################################
+
+--------------------------------------------------------------------------------
+PHASE 1 : FONDATIONS
+--------------------------------------------------------------------------------
+- Structure projet (Next.js + NestJS + Prisma)
+- Base de données, migrations
+- Authentification, rôles, redirection
+- Dashboard par rôle (squelette)
+
+--------------------------------------------------------------------------------
+PHASE 2 : RÉFÉRENTIEL
+--------------------------------------------------------------------------------
+- Structure académique (Formation, Maquette, Semestre, UE, EC)
+- Gestion des salles
+- Utilisateurs, personnes, enseignants, étudiants
+
+--------------------------------------------------------------------------------
+PHASE 3 : INSCRIPTIONS
+--------------------------------------------------------------------------------
+- Inscriptions, cohortes
+- Règles d'affectation, enjambement
+- Statut étudiant
+
+--------------------------------------------------------------------------------
+PHASE 4 : FINANCES ÉTUDIANTS & TARIFS
+--------------------------------------------------------------------------------
+- Configuration des tarifs (comptable)
+- Paiements, encaissements
+- Statut en règle / non en règle
+- Facture Proforma, Reçu de paiement
+- Certificat de scolarité
+
+--------------------------------------------------------------------------------
+PHASE 5 : EMPLOI DU TEMPS & NOTES
+--------------------------------------------------------------------------------
+- Emploi du temps, anti-conflit
+- Saisie des notes, date limite
+- Modification hors délai avec workflow
+
+--------------------------------------------------------------------------------
+PHASE 6 : POINTAGE & PAIE
+--------------------------------------------------------------------------------
+- Pointage (arrivée/départ)
+- Croisement emploi du temps
+- Calcul paie enseignants
+- Bulletins PDF (cryptage matricule)
+- Types de contrats (Vacataire/Permanent)
+- Tableau de bord Vigilance (présence temps réel)
+
+--------------------------------------------------------------------------------
+PHASE 7 : GOUVERNANCE FINANCIÈRE
+--------------------------------------------------------------------------------
+- Clôture journalière
+- Circuit de validation (comptable → Directeur)
+- Procédure de brèche
+- Historique des états financiers
+
+--------------------------------------------------------------------------------
+PHASE 8 : VIGILE & CONTRÔLE D'ACCÈS
+--------------------------------------------------------------------------------
+- Interface pointage entrée
+- Vérification statut étudiant
+- Blocage si non en règle
+- Log des passages
+
+--------------------------------------------------------------------------------
+PHASE 9 : AUDIT & FINALISATION
+--------------------------------------------------------------------------------
+- Journal d'audit complet
+- Rapports, statistiques
+- Export/Import
+- Tests, déploiement Apache2
+
+
+################################################################################
+# PARTIE 18 : RÉCAPITULATIF DES RÈGLES MÉTIER (CODES)
+################################################################################
+
+RG-INS-01 à RG-INS-04   : Inscriptions
+RG-NOT-01 à RG-NOT-03   : Notes
+RG-FIN-01 à RG-FIN-06   : Finances étudiants
+RG-EDT-01 à RG-EDT-03   : Emploi du temps
+RG-POI-01 à RG-POI-07   : Pointage
+RG-PAI-01 à RG-PAI-09   : Paie
+RG-GOV-01 à RG-GOV-13   : Gouvernance financière
+RG-RH-01 à RG-RH-06     : Supervision présence
+RG-VIG-01 à RG-VIG-03   : Vigile
+
+================================================================================
+                                    FIN DU DOCUMENT
+                         Document de référence - Projet Gestion Scolaire
+================================================================================

@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         String
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  auditLogs           AuditLog[]      @relation("actor")
+  farm                Farm?
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  jti       String    @unique
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model Region {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  zone      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  farms             Farm[]
+  parcels           Parcel[]
+  cropRequirements  CropRequirement[]
+  alertRules        AlertRule[]
+
+  @@index([isActive])
+}
+
+model Crop {
+  id                  String    @id @default(cuid())
+  name                String    @unique
+  scientificName      String?   @map("scientific_name")
+  category            String
+  description         String?
+  defaultPlantingMonths Int[]   @map("default_planting_months")
+  defaultHarvestMonths  Int[]   @map("default_harvest_months")
+  isActive            Boolean   @default(true) @map("is_active")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  requirements CropRequirement[]
+
+  @@index([isActive])
+}
+
+model CropRequirement {
+  id               String    @id @default(cuid())
+  cropId           String    @map("crop_id")
+  regionId         String?   @map("region_id")
+  season           String    @default("ANY")
+  phMin            Float?
+  phMax            Float?
+  soilMoistureMin  Float?    @map("soil_moisture_min")
+  soilMoistureMax  Float?    @map("soil_moisture_max")
+  salinityMax      Float?    @map("salinity_max")
+  rainfallMinMm    Float?    @map("rainfall_min_mm")
+  rainfallMaxMm    Float?    @map("rainfall_max_mm")
+  tempMinC         Float?    @map("temp_min_c")
+  tempMaxC         Float?    @map("temp_max_c")
+  weightPh         Int       @default(20) @map("weight_ph")
+  weightMoisture   Int       @default(20) @map("weight_moisture")
+  weightSalinity   Int       @default(20) @map("weight_salinity")
+  weightRainfall   Int       @default(20) @map("weight_rainfall")
+  weightTemp       Int       @default(20) @map("weight_temp")
+  notes            String?
+  version          Int       @default(1)
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  crop   Crop     @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  region Region?  @relation(fields: [regionId], references: [id], onDelete: SetNull)
+
+  @@unique([cropId, regionId, season, version])
+  @@index([cropId])
+  @@index([regionId])
+}
+
+model ParcelSoilProfile {
+  id           String   @id @default(cuid())
+  parcelId     String   @unique @map("parcel_id")
+  ph           Float?
+  soilMoisture Float?   @map("soil_moisture")
+  salinity     Float?
+  acidity      Float?
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+
+  @@index([parcelId])
+}
+
+model Recommendation {
+  id                 String   @id @default(cuid())
+  parcelId           String   @map("parcel_id")
+  generatedByUserId  String   @map("generated_by_user_id")
+  generatedAt        DateTime @map("generated_at")
+  engineVersion      String   @map("engine_version")
+  season             String
+  inputs             Json
+  results            Json
+  topCropId          String?  @map("top_crop_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  parcel  Parcel  @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  items   RecommendationItem[]
+
+  @@index([parcelId])
+  @@index([generatedByUserId])
+  @@index([generatedAt])
+}
+
+model RecommendationItem {
+  id               String   @id @default(cuid())
+  recommendationId String   @map("recommendation_id")
+  cropId           String   @map("crop_id")
+  score            Int
+  reasons          Json
+  constraints      Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  recommendation Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+
+  @@index([recommendationId])
+  @@index([cropId])
+}
+
+model Farm {
+  id          String      @id @default(cuid())
+  userId      String      @unique @map("user_id")
+  name        String
+  phone       String?
+  regionId    String      @map("region_id")
+  totalArea   Float?      @map("total_area")
+  farmingType String      @map("farming_type")
+  description String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  region  Region  @relation(fields: [regionId], references: [id])
+  parcels Parcel[]
+
+  @@index([userId])
+}
+
+model Parcel {
+  id        String    @id @default(cuid())
+  farmId    String    @map("farm_id")
+  name      String
+  area      Float
+  regionId  String    @map("region_id")
+  latitude  Float?
+  longitude Float?
+  soilType  String    @map("soil_type")
+  status    String    @default("ACTIVE")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  farm               Farm                 @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  region             Region               @relation(fields: [regionId], references: [id])
+  weatherDaily       WeatherDaily[]
+  soilProfile        ParcelSoilProfile?
+  recommendations    Recommendation[]
+  alerts             Alert[]
+  sensors            Sensor[]
+
+  @@index([farmId])
+  @@index([deletedAt])
+  @@index([regionId])
+}
+
+model Sensor {
+  id          String    @id @default(cuid())
+  name        String
+  type        String    @map("type")
+  model       String?
+  serialNumber String?  @map("serial_number")
+  apiKey      String    @unique @map("api_key")
+  parcelId    String    @map("parcel_id")
+  isActive    Boolean   @default(true) @map("is_active")
+  lastReadingAt DateTime? @map("last_reading_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+
+  @@index([parcelId])
+  @@index([type])
+  @@index([apiKey])
+}
+
+model WeatherDaily {
+  id          String    @id @default(cuid())
+  parcelId    String    @map("parcel_id")
+  date        DateTime  @db.Date
+  tMin        Float?    @map("t_min")
+  tMax        Float?    @map("t_max")
+  tAvg        Float?    @map("t_avg")
+  humidityAvg Float?    @map("humidity_avg")
+  rainfallMm  Float?    @map("rainfall_mm")
+  windSpeedAvg Float?   @map("wind_speed_avg")
+  provider    String
+  fetchedAt   DateTime  @map("fetched_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+
+  @@unique([parcelId, date, provider])
+  @@index([parcelId])
+  @@index([date])
+}
+
+model WeatherFetchLog {
+  id        String   @id @default(cuid())
+  parcelId  String   @map("parcel_id")
+  provider  String
+  status    String
+  httpStatus Int?    @map("http_status")
+  errorCode String?  @map("error_code")
+  fetchedAt DateTime @map("fetched_at")
+
+  @@index([parcelId])
+  @@index([fetchedAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?  @map("actor_user_id")
+  action      String
+  entity      String
+  entityId    String?  @map("entity_id")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  actor User? @relation("actor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([entity, action])
+  @@index([createdAt])
+}
+
+model AlertRule {
+  id               String   @id @default(cuid())
+  scope            String   @default("GLOBAL")
+  regionId         String?  @map("region_id")
+  parcelId         String?  @map("parcel_id")
+  type             String
+  severity         String
+  isActive         Boolean  @default(true) @map("is_active")
+  conditions       Json
+  windowDays       Int?     @map("window_days")
+  cooldownHours    Int      @default(24) @map("cooldown_hours")
+  messageTemplate  String   @map("message_template")
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  region Region?  @relation(fields: [regionId], references: [id], onDelete: SetNull)
+  alerts Alert[]
+
+  @@index([type, isActive])
+  @@index([regionId])
+  @@index([parcelId])
+}
+
+model Alert {
+  id           String    @id @default(cuid())
+  farmerUserId String    @map("farmer_user_id")
+  parcelId     String    @map("parcel_id")
+  ruleId       String    @map("rule_id")
+  type         String
+  severity     String
+  title        String
+  message      String
+  status       String    @default("OPEN")
+  triggeredAt  DateTime  @map("triggered_at")
+  ackedAt      DateTime? @map("acked_at")
+  resolvedAt  DateTime? @map("resolved_at")
+  mutedUntil   DateTime? @map("muted_until")
+  fingerprint  String    @unique
+  meta         Json?
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  rule   AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  parcel Parcel    @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  events AlertEvent[]
+
+  @@index([farmerUserId])
+  @@index([parcelId])
+  @@index([ruleId])
+  @@index([triggeredAt])
+  @@index([status])
+}
+
+model AlertEvent {
+  id         String   @id @default(cuid())
+  alertId    String   @map("alert_id")
+  eventType  String   @map("event_type")
+  actorUserId String? @map("actor_user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([alertId])
+}

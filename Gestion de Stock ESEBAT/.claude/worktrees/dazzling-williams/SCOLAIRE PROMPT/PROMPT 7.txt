@@ -1,0 +1,349 @@
+PROMPT 7 
+— Inscription Pédagogique (IP) + Choix UE + Règles crédits + Blocages (impayés/prérequis) + UI Scolarité & Portail Étudiant
+
+Objectif : Implémenter l’Inscription Pédagogique (IP) complète (backend + frontend) par semestre, avec :
+
+Précondition IA validée
+
+Sélection UE (obligatoires + optionnelles)
+
+Contrôle total crédits
+
+Contrôle prérequis (optionnel mais prévu)
+
+Blocage impayés (selon paramétrage)
+
+Génération “carte / état IP” et logs d’audit
+
+UI scolarité (gestion IP) + UI étudiant (voir état IP)
+
+Dépend des Prompts 3 (référentiel), 4 (UE), 6 (IA + facture), 5 (students), 2 (auth/audit).
+
+0) RBAC
+
+CRUD IP + validation : SCOLARITE, ADMIN, SUPER_ADMIN
+
+Consultation : DEPT_HEAD, AUDITOR
+
+Étudiant : accès à son IP en lecture (endpoints me)
+
+Audit obligatoire.
+
+1) Modèle de données (Prisma)
+1.1 EnrollmentIP
+
+Créer table :
+
+id
+
+studentId (FK Student)
+
+semesterId (FK Semester)
+
+academicYearId (FK AcademicYear) (redondant utile)
+
+programId (FK Program) (snapshot)
+
+levelId (FK Level) (snapshot)
+
+status enum: DRAFT | PENDING | VALIDATED | REJECTED | CANCELED
+
+submittedAt, validatedAt
+
+validatedByUserId nullable (FK User)
+
+rejectedReason nullable
+
+createdAt, updatedAt
+
+Contraintes :
+
+Unicité (studentId, semesterId) unique
+
+Semester doit appartenir à l’année de l’IA active de l’étudiant
+
+Interdire IP si IA non VALIDATED pour même année
+
+Interdire IP si semester.status=CLOSED ou année CLOSED
+
+1.2 EnrollmentIPCourseUnit
+
+Table liaison :
+
+id
+
+enrollmentIpId (FK EnrollmentIP)
+
+courseUnitId (FK CourseUnit)
+
+isOptional boolean
+
+createdAt
+
+Unicité :
+
+(enrollmentIpId, courseUnitId) unique
+
+1.3 Prérequis (optionnel mais structurant)
+
+Créer table :
+
+CourseUnitPrerequisite
+
+id
+
+courseUnitId
+
+prerequisiteCourseUnitId
+
+Règle :
+
+pas de boucle (simple check)
+
+1.4 Paramètres blocage impayés
+
+Créer table simple :
+
+FinanceRule
+
+id
+
+academicYearId
+
+blockIPIfUnpaid boolean default true
+
+blockThresholdAmount int default 0 (si >0, blocage si solde > seuil)
+
+2) Backend — Logique métier IP
+2.1 Préconditions IP
+
+Pour créer/valider une IP :
+
+L’étudiant doit avoir une IA VALIDATED pour l’année académique du semestre
+
+L’étudiant doit être ACTIVE
+
+Semestre OPEN
+
+Si FinanceRule.blockIPIfUnpaid=true :
+
+Vérifier solde facture (Invoice.totalAmount - paidAmount)
+
+Si solde > threshold => BLOQUER IP
+
+2.2 Sélection des UE
+
+Le système doit :
+
+Proposer automatiquement les UE obligatoires (selon program+level+semester)
+
+Permettre ajout d’UE optionnelles (si l’université en a)
+
+Supporter UE mutualisées
+
+2.3 Contrôle crédits
+
+Total crédits IP = somme crédits des UE sélectionnées
+
+Seuil recommandé : 30 crédits / semestre (configurable)
+
+Si total hors plage autorisée :
+
+en DRAFT : warning
+
+en VALIDATION : blocage (sauf override admin option)
+
+2.4 Contrôle prérequis (si activé)
+
+Si UE a prérequis :
+
+vérifier que l’étudiant a validé l’UE prérequise (on utilisera notes plus tard)
+Pour ce prompt, prévoir l’API et laisser vérification en “soft check” (warning) si notes pas encore.
+Ou créer table “ValidatedCourseUnit” temporaire (option) si université veut.
+
+3) API REST — Endpoints
+
+Base /api/v1
+
+3.1 IP (admin/scolarité)
+
+GET /enrolments/ip?page=&pageSize=&q=&semesterId=&programId=&levelId=&status=
+
+POST /enrolments/ip
+Body:
+
+{ "studentId":"...", "semesterId":"..." }
+
+-> crée DRAFT avec programId/levelId/academicYearId snapshot depuis IA
+
+GET /enrolments/ip/:id
+
+PATCH /enrolments/ip/:id (modifier sélection UE si DRAFT/PENDING)
+
+POST /enrolments/ip/:id/select-ues
+Body:
+
+{ "courseUnitIds":["..."], "mode":"REPLACE|ADD" }
+
+POST /enrolments/ip/:id/submit
+
+POST /enrolments/ip/:id/validate
+
+POST /enrolments/ip/:id/reject body {reason}
+
+POST /enrolments/ip/:id/cancel body {reason}
+
+3.2 Helpers
+
+GET /students/:id/eligible-semesters (selon IA)
+
+GET /students/:id/eligible-course-units?semesterId=...
+Retourne :
+
+UE obligatoires
+
+UE optionnelles
+
+mutualisées
+
+crédits total auto
+
+3.3 “Me” (étudiant)
+
+GET /me/enrolments/ip (liste)
+
+GET /me/enrolments/ip/:id (détails)
+
+GET /me/eligible-course-units?semesterId=... (si autorisé)
+
+RBAC : role STUDENT uniquement sur /me/*
+
+4) Audit
+
+Logger :
+
+IP_CREATED
+
+IP_UPDATED_SELECTION
+
+IP_SUBMITTED
+
+IP_VALIDATED
+
+IP_REJECTED
+
+IP_CANCELED
+
+IP_BLOCKED_UNPAID
+
+IP_BLOCKED_CREDITS
+
+5) Frontend — UI Scolarité (Admin)
+
+Créer pages :
+
+/app/enrolments/ip
+
+/app/enrolments/ip/new (wizard)
+
+/app/enrolments/ip/[id] (détails)
+
+5.1 Liste IP
+
+Search (matricule/nom)
+
+Filtres : semestre, programme, niveau, statut
+
+Actions rapides : voir, valider, rejeter
+
+5.2 Wizard création IP
+
+Étapes :
+
+choisir étudiant (search)
+
+choisir semestre éligible (fetch eligible-semesters)
+
+sélectionner UE (table + checkboxes)
+
+sections : obligatoires / optionnelles / mutualisées
+
+afficher total crédits live
+
+warning si dépassement
+
+résumé + création
+
+5.3 Détails IP
+
+Afficher :
+
+statut + timeline (audit mini)
+
+liste UE sélectionnées
+
+crédits total
+
+indicateur blocage impayé (si détecté)
+
+actions selon statut (submit/validate/reject/cancel)
+
+impression/export PDF “fiche IP” (option : générer côté serveur plus tard, mais préparer bouton)
+
+UX premium :
+
+drawer, skeleton, empty, toasts
+
+6) Frontend — Portail Étudiant (lecture IP)
+
+Créer pages :
+
+/app/student/enrolments (ou /app/me/enrolments)
+
+/app/student/enrolments/ip/[id]
+
+Fonctionnalités :
+
+Voir état IA (si existant) + état IP
+
+Voir UE sélectionnées
+
+Voir messages blocage (impayés / crédits) de façon claire
+
+UI très simple et propre
+
+7) Tests
+
+Backend :
+
+IP impossible sans IA VALIDATED
+
+IP bloquée si impayés et règle active
+
+sélection UE calcule crédits
+
+validate bloque si crédits hors seuil
+
+endpoints /me protégés
+
+Frontend :
+
+wizard fonctionne
+
+étudiant voit ses IP
+
+8) Definition of Done (PROMPT 7)
+
+Terminé si :
+
+IP workflow complet
+
+sélection UE correcte
+
+crédits contrôlés
+
+blocage impayés actif (même si paiements complets plus tard)
+
+UI scolarité + UI étudiant prêtes
+
+audit + swagger OK

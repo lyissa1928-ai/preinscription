@@ -150,14 +150,14 @@ L'application "Gestion Scolaire" est un système d'information complet pour un
 --------------------------------------------------------------------------------
 ÉTAPE 0 : PRÉPARATION (Jour 1)
 --------------------------------------------------------------------------------
-[ ] Créer le dépôt Git (structure monorepo ou séparée)
-[ ] Initialiser le projet backend (NestJS)
-[ ] Initialiser le projet frontend (Next.js)
-[ ] Configurer PostgreSQL (local + variables d'environnement)
-[ ] Configurer Prisma (schéma initial, migrations)
-[ ] Fichiers .env.example pour backend et frontend
-[ ] README avec instructions d'installation
-[ ] Scripts npm : dev, build, start, migrate
+[x] Créer le dépôt Git (structure monorepo ou séparée)
+[x] Initialiser le projet backend (NestJS)
+[x] Initialiser le projet frontend (Next.js)
+[x] Configurer PostgreSQL (local + variables d'environnement) — SQLite en dev
+[x] Configurer Prisma (schéma initial, migrations)
+[x] Fichiers .env.example pour backend et frontend
+[x] README avec instructions d'installation
+[x] Scripts npm : dev, build, start, migrate
 
 Livrables : Projet vide qui démarre, BDD connectée
 
@@ -167,24 +167,24 @@ Livrables : Projet vide qui démarre, BDD connectée
 --------------------------------------------------------------------------------
 
 Backend :
-[ ] Modèle User (id, email, passwordHash, role, firstName, lastName, createdAt)
-[ ] Modèle Person (lien User, matricule, type: STUDENT|TEACHER|STAFF)
-[ ] Module Auth : register, login, refresh, logout
-[ ] JWT (access + refresh tokens)
+[x] Modèle User (id, email, passwordHash, role, firstName, lastName, createdAt)
+[x] Modèle Person (lien User, matricule, type: STUDENT|TEACHER|STAFF)
+[x] Module Auth : register, login, refresh, logout
+[x] JWT (access + refresh tokens)
 [ ] Guard par rôle (RolesGuard)
 [ ] Décoration @Roles() pour protéger les routes
 [ ] Endpoint GET /me (profil courant)
 [ ] Endpoint PATCH /users/me (modification profil)
-[ ] Hash bcrypt pour mots de passe
+[x] Hash bcrypt pour mots de passe
 
 Frontend :
-[ ] Page de login (formulaire, gestion erreurs)
-[ ] Stockage token (httpOnly cookie ou localStorage sécurisé)
-[ ] Intercepteur API (ajout Bearer token, refresh si 401)
-[ ] Layout avec menu selon rôle
-[ ] Redirection post-login vers dashboard selon rôle
+[x] Page de login (formulaire, gestion erreurs)
+[x] Stockage token (httpOnly cookie ou localStorage sécurisé)
+[x] Intercepteur API (ajout Bearer token, refresh si 401)
+[x] Layout avec menu selon rôle
+[x] Redirection post-login vers dashboard selon rôle
 [ ] Page profil utilisateur
-[ ] Déconnexion
+[x] Déconnexion
 
 Livrables : Connexion fonctionnelle, redirection par rôle
 
@@ -194,21 +194,21 @@ Livrables : Connexion fonctionnelle, redirection par rôle
 --------------------------------------------------------------------------------
 
 Backend :
-[ ] Modèles : Formation, Maquette, Semestre, UE, EC
-[ ] Modèle Salle (nom, capacité, équipements)
-[ ] Modèle TariffRate (taux horaire CM/TD/TP/TPE par formation ou global)
-[ ] CRUD Formation (admin, scolarité)
-[ ] CRUD Maquette, Semestre, UE, EC
-[ ] CRUD Salle
-[ ] API liste hiérarchique (formation → EC)
-[ ] Validation : unicité codes, contraintes
+[x] Modèles : Formation, Maquette, Semestre, UE, EC
+[x] Modèle Salle (nom, capacité, équipements)
+[x] Modèle TariffRate (taux horaire CM/TD/TP/TPE par formation ou global)
+[x] CRUD Formation (admin, scolarité)
+[x] CRUD Maquette, Semestre, UE, EC
+[x] CRUD Salle
+[x] API liste hiérarchique (formation → EC)
+[x] Validation : unicité codes, contraintes
 
 Frontend :
-[ ] Pages CRUD Formations (liste, création, édition)
-[ ] Pages CRUD Maquettes, Semestres, UE, EC (navigation hiérarchique)
-[ ] Gestion des salles
+[x] Pages CRUD Formations (liste, création, édition)
+[x] Pages CRUD Maquettes, Semestres, UE, EC (navigation hiérarchique)
+[x] Gestion des salles
 [ ] Configuration des taux horaires (si applicable)
-[ ] Arbre ou navigation par formation
+[x] Arbre ou navigation par formation
 
 Livrables : Référentiel académique complet
 
@@ -218,22 +218,22 @@ Livrables : Référentiel académique complet
 --------------------------------------------------------------------------------
 
 Backend :
-[ ] Modèle Student (Person, inscription, formation, cohorte)
-[ ] Modèle Teacher (Person, contrat Vacataire/Permanent, taux)
-[ ] Modèle Staff (Person, pour personnel non enseignant)
-[ ] CRUD Students (scolarité)
-[ ] CRUD Teachers (admin, scolarité)
-[ ] CRUD Staff
-[ ] Génération matricule automatique
-[ ] Lien User ↔ Person (un User peut être Student, Teacher ou Staff)
+[x] Modèle Student (Person, inscription, formation, cohorte)
+[x] Modèle Teacher (Person, contrat Vacataire/Permanent, taux)
+[x] Modèle Staff (Person, pour personnel non enseignant)
+[x] CRUD Students (scolarité)
+[x] CRUD Teachers (admin, scolarité)
+[x] CRUD Staff
+[x] Génération matricule automatique
+[x] Lien User ↔ Person (un User peut être Student, Teacher ou Staff)
 
 Frontend :
-[ ] Liste étudiants (filtres, recherche, pagination)
+[x] Liste étudiants (filtres, recherche, pagination)
 [ ] Fiche étudiant (détails, inscription, statut financier)
-[ ] Liste enseignants (contrat, taux)
+[x] Liste enseignants (contrat, taux)
 [ ] Fiche enseignant
 [ ] Liste personnel
-[ ] Formulaire création utilisateur (avec rôle et type de personne)
+[x] Formulaire création utilisateur (avec rôle et type de personne)
 
 Livrables : Annuaire complet
 

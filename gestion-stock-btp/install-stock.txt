@@ -1,0 +1,620 @@
+================================================================================
+  INSTALLATION ET HÉBERGEMENT — GESTION STOCK BTP (ESEBAT) — DEBIAN 12
+================================================================================
+Document pratique pour administrateur système / DevOps.
+Basé sur l'analyse réelle du dépôt (composer.json, .env.example, structure).
+================================================================================
+
+--------------------------------------------------------------------------------
+1. PRÉSENTATION RAPIDE DU PROJET
+--------------------------------------------------------------------------------
+
+  Nom du projet
+  -------------
+  gestion-stock-btp (nom technique) / ESEBAT Logistics & Budget Manager
+  Dépôt : https://github.com/lyissa1928-ai/sunudepot
+
+  Objectif
+  --------
+  Application de gestion logistique et budgétaire : demandes de matériel, stock
+  (global et personnel), référentiel articles/désignations, budgets, messagerie
+  interne, bons de livraison, rapports. Rôles : super_admin, director,
+  point_focal, campus_manager, site_manager, staff, technician.
+
+  Stack détectée
+  --------------
+  - Backend : Laravel 12 (PHP ^8.2)
+  - Dépendances PHP : laravel/tinker, spatie/laravel-permission
+  - Frontend : pas de build (pas de package.json ni Vite) ; assets statiques
+    dans public/ (CSS, images). Bootstrap 5 et CSS custom servis tels quels.
+  - Base de données : MariaDB (requise pour ce guide). Laravel utilise le
+    driver mysql pour se connecter à MariaDB.
+  - Session / Cache / File d'attente : base de données (SESSION_DRIVER=database,
+    CACHE_STORE=database, QUEUE_CONNECTION=database). Redis non requis.
+  - Serveur web : Nginx + PHP-FPM (recommandé).
+
+--------------------------------------------------------------------------------
+2. PRÉREQUIS SERVEUR DEBIAN 12
+--------------------------------------------------------------------------------
+
+  Paquets système nécessaires
+  --------------------------
+  - Nginx (serveur web)
+  - PHP 8.2 (CLI + FPM)
+  - Extensions PHP listées en section 3
+  - MariaDB-server et MariaDB-client (base de données requise)
+  - Git, unzip, curl
+
+  Dépendances utiles
+  ------------------
+  - Aucun paquet Node.js/npm requis (pas de build frontend).
+  - Redis non requis (tout en base).
+
+  Outils requis
+  -------------
+  - Composer (installation manuelle depuis getcomposer.org).
+  - Accès root ou sudo pour installer les paquets et configurer Nginx/PHP-FPM.
+
+--------------------------------------------------------------------------------
+3. PRÉREQUIS APPLICATIFS RÉELS
+--------------------------------------------------------------------------------
+
+  Version PHP requise
+  ------------------
+  PHP >= 8.2 (contrainte composer.json : "php": "^8.2").
+
+  Extensions PHP requises
+  ----------------------
+  Obligatoires pour Laravel 12 et ce projet :
+    - php8.2-fpm, php8.2-cli
+    - php8.2-mbstring
+    - php8.2-xml
+    - php8.2-bcmath
+    - php8.2-curl
+    - php8.2-zip
+    - php8.2-gd
+    - php8.2-intl
+  Pour la base de données (MariaDB) :
+    - php8.2-mysql     (driver utilisé par Laravel pour MariaDB)
+
+  Composer
+  --------
+  Requis. Aucune version minimale spécifique ; utiliser la dernière stable.
+
+  Node.js / npm
+  -------------
+  Non nécessaires. Le projet n'a pas de package.json ni de build Vite/Webpack.
+  Les assets sont dans public/css, public/images, etc.
+
+  Serveur web utilisé
+  -------------------
+  Nginx (recommandé), avec PHP-FPM 8.2. Racine documentaire : répertoire
+  public/ du projet (pas la racine du dépôt).
+
+  SGBD utilisé
+  -------------
+  MariaDB. Base esebat, utilisateur dédié. Laravel se connecte via le driver
+  mysql (DB_CONNECTION=mysql).
+
+  Autres services requis
+  ----------------------
+  Aucun. Pas de Redis, pas de file d'attente asynchrone utilisée dans le code
+  (QUEUE_CONNECTION=database présent mais aucun job dispatché). Pas de cron
+  Laravel (aucune tâche planifiée dans routes/console.php).
+
+--------------------------------------------------------------------------------
+4. INSTALLATION DES DÉPENDANCES
+--------------------------------------------------------------------------------
+
+  Mise à jour du système
+  ----------------------
+  sudo apt update
+  sudo apt upgrade -y
+
+  Installation des paquets (PHP + Nginx + MariaDB)
+  ------------------------------------------------
+  sudo apt install -y nginx php8.2 php8.2-fpm php8.2-cli \
+    php8.2-mbstring php8.2-xml php8.2-bcmath php8.2-curl \
+    php8.2-zip php8.2-gd php8.2-intl php8.2-mysql \
+    mariadb-server mariadb-client \
+    git unzip curl
+
+  Installation de Composer
+  -----------------------
+  cd /tmp
+  curl -sS https://getcomposer.org/installer | php
+  sudo mv composer.phar /usr/local/bin/composer
+  composer --version
+
+  Vérifications après installation
+  --------------------------------
+  php -v
+  php -m | grep -E 'mbstring|xml|bcmath|curl|zip|gd|intl|mysql'
+  nginx -v
+  systemctl is-active php8.2-fpm
+  systemctl is-active nginx
+  systemctl is-active mariadb
+
+--------------------------------------------------------------------------------
+5. PRÉPARATION DU PROJET
+--------------------------------------------------------------------------------
+
+  Clonage
+  -------
+  sudo mkdir -p /var/www
+  cd /var/www
+  sudo git clone https://github.com/lyissa1928-ai/sunudepot.git gestion-stock-btp
+  cd gestion-stock-btp
+
+  Dossiers requis AVANT Composer (obligatoire)
+  -------------------------------------------
+  Composer lance "php artisan package:discover" qui exige que bootstrap/cache
+  existe et soit inscriptible. Sinon : erreur "bootstrap/cache directory must
+  be present and writable".
+  mkdir -p bootstrap/cache
+  chmod -R 775 bootstrap/cache
+
+  Installation Composer
+  --------------------
+  composer install --no-dev --optimize-autoloader
+
+  Installation npm / build frontend
+  ---------------------------------
+  Non applicable. Aucun package.json dans le projet.
+
+  Configuration .env
+  ------------------
+  cp .env.example .env
+  nano .env
+
+  À adapter pour la production (extrait pertinent). Deux cas selon l'accès :
+
+  --- Cas A : Installation avec adresse IP (accès par http://IP:port) ---
+    APP_NAME="ESEBAT Logistics & Budget Manager"
+    APP_ENV=production
+    APP_DEBUG=false
+    APP_URL=http://192.168.1.100:8080
+    (Remplacer 192.168.1.100 par l'IP du serveur et 8080 par le port utilisé
+     dans Nginx, ex. listen 8080. Si Nginx écoute sur 80, mettre http://IP sans
+     port : APP_URL=http://192.168.1.100)
+
+    DB_CONNECTION=mysql
+    DB_HOST=127.0.0.1
+    DB_PORT=3306
+    DB_DATABASE=esebat
+    DB_USERNAME=esebat
+    DB_PASSWORD=votre_mot_de_passe
+
+  --- Cas B : Installation avec nom de domaine (aucun port dans l'URL) ---
+    APP_NAME="ESEBAT Logistics & Budget Manager"
+    APP_ENV=production
+    APP_DEBUG=false
+    APP_URL=https://votre-domaine.com
+    (Pas de port : Nginx écoute sur 80 puis 443 avec certificat. L'utilisateur
+     accède à https://votre-domaine.com sans :8080 ni :80.)
+
+    DB_CONNECTION=mysql
+    DB_HOST=127.0.0.1
+    DB_PORT=3306
+    DB_DATABASE=esebat
+    DB_USERNAME=esebat
+    DB_PASSWORD=votre_mot_de_passe
+
+  (La base MariaDB doit être créée au préalable — voir section 6.)
+
+  Génération de clé
+  ----------------
+  php artisan key:generate
+
+  Migrations
+  ----------
+  Première installation (base vide) :
+    php artisan migrate:fresh --force
+  Mise à jour ultérieure (base déjà en place) :
+    php artisan migrate --force
+  (L'ordre des migrations a été corrigé dans le dépôt : table users créée avant
+   material_requests et autres tables qui en dépendent.)
+
+  Seeders
+  -------
+  Optionnel mais recommandé pour un premier déploiement (rôles et permissions
+  + optionnellement données de démo) :
+    php artisan db:seed --class=RolesAndPermissionsSeeder
+    php artisan db:seed
+  Ou uniquement rôles + compte admin (Directeur) :
+    php artisan db:seed --class=RolesAndPermissionsSeeder
+    php artisan esebat:admin
+  (Compte admin : admin@esebat.local / password — à changer en production.)
+
+  Équivalent pour le Super Admin (rôles + compte Super Admin) :
+    php artisan db:seed --class=RolesAndPermissionsSeeder
+    php artisan esebat:super-admin
+  (Compte Super Admin : issa.ly@esebat.com / Admin@2020 — à changer en production.)
+
+  Lien de stockage
+  ----------------
+  Obligatoire pour que les images uploadées (désignations) soient servies
+  sous /storage/... :
+  php artisan storage:link
+
+  Mot de passe oublié
+  -------------------
+  L’application gère les mots de passe oubliés via email :
+  - Page « Mot de passe oublié » : /mot-de-passe-oublie (lien aussi sur la page
+    de connexion).
+  - L’utilisateur saisit son email ; un lien de réinitialisation est envoyé par
+    email (valide 60 minutes).
+  - Page de réinitialisation : /reinitialiser-mot-de-passe/{token}?email=...
+  Pour que les emails partent en production, configurer le SMTP dans .env.
+  Guide détaillé (Gmail, Outlook, OVH, Mailtrap) : docs/CONFIGURATION-SMTP.md
+  Résumé des variables :
+  MAIL_MAILER=smtp
+  MAIL_HOST=... (ex. smtp.gmail.com)
+  MAIL_PORT=587
+  MAIL_USERNAME=...
+  MAIL_PASSWORD=...
+  MAIL_ENCRYPTION=tls
+  MAIL_FROM_ADDRESS="noreply@votre-domaine.com"
+  MAIL_FROM_NAME="${APP_NAME}"
+  Puis : php artisan config:clear && php artisan config:cache
+  (Avec MAIL_MAILER=log, le lien est écrit dans storage/logs/laravel.log
+   au lieu d’être envoyé — utile en dev.)
+
+--------------------------------------------------------------------------------
+6. CONFIGURATION DE LA BASE DE DONNÉES (MariaDB)
+--------------------------------------------------------------------------------
+
+  Création de la base et de l'utilisateur
+  ---------------------------------------
+  À exécuter après l'installation de MariaDB (section 4). Remplacer
+  MOT_DE_PASSE_FORT par un mot de passe sécurisé.
+
+  sudo mysql -e "CREATE DATABASE esebat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+  sudo mysql -e "CREATE USER 'esebat'@'localhost' IDENTIFIED BY 'MOT_DE_PASSE_FORT';"
+  sudo mysql -e "GRANT ALL PRIVILEGES ON esebat.* TO 'esebat'@'localhost';"
+  sudo mysql -e "FLUSH PRIVILEGES;"
+
+  Paramètres à reporter dans .env
+  ------------------------------
+  DB_CONNECTION=mysql
+  DB_HOST=127.0.0.1
+  DB_PORT=3306
+  DB_DATABASE=esebat
+  DB_USERNAME=esebat
+  DB_PASSWORD=MOT_DE_PASSE_FORT
+
+--------------------------------------------------------------------------------
+7. CONFIGURATION DU SERVEUR WEB
+--------------------------------------------------------------------------------
+
+  Serveur utilisé : Nginx + PHP-FPM 8.2
+
+  Deux types d'accès possibles :
+  - Par adresse IP : Nginx peut écouter sur un port (ex. 8080) ; l'URL affiche
+    le port (http://IP:8080).
+  - Par nom de domaine : Nginx écoute sur le port 80 (et 443 en HTTPS). Aucun
+    port visible dans l'URL (https://domaine.com).
+
+  -------- Cas A : Accès par adresse IP (avec port dans l'URL) --------
+  Fichier : /etc/nginx/sites-available/gestion-stock-btp
+
+  Remplacer 192.168.1.100 par l'IP réelle du serveur et 8080 par le port
+  souhaité (80 pour pas de port dans l'URL, 8080 pour http://IP:8080).
+
+  server {
+      listen 8080;
+      server_name 192.168.1.100;
+      root /var/www/gestion-stock-btp/public;
+
+      add_header X-Frame-Options "SAMEORIGIN";
+      add_header X-Content-Type-Options "nosniff";
+
+      index index.php;
+
+      charset utf-8;
+
+      location / {
+          try_files $uri $uri/ /index.php?$query_string;
+      }
+
+      location = /favicon.ico { access_log off; log_not_found off; }
+      location = /robots.txt  { access_log off; log_not_found off; }
+
+      error_page 404 /index.php;
+
+      location ~ \.php$ {
+          fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+          fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+          include fastcgi_params;
+          fastcgi_hide_header X-Powered-By;
+          fastcgi_read_timeout 300;
+      }
+  }
+
+  Dans .env : APP_URL=http://192.168.1.100:8080 (même IP et port que ci-dessus).
+  Si vous utilisez le port 80 : listen 80 et APP_URL=http://192.168.1.100 (sans port).
+
+  -------- Cas B : Accès par nom de domaine (pas de port dans l'URL) --------
+  Nginx écoute sur le port 80 (HTTP). Avec certificat SSL (certbot), écoute
+  aussi sur 443 (HTTPS). L'utilisateur ouvre https://votre-domaine.com sans
+  taper :80 ou :443.
+
+  server {
+      listen 80;
+      server_name votre-domaine.com www.votre-domaine.com;
+      root /var/www/gestion-stock-btp/public;
+
+      add_header X-Frame-Options "SAMEORIGIN";
+      add_header X-Content-Type-Options "nosniff";
+
+      index index.php;
+
+      charset utf-8;
+
+      location / {
+          try_files $uri $uri/ /index.php?$query_string;
+      }
+
+      location = /favicon.ico { access_log off; log_not_found off; }
+      location = /robots.txt  { access_log off; log_not_found off; }
+
+      error_page 404 /index.php;
+
+      location ~ \.php$ {
+          fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+          fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+          include fastcgi_params;
+          fastcgi_hide_header X-Powered-By;
+          fastcgi_read_timeout 300;
+      }
+  }
+
+  Dans .env : APP_URL=https://votre-domaine.com (sans port).
+  Après configuration du certificat SSL : certbot --nginx -d votre-domaine.com
+
+  Racine publique exacte
+  ---------------------
+  root /var/www/gestion-stock-btp/public;
+  (Ne jamais pointer la racine sur /var/www/gestion-stock-btp.)
+
+  Activation du site et test
+  --------------------------
+  Choisir un seul cas (A ou B), créer le fichier correspondant, puis :
+  sudo ln -s /etc/nginx/sites-available/gestion-stock-btp /etc/nginx/sites-enabled/
+  sudo nginx -t
+  sudo systemctl reload nginx
+
+  Configuration PHP-FPM
+  ---------------------
+  La version PHP utilisée par le serveur web est celle du paquet phpX.Y-fpm.
+  Vérifier avec : php -v (en CLI). Selon la version installée :
+  - PHP 8.2 : fastcgi_pass unix:/var/run/php/php8.2-fpm.sock ; service php8.2-fpm
+  - PHP 8.3 : fastcgi_pass unix:/var/run/php/php8.3-fpm.sock ; service php8.3-fpm
+  Remplacer dans les exemples de config Nginx ci-dessus php8.2-fpm.sock par
+  la socket correspondant à votre version (ex. php8.3-fpm.sock si php -v affiche 8.3).
+
+--------------------------------------------------------------------------------
+8. PERMISSIONS ET SÉCURITÉ
+--------------------------------------------------------------------------------
+
+  Propriétaire recommandé
+  -----------------------
+  www-data (utilisateur et groupe du serveur web sous Debian).
+
+  Commandes
+  ---------
+  sudo chown -R www-data:www-data /var/www/gestion-stock-btp
+
+  Droits nécessaires
+  ------------------
+  - 755 pour les répertoires et fichiers du projet, sauf :
+  - 775 pour storage et bootstrap/cache (écriture par le serveur web pour
+    logs, cache, sessions, uploads) :
+
+  sudo chmod -R 755 /var/www/gestion-stock-btp
+  sudo chmod -R 775 /var/www/gestion-stock-btp/storage
+  sudo chmod -R 775 /var/www/gestion-stock-btp/bootstrap/cache
+
+  Dossiers à rendre accessibles en écriture
+  ----------------------------------------
+  - storage (et tout son contenu : framework/sessions, framework/views,
+    framework/cache, logs, app/public si utilisé)
+  - bootstrap/cache
+
+  En cas d'erreur "Permission denied" sur storage/logs/laravel.log
+  -----------------------------------------------------------------
+  Si le fichier a été créé par root (ex. php artisan lancé en root), www-data
+  ne peut plus y écrire. À exécuter sur le serveur (en root) :
+    sudo chown -R www-data:www-data /var/www/gestion-stock-btp/storage
+    sudo chmod -R 775 /var/www/gestion-stock-btp/storage
+  Si le fichier laravel.log existe déjà et appartient à root, on peut le
+  supprimer pour qu'il soit recréé avec le bon propriétaire au prochain log :
+    sudo rm -f /var/www/gestion-stock-btp/storage/logs/laravel.log
+  puis relancer les deux commandes chown/chmod ci-dessus.
+
+  Points de vigilance
+  ------------------
+  - Ne pas exposer .env (il est en dehors de public/, donc correct).
+  - Ne pas mettre le dépôt dans public/ ; la racine Nginx doit être public/.
+  - Après toute mise à jour du code (git pull), ré-exécuter si besoin :
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
+  et vérifier les droits sur storage et bootstrap/cache.
+
+--------------------------------------------------------------------------------
+9. OPTIMISATION POUR LA PRODUCTION
+--------------------------------------------------------------------------------
+
+  Caches Laravel
+  -------------
+  php artisan config:cache
+  php artisan route:cache
+  php artisan view:cache
+
+  Queue worker
+  -----------
+  Non utilisé par l'application (aucun job dispatché dans le code). Inutile
+  de lancer un worker ou Supervisor pour ce projet.
+
+  Cron
+  ----
+  Aucune tâche planifiée définie dans routes/console.php. Aucune entrée
+  crontab requise pour Laravel.
+
+  Supervisor
+  ----------
+  Non nécessaire (pas de queue worker à maintenir).
+
+  Assets
+  ------
+  Aucun build à exécuter. Les CSS/JS et images sont déjà dans public/ et
+  servis tels quels.
+
+--------------------------------------------------------------------------------
+10. PHASE DE TEST
+--------------------------------------------------------------------------------
+
+  Tests techniques après déploiement
+  ---------------------------------
+  Selon le cas choisi (IP ou domaine) :
+
+  - Accès par IP (ex. port 8080) :
+    1. curl -I http://192.168.1.100:8080/
+    2. curl http://192.168.1.100:8080/up
+    → 200 ou 302 pour la racine, 200 pour /up.
+
+  - Accès par nom de domaine (pas de port dans l'URL) :
+    1. curl -I https://votre-domaine.com/
+    2. curl https://votre-domaine.com/up
+    → 200 ou 302 pour la racine, 200 pour /up.
+
+  Test accès page login
+  --------------------
+  - Avec IP : http://192.168.1.100:8080/login (adapter IP et port).
+  - Avec domaine : https://votre-domaine.com/login (aucun port visible).
+  La page de connexion doit s'afficher (formulaire, logo si présent).
+
+  Test connexion base
+  ------------------
+  php artisan tinker
+  >>> \Illuminate\Support\Facades\DB::connection()->getPdo();
+  >>> \App\Models\User::count();
+  (Quitter avec exit.)
+
+  Test chargement assets CSS/JS
+  -----------------------------
+  Sur la page login ou le tableau de bord : vérifier que les feuilles de style
+  (Bootstrap, esebat-dashboard-template.css) et les images (logo, favicon)
+  se chargent (pas d'erreur 404 dans l'onglet Réseau du navigateur).
+
+  Test fonctionnalités critiques
+  -----------------------------
+  - Connexion avec un compte (ex. admin@esebat.local après esebat:admin).
+  - Accès au tableau de bord.
+  - Accès à une page utilisant le stockage (ex. catalogue / référentiel avec
+    image) : vérifier que /storage/items/... répond (après storage:link).
+
+  Test logs
+  ---------
+  En cas d'erreur 500 : consulter storage/logs/laravel.log.
+  Vérifier que le répertoire storage/logs est inscriptible par www-data.
+
+--------------------------------------------------------------------------------
+11. PROBLÈMES FRÉQUENTS
+--------------------------------------------------------------------------------
+
+  Erreur 502 Bad Gateway / connect() to unix:... failed (No such file or directory)
+  --------------------------------------------------------------------------------
+  Cause : PHP-FPM n’est pas démarré ou la socket / version PHP ne correspond pas.
+  Utiliser la version indiquée par php -v (ex. 8.3 → php8.3-fpm) :
+    1. Démarrer PHP-FPM (adapter 8.2 en 8.3 si php -v affiche 8.3) :
+       sudo systemctl start php8.3-fpm
+    2. Activer au démarrage (optionnel) :
+       sudo systemctl enable php8.3-fpm
+    3. Vérifier que la socket existe :
+       ls -la /run/php/php8.3-fpm.sock
+    4. Dans la config Nginx, fastcgi_pass doit pointer vers cette socket :
+       fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+       (Si la config indique encore php8.2-fpm.sock alors que vous avez PHP 8.3,
+        remplacer par php8.3-fpm.sock et reload nginx.)
+    5. Recharger Nginx :
+       sudo systemctl reload nginx
+
+  Erreur 500 après déploiement
+  ---------------------------
+  Causes possibles : APP_KEY vide, permissions storage/bootstrap/cache,
+  base de données inaccessible (mauvais .env), extension PHP manquante.
+  Solutions : php artisan key:generate ; chmod 775 storage bootstrap/cache ;
+  chown www-data:www-data ; vérifier DB_* dans .env et que mysql est actif.
+
+  Page blanche ou "Permission denied" sur storage
+  ---------------------------------------------
+  Cause : www-data ne peut pas écrire dans storage ou bootstrap/cache.
+  Solution : chown -R www-data:www-data /var/www/gestion-stock-btp ;
+  chmod -R 775 storage bootstrap/cache.
+
+  Images /storage/... en 404
+  -------------------------
+  Cause : lien symbolique storage non créé.
+  Solution : php artisan storage:link (à exécuter depuis la racine du projet).
+
+  "No application encryption key has been specified"
+  -------------------------------------------------
+  Cause : .env absent ou APP_KEY vide.
+  Solution : cp .env.example .env ; php artisan key:generate.
+
+  SQLSTATE connection refused / Access denied for user
+  ---------------------------------------------------
+  Cause : mauvais DB_HOST, DB_USERNAME, DB_PASSWORD ou MariaDB non démarré.
+  Solution : vérifier .env et sudo systemctl start mariadb ; tester la
+  connexion avec mysql -u esebat -p esebat.
+
+  Table 'esebat.xxx' doesn't exist / Foreign key incorrectly formed
+  ----------------------------------------------------------------
+  Cause : ordre des migrations incorrect (migration qui modifie une table avant
+  que celle-ci soit créée). Le dépôt a été révisé pour corriger l'ordre.
+  Solution : git pull pour récupérer les migrations à jour, puis
+  php artisan migrate:fresh --force (première install) ou migrate --force.
+
+--------------------------------------------------------------------------------
+12. CHECKLIST DÉPLOIEMENT (À SUIVRE DANS L'ORDRE)
+--------------------------------------------------------------------------------
+
+  [ ] 1. Serveur à jour (apt update / upgrade)
+  [ ] 2. Paquets installés (Nginx, PHP 8.2 + extensions, MariaDB, Composer)
+  [ ] 3. Base esebat et utilisateur MariaDB créés
+  [ ] 4. Projet cloné dans /var/www/gestion-stock-btp
+  [ ] 5. bootstrap/cache créé et chmod 775
+  [ ] 6. composer install --no-dev --optimize-autoloader
+  [ ] 7. cp .env.example .env puis configuration .env (APP_URL, DB_*, APP_ENV=production)
+  [ ] 8. php artisan key:generate
+  [ ] 9. php artisan migrate:fresh --force (première fois) ou migrate --force
+  [ ] 10. php artisan db:seed --class=RolesAndPermissionsSeeder puis esebat:admin ou db:seed
+  [ ] 11. php artisan storage:link
+  [ ] 12. php artisan config:cache ; route:cache ; view:cache
+  [ ] 13. chown -R www-data:www-data ; chmod 775 storage bootstrap/cache
+  [ ] 14. Nginx configuré (racine = .../public), site activé, nginx -t, reload
+  [ ] 15. Test : accès login, connexion BDD, assets, /storage
+
+--------------------------------------------------------------------------------
+13. CHANGEMENTS MAJEURS (RÉVISION PROJET POUR DÉPLOIEMENT)
+--------------------------------------------------------------------------------
+
+  Corrections appliquées dans le dépôt pour éviter les échecs au déploiement :
+
+  - Ordre des migrations : La table users est maintenant créée avant les tables
+    qui en dépendent (material_requests, request_items, etc.). Fichiers
+    concernés : create_users_table déplacé en 2026_03_10_140050 ; migrations
+    add_matricule, material_request_participants, request_type, user_stock_
+    movements déplacées après création des tables liées.
+  - bootstrap/cache : À créer et rendre inscriptible avant de lancer
+    composer install (évite l'erreur PackageManifest ligne 179).
+  - Première installation : Utiliser migrate:fresh --force sur une base vide
+    pour appliquer toutes les migrations dans le bon ordre.
+  - Documentation : install-stock.txt mis à jour avec les deux cas (IP / domaine),
+    checklist déploiement et pièges courants.
+
+================================================================================
+  FIN DU DOCUMENT
+================================================================================

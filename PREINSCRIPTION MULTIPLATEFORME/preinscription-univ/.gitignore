@@ -1,0 +1,27 @@
+# Dépendances
+node_modules/
+**/node_modules/
+
+# Secrets & environnement
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# Builds frontend
+frontend/dist/
+*.log
+
+# Fichiers uploadés et sauvegardes auto (données locales)
+backend/uploads/
+backend/database/backups/
+
+# Note : backend/database/preinscription.json est VERSIONNÉ (jeu démo : établissements, filières, formations).
+# Ne pas l’ajouter ici — sinon les clones GitHub n’auraient plus de données.
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,393 @@
+PROMPT 2  
+
+Auth complète + RBAC + Audit + “mot de passe par défaut = matricule” (Web Fullstack)
+
+Objectif : Implémenter l’authentification réelle (backend + frontend), le RBAC, l’audit, et le flux première connexion obligatoire (changement mot de passe). Tout doit être production-ready et intégré au style UI “dernière génération” du Prompt 1.
+
+1) Backend (NestJS) — Auth & Sécurité
+1.1 Modules à créer / compléter
+
+Créer les modules :
+
+auth
+
+users
+
+roles (ou RBAC)
+
+audit
+
+common/security
+
+common/guards
+
+common/decorators
+
+Conventions
+
+API versionnée : /api/v1
+
+Swagger complet et à jour
+
+Erreurs normalisées { code, message, details, requestId }
+
+1.2 Modèle de données (Prisma) — à mettre à jour
+1.2.1 User
+
+Champs minimum requis :
+
+id (uuid)
+
+matricule (unique, required)
+
+email (unique, required)
+
+phone (required)
+
+firstName, lastName (required)
+
+passwordHash (required)
+
+role (enum ou relation Role)
+
+status (enum: ACTIVE, SUSPENDED, DISABLED)
+
+firstLoginRequired (boolean, default true)
+
+lastLoginAt (datetime nullable)
+
+passwordChangedAt (datetime nullable)
+
+createdAt, updatedAt
+
+Règle : à la création d’un utilisateur, le mot de passe initial = matricule (hashé) et firstLoginRequired = true.
+
+1.2.2 RBAC (choix recommandé)
+
+Option A (simple et robuste) : enum Role
+
+role enum : SUPER_ADMIN | ADMIN | SCOLARITE | DEPT_HEAD | TEACHER | STUDENT | FINANCE | AUDITOR
+
+Permissions codées par guard (mapping rôle → actions autorisées)
+
+Option B (granulaire) : tables Role + Permission + RolePermission
+
+Implémenter si possible, sinon garder Option A et préparer Option B.
+
+👉 Choisir Option A maintenant, mais structurer le code pour évoluer vers B.
+
+1.2.3 RefreshToken
+
+Créer table :
+
+id
+
+userId
+
+tokenHash
+
+expiresAt
+
+revokedAt (nullable)
+
+createdAt
+
+userAgent (nullable)
+
+ipAddress (nullable)
+
+1.2.4 AuditLog
+
+Déjà présent (Prompt 1) — compléter si besoin :
+
+actorUserId nullable
+
+action (string)
+
+entity (string)
+
+entityId (string nullable)
+
+before JSON
+
+after JSON
+
+ipAddress, userAgent
+
+createdAt
+
+1.3 Endpoints Auth (à implémenter)
+POST /api/v1/auth/login
+
+Body:
+
+{ "matricule": "STRING", "password": "STRING" }
+
+Réponse:
+
+{
+  "accessToken": "...",
+  "refreshToken": "...",
+  "user": { "id": "...", "matricule": "...", "role": "...", "firstLoginRequired": true }
+}
+
+Règles :
+
+Si status ≠ ACTIVE → refuser (ACCOUNT_DISABLED)
+
+Password hash compare
+
+Mise à jour lastLoginAt
+
+Audit log : AUTH_LOGIN_SUCCESS (et AUTH_LOGIN_FAILED en cas d’échec, sans exposer la cause exacte)
+
+POST /api/v1/auth/refresh
+
+Body:
+
+{ "refreshToken": "..." }
+
+Réponse:
+
+nouveaux tokens (rotation refresh) + user
+
+POST /api/v1/auth/logout
+
+Révoque le refresh token courant (ou tous si option)
+
+POST /api/v1/auth/change-password
+
+Protégé JWT.
+Body:
+
+{ "oldPassword": "...", "newPassword": "...", "confirmNewPassword": "..." }
+
+Règles :
+
+Politique mot de passe (min 8 + maj + min + chiffre + spécial)
+
+Si firstLoginRequired=true, obligatoire de passer par change-password
+
+Mettre firstLoginRequired=false après succès
+
+Audit : AUTH_PASSWORD_CHANGED
+
+POST /api/v1/auth/force-first-login-change
+
+Optionnel : endpoint interne (admin) pour rebasculer firstLoginRequired=true.
+
+1.4 Guards & RBAC
+1.4.1 JwtAuthGuard
+
+Vérifie access token
+
+Injecte req.user
+
+1.4.2 RolesGuard + decorator @Roles(...)
+
+Empêche accès selon rôle
+
+1.4.3 “FirstLoginGuard”
+
+Pour toutes les routes /app/** côté frontend on gère UX, mais côté backend :
+
+Pour endpoints sensibles (ex: user profile update), refuser si firstLoginRequired=true sauf /auth/change-password
+
+1.5 Sécurité
+
+Rate limiting login (par IP + matricule)
+
+Messages d’erreur non révélateurs
+
+Password hashing Argon2 (ou bcrypt cost élevé)
+
+Refresh token stocké hashé en DB
+
+Rotation refresh token (nouveau à chaque refresh)
+
+CORS strict (origins du frontend)
+
+Helmet + secure headers
+
+1.6 Swagger
+
+Tag Auth
+
+Exemples de payloads
+
+Schémas DTO
+
+2) Backend — Users (minimal pour UI)
+
+Créer endpoints (protégés RBAC) :
+
+GET /api/v1/users/me
+
+Retourne profil
+
+GET /api/v1/users
+
+Accessible rôles : SUPER_ADMIN, ADMIN
+
+Pagination + search q=
+
+Réponse paginée
+
+POST /api/v1/users
+
+Accessible SUPER_ADMIN, ADMIN
+Body: matricule, nom, prénom, email, phone, role, status
+Règle :
+
+mot de passe initial = matricule
+
+firstLoginRequired=true
+
+Audit : USER_CREATED
+
+PATCH /api/v1/users/:id
+
+update role/status/contacts
+
+Audit : USER_UPDATED
+
+Pas de delete physique. Ajouter DISABLED si besoin.
+
+3) Frontend (Next.js) — Auth UI “dernier cri”
+3.1 Gestion session
+
+Stocker accessToken en mémoire (React state) ou cookie httpOnly via proxy (option avancée)
+
+Pour ce prompt :
+✅ Utiliser cookies httpOnly si possible (meilleur) : Next route handler /api/auth/* qui proxifie vers backend.
+Sinon : localStorage + refresh (moins secure).
+👉 Préférence : cookies httpOnly.
+
+3.2 Pages à finaliser
+/login
+
+Form Zod + react-hook-form
+
+Call API /api/v1/auth/login
+
+Si firstLoginRequired=true → redirect /first-login
+
+Sinon → redirect /app
+
+/first-login
+
+Form “nouveau mot de passe” + confirmation
+
+UI très propre (cards, progress, guidelines)
+
+Appelle /api/v1/auth/change-password
+
+Au succès → redirect /app + toast “Mot de passe mis à jour”
+
+/app/settings
+
+Ajouter section “Changer mot de passe”
+
+Appelle change-password (avec oldPassword + newPassword)
+
+3.3 Guard de navigation
+
+Middleware Next :
+
+Si pas de token → redirect /login
+
+Si firstLoginRequired=true et route ≠ /first-login → redirect /first-login
+
+3.4 UX moderne
+
+Toast succès/erreur
+
+Loading states / disabled button
+
+Error messages friendly
+
+Animation légère framer-motion
+
+4) Frontend — Users UI (liste + création)
+
+Sur /app/users :
+
+4.1 Liste
+
+Table shadcn
+
+Search input
+
+Pagination
+
+Badge role/status
+
+Drawer/Modal “Détails”
+
+4.2 Création utilisateur
+
+Modal form :
+
+matricule, nom, prénom, email, phone, role, status
+
+Texte clair : “Mot de passe initial = matricule”
+
+À la création : toast + refresh table
+
+4.3 Sécurité UI
+
+Masquer page si role pas admin
+
+Afficher écran “Accès refusé” stylé
+
+5) Audit (backend) — obligatoire
+
+Logger automatiquement :
+
+LOGIN_SUCCESS / LOGIN_FAILED
+
+PASSWORD_CHANGED
+
+USER_CREATED / USER_UPDATED
+
+LOGOUT
+Inclure ip + userAgent + requestId
+
+6) Tests (minimum)
+Backend
+
+tests e2e ou integration :
+
+login ok
+
+login fail
+
+change password ok
+
+refresh ok
+
+RBAC bloque /users pour non-admin
+
+Frontend
+
+build OK + lint OK
+
+(option) test simple des pages
+
+7) Definition of Done (PROMPT 2)
+
+Terminé si :
+
+Auth complète fonctionne (login/refresh/logout/change-password)
+
+First-login enforced (backend + frontend)
+
+RBAC protège /users
+
+UI /login + /first-login + /app/users utilisables, modernes
+
+Audit logs écrits en DB
+
+Swagger documente tout
+
+Docker compose fonctionne

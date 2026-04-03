@@ -1,0 +1,37 @@
+# Dépendances
+node_modules/
+__pycache__/
+*.pyc
+.pnp
+.pnp.js
+
+# Fichiers sensibles
+.env
+.env.local
+.env.*.local
+*.env
+
+# Build / Cache
+.next/
+out/
+dist/
+build/
+.nuxt/
+.output/
+*.log
+.cache/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Base de données
+*.db
+*.sqlite
+
+# Docker
+.docker/

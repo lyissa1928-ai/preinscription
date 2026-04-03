@@ -1,0 +1,49 @@
+{
+  "HomePage": {
+    "badge": "E-agriculture platform Senegal",
+    "title": "E-agriculture platform for Senegal",
+    "subtitle": "Manage your parcels, follow crop recommendations and receive real-time weather alerts. A complete solution for smart agriculture.",
+    "cta": "Access the platform",
+    "login": "Login",
+    "features": {
+      "parcels": {
+        "title": "Parcel management",
+        "desc": "Create and track your parcels with geolocation and interactive map."
+      },
+      "recommendations": {
+        "title": "Recommendations",
+        "desc": "Crop recommendations based on soil, weather and regions."
+      },
+      "weather": {
+        "title": "Weather & data",
+        "desc": "Weather forecasts and history to optimize your decisions."
+      },
+      "alerts": {
+        "title": "Real-time alerts",
+        "desc": "Notifications on risks (drought, rain, etc.) per parcel."
+      }
+    },
+    "footer": "Smart Agriculture © Senegal — E-agriculture platform"
+  },
+  "Auth": {
+    "login": "Login",
+    "loginButton": "Sign in",
+    "loginLoading": "Signing in...",
+    "forgotPassword": "Forgot password?",
+    "accountsNote": "Accounts are created by the administrator.",
+    "sessionTimeout": "Your session was closed after a period of inactivity. Please log in again."
+  },
+  "Nav": {
+    "dashboard": "Dashboard",
+    "farm": "Farm",
+    "parcels": "Parcels",
+    "alerts": "Alerts",
+    "consultation": "Consultation",
+    "sensors": "Sensors",
+    "admin": "Administration",
+    "profile": "Profile",
+    "logout": "Log out",
+    "brand": "Agriculture",
+    "subtitle": "e-agriculture Senegal"
+  }
+}

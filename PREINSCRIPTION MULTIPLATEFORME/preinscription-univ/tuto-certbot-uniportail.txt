@@ -1,0 +1,149 @@
+================================================================================
+  TUTORIEL — HTTPS avec Certbot (Let’s Encrypt) pour uniportail-digital.com
+  Serveur : Debian / Nginx (VPS LWS ; panneau Hestia possible — lire l’encadré)
+================================================================================
+
+  Domaine visé : uniportail-digital.com (+ www si besoin)
+  Prérequis :
+    - DNS : A @ et www → IP du VPS
+    - http://uniportail-digital.com répond déjà (Nginx sert le site)
+    - Ports 80 et 443 ouverts
+
+================================================================================
+  INSTALLATION DE CERTBOT (si pas déjà fait)
+================================================================================
+
+--------------------------------------------------------------------------------
+sudo apt update
+sudo apt install -y certbot python3-certbot-nginx
+certbot --version
+--------------------------------------------------------------------------------
+
+================================================================================
+  MÉTHODE 1 — Certbot + plugin Nginx (la plus simple)
+================================================================================
+
+  Certbot modifie la configuration Nginx pour ajouter SSL et, en général, la
+  redirection HTTP → HTTPS.
+
+  Copier-coller (adapter l’email) :
+
+--------------------------------------------------------------------------------
+sudo certbot --nginx \
+  -d uniportail-digital.com \
+  -d www.uniportail-digital.com \
+  --non-interactive \
+  --agree-tos \
+  -m votre-email@exemple.com \
+  --redirect
+--------------------------------------------------------------------------------
+
+  Sans --non-interactive, certbot posera des questions (email, CGU).
+
+  Test de renouvellement :
+
+--------------------------------------------------------------------------------
+sudo certbot renew --dry-run
+--------------------------------------------------------------------------------
+
+  Renouvellement : un timer systemd / cron lance souvent certbot renew 2×/jour.
+
+================================================================================
+  APRÈS CERTBOT — Backend (CORS)
+================================================================================
+
+  Mets à jour le fichier .env puis redémarre l’API :
+
+--------------------------------------------------------------------------------
+sudo nano /var/www/uniportail/backend/.env
+--------------------------------------------------------------------------------
+
+  Ligne (une seule ligne) :
+
+    CORS_ORIGINS=https://uniportail-digital.com,https://www.uniportail-digital.com
+
+--------------------------------------------------------------------------------
+pm2 restart uniportail-api
+--------------------------------------------------------------------------------
+
+================================================================================
+  VÉRIFICATIONS
+================================================================================
+
+--------------------------------------------------------------------------------
+sudo nginx -t && sudo systemctl reload nginx
+curl -sI https://uniportail-digital.com/ | head -8
+--------------------------------------------------------------------------------
+
+  Navigateur : https://uniportail-digital.com — cadenas valide.
+
+================================================================================
+  MÉTHODE 2 — Certbot en mode « webroot » (sans modifier Nginx automatiquement)
+================================================================================
+
+  Utile si le plugin Nginx échoue ou si tu préfères gérer SSL à la main.
+  Remplace WEBROOT par la racine web du domaine (celle servie en HTTP pour
+  uniportail-digital.com), par exemple :
+
+    /home/admin/web/uniportail-digital.com/public_html
+
+  ou, si tu pointes directement le build Vite :
+
+    /var/www/uniportail/frontend/dist
+
+--------------------------------------------------------------------------------
+sudo certbot certonly --webroot \
+  -w /home/admin/web/uniportail-digital.com/public_html \
+  -d uniportail-digital.com \
+  -d www.uniportail-digital.com \
+  -m votre-email@exemple.com \
+  --agree-tos
+--------------------------------------------------------------------------------
+
+  Les certificats seront dans :
+
+    /etc/letsencrypt/live/uniportail-digital.com/
+
+  Il faudra alors configurer Nginx à la main (ssl_certificate,
+  ssl_certificate_key) pour ce vhost, ou importer les chemins dans le panneau
+  si ton hébergeur le propose.
+
+================================================================================
+  HESTIA / LWS — À LIRE AVANT D’UTILISER CERTBOT
+================================================================================
+
+  - « certbot --nginx » peut entrer en conflit avec les configs régénérées par
+    Hestia lors d’un « rebuild » ou d’une modification du domaine dans le
+    panneau. Fais une sauvegarde :
+
+      sudo cp -a /etc/nginx /root/backup-nginx-$(date +%Y%m%d)
+
+  - Après une commande certbot réussie, vérifie toujours :
+
+      sudo nginx -t
+      sudo systemctl reload nginx
+
+  - Si le panneau écrase ta config SSL, deux approches stables :
+      (1) Utiliser uniquement le SSL du panneau Hestia, ou
+      (2) Certbot en « certonly --webroot » puis déclarer les chemins
+          /etc/letsencrypt/live/... dans une config Nginx « custom » prévue par
+          Hestia (directives personnalisées du domaine), sans que certbot
+          réécrive tout le fichier.
+
+================================================================================
+  DÉPANNAGE RAPIDE
+================================================================================
+
+  Échec « Failed to verify domain »
+    → DNS, pare-feu port 80, ou mauvais WEBROOT pour --webroot.
+
+  Erreur nginx après certbot
+    → sudo nginx -t ; lire le message ; restaurer la sauvegarde si besoin.
+
+  Plusieurs blocs server_name pour le même domaine
+    → Certbot peut se tromper de bloc ; utilise --webroot ou précise le
+      server_name dans une config claire.
+
+================================================================================
+FIN
+================================================================================

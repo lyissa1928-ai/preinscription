@@ -1,0 +1,416 @@
+# DOCUMENT : mouha.txt
+# OBJET : Analyse et justification du design frontend — Projet Gestion Scolaire
+
+---
+
+## 1. État actuel
+
+### 1.1 Structure du layout
+
+- **Layout global** : Un seul layout dashboard (`dashboard/layout.tsx`) avec **header horizontal** en haut (pas de sidebar). Le header contient : logo "Gestion Scolaire", liens de navigation conditionnels selon le rôle (Tableau de bord, Scolarité, Pédagogie, Admin, Mon profil), cloche notifications (emoji 🔔), nom + rôle de l'utilisateur, bouton Déconnexion.
+- **Zone principale** : `<main className="p-6 text-slate-900">` — contenu en pleine largeur avec padding fixe. Fond `bg-slate-50`.
+- **Layouts par rôle** (admin, comptable, scolarite, pedagogie) : Ce sont des **guards** (vérification du rôle et redirection), pas des layouts visuels. Ils ne définissent pas de sidebar ni de structure propre à chaque domaine.
+- **Résultat** : Toutes les zones (admin, scolarité, comptable, enseignant, étudiant) partagent le même bandeau horizontal. La navigation vers les sous-modules se fait soit par des liens dans le header (limités), soit par les cartes des dashboards.
+
+### 1.2 Choix de couleurs
+
+- **CSS (globals.css)** : Variables `--background: #f8fafc`, `--foreground: #0f172a`, `--color-primary: #2563eb`, `--color-secondary: #64748b`, `--color-success`, `--color-warning`, `--color-danger`, `--color-sidebar: #ffffff`, `--color-border-subtle`.
+- **Tailwind** : Utilisation systématique de **slate** (slate-50, slate-200, slate-600, slate-800, slate-900) pour fonds, textes et bordures. **blue-600** pour liens actifs et bouton primary. **emerald / amber / red** pour variantes de NavCard et badges.
+- **ThemeContext** : Thème dynamique (logo, favicon, primaryColor, secondaryColor, successColor, dangerColor, backgroundColor, sidebarColor) chargé depuis l’API `/appearance/settings`. Les composants UI n’utilisent pas encore ces variables CSS de façon systématique (restent en classes Tailwind fixes).
+
+### 1.3 Composants UI utilisés
+
+- **PageHeader** : Titre (text-2xl), description optionnelle, slot enfants pour actions. Couleurs en dur (slate-900, slate-600).
+- **Card** : Section avec bordure slate-200, shadow-sm, rounded-xl, header optionnel (titre, description, headerRight).
+- **NavCard** : Lien en carte avec variantes (default, blue, emerald, amber, red), titre, description, badge optionnel.
+- **Button** : Variantes primary (blue-600), secondary (slate-100), ghost, danger ; tailles sm/md/lg ; leftIcon, loading.
+- **BadgeStatus** : Mapping de statuts (INSCRIT, VALIDE, ANNULEE, PENDING, etc.) vers des classes ring + bg/text (amber, green, red, slate). Fallback slate pour statuts inconnus.
+- **EmptyState** : Icône (caractère ⓘ dans un cercle slate), titre, description, action optionnelle.
+- **Spinner** : Cercle animé border-t-blue-600 + label.
+
+Aucun composant dédié : Input, Select, Label, Modal, DataTable, Pagination, Tabs, Tooltip, Dropdown menu.
+
+### 1.4 Organisation des dashboards
+
+- **Admin** : Utilise PageHeader + Card + NavCard en grille. Plusieurs blocs (Accès par domaine, Indicateurs, Admin — Gouvernance…). Cohérent avec le design system.
+- **Comptable** : Titre h1 + paragraphe en dur, puis grille de **Link** en cartes (styles répétés : `bg-white p-4 rounded-lg shadow border border-slate-200 hover:border-blue-400`). Pas de PageHeader ni Card/NavCard.
+- **Scolarité** : Similaire à Comptable (à vérifier selon la page d’accueil scolarité).
+- **Enseignant** : Titre + texte, sections avec listes (ul/li), puis grille de Link en cartes. Styles de cartes dupliqués.
+- **Étudiant** : Très simple : titre, paragraphe, grille de 3 Link en cartes. Pas de données dynamiques sur le dashboard.
+
+**Incohérence** : Seul l’admin utilise pleinement PageHeader / Card / NavCard. Les autres rôles répliquent des blocs Link + classes manuelles.
+
+### 1.5 Navigation
+
+- **Header** : Liens conditionnels par rôle (Tableau de bord, Scolarité, Pédagogie, Admin, Mon profil). Pas de lien direct vers Comptable pour un rôle qui aurait uniquement Comptable (en pratique les comptables ont le lien Comptabilité). Pas de breadcrumb.
+- **Sous-navigation** : Absente au niveau layout. Chaque zone (comptable, scolarité, etc.) affiche une page d’accueil avec des cartes vers les sous-pages. Pour aller à "Inscriptions" ou "Paiements", il faut repasser par le dashboard du rôle puis cliquer sur la carte. Pas de sidebar avec menu persistant.
+- **Profil / Notifications** : Accessibles depuis le header pour tous.
+
+### 1.6 Lisibilité des tableaux
+
+- **Pattern** : `overflow-x-auto` + `<table className="w-full bg-white ...">` avec `thead` et `tbody`, cellules `p-3`, `border-b`, `hover:bg-slate-50` sur les lignes.
+- **Filtres** : Souvent en headerRight de Card (inputs et selects en ligne). Pas de composant commun pour filtres.
+- **Pagination** : Présente sur certaines pages (ex. inscriptions) avec Précédent / Suivant et compteur. Pas de composant Pagination réutilisable.
+- **Problèmes** : Pas de sticky header, pas de alternance de lignes (striping), pas de tri visuel (colonnes triables), styles de table légèrement différents d’une page à l’autre (rounded-lg, shadow ou non, text-sm ou non). Sur grands volumes, pas de virtualisation ni de taille de page configurable dans l’UI.
+
+### 1.7 Expérience utilisateur
+
+- **Points positifs** : Design sobre (slate + bleu), pages chargées rapidement, toasts pour feedback, EmptyState sur certaines listes, boutons désactivés pendant le chargement.
+- **Points faibles** : Navigation peu scalable (tout dans le header ou via cartes), pas de fil d’Ariane, dashboards très inégaux (admin riche, étudiant minimaliste), formulaires avec champs natifs (select/input) non stylés de façon unifiée, icône notification en emoji, pas de mode sombre ni de densité compacte pour les tableaux.
+
+---
+
+## 2. Problèmes identifiés
+
+### 2.1 Visuellement faible
+
+- Header avec emoji 🔔 au lieu d’une icône vectorielle.
+- Cartes des dashboards Comptable / Enseignant / Étudiant répètent les mêmes classes sans passer par NavCard.
+- Formulaires : `className="w-full px-3 py-2 border rounded"` — bordures et focus non harmonisés avec le design system.
+- Tableaux : pas de ligne d’en-tête fixe au scroll, pas de style "data grid" professionnel (bordures, densité).
+- Absence de hiérarchie visuelle forte (une seule taille de titre de page, peu de séparation entre blocs).
+
+### 2.2 Incohérent
+
+- Admin utilise PageHeader + Card + NavCard ; Comptable / Enseignant / Étudiant utilisent h1 + div + Link avec styles en dur.
+- Badges : BadgeStatus sur certaines pages, composant local StatutBadge sur etudiants (styles proches mais dupliqués).
+- Couleurs : mélange de variables CSS (thème) et de classes Tailwind fixes (slate-*, blue-*). Le thème admin (couleur primaire, etc.) n’est pas reflété dans les composants.
+- Layout : un seul modèle pour tous les rôles alors que les besoins diffèrent (admin/scolarité ont beaucoup de sous-menus, étudiant peu).
+
+### 2.3 Interface "démo"
+
+- Navigation limitée au header : on dirait un prototype où les liens ont été ajoutés au fil de l’eau.
+- Dashboards étudiant et enseignant très simples (peu de données, peu d’indicateurs).
+- Pas de recherche globale, pas de raccourcis clavier, pas de messages d’aide contextuelle.
+- Tableaux basiques sans tri, sans export visible depuis l’UI (même si l’API le permet ailleurs).
+
+### 2.4 Manques pour une plateforme ERP professionnelle
+
+- **Sidebar** : Absence de menu latéral par domaine (Admin, Scolarité, Comptable, Enseignant, Étudiant) avec sous-éléments persistants.
+- **Data grid** : Pas de composant Table réutilisable avec tri, pagination, tailles de page, sélection, actions groupées.
+- **Formulaires** : Pas de champs stylés (Input, Select, Textarea, Checkbox) ni de validation visuelle cohérente.
+- **Filtres avancés** : Filtres ad hoc dans chaque page ; pas de barre de filtres réutilisable ni de persistance (ex. URL).
+- **Indicateurs** : Peu de KPIs visuels (widgets chiffrés, tendances) sur les dashboards.
+- **États vides / erreurs** : EmptyState présent par endroits ; pas de pattern commun pour erreur réseau ou pas de droits.
+- **Accessibilité** : Focus et contrastes non audités ; pas de landmarks ARIA explicites pour la navigation.
+- **Responsive** : Layout pensé desktop ; sur mobile le header avec tous les liens devient encombré.
+
+---
+
+## 3. Style actuel (synthèse)
+
+- **Palette** : Fond slate-50, cartes blanches, bordures slate-200, texte slate-800/600/500, accent bleu-600, statuts emerald/amber/red.
+- **Typo** : Geist Sans (variable), titres en bold, pas d’échelle type formelle.
+- **Espacements** : p-6 main, padding cartes 4/6, gap 3/4/6.
+- **Composants** : Coins arrondis (rounded-lg, rounded-xl), ombre légère (shadow-sm), pas de radius ni shadows tokenisés.
+- **Navigation** : Barre horizontale unique, pas de sidebar.
+
+---
+
+## 4. Style proposé
+
+- **Palette** : Conserver une base neutre (gris bleuté) avec une **couleur primaire unique** (configurable via thème) pour liens, boutons principaux et états actifs. Utiliser les variables CSS du thème partout pour rester cohérent avec l’admin (Apparence).
+- **Sidebar** : Menu latéral fixe (par ex. 240–260 px), fond clair ou très légèrement teinté, liens groupés par section, icône + libellé, sous-menu dépliable. Header réduit à logo, recherche optionnelle, notifications, profil.
+- **Dashboard** : Bloc titre + description (PageHeader), puis grille de cartes (NavCard ou équivalent) et/ou widgets KPIs (chiffre + label + tendance optionnelle). Même pattern pour tous les rôles.
+- **Tableaux** : Style "data grid" : en-têtes en gras, fond légèrement distinct, bordures discrètes, lignes alternées ou hover, padding régulier. Sticky header si scroll.
+- **Formulaires** : Champs avec bordure, focus ring (couleur primaire), label au-dessus, message d’erreur sous le champ. Même hauteur et radius pour input/select.
+- **Badges** : Palette sémantique fixe (success / warning / danger / neutral) basée sur les couleurs du thème, utilisée partout (BadgeStatus étendu).
+- **Cartes** : Toujours via composant Card ; pas de duplication de styles. Variantes éventuelles (flat, bordered, elevated) tokenisées.
+
+---
+
+## 5. Design system proposé
+
+### 5.1 Palette principale
+
+- **Background** : `--background` (page), `--background-card` (blanc ou équivalent).
+- **Foreground** : `--foreground` (texte principal), `--foreground-muted` (secondaire).
+- **Primary** : `--color-primary`, `--color-primary-hover`, `--color-primary-soft` (fond de badge/chip).
+- **Borders** : `--color-border`, `--color-border-subtle`.
+- **Sémantique** : success, warning, danger, info — avec variantes soft (fond) et strong (texte/icône).
+- **Neutres** : 50 à 900 pour gris (slate ou gray) si besoin au-delà des variables.
+
+### 5.2 Sidebar
+
+- Largeur fixe (ex. 256px), fond `--color-sidebar` ou `--background`.
+- Logo en haut, puis groupes de liens (titre de section en petit caps ou muted).
+- Lien : icône (24px) + libellé, padding vertical 10–12px, border-radius 6–8px, état actif (couleur primaire ou fond soft).
+- Sous-menus : dépliable (accordion) ou liste indentée. Pas de sidebar pour Étudiant si souhaité (layout plus simple).
+
+### 5.3 Dashboard
+
+- PageHeader systématique (titre + description + actions).
+- Grille de NavCards (ou Cards avec lien) pour accès rapide ; même composant pour tous les rôles.
+- Bloc "Indicateurs" ou "KPIs" : petites cartes avec chiffre, label, optionnellement icône ou tendance (flèche + couleur). Composant KpiCard réutilisable.
+
+### 5.4 Data tables
+
+- Composant **DataTable** (ou Table) : thead sticky, th avec tri possible (icône), tbody avec lignes alternées ou hover, cellules alignées (texte à gauche, nombres à droite).
+- Barre d’outils au-dessus : recherche, filtres (dropdowns ou barre dédiée), bouton export si besoin, "Nombre de lignes par page".
+- Pagination : composant commun (Précédent / Suivant + numéros ou "Page X / Y" + taille de page).
+- Empty state et état de chargement intégrés (Spinner / skeleton ou EmptyState).
+
+### 5.5 Formulaires
+
+- **Input** : border, rounded (ex. 8px), padding, focus:ring (primary). Variantes : error (border danger), disabled.
+- **Select** : Même style que Input, flèche personnalisée si besoin.
+- **Label** : au-dessus du champ, font-medium, text-sm.
+- **FormGroup** : wrapper label + champ + message d’erreur.
+- **Textarea / Checkbox / Radio** : alignés visuellement sur le même système.
+
+### 5.6 Badges de statut
+
+- Étendre BadgeStatus : mapping exhaustif des statuts métier (inscriptions, paiements, notes, pointage, etc.) vers les 4–5 couleurs sémantiques. Utiliser les variables du thème pour success/danger/warning.
+- Taille et padding uniformes (xs, sm). Option dot coloré à gauche.
+
+### 5.7 Cartes (cards)
+
+- **Card** : déjà bon ; ajouter variantes optionnelles (e.g. `elevated`, `bordered`) et s’assurer que headerRight + titre + description couvrent tous les cas.
+- **NavCard** : conserver variantes de couleur (default, blue, emerald, amber, red) en les reliant aux couleurs sémantiques du thème si possible.
+
+### 5.8 Graphiques
+
+- Style proposé : fond transparent ou blanc, lignes/barres en couleur primaire + une couleur secondaire (muted). Légendes discrètes, pas de 3D ni d’effets. Polices et tailles cohérentes avec le reste (texte small). Prévoir un composant wrapper (ChartCard) avec titre et option export.
+
+---
+
+## 6. Structure globale de layout
+
+### 6.1 Layout Admin
+
+- **Sidebar** : Sections Configuration, Utilisateurs, Demandes (validation, déverrouillage), Vigilance, Gouvernance, Apparence, Audit, Vigile, etc. Chaque section avec sous-liens.
+- **Header** : Logo, recherche globale (optionnel), notifications, profil + déconnexion.
+- **Contenu** : Zone principale avec breadcrumb (Dashboard Admin > Utilisateurs), puis contenu de la page. Max-width optionnel (ex. 1400px) pour lisibilité.
+
+### 6.2 Layout Scolarité
+
+- **Sidebar** : Formations, Filières, Campus, Salles, Étudiants, Enseignants, Classes, Inscriptions, Emploi du temps, Personnel, Transfert. Sous-menus selon droits.
+- **Header** : Idem (logo, notifications, profil).
+- **Contenu** : Breadcrumb (Dashboard Scolarité > Inscriptions), puis liste ou formulaire.
+
+### 6.3 Layout Enseignant
+
+- **Sidebar** : Tableau de bord, Emploi du temps, Notes, Pointage, Paie / Bulletins. Court et lisible.
+- **Header** : Même principe.
+- **Contenu** : Pages plus orientées "tâches" (saisie notes, pointage) avec formulaires et tableaux légers.
+
+### 6.4 Layout Étudiant
+
+- **Option A** : Sidebar réduite (Documents, Emploi du temps, Notes) pour cohérence.
+- **Option B** : Pas de sidebar, seulement header + grille de cartes (comme aujourd’hui mais avec les mêmes composants que les autres dashboards). Préférable si l’étudiant n’a que 3–4 entrées.
+
+### 6.5 Layout Comptable
+
+- **Sidebar** : Tarifs, Paiements, Recouvrement, Pointages, Paie, Caisse, Comptabilité, DAF, Clôture, Historique clôture, Taux horaires, Rapports. Groupement possible (ex. "Caisse & Paiements", "Paie", "Comptabilité & DAF").
+
+---
+
+## 7. Inspirations de design
+
+- **ERPNext** : Sidebar à icônes + libellés, listes denses, couleurs sobres, breadcrumb, data tables avec actions en ligne. Bon modèle pour structure ERP et densité d’information.
+- **Linear** : Sidebar sombre ou claire très lisible, typographie soignée, peu de couleurs vives, états (badges) discrets. Bon pour réduire le bruit visuel.
+- **Notion** : Hiérarchie claire (titres, blocs), sidebar repliable, cartes et listes simples. Utile pour organisation des pages et blocs de contenu.
+- **Stripe Dashboard** : Tableaux très lisibles, filtres en barre, badges de statut, ton professionnel. Bon pour partie "comptabilité / paiements".
+- **Supabase Studio** : Navigation latérale par fonction (Table Editor, SQL, etc.), fond neutre, code et données bien séparés. Utile pour inspiration sidebar et densité.
+
+Références à garder en tête : sobriété, lisibilité des tableaux, sidebar claire, pas de surcharge graphique.
+
+### 7.1 Page de connexion (login)
+
+La page de connexion a été refaite pour un rendu **institutionnel et professionnel**, aligné avec Stripe Dashboard, Notion et Supabase (fond clair, carte blanche, pas d’effets « startup » ou web3).
+
+**Principes appliqués :**
+- **Fond** : clair et neutre (`bg-slate-100`), sans grille, sans gradient ni halo. Aucun fond noir ou violet.
+- **Carte login** : blanche, `rounded-xl`, bordure `border-slate-200`, ombre légère `shadow-sm`. Padding généreux (`p-8`).
+- **Bouton principal** : couleur primaire du thème (`var(--color-primary)`), pas de dégradé ni de glow. Hover en léger `opacity-90`, transition courte.
+- **Champs** : bordures `border-slate-300`, focus ring en couleur primaire (`focus:ring-[var(--color-primary)]`). Labels en `text-sm font-medium text-slate-700`, hiérarchie claire.
+- **Messages** : session expirée (fond amber-50, bordure amber-200) ; erreur (fond red-50, bordure red-100). Texte lisible, pas d’effet glass ni blur.
+- **Animations** : uniquement le spinner de chargement (discret). Aucune animation pulse, blur ou halo sur le fond.
+- **Logo** : si configuré via Apparence, affiché au-dessus du titre ; sinon icône neutre (émoji ou bloc slate-100) et titre « Gestion Scolaire » en `text-xl font-semibold text-slate-900`.
+
+Objectif : une interface simple, rassurante et adaptée à un contexte ERP scolaire (établissement, administration), sans effet visuel distrayant.
+
+---
+
+## 8. Design ERP moderne (principes)
+
+- **Sobre** : Peu de couleurs vives ; primaire + neutres + sémantique (success/warning/danger) suffisent.
+- **Professionnel** : Typographie lisible, espacements réguliers, alignements nets. Pas d’illustrations décoratives sur les écrans métier.
+- **Très lisible** : Contraste suffisant (texte sur fond), taille de police minimale 14px pour le corps, lignes pas trop longues (max-width contenu si besoin).
+- **Adapté aux grandes tables** : Sticky header, pagination, tri, filtres visibles, densité "compact" optionnelle. Pas de carte par enregistrement pour des listes de 100+ lignes.
+- **Optimisé écrans larges** : Sidebar fixe, contenu qui utilise la largeur (tableaux pleine largeur dans leur conteneur), pas de max-width trop étroit sur les listes.
+
+---
+
+## 9. Amélioration du design system existant (components/ui)
+
+### 9.1 Composants manquants
+
+- **Input** : Champ texte avec label, erreur, disabled. Utiliser les variables de thème pour bordure et focus.
+- **Select** : Liste déroulante stylée comme Input, avec support option groups.
+- **Label** : Texte au-dessus des champs, optionnellement requis (astérisque).
+- **FormGroup** : Wrapper label + champ + message d’erreur.
+- **DataTable** : Table avec thead/tbody, support tri (optionnel), pagination externe ou intégrée, slot "actions" par ligne.
+- **Pagination** : Précédent / Suivant + affichage "X–Y sur Z" + sélecteur de taille de page.
+- **Modal** : Overlay + panneau centré, titre, contenu, footer (annuler / confirmer). Accessibilité (focus trap, Escape).
+- **Dropdown / Menu** : Bouton déclencheur + liste d’actions (liens ou boutons). Pour actions "plus" ou menu utilisateur.
+- **Tabs** : Onglets horizontaux pour découper le contenu d’une page.
+- **Tooltip** : Info au survol (titre, statut, explication).
+- **KpiCard** : Chiffre + label + optionnel sous-texte ou tendance (icône + couleur).
+
+### 9.2 Améliorations des composants existants
+
+- **PageHeader** : Utiliser `var(--foreground)` et `var(--foreground-muted)` au lieu de slate en dur ; permettre une breadcrumb au-dessus du titre.
+- **Card** : Variantes (bordered, elevated), utilisation de `--background-card` et `--color-border`.
+- **Button** : Couleur primaire via variable (`var(--color-primary)`), hover via variable si définie.
+- **BadgeStatus** : Étendre le mapping à tous les statuts métier ; utiliser les couleurs sémantiques du thème ; ajouter une prop "size" (sm/xs).
+- **EmptyState** : Remplacer l’icône caractère par une icône SVG ou un composant Icône ; utiliser les couleurs du thème.
+- **Spinner** : Couleur de la bordure animée = `var(--color-primary)`.
+
+### 9.3 Standardisation des styles
+
+- Définir des tokens dans `globals.css` (ou thème) : `--input-height`, `--input-radius`, `--input-border`, `--focus-ring`. Tous les champs de formulaire les utilisent.
+- Un seul fichier (ou ensemble) listant les couleurs de statut (success, warning, danger, neutral) et les classes ou variables associées. BadgeStatus et tout nouveau badge s’y réfèrent.
+- Documentation interne (Storybook ou page "UI" en dev) listant PageHeader, Card, NavCard, Button, BadgeStatus, EmptyState, Spinner, Input, Select, DataTable, Pagination, Modal, avec exemples.
+
+---
+
+## 10. Améliorations concrètes
+
+- **Sidebar moderne** : Composant Sidebar avec logo, groupes de liens, état actif basé sur pathname, responsive (repliable en drawer sur mobile).
+- **Tableau data grid** : Composant DataTable avec thead sticky, tri (icône), pagination, choix de page size, slot pour actions (boutons ou menu).
+- **Filtres avancés** : Barre de filtres réutilisable (recherche + N selects + bouton réinitialiser). Persistance des filtres dans l’URL (query params) pour partage et rafraîchissement.
+- **Badges colorés** : Unifier tous les statuts (inscription, paiement, note, pointage, etc.) via BadgeStatus étendu ; couleurs sémantiques cohérentes.
+- **Indicateurs visuels** : KpiCard sur les dashboards (nombre d’inscriptions, encaissements du jour, demandes en attente, etc.) avec même style partout.
+- **États vides** : Toujours utiliser EmptyState avec titre, description et action si pertinent. Page "aucun résultat" après filtres avec bouton "Réinitialiser les filtres".
+- **Notifications visuelles** : Remplacer l’emoji cloche par une icône (SVG), badge compteur existant ; liste déroulante ou page dédiée avec design cohérent (Card, liste, marquer lu).
+
+---
+
+## 11. Plan de refonte
+
+### Phase 1 — Fondations (sans casser l’existant)
+
+1. Introduire les tokens manquants dans `globals.css` (input, focus, radius) et faire utiliser `var(--color-primary)` aux composants Button et Spinner.
+2. Créer les composants de formulaire de base : Input, Select, Label, FormGroup (sans migrer toutes les pages tout de suite).
+3. Créer le composant Pagination et l’utiliser sur une page pilote (ex. Inscriptions).
+4. Étendre BadgeStatus avec tous les statuts métier et couleurs sémantiques ; documenter.
+
+### Phase 2 — Layout et navigation
+
+5. Créer le composant Sidebar (liste de liens par section, état actif). Ne pas remplacer le header actuel tout de suite : ajouter une prop ou un layout alternatif "withSidebar" pour une zone pilote (ex. Admin).
+6. Créer un layout "DashboardWithSidebar" utilisé par Admin (ou Comptable) avec sidebar + header réduit. Tester sur une branche ou une route.
+7. Définir la structure des menus par rôle (Admin, Scolarité, Comptable, Enseignant, Étudiant) dans un config (tableau ou objet) et alimenter la Sidebar.
+8. Généraliser le layout avec sidebar à toutes les zones concernées ; retirer les liens redondants du header (garder logo, notifications, profil).
+
+### Phase 3 — Dashboards et tableaux
+
+9. Unifier les dashboards : utiliser partout PageHeader + Card + NavCard (et KpiCard si créé). Migrer Comptable, Enseignant, Étudiant (et Scolarité si besoin).
+10. Créer le composant DataTable (thead, tbody, tri optionnel, pagination intégrée ou externe). L’utiliser sur 2–3 pages (Inscriptions, Étudiants, Paiements).
+11. Créer une barre de filtres réutilisable (recherche + selects) et l’intégrer aux pages listes pilotes ; optionnellement lier les filtres à l’URL.
+
+### Phase 4 — Polish et accessibilité
+
+12. Remplacer l’icône notification (emoji) par une icône SVG ; harmoniser la liste des notifications.
+13. Introduire Modal et Dropdown/Menu pour actions groupées (ex. "Actions" sur une ligne de tableau).
+14. Audit accessibilité (focus, contrastes, landmarks) et corriger les écarts majeurs.
+15. Documenter le design system (page interne ou Storybook) : tous les composants, exemples, bonnes pratiques.
+
+### Ordre recommandé
+
+Respecter l’ordre 1 → 15 pour limiter les régressions : d’abord tokens et petits composants, puis layout et sidebar, puis dashboards et tableaux, enfin polish. Chaque phase peut être livrée et testée séparément.
+
+---
+
+## Refonte pilote — réalisations (2025-03-03)
+
+(Voir ci-dessous « Uniformisation design ERP » pour l’état actuel.)
+
+---
+
+## Uniformisation design ERP (2025-03-03)
+
+### Style cible validé
+
+- ERP moderne, sobre, professionnel, lisible. Inspirations : Stripe Dashboard (structure, tableaux, filtres), ERPNext (densité), Linear (finesse, hiérarchie).
+- Un seul layout : sidebar + header pour tous les dashboards. Aucun mélange ancien/nouveau.
+
+### Ce qui a été implémenté
+
+1. **Layout uniforme**
+   - **AppShell** : affiche toujours sidebar + header (plus de layout legacy). La config du menu est donnée par `getSidebarConfigForPath(pathname, role)`.
+   - **Sidebar** : 260px, sections par zone. Même rendu pour Admin, Scolarité, Pédagogie, Comptable, Enseignant, Étudiant, Chef de département, Auditeur, et page d’accueil/profil (config par défaut).
+   - **DashboardHeader** : titre/liens, icône cloche SVG, profil, déconnexion. Partout identique.
+
+2. **Config sidebar par zone**
+   - `getAdminSidebarConfig(role)`, `getScolariteSidebarConfig()`, `getPedagogieSidebarConfig()`, `getComptableSidebarConfig(role)`, `getEnseignantSidebarConfig()`, `getEtudiantSidebarConfig()`, `getChefDepartementSidebarConfig()`, `getAuditeurSidebarConfig()`, `getDefaultSidebarConfig(role)`.
+   - Une seule entrée : `getSidebarConfigForPath(pathname, role)` utilisée par AppShell.
+
+3. **Design system complété**
+   - **Formulaires** : `Label` (required), `Input` (error), `Select` (error, flèche SVG), `Textarea` (error), `FormGroup` (label, error, hint). Variables `--input-height`, `--input-px`, `--radius-input`, `--input-focus-ring`.
+   - **Tokens globaux** : `--radius-md`, `--radius-lg`, `--radius-input` ; `--transition-fast` (150ms), `--transition-base` (200ms), `--transition-smooth` (250ms). Transitions appliquées via `data-erp-card`, `data-erp-sidebar`, `data-erp-table-row` (hover, border, shadow).
+   - **DataTable** : tri optionnel (colonne `sortable`, props `sortKey`, `sortDirection`, `onSort`, icônes asc/desc dans le header).
+
+4. **Dashboards migrés (structure homogène)**
+   - **Admin** : PageHeader + Card + NavCard + KpiCard (déjà fait).
+   - **Scolarité** : PageHeader + Card + grille NavCard (Formations, Filières, Étudiants, Inscriptions, etc.).
+   - **Pédagogie** : PageHeader + Card + NavCard (Classes, Formations LMD, Emploi du temps, Demandes de validation, etc.).
+   - **Comptable** : PageHeader + Card + NavCard (Tarifs, Paiements, Recouvrement, Pointages, Paie, Caisse, Comptabilité, DAF, Clôture, Rapports) selon rôle.
+   - **Enseignant** : PageHeader + Cards (Modules en cours, Historique, Encadrements) + Card Accès rapide avec NavCards (Emploi du temps, Notes, Pointage, Bulletins). Spinner au chargement.
+   - **Étudiant** : PageHeader + Card + NavCard (Documents, Emploi du temps, Notes).
+   - **Chef de département** : PageHeader + Card + NavCard (Validation des notes, Formations et effectifs).
+   - **Auditeur** : PageHeader + Card + NavCard (Journal d’audit).
+   - **Inscriptions** (liste) : déjà en DataTable + Pagination + EmptyState.
+
+5. **Animations retenues**
+   - Transitions CSS : `background-color`, `border-color`, `box-shadow` en 150ms ease sur cartes, sidebar, lignes de tableau (`data-erp-*`).
+   - Hover léger sur Card (shadow), NavCard (border), lignes DataTable (bg-slate-50/80).
+   - Focus ring 2px `var(--color-primary)` sur boutons et champs. Aucune animation gadget.
+
+### Composants UI créés ou modifiés
+
+| Composant | Fichier | Rôle |
+|-----------|---------|------|
+| **Label** | `components/ui/label.tsx` | Label de champ (optionnel required) |
+| **Input** | `components/ui/input.tsx` | Champ texte (thème, error, focus) |
+| **Select** | `components/ui/select.tsx` | Liste déroulante (thème, error, flèche) |
+| **Textarea** | `components/ui/textarea.tsx` | Zone de texte (thème, error) |
+| **FormGroup** | `components/ui/form-group.tsx` | Wrapper label + champ + error + hint |
+| **Sidebar** | `components/layout/Sidebar.tsx` | Menu latéral (data-erp-sidebar) |
+| **DashboardHeader** | `components/layout/DashboardHeader.tsx` | Header unique (cloche SVG) |
+| **AppShell** | `components/layout/AppShell.tsx` | Layout unique sidebar + header |
+| **DataTable** | `components/ui/data-table.tsx` | Table + tri optionnel (sortable, onSort) |
+| **Pagination** | `components/ui/pagination.tsx` | Précédent/Suivant + compteur |
+| **KpiCard** | `components/ui/kpi-card.tsx` | Carte KPI (variant success/danger/warning) |
+| **Card** | `components/ui/card.tsx` | data-erp-card, hover shadow |
+| **NavCard** | `components/ui/nav-card.tsx` | Variables thème, data-erp-card |
+| **config/sidebar** | `config/sidebar.ts` | getSidebarConfigForPath + toutes les configs par zone |
+| **Icon** | `components/ui/icons.tsx` | Jeu d’icônes SVG (IconName, composant Icon) : home, building, users, calendar, document-text, chart, currency, clipboard-list, bell, cog, etc. |
+
+### Icônes (ajout récent)
+
+- **Sidebar** : chaque entrée de menu a un `icon` (IconName) dans la config ; le composant Sidebar affiche l’icône à gauche du libellé (toutes les zones : admin, scolarité, pédagogie, comptable, enseignant, étudiant, chef-departement, auditeur, défaut).
+- **NavCard** : prop optionnelle `icon` ; toutes les cartes des dashboards (Admin, Scolarité, Pédagogie, Comptable, Enseignant, Étudiant, Chef de département, Auditeur) ont une icône.
+- **DashboardHeader** : notifications avec `Icon name="bell"`.
+- **EmptyState** : icône `information-circle` (remplace le caractère ⓘ).
+- **KpiCard** : prop optionnelle `icon` ; indicateur « Encaissements du jour » utilise `banknotes`.
+- **Boutons** : `leftIcon` sur le bouton « Nouvelle inscription » (page Inscriptions) avec `Icon name="plus"`.
+
+### Ce qui reste à uniformiser
+
+- **Formulaires** : utiliser Input, Select, FormGroup (et Textarea) sur la page Inscriptions et les autres formulaires métier (remplacer champs natifs).
+- **Tri DataTable** : brancher `sortKey` / `onSort` sur les pages listes (tri côté client ou API).
+- **Filtres** : composant barre de filtres réutilisable ; persistance des filtres dans l’URL.
+- **Modal / Dropdown** : pour actions groupées et menus (ex. « Actions » par ligne).
+- **Accessibilité** : audit focus, contrastes, landmarks.
+- **Documentation** : page ou Storybook listant tous les composants et usages.
+
+### Écarts design proposé / implémenté
+
+- Sidebar : liste plate par section (pas d’accordion dépliable). Badges dynamiques (ex. nombre demandes) non injectés depuis l’API.
+- DataTable : tri implémenté en UI mais pas encore connecté sur les pages ; pas de sélection de lignes ni d’actions groupées.
+- Formulaires : composants créés mais pas encore utilisés partout (Inscriptions garde des champs natifs stylés).
+
+---
+
+Fin du document — Analyse et justification du design frontend (mouha.txt).

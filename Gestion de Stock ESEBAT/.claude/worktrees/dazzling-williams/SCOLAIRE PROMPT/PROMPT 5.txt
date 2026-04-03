@@ -1,0 +1,462 @@
+PROMPT 5 
+
+— Étudiants & Enseignants + Profils Complets + Imports Massifs + Badge & QR (génération) + UI Premium
+
+Objectif : Implémenter toute la gestion des personnes (Étudiants/Enseignants) avec :
+
+Création manuelle + import CSV
+
+Champs obligatoires : matricule, tel, email, date de naissance (étudiant), photo
+
+Comptes liés à User (RBAC, statut, firstLoginRequired)
+
+Génération automatique du badge + QR Code dès création
+
+Endpoint verify QR (sécurisé + logs)
+
+UI admin moderne (listes, filtres, fiche profil, upload, badge preview PDF)
+
+Dépend des prompts 2 (Auth/Users) et 3-4 (référentiel : programme/niveau/année, groupes).
+
+0) RBAC
+
+CRUD :
+
+SUPER_ADMIN, ADMIN, SCOLARITE
+
+Lecture :
+
+DEPT_HEAD (sur enseignants du département, étudiants du programme)
+
+AUDITOR
+
+Interdit :
+
+STUDENT, TEACHER, FINANCE (sauf endpoints “me” plus tard)
+
+Audit obligatoire sur toutes actions critiques.
+
+1) Modèle de données (Prisma)
+1.1 Mettre à jour User (si pas déjà)
+
+Ajouter firstName, lastName obligatoires
+
+status: ACTIVE/SUSPENDED/DISABLED
+
+firstLoginRequired: default true
+
+passwordHash
+
+role
+
+1.2 FileStorage (obligatoire ici)
+
+Créer table :
+
+id
+
+path
+
+mime
+
+size
+
+ownerUserId nullable
+
+createdAt
+
+Stockage recommandé : MinIO/S3 (déjà prévu)
+→ utiliser URL signées pour téléchargement.
+
+1.3 Student
+
+Créer table Student :
+
+id
+
+userId (unique FK User)
+
+dateOfBirth (date) obligatoire
+
+programId (FK Program) obligatoire
+
+levelId (FK Level) obligatoire
+
+academicYearId (FK AcademicYear) obligatoire
+
+groupId (FK Group) nullable (affectation optionnelle maintenant)
+
+admissionYear (int, option)
+
+photoFileId (FK FileStorage) obligatoire pour badge
+
+status enum: ACTIVE | SUSPENDED | GRADUATED | DROPPED
+
+createdAt, updatedAt
+
+Contraintes :
+
+level.programId == programId
+
+group.programId == programId et group.levelId == levelId si groupId fourni
+
+1.4 Teacher
+
+Créer table Teacher :
+
+id
+
+userId (unique FK User)
+
+departmentId (FK Department) obligatoire
+
+grade (string option)
+
+specialty (string option)
+
+photoFileId (FK FileStorage) option (mais recommandé)
+
+status enum: ACTIVE | SUSPENDED
+
+createdAt, updatedAt
+
+1.5 Badge
+
+Créer table Badge :
+
+id
+
+userId (unique)
+
+qrTokenHash (string)
+
+qrTokenExpiresAt (nullable)
+
+status enum: ACTIVE | REVOKED | EXPIRED
+
+generatedAt
+
+pdfFileId (FK FileStorage) nullable (badge PDF stocké)
+
+lastRegeneratedAt nullable
+
+Règles :
+
+1 badge par user
+
+Token stocké hashé
+
+1.6 BadgeScanLog
+
+Créer table :
+
+id
+
+scannedUserId (FK User)
+
+scannerUserId (FK User nullable) (si scan par agent connecté)
+
+method enum: WEB_QR | USB_SCANNER | MOBILE
+
+result enum: VALID | INVALID | REVOKED | EXPIRED
+
+ipAddress, userAgent
+
+createdAt
+
+2) Backend — Services & Logique
+2.1 Création Étudiant / Enseignant (flow)
+
+Quand on crée un étudiant/enseignant :
+
+Créer User avec :
+
+matricule unique
+
+email, phone
+
+passwordHash = hash(matricule)
+
+firstLoginRequired = true
+
+role = STUDENT ou TEACHER
+
+Upload photo (FileStorage)
+
+Créer Student ou Teacher
+
+Générer Badge (token sécurisé) + QR + PDF badge
+
+Audit logs :
+
+STUDENT_CREATED / TEACHER_CREATED
+
+BADGE_GENERATED
+
+2.2 Génération QR token
+
+Générer token aléatoire (32+ bytes) + signer si besoin
+
+Stocker hash en DB
+
+Token réel doit être présent dans QR URL :
+
+https://web-domain/verify/badge?token=...
+ou endpoint API :
+
+/api/v1/badges/verify?token=...
+
+2.3 Génération PDF badge
+
+Générer PDF imprimable (format carte)
+
+Inclure : logo, nom, matricule, rôle, photo, QR
+
+Stocker PDF dans MinIO + enregistrer pdfFileId
+
+Permettre “regenerate badge” (nouveau token + nouveau pdf + revoke ancien)
+
+3) API REST — Endpoints
+3.1 Upload fichiers
+
+POST /api/v1/files/upload (multipart)
+
+GET /api/v1/files/:id/signed-url (download)
+
+RBAC : admin + scolarité, utilisateur peut accéder à ses propres fichiers.
+
+3.2 Étudiants
+
+GET /api/v1/students?page=&pageSize=&q=&programId=&levelId=&academicYearId=&groupId=&status=
+
+POST /api/v1/students
+Body:
+
+{
+  "matricule":"...",
+  "firstName":"...",
+  "lastName":"...",
+  "email":"...",
+  "phone":"...",
+  "dateOfBirth":"YYYY-MM-DD",
+  "programId":"...",
+  "levelId":"...",
+  "academicYearId":"...",
+  "groupId":"...",
+  "photoFileId":"..."
+}
+
+GET /api/v1/students/:id
+
+PATCH /api/v1/students/:id (status, group, contacts)
+
+POST /api/v1/students/import (CSV multipart)
+
+3.3 Enseignants
+
+GET /api/v1/teachers?page=&pageSize=&q=&departmentId=&status=
+
+POST /api/v1/teachers
+
+GET /api/v1/teachers/:id
+
+PATCH /api/v1/teachers/:id
+
+POST /api/v1/teachers/import
+
+3.4 Badges
+
+GET /api/v1/badges/user/:userId (info badge + lien pdf)
+
+POST /api/v1/badges/user/:userId/regenerate (nouveau token + pdf)
+
+GET /api/v1/badges/user/:userId/pdf (signed url)
+
+GET /api/v1/badges/verify?token=... (public ou semi-public selon choix)
+Réponse minimale :
+
+{ "valid": true, "user": { "fullName":"...", "matricule":"...", "role":"...", "status":"ACTIVE" } }
+
+Ne jamais exposer DOB, email, phone sur verify public.
+
+Loguer scan dans BadgeScanLog.
+
+RBAC verify :
+
+mode public : accessible sans login mais rate-limited
+
+mode interne : accessible seulement roles Admin/Scolarité/Surveillant (à décider)
+👉 Par défaut : public mais limité + info minimale.
+
+4) Import CSV — formats attendus
+4.1 Students CSV colonnes
+
+matricule
+
+firstName
+
+lastName
+
+email
+
+phone
+
+dateOfBirth
+
+programCode (ou programId)
+
+levelName (ou levelId)
+
+academicYearName (ou id)
+
+groupName (option)
+
+photoUrl (option) / ou photoFileId si déjà uploadé
+
+Règles import :
+
+Validation strict + rapport erreurs par ligne
+
+Création en bulk transactionnel par chunk (ex 200)
+
+Génération badge pour chaque compte créé
+
+Si photo manquante : refuser ligne (badge nécessite photo) ou mettre placeholder institutionnel (option)
+
+4.2 Teachers CSV colonnes
+
+matricule
+
+firstName
+
+lastName
+
+email
+
+phone
+
+departmentCode
+
+grade (option)
+
+specialty (option)
+
+5) Frontend — UI Admin Premium
+
+Créer pages :
+
+/app/students
+
+/app/teachers
+
+/app/badges (option) ou intégré dans profils
+
+/verify/badge (page publique de vérification via token)
+
+5.1 Liste Étudiants
+
+UI :
+
+Table paginée
+
+Search + filtres (programme, niveau, année, groupe, statut)
+
+Bouton “Créer étudiant”
+
+Bouton “Importer CSV”
+
+Row action : “Voir profil”
+
+5.2 Fiche Étudiant (drawer/page)
+
+Afficher :
+
+identité
+
+académie (programme, niveau, année, groupe)
+
+statut
+
+photo
+
+bouton “Voir badge”
+
+bouton “Télécharger badge PDF”
+
+bouton “Régénérer badge” (confirmation)
+
+5.3 Création Étudiant
+
+Form :
+
+matricule, nom, prénom, email, phone
+
+date naissance (date picker)
+
+selects dépendants : programme → niveaux, année → groupes
+
+upload photo (drag&drop)
+
+texte : “Mot de passe initial = matricule”
+
+5.4 Liste Enseignants + Fiche
+
+Similaire, filtres département.
+
+5.5 Page publique Verify Badge
+
+UI simple et premium
+
+Si token valide : afficher carte (photo + nom + matricule + statut)
+
+Sinon : message “Badge invalide / révoqué”
+
+Ne jamais afficher infos sensibles
+
+6) Sécurité & conformité
+
+Rate limit /badges/verify
+
+Logs scan
+
+Token non stocké en clair
+
+Accès fichiers via signed URLs
+
+Audit complet sur create/update/regenerate/import
+
+7) Tests (minimum)
+
+Backend :
+
+create student => user+student+badge créés
+
+verify badge valide/invalide
+
+regenerate invalide ancien token
+
+import CSV avec erreurs
+
+Frontend :
+
+pages build
+
+création étudiant marche
+
+verify page marche
+
+8) Definition of Done (PROMPT 5)
+
+Terminé si :
+
+Étudiants/enseignants gérés de bout en bout
+
+Imports CSV robustes
+
+Badge + QR + PDF générés automatiquement
+
+Verify badge fonctionne + logs scan
+
+UI premium complète
+
+Audit + RBAC partout

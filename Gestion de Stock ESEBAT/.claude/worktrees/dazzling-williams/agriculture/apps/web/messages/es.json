@@ -1,0 +1,49 @@
+{
+  "HomePage": {
+    "badge": "Plataforma e-agrícola Senegal",
+    "title": "Plataforma e-agrícola para Senegal",
+    "subtitle": "Gestione sus parcelas, siga las recomendaciones de cultivos y reciba alertas meteorológicas en tiempo real. Una solución completa para la agricultura inteligente.",
+    "cta": "Acceder a la plataforma",
+    "login": "Iniciar sesión",
+    "features": {
+      "parcels": {
+        "title": "Gestión de parcelas",
+        "desc": "Cree y siga sus parcelas con geolocalización y mapa interactivo."
+      },
+      "recommendations": {
+        "title": "Recomendaciones",
+        "desc": "Recomendaciones de cultivos basadas en suelo, clima y regiones."
+      },
+      "weather": {
+        "title": "Clima y datos",
+        "desc": "Pronósticos meteorológicos e historial para optimizar sus decisiones."
+      },
+      "alerts": {
+        "title": "Alertas en tiempo real",
+        "desc": "Notificaciones sobre riesgos (sequía, lluvia, etc.) por parcela."
+      }
+    },
+    "footer": "Agricultura Inteligente © Senegal — Plataforma e-agrícola"
+  },
+  "Auth": {
+    "login": "Iniciar sesión",
+    "loginButton": "Iniciar sesión",
+    "loginLoading": "Iniciando sesión...",
+    "forgotPassword": "¿Olvidó su contraseña?",
+    "accountsNote": "Las cuentas son creadas por el administrador.",
+    "sessionTimeout": "Su sesión se cerró después de un período de inactividad. Por favor, inicie sesión de nuevo."
+  },
+  "Nav": {
+    "dashboard": "Panel de control",
+    "farm": "Explotación",
+    "parcels": "Parcelas",
+    "alerts": "Alertas",
+    "consultation": "Consultación",
+    "sensors": "Sensores",
+    "admin": "Administración",
+    "profile": "Perfil",
+    "logout": "Cerrar sesión",
+    "brand": "Agricultura",
+    "subtitle": "e-agrícola Senegal"
+  }
+}

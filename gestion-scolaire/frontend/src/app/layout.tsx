@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ToastProvider } from "@/contexts/ToastContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { DEFAULT_APP_NAME } from "@/lib/branding";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gestion Scolaire",
+  title: { default: DEFAULT_APP_NAME, template: `%s | ${DEFAULT_APP_NAME}` },
   description: "Application de gestion pour établissement d'enseignement supérieur",
 };
 
@@ -27,7 +30,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <ThemeProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </ThemeProvider>
       </body>
     </html>
   );

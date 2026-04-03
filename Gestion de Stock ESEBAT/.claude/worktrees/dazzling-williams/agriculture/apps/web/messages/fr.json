@@ -1,0 +1,49 @@
+{
+  "HomePage": {
+    "badge": "Plateforme e-agricole Sénégal",
+    "title": "Plateforme e-agricole pour le Sénégal",
+    "subtitle": "Gérez vos parcelles, suivez les recommandations culturales et recevez des alertes météo en temps réel. Une solution complète pour l'agriculture intelligente.",
+    "cta": "Accéder à la plateforme",
+    "login": "Connexion",
+    "features": {
+      "parcels": {
+        "title": "Gestion des parcelles",
+        "desc": "Créez et suivez vos parcelles avec géolocalisation et carte interactive."
+      },
+      "recommendations": {
+        "title": "Recommandations",
+        "desc": "Recommandations culturales basées sur le sol, la météo et les régions."
+      },
+      "weather": {
+        "title": "Météo & données",
+        "desc": "Prévisions météo et historique pour optimiser vos décisions."
+      },
+      "alerts": {
+        "title": "Alertes en temps réel",
+        "desc": "Notifications sur les risques (sécheresse, pluie, etc.) par parcelle."
+      }
+    },
+    "footer": "Agriculture Intelligente © Sénégal — Plateforme e-agricole"
+  },
+  "Auth": {
+    "login": "Connexion",
+    "loginButton": "Se connecter",
+    "loginLoading": "Connexion en cours...",
+    "forgotPassword": "Mot de passe oublié ?",
+    "accountsNote": "Les comptes sont créés par l'administrateur.",
+    "sessionTimeout": "Votre session a été fermée après une période d'inactivité. Veuillez vous reconnecter."
+  },
+  "Nav": {
+    "dashboard": "Tableau de bord",
+    "farm": "Exploitation",
+    "parcels": "Parcelles",
+    "alerts": "Alertes",
+    "consultation": "Consultation",
+    "sensors": "Capteurs",
+    "admin": "Administration",
+    "profile": "Profil",
+    "logout": "Déconnexion",
+    "brand": "Agriculture",
+    "subtitle": "e-agricole Sénégal"
+  }
+}

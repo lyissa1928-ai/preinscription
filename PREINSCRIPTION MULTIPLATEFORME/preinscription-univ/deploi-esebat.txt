@@ -1,0 +1,411 @@
+================================================================================
+  TUTORIEL COMPLET — Déploiement UniPortail (préinscription-univ)
+  Domaine : https://uniportail-digital.com
+  Serveur : Debian 12 (bookworm)
+  Méthode : tout peut être copié-collé bloc par bloc dans un terminal SSH.
+================================================================================
+
+  Sommaire
+  --------
+  A. Avant de commencer (prérequis)
+  B. DNS (chez votre hébergeur de nom de domaine)
+  C. Connexion au serveur et passage root
+  D. Mise à jour, pare-feu, paquets
+  E. Node.js 20 et PM2
+  F. Cloner le projet et installer
+  G. Fichier backend/.env (production) — commandes automatiques
+  H. Frontend : build (et captcha optionnel)
+  I. Démarrer l’API avec PM2
+  J. Nginx (HTTP) — fichier créé par copier-coller
+  K. Tester avant HTTPS
+  L. Certificat SSL (Let’s Encrypt)
+  M. Après SSL : vérifications
+  N. Déploiements ultérieurs (mise à jour du site)
+  O. Sauvegardes
+  P. Dépannage
+
+  Chemin d’installation utilisé partout : /var/www/uniportail
+  (Si vous préférez un autre dossier, remplacez ce chemin dans toutes les commandes.)
+
+================================================================================
+A. AVANT DE COMMENCER (PRÉREQUIS)
+================================================================================
+
+  Vous devez avoir :
+  - Un VPS ou serveur dédié avec Debian 12 installé.
+  - L’adresse IP publique de ce serveur (ex. 203.0.113.50).
+  - Un accès SSH (utilisateur avec sudo, ou root), avec mot de passe ou clé.
+  - Le domaine uniportail-digital.com (ou la gestion DNS chez votre registrar).
+
+  Important : faites la section B (DNS) AVANT la section L (Certbot), sinon
+  Let’s Encrypt ne pourra pas valider le domaine.
+
+================================================================================
+B. DNS (CHEZ VOTRE REGISTRAR / HÉBERGEUR DNS)
+================================================================================
+
+  Créez ces enregistrements (remplacez <IP_DU_VPS> par l’IP réelle) :
+
+    Type   Nom / Hôte              Valeur
+    ----   ----------------------  -----------------
+    A      @  ou  uniportail-digital.com    <IP_DU_VPS>
+    A      www                     <IP_DU_VPS>
+
+  Attendez la propagation (souvent 5 à 60 minutes, parfois plus).
+
+  Vérification depuis votre PC (PowerShell ou terminal) :
+
+    nslookup uniportail-digital.com
+
+  La réponse doit afficher l’IP de votre VPS.
+
+================================================================================
+C. CONNEXION AU SERVEUR ET PASSAGE ROOT
+================================================================================
+
+  Remplacez utilisateur et IP par les vôtres.
+
+    ssh utilisateur@<IP_DU_VPS>
+
+  Puis, si vous n’êtes pas déjà root :
+
+    sudo -i
+
+  Toutes les commandes suivantes supposent que vous êtes root (invite #).
+
+================================================================================
+D. MISE À JOUR DU SYSTÈME, PARE-FEU, PAQUETS DE BASE
+================================================================================
+
+  Copier-coller tout le bloc suivant :
+
+--------------------------------------------------------------------------------
+apt update && apt upgrade -y
+apt install -y curl git ufw nginx certbot python3-certbot-nginx
+ufw allow OpenSSH
+ufw allow 'Nginx Full'
+ufw --force enable
+ufw status
+--------------------------------------------------------------------------------
+
+================================================================================
+E. NODE.JS 20 LTS ET PM2
+================================================================================
+
+--------------------------------------------------------------------------------
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+node -v
+npm -v
+npm install -g pm2
+--------------------------------------------------------------------------------
+
+================================================================================
+F. CLONER LE PROJET ET INSTALLER LES DÉPENDANCES
+================================================================================
+
+  Dépôt Git (à adapter si votre URL change) :
+
+--------------------------------------------------------------------------------
+mkdir -p /var/www
+cd /var/www
+git clone https://github.com/lyissa1928-ai/preinscription.git uniportail
+cd /var/www/uniportail
+git checkout main
+git pull
+npm run install:all
+--------------------------------------------------------------------------------
+
+  Si après le clone vous voyez un sous-dossier (ex. preinscription-univ) qui
+  contient le package.json à la racine du monorepo, faites :
+
+    cd /var/www/uniportail/preinscription-univ
+
+  et remplacez dans TOUT ce tutoriel :
+    /var/www/uniportail   par   /var/www/uniportail/preinscription-univ
+
+================================================================================
+G. FICHIER backend/.env (PRODUCTION)
+================================================================================
+
+  Le bloc ci-dessous :
+  - copie .env.example vers .env
+  - génère un JWT_SECRET aléatoire (hexadécimal, compatible sed)
+  - fixe NODE_ENV, CORS pour votre domaine
+  - laisse AUTH_INSCRIPTION_BYPASS_CAPTCHA=0 (obligatoire en prod si pas de contournement)
+
+  Copier-coller :
+
+--------------------------------------------------------------------------------
+cd /var/www/uniportail/backend
+test -f .env || cp .env.example .env
+
+JWT_HEX=$(openssl rand -hex 32)
+sed -i "s/^JWT_SECRET=.*/JWT_SECRET=${JWT_HEX}/" .env
+
+grep -q '^NODE_ENV=' .env && sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' .env || echo 'NODE_ENV=production' >> .env
+grep -q '^PORT=' .env || echo 'PORT=5000' >> .env
+
+if grep -q '^# CORS_ORIGINS=' .env; then
+  sed -i 's/^# CORS_ORIGINS=.*/CORS_ORIGINS=https:\/\/uniportail-digital.com,https:\/\/www.uniportail-digital.com/' .env
+fi
+if ! grep -q '^CORS_ORIGINS=' .env; then
+  echo 'CORS_ORIGINS=https://uniportail-digital.com,https://www.uniportail-digital.com' >> .env
+fi
+--------------------------------------------------------------------------------
+
+  Ensuite, édition manuelle si vous utilisez l’inscription / préinscription avec
+  captcha en production (recommandé) :
+
+    nano /var/www/uniportail/backend/.env
+
+  Renseignez au minimum pour la prod (selon votre choix Google ou Cloudflare) :
+    RECAPTCHA_SECRET_KEY=...
+    et/ou
+    TURNSTILE_SECRET_KEY=...
+
+  Côté frontend, les clés publiques se mettent AVANT le build (section H).
+
+  Ne mettez JAMAIS AUTH_INSCRIPTION_BYPASS_CAPTCHA=1 en production.
+
+================================================================================
+H. FRONTEND : VARIABLES VITE (OPTIONNEL) PUIS BUILD
+================================================================================
+
+  Même origine (https://uniportail-digital.com) : souvent VITE_API_URL peut
+  rester vide. Si l’API est sur un autre domaine, créez frontend/.env.production :
+
+    nano /var/www/uniportail/frontend/.env.production
+
+  Exemple :
+
+    VITE_API_URL=https://uniportail-digital.com
+    VITE_RECAPTCHA_SITE_KEY=votre_cle_site_google
+    VITE_TURNSTILE_SITE_KEY=votre_cle_site_cloudflare
+
+  Puis build :
+
+--------------------------------------------------------------------------------
+cd /var/www/uniportail
+npm run build
+--------------------------------------------------------------------------------
+
+  Le dossier généré est : /var/www/uniportail/frontend/dist
+
+================================================================================
+I. DÉMARRER L’API AVEC PM2
+================================================================================
+
+--------------------------------------------------------------------------------
+cd /var/www/uniportail/backend
+pm2 start server.js --name uniportail-api
+pm2 save
+pm2 startup systemd
+--------------------------------------------------------------------------------
+
+  La commande pm2 startup affiche UNE ligne du type :
+    env PATH=... /usr/bin/pm2 startup systemd -u root --hp /root
+  Copiez-collez cette ligne exacte et exécutez-la, puis :
+
+--------------------------------------------------------------------------------
+pm2 status
+curl -sS http://127.0.0.1:5000/api/etablissements | head -c 400
+echo
+--------------------------------------------------------------------------------
+
+  Vous devez voir du JSON (ou une réponse valide). Si erreur, voir section P.
+
+================================================================================
+J. NGINX — SITE EN HTTP (PORT 80)
+================================================================================
+
+  Ce bloc crée le fichier de site sans ouvrir nano (copier-coller entier).
+  client_max_body_size permet les envois de fichiers (ajustez si besoin).
+
+--------------------------------------------------------------------------------
+cat <<'NGINX_EOF' > /etc/nginx/sites-available/uniportail-digital.com
+server {
+    listen 80;
+    listen [::]:80;
+    server_name uniportail-digital.com www.uniportail-digital.com;
+
+    root /var/www/uniportail/frontend/dist;
+    index index.html;
+
+    client_max_body_size 25M;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+NGINX_EOF
+
+ln -sf /etc/nginx/sites-available/uniportail-digital.com /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl reload nginx
+--------------------------------------------------------------------------------
+
+================================================================================
+K. TESTER EN HTTP AVANT HTTPS
+================================================================================
+
+  Depuis le serveur :
+
+--------------------------------------------------------------------------------
+curl -sI -H "Host: uniportail-digital.com" http://127.0.0.1/ | head -5
+--------------------------------------------------------------------------------
+
+  Depuis votre navigateur (après propagation DNS) :
+
+    http://uniportail-digital.com
+
+  La page du site doit s’afficher ; les appels /api passent par Nginx vers PM2.
+
+================================================================================
+L. HTTPS / CERTIFICAT SSL (LET’S ENCRYPT)
+    À faire quand le DNS (A @ et www) pointe vers l’IP du VPS et que le site
+    répond déjà en HTTP.
+
+    Tutoriels détaillés à la racine du projet :
+    - tuto-https-uniportail.txt — HTTPS via panneau Hestia (recommandé si tu
+      ne touches pas à certbot).
+    - tuto-certbot-uniportail.txt — HTTPS avec Certbot (--nginx ou --webroot),
+      prérequis, CORS, précautions Hestia.
+================================================================================
+
+  Prérequis : ports 80 et 443 ouverts vers le VPS (pare-feu / « Nginx Full »).
+
+  ── Méthode A — VPS avec Hestia (ex. LWS) : À PRIVILÉGIER ─────────────────────
+  Le panneau gère Nginx ; évitez certbot en parallès sans savoir ce que vous
+  faites (double config).
+
+  1) Panneau web (https://VOTRE_IP:8083 ou URL fournie par l’hébergeur).
+  2) Web → domaine uniportail-digital.com → Modifier (ou icône SSL).
+  3) Activer SSL / Let’s Encrypt (parfois « Support SSL » puis « Lets Encrypt »).
+  4) Cocher le domaine + www si proposé ; lancer la génération du certificat.
+  5) Activer la redirection HTTP → HTTPS si l’option existe.
+
+  Ligne de commande Hestia (si vous avez un utilisateur admin et le CLI hstctl) :
+
+--------------------------------------------------------------------------------
+# Remplacez admin par l’utilisateur du panneau Hestia (souvent admin sur LWS).
+# Syntaxe typique (selon version Hestia, voir : v-list-letsencrypt-user) :
+/usr/local/hestia/bin/v-add-letsencrypt-domain admin uniportail-digital.com www.uniportail-digital.com
+--------------------------------------------------------------------------------
+
+  En cas de doute ou d’erreur CLI, utilisez uniquement le panneau graphique
+  (Web → domaine → SSL / Let’s Encrypt).
+
+  Après activation HTTPS : dans backend/.env, CORS_ORIGINS doit inclure
+  https://uniportail-digital.com (et https://www... si vous l’utilisez), puis :
+  pm2 restart uniportail-api
+
+  ── Méthode B — Serveur Debian « nu » (sans Hestia), Nginx classique ─────────
+
+--------------------------------------------------------------------------------
+certbot --nginx -d uniportail-digital.com -d www.uniportail-digital.com
+--------------------------------------------------------------------------------
+
+  Test du renouvellement automatique :
+
+--------------------------------------------------------------------------------
+certbot renew --dry-run
+--------------------------------------------------------------------------------
+
+  Certbot modifie la config Nginx pour écouter en HTTPS et rediriger le HTTP.
+
+================================================================================
+M. VÉRIFICATIONS APRÈS SSL
+================================================================================
+
+  - Ouvrir : https://uniportail-digital.com
+  - Vérifier le cadenas du navigateur.
+  - Tester connexion / navigation.
+
+  Si vous modifiez backend/.env après coup :
+
+--------------------------------------------------------------------------------
+pm2 restart uniportail-api
+--------------------------------------------------------------------------------
+
+================================================================================
+N. DÉPLOIEMENTS ULTÉRIEURS (MISE À JOUR DU CODE)
+================================================================================
+
+--------------------------------------------------------------------------------
+cd /var/www/uniportail
+git pull
+npm run install:all
+npm run build
+pm2 restart uniportail-api
+nginx -t && systemctl reload nginx
+--------------------------------------------------------------------------------
+
+  Si vous changez des variables VITE_* : refaire npm run build après les avoir
+  modifiées dans frontend/.env.production.
+
+================================================================================
+O. SAUVEGARDES (RECOMMANDÉ)
+================================================================================
+
+  Fichiers importants :
+    /var/www/uniportail/backend/database/preinscription.json
+    /var/www/uniportail/backend/uploads/
+
+  Exemple d’archive datée (à lancer manuellement ou en cron) :
+
+--------------------------------------------------------------------------------
+tar czf /root/sauvegarde-uniportail-$(date +%Y%m%d-%H%M).tar.gz \
+  /var/www/uniportail/backend/database/preinscription.json \
+  /var/www/uniportail/backend/uploads
+ls -lh /root/sauvegarde-uniportail-*.tar.gz | tail -3
+--------------------------------------------------------------------------------
+
+================================================================================
+P. DÉPANNAGE
+================================================================================
+
+  Logs de l’API :
+    pm2 logs uniportail-api --lines 80
+
+  Redémarrer l’API :
+    pm2 restart uniportail-api
+
+  Statut Nginx :
+    systemctl status nginx
+    nginx -t
+    tail -50 /var/log/nginx/error.log
+
+  Port 5000 utilisé ?
+    ss -tlnp | grep 5000
+
+  Tester l’API en local sur le serveur :
+    curl -sS http://127.0.0.1:5000/api/etablissements | head
+
+  CORS / erreurs API depuis le navigateur : vérifier que CORS_ORIGINS dans
+  backend/.env contient exactement l’URL affichée dans la barre d’adresse
+  (https://uniportail-digital.com ou https://www.uniportail-digital.com).
+
+  Pare-feu : si vous avez touché à ufw, le port 80/443 doit être ouverts
+  (le profil « Nginx Full » le fait).
+
+================================================================================
+FIN DU TUTORIEL
+================================================================================

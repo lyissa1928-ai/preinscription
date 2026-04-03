@@ -1,0 +1,258 @@
+Prompt 1 
+
+
+✅ PROMPT 1 — Bootstrap Fullstack (Web) “Dernière génération”
+
+Objectif : Initialiser un monorepo fullstack prêt production : Backend NestJS + PostgreSQL + Prisma et Frontend Next.js (App Router) + Tailwind + shadcn/ui, avec Docker, CI, Swagger, conventions, qualité, thèmes UI modernes, pages de base, layout, navigation, auth placeholder.
+
+1) Stack imposée
+
+Backend
+
+NestJS (TypeScript)
+
+Prisma ORM
+
+PostgreSQL
+
+Swagger OpenAPI auto
+
+Validation DTO (class-validator / class-transformer)
+
+Logger structuré (pino ou nestjs-pino)
+
+Config env (dotenv + validation)
+
+Tests (Jest)
+
+Frontend
+
+Next.js (App Router) TypeScript
+
+TailwindCSS
+
+shadcn/ui (Radix)
+
+Icons lucide-react
+
+React Query (TanStack Query) pour API calls
+
+Zod + react-hook-form
+
+Dark mode + theme toggle
+
+Responsive design + animations légères (framer-motion)
+
+DevOps
+
+Docker Compose (postgres + api + web)
+
+migrations automatisées
+
+CI (GitHub Actions) : lint + tests + build
+
+Prettier + ESLint + editorconfig
+
+2) Monorepo & structure
+
+Créer un monorepo avec cette structure :
+
+sis/
+  apps/
+    api/         (NestJS)
+    web/         (Next.js)
+  packages/
+    shared/      (types, zod schemas, utils)
+    ui/          (optionnel si besoin)
+  infra/
+    docker/
+  docs/
+  .github/workflows/
+  docker-compose.yml
+  README.md
+
+Utiliser pnpm workspaces (ou npm workspaces) pour gérer le monorepo.
+
+Ajouter scripts root : dev, build, lint, test, db:up, db:migrate, db:seed.
+
+3) Backend — détails à implémenter maintenant
+3.1 Configuration & qualité
+
+@nestjs/config + validation env (zod ou joi)
+
+Structure modules : app.module.ts + health, common, config, database
+
+Logger structuré (pino) + request-id
+
+CORS configuré pour le frontend
+
+Global pipes : ValidationPipe (transform, whitelist)
+
+Global exception filter : erreurs standard JSON :
+
+{ "code": "VALIDATION_ERROR", "message": "...", "details": {...}, "requestId": "..." }
+3.2 Prisma + DB
+
+Prisma schema initial + migrations
+
+Tables initiales minimalistes :
+
+User (id uuid, matricule unique, email unique, phone, passwordHash, role, status, firstLoginRequired, createdAt, updatedAt)
+
+AuditLog (id, actorUserId nullable, action, entity, entityId, before JSON, after JSON, ipAddress, userAgent, createdAt)
+
+Seed script : créer un Super Admin:
+
+matricule: ADMIN0001
+
+email: admin@univ.local
+
+phone: 770000000
+
+password = ADMIN0001 hashé
+
+role = SUPER_ADMIN
+
+firstLoginRequired = true
+
+3.3 Healthcheck
+
+GET /api/v1/health -> { status: "ok", time: ... }
+
+GET /api/v1/health/db -> test connexion DB
+
+3.4 Swagger
+
+Swagger accessible : /api/docs
+
+API base : /api/v1
+
+4) Frontend — détails à implémenter maintenant (style “dernier cri”)
+4.1 Design system
+
+Setup Tailwind + shadcn/ui
+
+Thème moderne :
+
+layout “dashboard” (sidebar + topbar)
+
+dark mode
+
+typographie propre
+
+composants : Button, Card, Badge, Dialog, Table, Tabs, Skeleton, Toast
+
+4.2 Pages
+
+Créer pages suivantes (UI complète, sans logique métier complexe encore) :
+
+Public
+
+/login : formulaire matricule + password
+
+validation Zod
+
+UI premium (card, gradient subtil, animation)
+
+“Mot de passe par défaut = matricule” (texte info)
+
+/first-login : écran changement mot de passe obligatoire
+
+Dashboard (protégé)
+
+/app : dashboard KPIs placeholder (cards + charts placeholder)
+
+/app/users : page liste utilisateurs (table + search + filters UI)
+
+/app/settings : page paramètres (theme toggle, profil placeholder)
+
+4.3 UX/Qualité
+
+Layout responsive (mobile sidebar drawer)
+
+Loading states (skeleton)
+
+Empty states élégants
+
+Toast notifications (success/error)
+
+Routing guard (middleware Next) basé sur token cookie (placeholder)
+
+5) Contrat API minimal pour login (placeholder)
+
+Même si auth complète est au prompt 2, ici on met un “fake mode” :
+
+Créer un AuthApiClient dans web :
+
+appelle /api/v1/health et affiche “API connectée”
+
+préparer structure pour /auth/login (sera ajouté prompt 2)
+
+6) Docker & scripts
+6.1 docker-compose.yml
+
+Services :
+
+db postgres (port 5432)
+
+api (Nest, port 3001)
+
+web (Next, port 3000)
+
+Variables env :
+
+DATABASE_URL
+
+API_PORT, WEB_PORT
+
+JWT secrets placeholders (même si auth prompt 2)
+
+6.2 Commandes
+
+pnpm dev -> lance db + api + web
+
+pnpm db:migrate -> prisma migrate
+
+pnpm db:seed -> seed super admin
+
+7) Tests & CI
+
+Backend: test de health route
+
+Frontend: lint/build
+
+GitHub Actions workflow : lint + test + build sur PR/push
+
+8) Documentation (README)
+
+Rédiger README ultra clair :
+
+Prérequis
+
+Installation
+
+Lancement
+
+URLs
+
+Commandes utiles
+
+Notes architecture
+
+Convention commit (optionnel)
+
+9) Définition “DONE” pour ce prompt 1
+
+Le prompt 1 est terminé si :
+
+docker compose up démarre db + api + web sans erreur
+
+/api/v1/health répond OK
+
+/api/docs accessible
+
+Frontend a pages /login, /first-login, /app avec layout moderne
+
+Seed super admin créé en DB
+
+CI passe (lint/test/build)

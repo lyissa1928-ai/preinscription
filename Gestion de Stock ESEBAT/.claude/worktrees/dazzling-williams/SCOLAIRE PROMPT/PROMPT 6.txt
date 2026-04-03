@@ -1,0 +1,369 @@
+PROMPT 6
+
+ — Inscriptions Administratives (IA) + Facturation initiale + Attestation PDF + UI Scolarité “dernier cri”
+
+Objectif : Implémenter l’Inscription Administrative (IA) complète (backend + frontend), liée à la finance (facture initiale), avec règles strictes : unicité, statut, validation, audit, et génération automatique d’Attestation d’Inscription / Scolarité PDF.
+
+Dépend des Prompts 3 (référentiel), 5 (students), 2 (auth/audit), et prépare le Prompt 7 (IP).
+
+0) RBAC
+
+IA CRUD + validation : SCOLARITE, ADMIN, SUPER_ADMIN
+
+Consultation : AUDITOR, DEPT_HEAD (sur périmètre département/programmes)
+
+Accès étudiant : seulement “voir son IA” (endpoints me) dans un prompt futur
+
+Audit obligatoire sur toutes actions.
+
+1) Modèle de données (Prisma)
+1.1 EnrollmentIA
+
+Créer table :
+
+id
+
+studentId (FK Student)
+
+academicYearId (FK AcademicYear)
+
+programId (FK Program)
+
+levelId (FK Level)
+
+status enum: DRAFT | PENDING | VALIDATED | REJECTED | CANCELED
+
+submittedAt nullable
+
+validatedAt nullable
+
+validatedByUserId nullable (FK User)
+
+rejectedReason nullable
+
+createdAt, updatedAt
+
+Contraintes :
+
+Unicité (studentId, academicYearId) unique
+
+level.programId == programId
+
+Interdire IA si student.status in (SUSPENDED, DROPPED) selon règles
+
+Interdire IA si academicYear.status=CLOSED
+
+1.2 IA Documents
+
+Créer table GeneratedDocument (si pas déjà) :
+
+id
+
+type enum: IA_ATTESTATION | ...
+
+studentId
+
+academicYearId
+
+enrollmentIaId
+
+fileId (FK FileStorage)
+
+version int (default 1)
+
+generatedAt
+
+generatedByUserId (FK User)
+
+status enum: ACTIVE | REVOKED
+
+hash (string) (hash du PDF pour vérification)
+
+verifyTokenHash (string) (token public hashé)
+
+Règles :
+
+On peut régénérer => version+1, l’ancienne passe REVOKED
+
+Vérification publique via token (info minimale)
+
+1.3 Finance (liaison IA → Facture)
+
+Si Invoice existe déjà plus tard, ici on crée au minimum :
+
+FeeItem (si pas fait)
+
+id, label, amount, academicYearId, programId?, levelId?, status
+
+Invoice (min pour IA)
+
+id
+
+studentId
+
+academicYearId
+
+reference unique
+
+totalAmount
+
+paidAmount default 0
+
+status enum: ISSUED | PARTIAL | PAID | CANCELED
+
+createdAt, updatedAt
+
+InvoiceLine
+
+id
+
+invoiceId
+
+feeItemId
+
+labelSnapshot
+
+amountSnapshot
+
+Règles :
+
+À validation IA : générer facture (si paramétrage actif)
+
+Total = sum lignes
+
+paidAmount mis à jour plus tard (Prompt Finance)
+
+2) Backend — Règles métier IA
+2.1 Workflow IA
+
+DRAFT : créé par scolarité (brouillon)
+
+PENDING : dossier soumis (optionnel)
+
+VALIDATED : validée par scolarité
+
+REJECTED : rejet avec motif
+
+CANCELED : annulation (audit + rôle)
+
+2.1.1 Règles
+
+Un étudiant ne peut pas avoir 2 IA pour la même année (unicité)
+
+Si IA VALIDATED : impossible de modifier programme/niveau (sauf procédure “rectification IA” option future)
+
+IA bloquée si année CLOSED
+
+IA bloquée si étudiant DISABLED/SUSPENDED selon règles
+
+Au passage VALIDATED :
+
+générer attestation PDF
+
+générer facture (si paramétrage frais IA)
+
+audit log
+
+3) API REST — Endpoints IA
+
+Base /api/v1
+
+3.1 IA
+
+GET /enrolments/ia?page=&pageSize=&q=&academicYearId=&programId=&levelId=&status=
+
+POST /enrolments/ia
+
+GET /enrolments/ia/:id
+
+PATCH /enrolments/ia/:id (seulement si DRAFT/PENDING)
+
+POST /enrolments/ia/:id/submit (DRAFT -> PENDING)
+
+POST /enrolments/ia/:id/validate (-> VALIDATED)
+
+Body : { "generateInvoice": true } (default true)
+
+POST /enrolments/ia/:id/reject (-> REJECTED) body { reason }
+
+POST /enrolments/ia/:id/cancel (-> CANCELED) body { reason }
+
+3.2 Attestation IA
+
+GET /documents/ia/:enrollmentIaId (métadonnées + lien)
+
+POST /documents/ia/:enrollmentIaId/regenerate (version +1)
+
+GET /documents/download/:fileId (signed URL)
+
+GET /documents/verify?token=... (public : retourne validité + info minimale)
+
+Info minimale verify :
+
+nom, matricule, année, programme, statut VALIDATED (oui/non)
+
+pas d’email/tel/DOB
+
+4) Backend — Génération PDF Attestation
+
+Template PDF officiel (logo, entête, numéro, date)
+
+Contenu :
+
+Nom, prénom
+
+Matricule
+
+Programme + niveau
+
+Année académique
+
+Mention “Attestation d’inscription” ou “Attestation de scolarité”
+
+QR Code de vérification (token)
+
+Stocker PDF dans FileStorage via MinIO
+
+Hash du document + verify token (stock hash)
+
+Audit :
+
+IA_VALIDATED
+
+IA_ATTESTATION_GENERATED
+
+IA_ATTESTATION_REGENERATED
+
+5) Frontend — UI Scolarité Premium
+
+Créer pages :
+
+/app/enrolments/ia
+
+/app/enrolments/ia/new
+
+/app/enrolments/ia/[id] (détails)
+
+/verify/document (public)
+
+5.1 Liste IA
+
+Table paginée
+
+Search (matricule, nom)
+
+Filtres :
+
+année académique
+
+programme
+
+niveau
+
+statut
+
+Row actions :
+
+Voir
+
+Valider
+
+Rejeter
+
+Annuler
+
+Badges statut (color neutral, pas besoin de custom colors)
+
+5.2 Création IA (wizard UX)
+
+Wizard en 3 étapes :
+
+Sélection étudiant (search modal)
+
+Choix année/programme/niveau (select dépendants)
+
+Résumé + création (DRAFT)
+
+5.3 Détails IA
+
+Afficher :
+
+infos étudiant + académiques
+
+statut + historique actions (audit mini)
+
+boutons selon statut :
+
+Submit
+
+Validate
+
+Reject (dialog motif)
+
+Cancel (dialog motif)
+
+Section documents :
+
+Aperçu attestation (si VALIDATED)
+
+Télécharger PDF
+
+Régénérer (confirm)
+
+5.4 Page publique Verify Document
+
+UI premium simple
+
+Affiche validité document
+
+Affiche infos minimales
+
+Sinon erreur claire
+
+UX :
+
+Skeleton
+
+Empty states
+
+Toast
+
+6) Tests (minimum)
+
+Backend :
+
+create IA unique OK / duplicate rejected
+
+validate IA => doc généré + invoice générée
+
+verify doc => valid
+
+regenerate => version increment + old revoked
+
+RBAC : étudiant interdit
+
+Frontend :
+
+création IA via wizard
+
+validation IA
+
+téléchargement doc (signed url)
+
+verify public page
+
+7) Definition of Done (PROMPT 6)
+
+Terminé si :
+
+IA workflow complet fonctionne
+
+Facture initiale créée à validation
+
+Attestation PDF générée + vérifiable via QR/token
+
+UI scolarité complète et moderne
+
+Audit intégré partout
+
+Swagger à jour

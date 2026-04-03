@@ -1,0 +1,397 @@
+# Architecture du projet Gestion Scolaire
+
+## 1. Vue d’ensemble
+
+- **Backend** : NestJS, Prisma, base SQLite (dev) / PostgreSQL (prod).
+- **Frontend** : Next.js 16 (App Router), React, Tailwind.
+- **Communication** : REST API, JWT dans `Authorization: Bearer`, URL backend via `NEXT_PUBLIC_API_URL` (défaut `http://localhost:3000`).
+
+### 1.1 Contexte environnement
+
+Le projet est actuellement en **phase de test et de développement**.
+
+Il n'y a **pas encore de nom de domaine public**.
+
+Environnement actuel :
+
+- Backend : localhost
+- Frontend : localhost
+- Base de données : SQLite (dev)
+- Accès : réseau local
+
+Règles importantes :
+
+- ne pas hardcoder d'URL publique
+- toutes les URLs doivent utiliser des variables d'environnement
+- API backend configurable via `NEXT_PUBLIC_API_URL`
+- CORS configuré pour localhost et réseau local
+- Swagger accessible en local
+- aucune dépendance à un nom de domaine public
+
+Prévoir simplement une architecture compatible avec une future production.
+
+---
+
+## 2. Backend (NestJS)
+
+### 2.1 Configuration
+
+- **Port** : `process.env.PORT` (défaut 3000).
+- **CORS** : autorisé pour le frontend (`FRONTEND_URL`, localhost).
+- **Global** : pas de préfixe global ; validation `ValidationPipe`, filtre d’exceptions global.
+- **Static** : `/uploads/` → dossier `uploads`.
+- **Swagger** : `/api/docs` avec Bearer.
+
+### 2.2 Modules et rôles métier
+
+| Module | Rôle | Routes principales |
+|--------|------|---------------------|
+| **AuthModule** | Connexion, JWT | `POST /auth/login`, `GET /auth/me` |
+| **UsersModule** | Utilisateurs, profil, badge | CRUD `/users`, `PATCH /users/me`, photo, `GET /users/:id/badge-data`, `GET /badge/verify` |
+| **FormationsModule** | Référentiel LMD | CRUD formations, maquettes, semestres, UE, EC, filières, import, demandes validation/déverrouillage |
+| **CampusModule** | Lieux | CRUD `/campuses`, `GET /campuses/regions` |
+| **SallesModule** | Salles | CRUD `/salles`, template/bulk |
+| **PersonsModule** | Annuaire | CRUD `/persons`, étudiants/enseignants/staff, export, attestation, carte, documents, inscription complète |
+| **InscriptionsModule** | Inscriptions & cohortes | CRUD `/inscriptions`, `/inscriptions/cohorts`, close, bulk-assign, statut, annuler |
+| **FinanceModule** | Finances étudiants | FeeConfig, paiements, validation/rejet, statut en règle, non-en-regle, recouvrement |
+| **StudentsModule** | Self-service étudiant | Proforma, certificat, statut financier, reçus |
+| **CoursesModule** | Référentiel pédagogique des cours | CRUD `/courses`, conflits, bulk, dashboard enseignant |
+| **TimetablesModule** | Planification des séances d'emploi du temps | CRUD `/api/v1/timetables/sessions`, conflits |
+| **EncadrementsModule** | Encadrements | `GET /encadrements/me` |
+| **GradesModule** | Notes | Session-configs, saisie notes, demandes modification, approbation/rejet |
+| **AttendanceModule** | Pointage | Mes cours du jour, arrivée/départ, validation |
+| **PayrollModule** | Paie | Preview, calcul, génération paie, bulletins (me + admin) |
+| **TariffRatesModule** | Taux horaires | CRUD `/tariff-rates` (CM/TD/TP) |
+| **VigilanceModule** | Présence temps réel | `GET /vigilance/presence` (tableau de bord Directeur) |
+| **GovernanceModule** | Gouvernance financière | États financiers, clôture, demandes de brèche, validation, export |
+| **FinancialModule** | Comptabilité | Encaissements, brouillard, clôture journalière, écritures, DAF, comptes, budgets |
+| **VigileModule** | Contrôle d'accès | `POST /vigile/check-in` (autorisation selon statut financier) |
+| **AuditModule** | Traçabilité | `GET /audit/logs`, `GET /audit/export` |
+| **NotificationsModule** | Alertes in-app | Liste, count, marquer lu |
+| **ReportsModule** | Rapports | Effectifs, recettes, taux réussite, synthèse, export PDF/CSV |
+| **AppearanceModule** | Thème plateforme (SUPER_ADMIN) | `GET /appearance/settings` (public), `PATCH /appearance/settings` (SUPER_ADMIN) |
+| **DeviceTokenModule** | Tokens appareil | Guard / notifications |
+| **PrismaModule** | BDD | Client Prisma global |
+
+### 2.3 Dépendances importantes
+
+- **Inscriptions** → Auth, Audit
+- **Persons** → Auth, Inscriptions
+- **Finance** → Auth, Audit
+- **Students** → Finance
+- **Vigile** → Finance (statut en règle), DeviceToken, Audit
+- **Governance** → Audit, Notifications
+- **Appearance** → Auth, Audit
+
+---
+
+## Entités métier principales
+
+Les modules doivent s'appuyer sur ces entités centrales.
+
+### Académique
+
+- AcademicYear
+- Semester
+- Formation
+- Filiere
+- Niveau
+- Groupe
+- UE
+- EC
+
+### Utilisateurs
+
+- User
+- Person
+- Student
+- Teacher
+- Staff
+
+### Pédagogique
+
+- Course
+- TimetableSession
+- Attendance
+- Grade
+
+### Administratif
+
+- Inscription
+- Payment
+- Payroll
+- Notification
+- AuditLog
+
+---
+
+## Workflows métier principaux
+
+### Inscription étudiant
+
+création Person  
+→ création User  
+→ inscription formation  
+→ génération matricule  
+→ activation étudiant
+
+### Paiement
+
+création paiement  
+→ validation caissier  
+→ génération reçu  
+→ mise à jour statut financier
+
+### Notes
+
+enseignant saisit notes  
+→ soumission  
+→ validation chef département  
+→ validation scolarité  
+→ verrouillage
+
+### Pointage enseignant
+
+arrivée  
+→ pointage  
+→ validation comptable  
+→ utilisé pour calcul paie
+
+---
+
+## Règles métier principales
+
+### Inscription
+
+- un étudiant ne peut avoir qu'une inscription active par année académique
+- une inscription est liée à une formation et un groupe
+
+### Paiement
+
+- un paiement doit être validé par un caissier
+- la validation génère un reçu
+- le statut financier de l'étudiant est mis à jour
+
+### Notes
+
+- les notes doivent être validées avant d'être verrouillées
+- aucune modification possible après validation finale
+
+### Pointage
+
+- un pointage doit être lié à une séance d'emploi du temps
+- seuls les pointages validés peuvent être utilisés pour la paie
+
+---
+
+## Standards de qualité du code
+
+### Backend
+
+- architecture modulaire NestJS
+- DTO + validation class-validator
+- services métier séparés des controllers
+- Prisma pour l'accès base de données
+
+### Frontend
+
+- utilisation du design system existant
+- composants réutilisables
+- gestion des états cohérente
+- pas de logique métier côté UI
+
+### Règles générales
+
+- ne pas dupliquer la logique métier
+- privilégier les services backend
+- documenter les endpoints Swagger
+
+---
+
+## 3. Frontend (Next.js)
+
+### 3.1 Routes principales
+
+| Zone | Chemins | Rôle cible |
+|------|---------|------------|
+| **Auth** | `(auth)/login` | Tous (non connectés) |
+| **Accueil** | `/` | Redirection selon rôle |
+| **Vigile** | `/vigile` | Kiosque (check-in, pas de login classique) |
+| **Dashboard** | `/dashboard` | Redirection selon rôle |
+| **Admin** | `/dashboard/admin`, configuration, utilisateurs, demandes-validation, demandes-deverrouillage, vigilance, gouvernance, **settings/appearance** | ADMIN, SUPER_ADMIN |
+| **Comptable** | `/dashboard/comptable`, tarifs, paiements, recouvrement, pointages, paie, cloture, historique cloture, caisse, comptabilite, daf, taux-horaires | CAISSIER, CHEF_COMPTABLE, DAF |
+| **Scolarité** | `/dashboard/scolarite`, formations, filières, campus, salles, enseignants, etudiants, classes, inscriptions, emploi-du-temps, personnel, transfert | SCOLARITE, ADMIN, SUPER_ADMIN |
+| **Pédagogie** | `/dashboard/pedagogie`, classes | SERVICE_PEDAGOGIQUE, ADMIN, SUPER_ADMIN |
+| **Enseignant** | `/dashboard/enseignant`, notes, pointage, emploi-du-temps, paie | TEACHER |
+| **Étudiant** | `/dashboard/etudiant`, notes, emploi-du-temps, documents | STUDENT |
+| **Chef de département** | `/dashboard/chef-departement` | DEPT_HEAD |
+| **Auditeur** | `/dashboard/auditeur`, journal | AUDITOR |
+| **Partagé** | `/dashboard/profil`, `/dashboard/notifications`, `/dashboard/rapports` | Selon droits |
+
+### 3.2 Lib & composants
+
+- **`lib/api.ts`** : `api<T>(path, options)`, `downloadFile`, `getApiUrl`, `getFetchUrl`.
+- **`lib/session.ts`** : token + user (localStorage), `clearSession`, `isSessionValid`, `isTokenNotExpired`.
+- **Contextes** : `ThemeContext` (thème / couleurs / favicon), `ToastContext` (succès/erreur/info).
+- **Design system** (`components/ui`) : `PageHeader`, `Card`, `NavCard`, `Button`, `BadgeStatus`, `EmptyState`, `Spinner`, `DataTable` (tri optionnel), `Pagination`, `KpiCard`, `Label`, `Input`, `Select`, `Textarea`, `FormGroup`, **`Icon`** (jeu d’icônes SVG dans `icons.tsx`). Layout **uniforme** : `Sidebar`, `DashboardHeader`, `AppShell` (sidebar + header pour tous les dashboards ; config par pathname et rôle dans `config/sidebar.ts`). **Icônes** : toutes les entrées de la sidebar et toutes les NavCards des dashboards ont une icône ; EmptyState, KpiCard et boutons d’action (ex. Nouvelle inscription) utilisent aussi des icônes.
+
+---
+
+## Suivi du développement
+
+Le projet doit maintenir un fichier `fatima.txt`.
+
+Ce fichier sert de **journal technique du projet**.
+
+Cursor doit mettre à jour ce fichier après chaque modification importante.
+
+Format obligatoire :
+
+DATE : YYYY-MM-DD
+
+MODULE : nom du module
+
+ETAT ACTUEL
+- description de l'état actuel du module
+
+MODIFICATIONS REALISEES
+- ce qui a été ajouté ou corrigé
+
+PROBLEMES IDENTIFIES
+- incohérences ou bugs détectés
+
+TRAVAUX RESTANTS
+- prochaines améliorations
+
+Cursor doit lire ce fichier avant toute nouvelle modification.
+
+---
+
+## 4. Ce qui existe vs ce qui reste à faire
+
+D'après issa.txt et le code actuel.
+
+### 4.1 Déjà en place (backend + frontend)
+
+- Auth (login, JWT, redirection par rôle), structure académique (formations, maquettes, UE, EC, salles), campus, filières.
+- Utilisateurs et personnes (étudiants, enseignants, personnel), génération matricules, lien User ↔ Person.
+- Inscriptions (API complète, cohortes, statuts, clôture, bulk-assign), côté front (liste, formulaire, design system sur la page Inscriptions).
+- Finances étudiants (tarifs, paiements, validation, statut en règle, recouvrement).
+- Self-service étudiant (proforma, certificat, reçus, statut).
+- Emploi du temps (courses + timetables), conflits, bulk.
+- Notes (saisie, sessions, demandes de modification, approbation/rejet).
+- Pointage (arrivée/départ, validation, mes cours du jour).
+- Paie (preview, calcul, génération, bulletins), taux horaires.
+- Vigilance (présence), Gouvernance (états financiers, brèche), Vigile (check-in).
+- Audit (logs, export), Notifications (liste, count, lu), Rapports (effectifs, recettes, taux réussite, export).
+- Apparence & thème (SUPER_ADMIN) : couleurs, logos, favicon, ThemeProvider.
+
+### 4.2 À compléter ou renforcer
+
+| Domaine | À faire |
+|--------|---------|
+| **Auth** | Guards @Roles() sur toutes les routes sensibles ; page **profil** (GET/me, PATCH /users/me, changement mot de passe). |
+| **Inscriptions** | Règles métier explicites (enjambement, affectation unique) ; formulaire + contrôles temps réel ; cohérence liste par formation/cohorte. |
+| **Notes** | Date limite de saisie configurable ; file de validation complète en UI (scolarité / chef de département) ; historique des modifications. |
+| **Documents PDF** | Vérifier/coder génération reçu après validation paiement ; templates proforma/certificat ; boutons self-service clairs. |
+| **Emploi du temps** | Clarifier ou unifier courses vs timetables ; **vue calendrier/semaine** ; conflits avant enregistrement ; vues enseignant/étudiant homogènes. |
+| **Pointage** | Lier strictement à un cours (EDT) ; statuts VALIDE / NON_REMUNERE / REFUSE ; écran **liste pointages à valider** (comptable). |
+| **Paie** | Confirmer cryptage bulletin (matricule) ; interface **calcul paie** (mois, liste, heures, montants) ; historique des paies. |
+| **Gouvernance** | Notification Directeur (demande de brèche) ; blocage modification tant que brèche non traitée ; historique états + brèches en UI. |
+| **Vigilance** | Mise à jour **temps réel** (polling 30 s ou WebSocket) ; pastilles vert/rouge ; filtres (département, type). |
+| **Vigile** | Log des passages (CheckInLog) côté backend ; interface kiosque **plein écran** (vert/rouge, message refus, saisie manuelle). |
+| **Audit** | Enregistrement **systématique** des actions sensibles (notes, finances, inscriptions, validations) ; optionnel : connexions/échecs. |
+| **Notifications** | Typage des notifications côté backend ; envoi lors validations/brèche ; cloche + liste + marquer lu bien intégrés. |
+| **Rapports** | Graphiques et vues synthèse ; exports PDF/Excel par rôle. |
+| **Design** | Étendre le design system à toutes les pages critiques ; densité type ERP ; empty states, pagination, toasts partout. |
+
+### 4.3 Priorisation pour une plateforme complète
+
+1. **Sécurité** : Guards @Roles partout ; page profil + PATCH /users/me + changement de mot de passe.
+2. **Inscriptions** : Règles métier + formulaire complet + listes/filtres.
+3. **Notes** : Date limite + workflow de validation en UI + historique.
+4. **Documents** : Génération PDF (reçu, proforma, certificat) + self-service étudiant.
+5. **Emploi du temps** : Unification/clarification + vue calendrier/semaine.
+6. **Pointage** : Lien EDT + statuts + écran validation (comptable).
+7. **Paie** : Cryptage bulletin + UI calcul + historique.
+8. **Gouvernance** : Notifications brèche + blocage + historique en UI.
+9. **Vigilance** : Temps réel (polling/WebSocket) + pastilles + filtres.
+10. **Vigile** : Log CheckInLog + interface kiosque plein écran.
+11. **Audit** : Couverture complète des actions sensibles.
+12. **Notifications** : Typage + envoi automatique + UI cloche/liste.
+13. **Rapports** : Graphiques + exports par rôle.
+14. **Livrable** : Tests (flux critiques), Swagger à jour, déploiement (Apache2, sauvegardes BDD).
+
+---
+
+## Journal technique (fatima.txt)
+
+DATE : 2025-03-03
+
+MODULE : fatima.txt / documentation
+
+ETAT ACTUEL
+- Document d'architecture existant (Vue d'ensemble, Backend, Frontend, Ce qui existe vs reste à faire, Priorisation).
+
+MODIFICATIONS REALISEES
+- Ajout section 1.1 Contexte environnement (phase test, localhost, SQLite, règles URLs / CORS).
+- Ajout section Entités métier principales (Académique, Utilisateurs, Pédagogique, Administratif).
+- Correction libellés CoursesModule (référentiel pédagogique des cours) et TimetablesModule (planification des séances d'emploi du temps).
+- Ajout section Suivi du développement (règle journal + format obligatoire).
+- Ajout section Workflows métier principaux (inscription étudiant, paiement, notes, pointage enseignant).
+
+PROBLEMES IDENTIFIES
+- Aucun.
+
+TRAVAUX RESTANTS
+- Mettre à jour ce journal après chaque modification importante ; Cursor doit lire fatima.txt avant toute nouvelle modification.
+
+---
+
+DATE : 2025-03-03
+
+MODULE : Frontend — refonte pilote (design ERP)
+
+ETAT ACTUEL
+- Layout dashboard : header horizontal unique pour tous les rôles. Design system partiel (PageHeader, Card, NavCard, etc.). Page Admin utilise le design system ; Comptable/Enseignant/Étudiant répètent des styles. Tableaux en HTML manuel, pagination ad hoc.
+
+MODIFICATIONS REALISEES
+- **Sidebar + header simplifié** : composants `Sidebar`, `DashboardHeader`, `AppShell`. Pour les chemins `/dashboard/admin` et `/dashboard/scolarite`, affichage sidebar (260px) + header réduit (logo, Tableau de bord, Mon profil, cloche notifications SVG, utilisateur, Déconnexion). Sinon layout legacy conservé.
+- **Config menus** : `config/sidebar.ts` — `getAdminSidebarConfig(role)`, `getScolariteSidebarConfig()`. Menus par sections (Accueil, Domaines, Admin pour admin ; Accueil, Structure, Personnes, Pédagogie, Autres pour scolarité).
+- **Variables de thème** : `--foreground-muted` ajoutée dans `globals.css`. PageHeader, Card, Button, EmptyState, Spinner utilisent `var(--foreground)`, `var(--foreground-muted)`, `var(--color-primary)`, `var(--color-sidebar)`, `var(--color-border-subtle)`, `var(--color-danger)` selon le cas.
+- **Composants UI créés** : `DataTable` (colonnes, keyExtractor, empty, toolbar, pagination, densité), `Pagination` (currentPage, totalPages, totalItems, pageSize, itemLabel), `KpiCard` (label, value, sub, variant success/danger/warning).
+- **Dashboard admin refondu** : inchangé fonctionnellement ; indicateur "Encaissements du jour" passé en `KpiCard` (variant success). S’affiche dans le nouveau layout avec sidebar.
+- **Page Inscriptions refondue** : liste via `DataTable` + `Pagination`, empty state via `EmptyState`, filtres conservés en headerRight de la Card. Page accessible avec sidebar Scolarité.
+
+PROBLEMES IDENTIFIES
+- Icône notifications en legacy layout reste en emoji 🔔 (sidebar utilise SVG). Tri des colonnes du DataTable non implémenté. Input/Select/FormGroup non créés (formulaires Inscriptions gardent champs natifs).
+
+TRAVAUX RESTANTS
+- Migrer d’autres listes vers DataTable. Utiliser Input/Select/FormGroup sur les formulaires (ex. Inscriptions). Barre de filtres réutilisable ; persistance filtres en URL. Sous-menus sidebar optionnels ; badges dynamiques.
+
+---
+
+DATE : 2025-03-03
+
+MODULE : Frontend — uniformisation design ERP (tous dashboards)
+
+ETAT ACTUEL
+- Refonte pilote en place : sidebar Admin + Scolarité, header simplifié, DataTable/Pagination sur Inscriptions, variables de thème. Layout legacy encore utilisé pour Comptable, Pédagogie, Enseignant, Étudiant, Chef de département, Auditeur.
+
+MODIFICATIONS REALISEES
+- **Layout 100 % uniforme** : suppression du layout legacy. `AppShell` utilise toujours sidebar + header ; la config sidebar est déterminée par `getSidebarConfigForPath(pathname, role)` (admin, scolarité, pédagogie, comptable, enseignant, étudiant, chef-departement, auditeur, défaut pour /dashboard et /dashboard/profil, etc.).
+- **Config sidebar** : `getComptableSidebarConfig(role)`, `getPedagogieSidebarConfig()`, `getEnseignantSidebarConfig()`, `getEtudiantSidebarConfig()`, `getChefDepartementSidebarConfig()`, `getAuditeurSidebarConfig()`, `getDefaultSidebarConfig(role)` ajoutés dans `config/sidebar.ts`.
+- **Design system complété** : `Label`, `Input`, `Select`, `Textarea`, `FormGroup` créés (variables thème, focus ring, error, hint). Tokens globaux : `--radius-input`, `--input-height`, `--input-px`, `--input-border`, `--input-focus-ring`, `--transition-fast`, `--transition-base`, `--transition-smooth`. Attributs `data-erp-card`, `data-erp-sidebar`, `data-erp-table-row` pour transitions CSS (hover, border).
+- **DataTable** : tri optionnel (colonnes `sortable`, props `sortKey`, `sortDirection`, `onSort`, icônes asc/desc).
+- **Dashboards migrés** : Admin (déjà fait), Scolarité, Pédagogie, Comptable, Enseignant, Étudiant, Chef de département, Auditeur — tous en PageHeader + Card + NavCard (et KpiCard/Spinner/Card contenu métier où pertinent). Même structure visuelle et mêmes espacements (max-w-5xl, space-y-6).
+- **NavCard / Card** : utilisation variables thème (couleurs, radius), data-erp-card pour transition hover.
+
+PROBLEMES IDENTIFIES
+- Formulaires (ex. Inscriptions) n’utilisent pas encore les composants Input/Select/FormGroup partout. Tri DataTable non branché sur les pages (API côté client pour l’instant).
+
+TRAVAUX RESTANTS
+- Remplacer champs natifs par Input/Select/FormGroup sur les formulaires clés. Brancher tri DataTable (état local ou API). Barre de filtres réutilisable ; persistance URL. Modal, Dropdown, accessibilité.
+
+---
+
+Fin du document — Architecture et état d'avancement Gestion Scolaire.

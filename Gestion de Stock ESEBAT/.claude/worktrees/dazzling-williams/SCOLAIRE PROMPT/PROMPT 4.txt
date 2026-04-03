@@ -1,0 +1,438 @@
+PROMPT 4 
+— UE (Unités d’Enseignement) + Groupes + Salles
+Cohérence crédits + Mutualisation + Imports + UI Admin avancée
+
+Objectif : Implémenter le module pédagogique structurel complet :
+
+UE (CourseUnit)
+
+Groupes (Classes)
+
+Salles (Rooms)
+
+Validation cohérence crédits
+
+Mutualisation UE entre programmes
+
+Import CSV
+
+UI Admin moderne premium
+
+Audit + RBAC strict
+
+Ce module dépend du Prompt 3 (Référentiel académique).
+
+0) RBAC
+
+CRUD autorisé :
+
+SUPER_ADMIN
+
+ADMIN
+
+SCOLARITE
+
+DEPT_HEAD
+
+Lecture seule :
+
+TEACHER
+
+AUDITOR
+
+Interdit :
+
+STUDENT
+
+FINANCE
+
+Toutes actions CREATE/UPDATE doivent générer AuditLog.
+
+1) Modèle de données (Prisma)
+1.1 CourseUnit (UE)
+
+Champs :
+
+id (uuid)
+
+code (string, unique global ou unique par programme — choisir global unique)
+
+title
+
+programId (FK Program)
+
+levelId (FK Level)
+
+semesterId (FK Semester)
+
+credits (int > 0)
+
+coefficient (float > 0)
+
+vh_cm (int >= 0)
+
+vh_td (int >= 0)
+
+vh_tp (int >= 0)
+
+isMutualized (bool, default false)
+
+status enum: ACTIVE | INACTIVE
+
+createdAt, updatedAt
+
+Contraintes
+
+(programId, levelId, semesterId, code) cohérent
+
+credits > 0
+
+coefficient > 0
+
+total heures >= 0
+
+level.programId == programId
+
+semester doit appartenir à année active (option warning)
+
+1.2 Mutualisation UE
+
+Créer table liaison :
+
+CourseUnitProgram
+
+id
+
+courseUnitId
+
+programId
+
+Permet :
+
+Une UE appartenant officiellement à Program A
+
+Mais mutualisée à Program B
+
+Règles :
+
+UE source garde programId principal
+
+Mutualisation autorise visibilité dans autres programmes
+
+Empêcher doublon (courseUnitId, programId)
+
+1.3 Group (Classe/Groupe)
+
+Champs :
+
+id
+
+name (ex: G1, G2)
+
+programId
+
+levelId
+
+academicYearId
+
+capacity (int > 0)
+
+status enum: ACTIVE | INACTIVE
+
+createdAt, updatedAt
+
+Contraintes :
+
+(programId, levelId, academicYearId, name) unique
+
+capacity > 0
+
+1.4 Room (Salle)
+
+Champs :
+
+id
+
+code (unique)
+
+name
+
+capacity
+
+location (string optional)
+
+equipment (string optional)
+
+status enum: ACTIVE | INACTIVE
+
+createdAt, updatedAt
+
+Contraintes :
+
+capacity > 0
+
+2) Validation Cohérence Crédits (Business Logic)
+2.1 Règle Semestre
+
+Total crédits par :
+
+(programId + levelId + semesterId)
+
+doit respecter cohérence académique.
+
+Par défaut :
+
+30 crédits par semestre (configurable plus tard)
+
+Implémenter validation :
+
+Lors création/modification UE :
+
+recalcul total crédits semestre
+
+si dépassement seuil configurable (ex: 30 ± 10%) → warning
+
+si strict mode activé → blocage
+
+Ajouter fonction service :
+
+validateSemesterCredits(programId, levelId, semesterId)
+3) API REST
+
+Base /api/v1
+
+3.1 CourseUnit (UE)
+
+GET /course-units?programId=&levelId=&semesterId=
+
+GET /course-units/:id
+
+POST /course-units
+
+PATCH /course-units/:id
+
+POST /course-units/:id/mutualize
+
+GET /course-units/:id/mutualizations
+
+3.2 Groups
+
+GET /groups?programId=&levelId=&academicYearId=
+
+POST /groups
+
+PATCH /groups/:id
+
+3.3 Rooms
+
+GET /rooms
+
+POST /rooms
+
+PATCH /rooms/:id
+
+3.4 Import CSV
+
+Implémenter import pour :
+
+UE
+
+Groups
+
+Rooms
+
+Endpoints :
+
+POST /academic/import/course-units
+
+POST /academic/import/groups
+
+POST /academic/import/rooms
+
+Format retour standard :
+
+{
+  created,
+  updated,
+  skipped,
+  errors[]
+}
+4) Audit
+
+Actions à logger :
+
+COURSE_UNIT_CREATED
+
+COURSE_UNIT_UPDATED
+
+COURSE_UNIT_MUTUALIZED
+
+GROUP_CREATED
+
+ROOM_CREATED
+
+IMPORT_COURSE_UNIT
+
+etc.
+
+Inclure before/after JSON.
+
+5) Frontend (Next.js) — UI Premium
+
+Ajouter au menu :
+
+Référentiel >
+
+UE
+
+Groupes
+
+Salles
+
+5.1 Page UE /app/academic/course-units
+
+UI :
+
+Filtres :
+
+Programme
+
+Niveau
+
+Semestre
+
+Table :
+
+Code
+
+Intitulé
+
+Crédits
+
+Coefficient
+
+Volume horaire total
+
+Badge mutualisé
+
+Bouton “Créer UE”
+
+Bouton “Importer CSV”
+
+Drawer édition
+
+Form création :
+
+code
+
+title
+
+programme (select dépendant)
+
+niveau
+
+semestre
+
+crédits
+
+coefficient
+
+VH CM/TD/TP
+
+mutualisation (multi-select programmes)
+
+Afficher :
+
+Crédit total semestre (live)
+
+Warning visuel si dépassement
+
+UX :
+
+Skeleton loading
+
+Empty state illustré
+
+Animations framer-motion
+
+5.2 Page Groupes /app/academic/groups
+
+Filtres :
+
+Année académique
+
+Programme
+
+Niveau
+
+Table :
+
+Nom
+
+Capacité
+
+Année
+
+Modal création
+
+Validation capacity > 0
+
+5.3 Page Salles /app/academic/rooms
+
+Table simple
+
+Modal création
+
+Champ équipement libre
+
+Badge ACTIVE/INACTIVE
+
+6) UX Avancée
+
+Validations Zod strictes
+
+Messages d’erreur précis
+
+Toast succès/erreur
+
+Confirmation dialog pour mutualisation
+
+Désactiver édition si année CLOSED
+
+7) Tests
+
+Backend :
+
+Création UE valide
+
+Validation cohérence crédits
+
+Mutualisation fonctionne
+
+Import gère erreurs
+
+RBAC bloque étudiants
+
+Frontend :
+
+Pages build OK
+
+Création UE via UI fonctionne
+
+8) Definition of Done (PROMPT 4)
+
+Terminé si :
+
+CRUD UE/Groups/Rooms opérationnels
+
+Mutualisation fonctionne
+
+Validation crédits active
+
+Import CSV fonctionnel
+
+UI moderne complète
+
+Audit actif
+
+Docker toujours fonctionnel
