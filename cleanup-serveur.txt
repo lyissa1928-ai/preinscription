@@ -1,0 +1,39 @@
+================================================================================
+  NETTOYAGE SERVEUR (SSH root) — UniPortail / Nginx / Certbot / PM2
+  À lire : tout ce qui concerne uniportail-digital.com et l’app est supprimé.
+================================================================================
+
+# 1) API Node
+pm2 delete all 2>/dev/null
+pm2 save 2>/dev/null
+
+# 2) Dossiers application
+rm -rf /var/www/uniportail
+rm -rf /home/admin/web/uniportail-digital.com/uniportail
+rm -rf /home/admin/web/uniportail-digital.com 2>/dev/null
+
+# 3) Config Nginx (conf.d + éventuels sites-available)
+rm -f /etc/nginx/conf.d/uniportail*.conf
+rm -f /etc/nginx/sites-available/uniportail-digital.com /etc/nginx/sites-enabled/uniportail-digital.com 2>/dev/null
+
+# 4) Let’s Encrypt pour ce domaine
+certbot delete --cert-name uniportail-digital.com 2>/dev/null || true
+
+# 5) Dossier challenge ACME dédié (optionnel)
+rm -rf /var/www/letsencrypt
+
+# 6) Hestia — retirer le domaine web (remplace admin si besoin)
+/usr/local/hestia/bin/v-delete-web-domain admin uniportail-digital.com 2>/dev/null || true
+rm -rf /home/admin/conf/web/uniportail-digital.com* 2>/dev/null
+
+# 7) Recharger Nginx
+nginx -t && systemctl reload nginx
+
+# 8) Vérifier qu’il ne reste rien d’évident
+pm2 list
+ls -la /etc/nginx/conf.d/ | head -20
+certbot certificates 2>/dev/null
+
+================================================================================
+  Après ça : repartir avec prod.TXT depuis l’étape DNS / clone.
+================================================================================

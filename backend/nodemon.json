@@ -1,0 +1,4 @@
+{
+  "ignore": ["database/preinscription.json", "uploads/**", "node_modules/**"],
+  "watch": ["server.js", "routes", "middleware", "utils", "database/db.js"]
+}

@@ -1,0 +1,171 @@
+================================================================================
+  TUTORIEL — Activer HTTPS (Let’s Encrypt) pour uniportail-digital.com
+  Contexte : VPS LWS avec panneau Hestia + application UniPortail déjà en HTTP
+================================================================================
+
+  Objectif : accéder au site en https://uniportail-digital.com avec un
+  certificat valide (cadenas vert) et que l’API accepte les requêtes depuis
+  cette URL (CORS).
+
+================================================================================
+  AVANT DE COMMENCER — Vérifications obligatoires
+================================================================================
+
+  1) DNS chez LWS (zone du domaine)
+     - Enregistrement A pour @ (racine) → IP de ton VPS (ex. 192.162.68.227)
+     - www en CNAME vers @ OU en A vers la même IP
+     - Si un enregistrement AAAA pointe encore vers un ancien hébergeur alors
+       que tu n’utilises pas l’IPv6 du VPS, supprime-le pour éviter les accès
+       « au mauvais serveur » en IPv6.
+
+  2) Le site doit déjà répondre en HTTP
+     Depuis ton PC : ouvre http://uniportail-digital.com (la page de l’app doit
+     s’afficher, pas une erreur de connexion).
+
+  3) Ports ouverts sur le VPS
+     - 80 (HTTP) — nécessaire pour la validation Let’s Encrypt
+     - 443 (HTTPS) — pour le site en SSL
+     (Sur Debian + ufw : « ufw allow 'Nginx Full' » ou équivalent.)
+
+================================================================================
+  ÉTAPE 1 — Ouvrir le panneau Hestia
+================================================================================
+
+  - URL typique : https://ADRESSE_IP_DU_VPS:8083
+    (ou l’URL indiquée par LWS dans les emails d’accès au VPS.)
+  - Connecte-toi avec ton utilisateur (souvent « admin ») et ton mot de passe
+    du panneau.
+
+  Si le port 8083 est fermé côté pare-feu ou FAI, utilise le tunnel / l’accès
+  que LWS documente (VPN, port alternatif, etc.).
+
+================================================================================
+  ÉTAPE 2 — Activer Let’s Encrypt pour le domaine
+================================================================================
+
+  Les libellés peuvent varier selon la version de Hestia ; l’idée reste la même.
+
+  A) Va dans la section « Web » (ou « Sites web » / « Domains »).
+
+  B) Repère la ligne du domaine : uniportail-digital.com
+
+  C) Ouvre les options du domaine :
+     - soit un clic sur le nom du domaine,
+     - soit une icône « Modifier » / « Edit » / engrenage.
+
+  D) Cherche une section du type :
+     - « SSL »
+     - « Support SSL »
+     - « HTTPS »
+     - « Let’s Encrypt »
+
+  E) Active le certificat Let’s Encrypt :
+     - choisis « Let’s Encrypt » (pas « certificat auto-signé » pour la prod),
+     - coche uniportail-digital.com,
+     - si proposé, coche aussi www.uniportail-digital.com pour le même certificat.
+
+  F) Enregistre / lance la génération du certificat et attends la fin (quelques
+     secondes à une minute). En cas d’erreur, voir la section Dépannage ci-dessous.
+
+  G) Si une option existe : « Rediriger HTTP vers HTTPS » ou « Force HTTPS »,
+     active-la pour que http:// redirige automatiquement vers https://.
+
+================================================================================
+  ÉTAPE 3 — Mettre à jour le CORS du backend (important)
+================================================================================
+
+  Le navigateur appelle l’API en https:// ; le backend doit autoriser cette
+  origine dans CORS_ORIGINS.
+
+  Sur le VPS en SSH (root ou sudo) :
+
+--------------------------------------------------------------------------------
+nano /var/www/uniportail/backend/.env
+--------------------------------------------------------------------------------
+
+  Vérifie ou ajoute une ligne du type (une seule ligne, pas de retour au milieu) :
+
+    CORS_ORIGINS=https://uniportail-digital.com,https://www.uniportail-digital.com
+
+  Enregistre le fichier (Ctrl+O, Entrée, Ctrl+X dans nano).
+
+  Puis redémarre l’API :
+
+--------------------------------------------------------------------------------
+pm2 restart uniportail-api
+--------------------------------------------------------------------------------
+
+  (Si tu utilises un autre chemin que /var/www/uniportail, adapte le chemin du .env.)
+
+================================================================================
+  ÉTAPE 4 — Vérifications
+================================================================================
+
+  Depuis ton PC (navigateur) :
+
+    https://uniportail-digital.com
+
+  - Le cadenas doit être présent (certificat valide).
+  - Teste la connexion admin : email + mot de passe ; l’API ne doit pas être
+    bloquée par CORS (pas d’erreur « CORS » dans la console F12 → Console).
+
+  Test rapide API depuis le serveur (optionnel) :
+
+--------------------------------------------------------------------------------
+curl -sS -X POST https://uniportail-digital.com/api/auth/connexion \
+  -H "Content-Type: application/json" \
+  -H "Origin: https://uniportail-digital.com" \
+  -d '{"email":"admin@universite.sn","mot_de_passe":"TON_MOT_DE_PASSE"}' | head -c 300
+--------------------------------------------------------------------------------
+
+  (Remplace le mot de passe ; utilise -k seulement si tu testes un certificat
+  non reconnu — en prod le certificat doit être valide sans -k.)
+
+================================================================================
+  ALTERNATIVE — Ligne de commande Hestia (utilisateurs avancés)
+================================================================================
+
+  Seulement si le binaire existe et que tu connais le nom d’utilisateur Hestia
+  (souvent admin) :
+
+--------------------------------------------------------------------------------
+/usr/local/hestia/bin/v-add-letsencrypt-domain admin uniportail-digital.com www.uniportail-digital.com
+--------------------------------------------------------------------------------
+
+  En cas d’erreur, repasse par le panneau graphique (étapes 1–2).
+
+================================================================================
+  DÉPANNAGE
+================================================================================
+
+  Erreur Let’s Encrypt / échec de validation
+  - Vérifie que le domaine en DNS pointe bien vers l’IP du VPS (nslookup).
+  - Vérifie que le port 80 est joignable depuis Internet (pare-feu VPS + hébergeur).
+  - Attends quelques minutes après un changement DNS.
+
+  Boucle de redirection ou page blanche
+  - Regarde la config Nginx du domaine dans Hestia (proxy /api et /uploads vers
+    le port 5000 doit rester en place).
+
+  Erreur CORS dans le navigateur après HTTPS
+  - Corrige CORS_ORIGINS dans backend/.env (https:// exact, avec ou sans www
+    selon l’URL utilisée), puis pm2 restart uniportail-api.
+
+  Ne pas lancer certbot --nginx « à la main » sur un serveur géré par Hestia
+  sans suivre la doc Hestia : risque de conflit avec les configs régénérées par
+  le panneau.
+
+================================================================================
+  RÉFÉRENCE RAPIDE — Ordre des actions
+================================================================================
+
+  1. DNS → IP du VPS
+  2. Site OK en HTTP
+  3. Hestia → SSL Let’s Encrypt + redirection HTTPS
+  4. backend/.env → CORS_ORIGINS en https://
+  5. pm2 restart uniportail-api
+  6. Test https://uniportail-digital.com
+
+================================================================================
+FIN DU TUTORIEL
+================================================================================

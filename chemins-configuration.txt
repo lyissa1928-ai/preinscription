@@ -1,0 +1,47 @@
+================================================================================
+  Chemins absolus — configuration sur le VPS (exemple standard)
+  Racine du dépôt Git (clone) :
+================================================================================
+
+  /home/admin/web/uniportail-digital.com/uniportail
+
+  (Si ton clone est ailleurs, remplace uniquement cette partie au début des chemins.)
+
+================================================================================
+  Fichiers à éditer pour reCAPTCHA (inscription en production)
+================================================================================
+
+  1) Clé publique (site) — Vite, injectée au build
+
+     /home/admin/web/uniportail-digital.com/uniportail/frontend/.env.production
+
+     Contenu type :
+       VITE_RECAPTCHA_SITE_KEY=votre_cle_site
+
+  2) Clé secrète — API Node
+
+     /home/admin/web/uniportail-digital.com/uniportail/backend/.env
+
+     Ligne à ajouter ou modifier :
+       RECAPTCHA_SECRET_KEY=votre_cle_secrete
+
+================================================================================
+  Après modification : commandes (depuis la racine du dépôt)
+================================================================================
+
+  cd /home/admin/web/uniportail-digital.com/uniportail
+  npm run build
+  pm2 restart uniportail-api
+
+================================================================================
+  Si le code est dans un sous-dossier preinscription-univ/ (autre structure Git)
+================================================================================
+
+  Remplace « uniportail » par « uniportail/preinscription-univ » dans les chemins :
+
+    /home/admin/web/uniportail-digital.com/uniportail/preinscription-univ/frontend/.env.production
+    /home/admin/web/uniportail-digital.com/uniportail/preinscription-univ/backend/.env
+
+================================================================================
+FIN
+================================================================================
