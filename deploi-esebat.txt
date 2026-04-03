@@ -159,10 +159,9 @@ fi
 
     nano /var/www/uniportail/backend/.env
 
-  Renseignez au minimum pour la prod (selon votre choix Google ou Cloudflare) :
+  Renseignez au minimum pour la prod (reCAPTCHA Google ou Enterprise) :
     RECAPTCHA_SECRET_KEY=...
-    et/ou
-    TURNSTILE_SECRET_KEY=...
+    et/ou variables RECAPTCHA_ENTERPRISE_* si vous utilisez Enterprise.
 
   Côté frontend, les clés publiques se mettent AVANT le build (section H).
 
@@ -181,7 +180,6 @@ H. FRONTEND : VARIABLES VITE (OPTIONNEL) PUIS BUILD
 
     VITE_API_URL=https://uniportail-digital.com
     VITE_RECAPTCHA_SITE_KEY=votre_cle_site_google
-    VITE_TURNSTILE_SITE_KEY=votre_cle_site_cloudflare
 
   Puis build :
 

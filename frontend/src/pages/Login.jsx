@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
@@ -28,12 +28,38 @@ const BRANDS = [
 ]
 
 export default function Login() {
+  const location = useLocation()
   const [form, setForm] = useState({ email: '', mot_de_passe: '' })
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState('')
+  const [authOptions, setAuthOptions] = useState({
+    password_reset_email: false,
+    email_verification: false,
+  })
+  const [resendLoading, setResendLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const pending = location.state?.pendingEmailVerification
+    if (typeof pending === 'string' && pending.trim()) {
+      setForm((f) => ({ ...f, email: pending.trim().toLowerCase() }))
+      if (typeof window !== 'undefined') window.history.replaceState({}, document.title)
+    }
+  }, [location.state])
+
+  useEffect(() => {
+    axios
+      .get('/api/auth/options-public')
+      .then(({ data }) =>
+        setAuthOptions({
+          password_reset_email: Boolean(data?.password_reset_email_enabled),
+          email_verification: Boolean(data?.email_verification_enabled),
+        }),
+      )
+      .catch(() => {})
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -56,7 +82,11 @@ export default function Login() {
       navigate(dest)
     } catch (err) {
       const d = err.response?.data
-      if (d?.code === 'ACCOUNT_LOCKED') {
+      if (d?.code === 'EMAIL_NOT_VERIFIED') {
+        const full = d.message || 'E-mail non confirmé.'
+        setFormError(full)
+        toast.error(full, { duration: 6000 })
+      } else if (d?.code === 'ACCOUNT_LOCKED') {
         const sec = typeof d.retry_after_sec === 'number' ? d.retry_after_sec : null
         const min = sec != null ? Math.max(1, Math.ceil(sec / 60)) : null
         const extra = min != null ? ` Réessayez dans environ ${min} minute${min > 1 ? 's' : ''}.` : ''
@@ -177,11 +207,40 @@ export default function Login() {
                 </Link>
                 {' '}(vérification anti-bot requise)
               </p>
-              <p className="text-sm">
+              <p className="text-sm flex flex-col gap-1">
+                {authOptions.password_reset_email && (
+                  <Link to="/mot-de-passe-oublie-email" className="text-blue-600 hover:underline font-medium">
+                    Mot de passe oublié (lien par e-mail)
+                  </Link>
+                )}
                 <Link to="/mot-de-passe-oublie-matricule" className="text-blue-600 hover:underline font-medium">
                   Mot de passe oublié (matricule)
                 </Link>
               </p>
+              {authOptions.email_verification && form.email.trim() && (
+                <p className="text-xs text-slate-600">
+                  <button
+                    type="button"
+                    disabled={resendLoading}
+                    className="text-blue-600 hover:underline font-medium disabled:opacity-50"
+                    onClick={async () => {
+                      setResendLoading(true)
+                      try {
+                        const { data } = await axios.post('/api/auth/renvoyer-email-verification', {
+                          email: form.email.trim().toLowerCase(),
+                        })
+                        toast.success(data?.message || 'Si besoin, un e-mail vient d’être envoyé.')
+                      } catch {
+                        toast.error('Impossible d’envoyer pour le moment.')
+                      } finally {
+                        setResendLoading(false)
+                      }
+                    }}
+                  >
+                    {resendLoading ? 'Envoi…' : 'Renvoyer l’e-mail de confirmation'}
+                  </button>
+                </p>
+              )}
               <p className="text-xs text-gray-500">
                 Matricule oublié ?{' '}
                 <a

@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -11,7 +12,6 @@ const { rateLimit, getClientIp } = require('../utils/rateLimit');
 const { logSecurityEvent } = require('../utils/securityEvent');
 const {
   antiBotConfig,
-  verifyTurnstileToken,
   verifyRecaptchaTokenWithDetails,
   verifyRecaptchaEnterpriseWithDetails,
   recaptchaEnterpriseConfigured,
@@ -35,6 +35,33 @@ const {
   validatePasswordPolicy,
   validateNomPrenom,
 } = require('../utils/inscriptionValidation');
+const {
+  sendMail,
+  emailVerificationEnabled,
+  passwordResetEmailEnabled,
+  publicAppUrl,
+  isSmtpConfigured,
+} = require('../utils/mail');
+
+function newSecureToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function escapeHtml(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Compte utilisable à la connexion (e-mail confirmé ou pas de flux vérif actif). */
+function isLoginEmailVerified(user) {
+  if (!emailVerificationEnabled()) return true;
+  if (user.email_verified_at) return true;
+  if (!user.email_verify_token) return true;
+  return false;
+}
 const inscriptionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
@@ -51,6 +78,20 @@ const resetPwdLimiter = rateLimit({
   max: 10,
   message: 'Trop de tentatives de réinitialisation. Réessayez plus tard.',
   keyGenerator: (req) => `reset:${getClientIp(req)}:${normalizeMatricule(req.body?.matricule) || ''}`,
+});
+const forgotEmailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: 'Trop de demandes. Réessayez dans une heure.',
+  keyGenerator: (req) =>
+    `forgot-email:${getClientIp(req)}:${String(req.body?.email || '').trim().toLowerCase()}`,
+});
+const resendVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'Trop de renvois. Réessayez dans quelques minutes.',
+  keyGenerator: (req) =>
+    `resend-verify:${getClientIp(req)}:${String(req.body?.email || '').trim().toLowerCase()}`,
 });
 
 function buildPublicUserPayload(user, req) {
@@ -81,7 +122,7 @@ router.post('/inscription', inscriptionLimiter, async (req, res) => {
   }
 
   const captchaStrict = inscriptionCaptchaEnforced();
-  const { secret, minFillMs } = antiBotConfig();
+  const { minFillMs } = antiBotConfig();
   const startedAtRaw = Number(req.body?.bot_started_at || 0);
   // En dev (AUTH_INSCRIPTION_BYPASS_CAPTCHA=1), pas de délai minimal ni captcha — le honeypot et le rate limit restent actifs.
   const filledTooFast =
@@ -115,21 +156,10 @@ router.post('/inscription', inscriptionLimiter, async (req, res) => {
         }, 'warning');
         return res.status(400).json({ message: 'reCAPTCHA invalide ou expiré. Cochez à nouveau la case et réessayez.' });
       }
-    } else if (secret) {
-      const token = String(req.body?.bot_token || '').trim();
-      if (!token) {
-        logSecurityEvent(req, 'bot_missing_captcha_token', { endpoint: '/api/auth/inscription' }, 'warning');
-        return res.status(400).json({ message: 'Veuillez valider la vérification anti-bot (captcha) avant de créer votre compte.' });
-      }
-      const ok = await verifyTurnstileToken(token, getClientIp(req), secret);
-      if (!ok) {
-        logSecurityEvent(req, 'bot_captcha_verification_failed', { endpoint: '/api/auth/inscription' }, 'warning');
-        return res.status(400).json({ message: 'Vérification anti-bot invalide ou expirée. Réessayez.' });
-      }
     } else {
       logSecurityEvent(req, 'inscription_captcha_not_configured', { endpoint: '/api/auth/inscription' }, 'error');
       return res.status(503).json({
-        message: 'Inscription temporairement indisponible (reCAPTCHA ou Turnstile non configuré sur le serveur).',
+        message: 'Inscription temporairement indisponible (reCAPTCHA non configuré sur le serveur).',
       });
     }
   }
@@ -212,6 +242,7 @@ router.post('/inscription', inscriptionLimiter, async (req, res) => {
 
   const hash = bcrypt.hashSync(mot_de_passe, 10);
   const id = db.nextId('utilisateurs');
+  const needVerify = emailVerificationEnabled();
   const user = {
     id,
     nom: vn.nom,
@@ -229,8 +260,42 @@ router.post('/inscription', inscriptionLimiter, async (req, res) => {
     is_locked: false,
     lock_until: null,
     created_at: new Date().toISOString(),
+    email_verified_at: needVerify ? null : new Date().toISOString(),
+    email_verify_token: needVerify ? newSecureToken() : null,
+    email_verify_expires: needVerify ? Date.now() + 48 * 60 * 60 * 1000 : null,
   };
   db.get('utilisateurs').push(user).write();
+
+  if (needVerify && user.email_verify_token) {
+    const url = `${publicAppUrl()}/verifier-email?token=${encodeURIComponent(user.email_verify_token)}`;
+    const ok = await sendMail({
+      to: emailNorm,
+      subject: 'Confirmez votre adresse e-mail — UniPortail',
+      text:
+        `Bonjour ${user.prenom},\n\n` +
+        `Pour activer votre compte, ouvrez ce lien dans votre navigateur :\n${url}\n\n` +
+        `Le lien expire dans 48 heures.\n\n` +
+        `Si vous n’avez pas créé de compte, ignorez ce message.`,
+      html:
+        `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
+        `<p>Pour <strong>activer votre compte</strong>, cliquez sur le bouton ci-dessous :</p>` +
+        `<p><a href="${url}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;border-radius:8px;text-decoration:none;">Confirmer mon e-mail</a></p>` +
+        `<p style="font-size:12px;color:#64748b;">Ou copiez ce lien :<br/>${escapeHtml(url)}</p>` +
+        `<p style="font-size:12px;color:#64748b;">Le lien expire dans 48 h.</p>`,
+    });
+    if (!ok) {
+      logSecurityEvent(req, 'email_verification_send_failed', { user_id: id, email: emailNorm }, 'error');
+      return res.status(503).json({
+        message:
+          'Compte créé mais l’e-mail de confirmation n’a pas pu être envoyé. Contactez le support ou réessayez plus tard (renvoi depuis la page de connexion).',
+        code: 'EMAIL_SEND_FAILED',
+      });
+    }
+    return res.status(201).json({
+      message: 'Compte créé. Consultez votre boîte e-mail pour confirmer votre adresse avant de vous connecter.',
+      requires_email_verification: true,
+    });
+  }
 
   const { token } = signPayload({
     id,
@@ -291,6 +356,14 @@ router.post('/connexion', loginLimiter, (req, res) => {
     }
     logSecurityEvent(req, 'auth_login_failed', { email: emailNorm }, 'warning');
     return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
+  }
+  if (!isLoginEmailVerified(user)) {
+    logSecurityEvent(req, 'auth_login_email_unverified', { email: emailNorm, user_id: user.id }, 'warning');
+    return res.status(403).json({
+      code: 'EMAIL_NOT_VERIFIED',
+      message:
+        'Votre adresse e-mail n’est pas encore confirmée. Ouvrez le lien reçu à l’inscription ou demandez un nouvel e-mail depuis la page de connexion.',
+    });
   }
   if (user.actif === false) {
     logSecurityEvent(req, 'auth_login_disabled_account', { email: emailNorm, user_id: user.id }, 'warning');
@@ -412,7 +485,14 @@ router.get('/me', (req, res) => {
       ? db.get('etablissements').find({ id: user.etablissement_id }).value()
       : null;
 
-    const { mot_de_passe, ...safe } = user;
+    const {
+      mot_de_passe,
+      email_verify_token: _evt,
+      email_verify_expires: _eve,
+      password_reset_token: _prt,
+      password_reset_expires: _pre,
+      ...safe
+    } = user;
     res.json({
       ...safe,
       must_change_password: user.must_change_password === true,
@@ -464,6 +544,189 @@ router.post('/reinitialiser-mot-de-passe-matricule', resetPwdLimiter, (req, res)
   }).write();
 
   res.json({ message: 'Mot de passe mis à jour. Vous pouvez vous connecter avec votre adresse email.' });
+});
+
+// POST /api/auth/verifier-email — lien reçu par e-mail
+router.post('/verifier-email', async (req, res) => {
+  const token = String(req.body?.token || '').trim();
+  if (!token) return res.status(400).json({ message: 'Lien invalide (token manquant).' });
+
+  const user = db.get('utilisateurs').value().find((u) => u.email_verify_token === token);
+  if (!user) {
+    return res.status(400).json({ message: 'Lien invalide ou déjà utilisé.' });
+  }
+  if (user.email_verify_expires && Date.now() > user.email_verify_expires) {
+    return res.status(400).json({
+      code: 'VERIFY_EXPIRED',
+      message: 'Ce lien a expiré. Demandez un nouvel e-mail de confirmation depuis la page de connexion.',
+    });
+  }
+
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    email_verified_at: new Date().toISOString(),
+    email_verify_token: null,
+    email_verify_expires: null,
+    updated_at: new Date().toISOString(),
+  }).write();
+
+  const updated = db.get('utilisateurs').find({ id: user.id }).value();
+  clearAccountLockOnSuccess(user.id);
+  const { token: jwt } = signPayload({
+    id: updated.id,
+    email: updated.email,
+    role: updated.role,
+    nom: updated.nom,
+    prenom: updated.prenom,
+    etablissement_id: updated.etablissement_id || null,
+  });
+  res.json({
+    message: 'Adresse e-mail confirmée. Vous êtes connecté.',
+    token: jwt,
+    utilisateur: buildPublicUserPayload(updated, req),
+  });
+});
+
+// POST /api/auth/renvoyer-email-verification
+router.post('/renvoyer-email-verification', resendVerifyLimiter, async (req, res) => {
+  const emailNorm = normalizeEmail(String(req.body?.email || ''));
+  if (!emailNorm) {
+    return res.status(400).json({ message: 'Adresse e-mail requise.' });
+  }
+  const user = db.get('utilisateurs').find({ email: emailNorm }).value();
+  if (!user || user.role !== 'etudiant') {
+    return res.json({
+      message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
+    });
+  }
+  if (user.email_verified_at || !user.email_verify_token) {
+    return res.json({
+      message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
+    });
+  }
+
+  const tok = newSecureToken();
+  const exp = Date.now() + 48 * 60 * 60 * 1000;
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    email_verify_token: tok,
+    email_verify_expires: exp,
+    updated_at: new Date().toISOString(),
+  }).write();
+
+  const url = `${publicAppUrl()}/verifier-email?token=${encodeURIComponent(tok)}`;
+  await sendMail({
+    to: emailNorm,
+    subject: 'Confirmez votre adresse e-mail — UniPortail',
+    text:
+      `Bonjour ${user.prenom},\n\nPour activer votre compte :\n${url}\n\nLe lien expire dans 48 heures.`,
+    html:
+      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
+      `<p><a href="${url}">Confirmer mon e-mail</a></p>` +
+      `<p style="font-size:12px;color:#64748b;">Expire dans 48 h.</p>`,
+  });
+
+  res.json({
+    message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
+  });
+});
+
+// POST /api/auth/mot-de-passe-oublie-email — envoi lien (étudiants)
+router.post('/mot-de-passe-oublie-email', forgotEmailLimiter, async (req, res) => {
+  const emailNorm = normalizeEmail(String(req.body?.email || ''));
+  const generic = {
+    message:
+      'Si un compte étudiant existe avec cette adresse, un e-mail de réinitialisation vient d’être envoyé.',
+  };
+  if (!passwordResetEmailEnabled() || !emailNorm) {
+    return res.json(generic);
+  }
+
+  const user = db.get('utilisateurs').find({ email: emailNorm }).value();
+  if (!user || user.role !== 'etudiant' || user.actif === false) {
+    return res.json(generic);
+  }
+
+  const tok = newSecureToken();
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    password_reset_token: tok,
+    password_reset_expires: Date.now() + 60 * 60 * 1000,
+    updated_at: new Date().toISOString(),
+  }).write();
+
+  const url = `${publicAppUrl()}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(tok)}`;
+  await sendMail({
+    to: emailNorm,
+    subject: 'Réinitialisation de votre mot de passe — UniPortail',
+    text:
+      `Bonjour ${user.prenom},\n\n` +
+      `Pour choisir un nouveau mot de passe, ouvrez ce lien (valide 1 h) :\n${url}\n\n` +
+      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.`,
+    html:
+      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
+      `<p><a href="${url}">Choisir un nouveau mot de passe</a> (lien valide 1 h)</p>` +
+      `<p style="font-size:12px;color:#64748b;">Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>`,
+  });
+
+  res.json(generic);
+});
+
+// POST /api/auth/reinitialiser-mot-de-passe-email
+router.post('/reinitialiser-mot-de-passe-email', (req, res) => {
+  const token = String(req.body?.token || '').trim();
+  const { nouveau_mot_de_passe, confirmation } = req.body;
+  if (!token || !nouveau_mot_de_passe || !confirmation) {
+    return res.status(400).json({ message: 'Token, nouveau mot de passe et confirmation requis.' });
+  }
+  if (nouveau_mot_de_passe !== confirmation) {
+    return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
+  }
+  const vp = validatePasswordPolicy(nouveau_mot_de_passe);
+  if (!vp.ok) {
+    return res.status(400).json({ message: vp.message, code: 'PASSWORD_POLICY' });
+  }
+
+  const user = db.get('utilisateurs').value().find((u) => u.password_reset_token === token);
+  if (!user || user.role !== 'etudiant') {
+    logSecurityEvent(req, 'auth_reset_email_bad_token', {}, 'warning');
+    return res.status(400).json({ message: 'Lien invalide ou expiré.' });
+  }
+  if (!user.password_reset_expires || Date.now() > user.password_reset_expires) {
+    return res.status(400).json({ message: 'Lien expiré. Demandez une nouvelle réinitialisation.' });
+  }
+
+  const hash = bcrypt.hashSync(nouveau_mot_de_passe, 10);
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    mot_de_passe: hash,
+    password_reset_token: null,
+    password_reset_expires: null,
+    must_change_password: false,
+    password_changed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).write();
+
+  const updated = db.get('utilisateurs').find({ id: user.id }).value();
+  clearAccountLockOnSuccess(user.id);
+  const { token: jwt } = signPayload({
+    id: updated.id,
+    email: updated.email,
+    role: updated.role,
+    nom: updated.nom,
+    prenom: updated.prenom,
+    etablissement_id: updated.etablissement_id || null,
+  });
+  res.json({
+    message: 'Mot de passe mis à jour. Vous êtes connecté.',
+    token: jwt,
+    utilisateur: buildPublicUserPayload(updated, req),
+  });
+});
+
+// GET /api/auth/options-public — pour le front (affichage liens)
+router.get('/options-public', (req, res) => {
+  res.json({
+    email_verification_enabled: emailVerificationEnabled(),
+    password_reset_email_enabled: passwordResetEmailEnabled(),
+    smtp_configured: isSmtpConfigured(),
+  });
 });
 
 module.exports = router;

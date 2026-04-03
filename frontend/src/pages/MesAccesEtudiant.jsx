@@ -35,6 +35,11 @@ export default function MesAccesEtudiant() {
           <p>Pour des raisons de sécurité, le mot de passe n’est pas stocké en clair et ne peut pas être affiché ici.</p>
           <ul className="mt-3 space-y-2 list-disc list-inside text-sm">
             <li>
+              <Link to="/mot-de-passe-oublie-email" className="text-blue-600 hover:underline font-medium">
+                Recevoir un lien de réinitialisation par e-mail
+              </Link>
+            </li>
+            <li>
               <Link to="/mot-de-passe-oublie-matricule" className="text-blue-600 hover:underline font-medium">
                 Définir un nouveau mot de passe avec mon matricule
               </Link>

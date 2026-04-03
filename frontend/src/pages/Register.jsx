@@ -23,6 +23,7 @@ import AuthCinematicBackground from '../components/AuthCinematicBackground'
 import RegistrationMascot from '../components/RegistrationMascot'
 import { cn } from '@/lib/utils'
 import { passwordStrength } from '@/lib/passwordStrength'
+import { getRecaptchaSiteKey } from '@/lib/siteKeys'
 import {
   trimStr,
   normalizeEmail,
@@ -122,16 +123,10 @@ export default function Register() {
   const [showPolicy, setShowPolicy] = useState(false)
   const [botStartedAt] = useState(() => Date.now())
   const [honeypot, setHoneypot] = useState('')
-  const [turnstileToken, setTurnstileToken] = useState('')
-  const [turnstileError, setTurnstileError] = useState(false)
   const [recaptchaToken, setRecaptchaToken] = useState('')
-  const turnstileContainerRef = useRef(null)
-  const turnstileWidgetIdRef = useRef(null)
   const recaptchaRef = useRef(null)
-  const recaptchaSiteKey = String(import.meta.env.VITE_RECAPTCHA_SITE_KEY || '').trim()
-  const turnstileSiteKey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim()
+  const recaptchaSiteKey = getRecaptchaSiteKey()
   const useRecaptcha = Boolean(recaptchaSiteKey)
-  const useTurnstile = Boolean(turnstileSiteKey) && !useRecaptcha
   const { login } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -162,68 +157,17 @@ export default function Register() {
       .catch(() => setEtablissements([]))
   }, [])
 
-  // Le bloc formulaire utilise key={step} : en quittant l’étape 5 le widget reCAPTCHA/Turnstile est démonté
+  // Le bloc formulaire utilise key={step} : en quittant l’étape 5 le widget reCAPTCHA est démonté
   // mais l’ancien jeton pouvait rester en state → envoi invalide côté Google. On réinitialise à la sortie.
   useEffect(() => {
     if (step === 5) return
     setRecaptchaToken('')
-    setTurnstileToken('')
-    setTurnstileError(false)
     try {
       recaptchaRef.current?.reset()
     } catch {
       /* ignore */
     }
   }, [step])
-
-  useEffect(() => {
-    if (!useTurnstile || !turnstileSiteKey || !turnstileContainerRef.current) return
-    let cancelled = false
-
-    const mountWidget = () => {
-      if (cancelled || !window.turnstile || !turnstileContainerRef.current) return
-      if (turnstileWidgetIdRef.current != null) return
-      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: turnstileSiteKey,
-        callback: (token) => {
-          setTurnstileToken(String(token || ''))
-          setTurnstileError(false)
-        },
-        'expired-callback': () => {
-          setTurnstileToken('')
-          setTurnstileError(true)
-        },
-        'error-callback': () => {
-          setTurnstileToken('')
-          setTurnstileError(true)
-        },
-      })
-    }
-
-    if (window.turnstile) {
-      mountWidget()
-    } else {
-      const script = document.createElement('script')
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
-      script.async = true
-      script.defer = true
-      script.onload = mountWidget
-      script.onerror = () => setTurnstileError(true)
-      document.head.appendChild(script)
-    }
-
-    return () => {
-      cancelled = true
-      if (window.turnstile && turnstileWidgetIdRef.current != null) {
-        try {
-          window.turnstile.remove(turnstileWidgetIdRef.current)
-        } catch {
-          /* ignore */
-        }
-      }
-      turnstileWidgetIdRef.current = null
-    }
-  }, [useTurnstile, turnstileSiteKey])
 
   const validateStep = useCallback(
     (s) => {
@@ -283,16 +227,14 @@ export default function Register() {
   const goPrev = () => setStep((x) => Math.max(1, x - 1))
 
   const submitRegistration = async () => {
-    if (import.meta.env.PROD && !useRecaptcha && !useTurnstile) {
-      toast.error('Inscription indisponible : configurez reCAPTCHA (VITE_RECAPTCHA_SITE_KEY) ou Turnstile sur le site.')
+    if (import.meta.env.PROD && !useRecaptcha) {
+      toast.error(
+        'Inscription indisponible : configurez reCAPTCHA (VITE_RECAPTCHA_SITE_KEY au build ou config-site.js sur le serveur).',
+      )
       return
     }
     if (useRecaptcha && !recaptchaToken) {
       toast.error('Veuillez cocher « Je ne suis pas un robot » (reCAPTCHA) avant de créer votre compte.')
-      return
-    }
-    if (useTurnstile && !turnstileToken) {
-      toast.error('Veuillez valider la vérification anti-bot avant de créer votre compte.')
       return
     }
     if (!acceptPolicy) {
@@ -319,8 +261,19 @@ export default function Register() {
         bot_started_at: botStartedAt,
         website: honeypot,
         ...(useRecaptcha ? { recaptcha_token: recaptchaPayload } : {}),
-        ...(useTurnstile ? { bot_token: turnstileToken } : {}),
       })
+      if (data.requires_email_verification) {
+        toast.success(data.message || 'Consultez votre boîte e-mail pour confirmer votre compte.')
+        navigate('/connexion', {
+          replace: true,
+          state: { pendingEmailVerification: normalizeEmail(form.email) },
+        })
+        return
+      }
+      if (!data.token || !data.utilisateur) {
+        toast.error('Réponse serveur inattendue.')
+        return
+      }
       login(data.token, data.utilisateur)
       try {
         sessionStorage.setItem('signup_creds_once', JSON.stringify({ p: form.mot_de_passe, t: Date.now() }))
@@ -354,10 +307,7 @@ export default function Register() {
 
   const currentStepMeta = STEPS[Math.min(STEPS.length, Math.max(1, step)) - 1]
 
-  const captchaBlocked =
-    (useRecaptcha && !recaptchaToken) ||
-    (useTurnstile && !turnstileToken) ||
-    (import.meta.env.PROD && !useRecaptcha && !useTurnstile)
+  const captchaBlocked = (useRecaptcha && !recaptchaToken) || (import.meta.env.PROD && !useRecaptcha)
 
   return (
     <div className="min-h-screen relative overflow-hidden px-3 sm:px-5 py-6 md:py-10">
@@ -410,7 +360,7 @@ export default function Register() {
               {[
                 'Matricule attribué automatiquement après votre établissement',
                 'E-mail et téléphone uniques pour sécuriser votre accès',
-                'Protection anti-bot (reCAPTCHA ou Cloudflare Turnstile) en production',
+                'Protection anti-bot (reCAPTCHA) en production',
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2">
                   <FaCheck className="text-emerald-400 mt-0.5 shrink-0" />
@@ -859,31 +809,18 @@ export default function Register() {
                         </div>
                       )}
 
-                      {useTurnstile && (
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                          <p className="text-sm font-semibold text-slate-700 mb-2">
-                            Vérification anti-bot (Turnstile) <span className="text-red-500">*</span>
-                          </p>
-                          <div ref={turnstileContainerRef} />
-                          {turnstileError && (
-                            <p className="text-xs text-red-600 mt-2">
-                              La vérification a expiré ou a échoué. Rechargez la page si nécessaire.
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {!useRecaptcha && !useTurnstile && import.meta.env.DEV && (
+                      {!useRecaptcha && import.meta.env.DEV && (
                         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                           Dev : sans captcha, le serveur doit autoriser l’inscription (ex.{' '}
                           <code className="font-mono">AUTH_INSCRIPTION_BYPASS_CAPTCHA=1</code>).
                         </p>
                       )}
 
-                      {!useRecaptcha && !useTurnstile && import.meta.env.PROD && (
+                      {!useRecaptcha && import.meta.env.PROD && (
                         <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                          Configuration manquante : définissez <code className="font-mono">VITE_RECAPTCHA_SITE_KEY</code> ou{' '}
-                          <code className="font-mono">VITE_TURNSTILE_SITE_KEY</code>.
+                          Configuration manquante : au build (<code className="font-mono">VITE_RECAPTCHA_SITE_KEY</code>) ou sur
+                          le serveur éditez <code className="font-mono">config-site.js</code> (<code className="font-mono">recaptcha</code>
+                          ), puis rechargez la page.
                         </p>
                       )}
                     </>
@@ -958,7 +895,7 @@ export default function Register() {
                     Se connecter
                   </Link>
                 </p>
-                {(useRecaptcha || useTurnstile) && (
+                {useRecaptcha && (
                   <p className="text-xs text-white/75 mt-2 leading-snug">
                     Vérification anti-bot requise en production.
                   </p>

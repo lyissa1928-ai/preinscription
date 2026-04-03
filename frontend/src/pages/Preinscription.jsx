@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import ReCAPTCHA from 'react-google-recaptcha'
 import { useNavigate, useParams, Link, useLocation } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
@@ -26,6 +27,7 @@ import {
   emptyDossierFilesState,
 } from '../utils/preinscriptionDocumentRules'
 import { evaluateSanteFiliereEligibility } from '../utils/santeEligibility'
+import { getRecaptchaSiteKey } from '@/lib/siteKeys'
 
 const DIPLOMES = [
   'Baccalauréat',
@@ -112,11 +114,9 @@ export default function Preinscription() {
   const [guideStep, setGuideStep] = useState(0)
   const [botStartedAt] = useState(() => Date.now())
   const [honeypot, setHoneypot] = useState('')
-  const [turnstileToken, setTurnstileToken] = useState('')
-  const [turnstileError, setTurnstileError] = useState(false)
-  const turnstileContainerRef = useRef(null)
-  const turnstileWidgetIdRef = useRef(null)
-  const turnstileSiteKey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim()
+  const [recaptchaToken, setRecaptchaToken] = useState('')
+  const recaptchaRef = useRef(null)
+  const recaptchaSiteKey = getRecaptchaSiteKey()
 
   const [form, setForm] = useState({
     formation_id: formationId || '',
@@ -187,49 +187,14 @@ export default function Preinscription() {
   }, [location.search])
 
   useEffect(() => {
-    if (!turnstileSiteKey || !turnstileContainerRef.current) return
-    let cancelled = false
-
-    const mountWidget = () => {
-      if (cancelled || !window.turnstile || !turnstileContainerRef.current) return
-      if (turnstileWidgetIdRef.current != null) return
-      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: turnstileSiteKey,
-        callback: (token) => {
-          setTurnstileToken(String(token || ''))
-          setTurnstileError(false)
-        },
-        'expired-callback': () => {
-          setTurnstileToken('')
-          setTurnstileError(true)
-        },
-        'error-callback': () => {
-          setTurnstileToken('')
-          setTurnstileError(true)
-        },
-      })
+    if (step === 3) return
+    setRecaptchaToken('')
+    try {
+      recaptchaRef.current?.reset()
+    } catch {
+      /* ignore */
     }
-
-    if (window.turnstile) {
-      mountWidget()
-    } else {
-      const script = document.createElement('script')
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
-      script.async = true
-      script.defer = true
-      script.onload = mountWidget
-      script.onerror = () => setTurnstileError(true)
-      document.head.appendChild(script)
-    }
-
-    return () => {
-      cancelled = true
-      if (window.turnstile && turnstileWidgetIdRef.current != null) {
-        try { window.turnstile.remove(turnstileWidgetIdRef.current) } catch {}
-      }
-      turnstileWidgetIdRef.current = null
-    }
-  }, [turnstileSiteKey])
+  }, [step])
 
   const up = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }))
   const upFile = (field) => (e) => setFiles(p => ({ ...p, [field]: e.target.files[0] }))
@@ -279,9 +244,12 @@ export default function Preinscription() {
     return true
   }
 
+  const recaptchaConfigured = Boolean(recaptchaSiteKey)
+  const prodNoRecaptcha = import.meta.env.PROD && !recaptchaConfigured
   const canSubmit =
     areRequiredFilesPresent(files, niveauKey, form.nationalite) &&
-    (!turnstileSiteKey || !!turnstileToken)
+    (!recaptchaConfigured || !!recaptchaToken) &&
+    !prodNoRecaptcha
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -292,7 +260,10 @@ export default function Preinscription() {
       Object.entries(files).forEach(([k, v]) => { if (v) formData.append(k, v) })
       formData.append('bot_started_at', String(botStartedAt))
       formData.append('website', honeypot)
-      if (turnstileSiteKey) formData.append('bot_token', turnstileToken)
+      if (recaptchaSiteKey) {
+        const t = String(recaptchaRef.current?.getValue?.() || recaptchaToken || '').trim()
+        if (t) formData.append('recaptcha_token', t)
+      }
       const { data } = await axios.post('/api/etudiant/dossier', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
       toast.success(`Dossier soumis ! N° ${data.numero_dossier}`)
       navigate('/dashboard')
@@ -848,14 +819,24 @@ export default function Preinscription() {
                     />
                   ))}
                 </div>
-                {turnstileSiteKey && (
+                {recaptchaSiteKey && (
                   <div className="mt-5">
-                    <p className="text-sm font-semibold text-gray-700 mb-2">Vérification anti-bot <span className="text-red-500">*</span></p>
-                    <div ref={turnstileContainerRef} />
-                    {turnstileError && (
-                      <p className="text-xs text-red-600 mt-2">La vérification anti-bot a expiré ou a échoué. Rechargez la vérification.</p>
-                    )}
+                    <p className="text-sm font-semibold text-gray-700 mb-2">reCAPTCHA <span className="text-red-500">*</span></p>
+                    <div className="flex justify-start">
+                      <ReCAPTCHA
+                        ref={recaptchaRef}
+                        sitekey={recaptchaSiteKey}
+                        onChange={(t) => setRecaptchaToken(t || '')}
+                        onExpired={() => setRecaptchaToken('')}
+                      />
+                    </div>
                   </div>
+                )}
+                {!recaptchaSiteKey && import.meta.env.PROD && (
+                  <p className="mt-4 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    En production, définissez <code className="font-mono">VITE_RECAPTCHA_SITE_KEY</code> ou{' '}
+                    <code className="font-mono">config-site.js</code> (clé <code className="font-mono">recaptcha</code>).
+                  </p>
                 )}
               </div>
 
@@ -940,7 +921,9 @@ export default function Preinscription() {
               <div className="flex flex-col items-end gap-2">
                 {!canSubmit && (
                   <p className="text-xs text-red-600 font-medium text-right max-w-xs">
-                    Fournissez toutes les pièces obligatoires et validez l’anti-bot si affiché.
+                    {prodNoRecaptcha
+                      ? 'En production, la clé site reCAPTCHA doit être configurée côté build ou serveur.'
+                      : 'Fournissez toutes les pièces obligatoires et validez le reCAPTCHA si affiché.'}
                   </p>
                 )}
                 <button

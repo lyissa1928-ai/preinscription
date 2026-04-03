@@ -8,7 +8,13 @@ const { authMiddleware } = require('../middleware/auth');
 const { snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
 const { rateLimit, getClientIp } = require('../utils/rateLimit');
 const { logSecurityEvent } = require('../utils/securityEvent');
-const { antiBotConfig, verifyTurnstileToken } = require('../utils/antiBot');
+const {
+  antiBotConfig,
+  verifyRecaptchaTokenWithDetails,
+  verifyRecaptchaEnterpriseWithDetails,
+  recaptchaEnterpriseConfigured,
+  recaptchaSecret,
+} = require('../utils/antiBot');
 const {
   normalizePreinscriptionNiveau,
   validateDossierUploadsForNiveau,
@@ -98,7 +104,7 @@ router.post(
     return abortUploads(400, { message: 'Requête invalide.' });
   }
 
-  const { secret, requireCaptcha, minFillMs } = antiBotConfig();
+  const { requireCaptcha, minFillMs } = antiBotConfig();
   const startedAtRaw = Number(req.body?.bot_started_at || 0);
   const filledTooFast = !Number.isFinite(startedAtRaw) || startedAtRaw <= 0 || (Date.now() - startedAtRaw) < minFillMs;
   if (filledTooFast) {
@@ -111,15 +117,30 @@ router.post(
   }
 
   if (requireCaptcha) {
-    const token = String(req.body?.bot_token || '').trim();
-    if (!token) {
-      logSecurityEvent(req, 'bot_missing_captcha_token', { endpoint: '/api/etudiant/dossier' }, 'warning');
-      return abortUploads(400, { message: 'Vérification anti-bot requise.' });
+    const useEnterprise = recaptchaEnterpriseConfigured();
+    const recSecret = recaptchaSecret();
+    const recToken = String(req.body?.recaptcha_token || '').trim();
+    if (!recToken) {
+      logSecurityEvent(req, 'recaptcha_missing_token', { endpoint: '/api/etudiant/dossier' }, 'warning');
+      return abortUploads(400, { message: 'reCAPTCHA requis.' });
     }
-    const ok = await verifyTurnstileToken(token, getClientIp(req), secret);
-    if (!ok) {
-      logSecurityEvent(req, 'bot_captcha_verification_failed', { endpoint: '/api/etudiant/dossier' }, 'warning');
-      return abortUploads(400, { message: 'Vérification anti-bot invalide. Réessayez.' });
+    if (useEnterprise || recSecret) {
+      const recResult = useEnterprise
+        ? await verifyRecaptchaEnterpriseWithDetails(recToken)
+        : await verifyRecaptchaTokenWithDetails(recToken, getClientIp(req), recSecret);
+      if (!recResult.ok) {
+        logSecurityEvent(req, 'recaptcha_verification_failed', {
+          endpoint: '/api/etudiant/dossier',
+          recaptcha_mode: useEnterprise ? 'enterprise' : 'legacy',
+          recaptcha_error_codes: recResult.errorCodes || [],
+        }, 'warning');
+        return abortUploads(400, { message: 'reCAPTCHA invalide ou expiré. Réessayez.' });
+      }
+    } else {
+      logSecurityEvent(req, 'dossier_captcha_not_configured', { endpoint: '/api/etudiant/dossier' }, 'error');
+      return abortUploads(503, {
+        message: 'Soumission temporairement indisponible (reCAPTCHA non configuré sur le serveur).',
+      });
     }
   }
 
