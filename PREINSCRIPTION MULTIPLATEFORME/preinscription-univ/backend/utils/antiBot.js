@@ -4,7 +4,7 @@ function envFlag(name, defaultValue = false) {
   return ['1', 'true', 'yes', 'on'].includes(String(raw).trim().toLowerCase());
 }
 
-/** Inscription : exiger Turnstile côté serveur sauf si AUTH_INSCRIPTION_BYPASS_CAPTCHA=1 (dev local). */
+/** Inscription : exiger reCAPTCHA côté serveur sauf si AUTH_INSCRIPTION_BYPASS_CAPTCHA=1 (dev local). */
 function inscriptionCaptchaEnforced() {
   return !envFlag('AUTH_INSCRIPTION_BYPASS_CAPTCHA', false);
 }
@@ -16,10 +16,11 @@ function toPositiveInt(value, fallback) {
 }
 
 function antiBotConfig() {
-  const secret = String(process.env.TURNSTILE_SECRET_KEY || '').trim();
-  const requireCaptcha = envFlag('ANTI_BOT_REQUIRE_CAPTCHA', false) || Boolean(secret);
+  const recaptchaConfigured =
+    recaptchaEnterpriseConfigured() || Boolean(recaptchaSecret());
+  const requireCaptcha = envFlag('ANTI_BOT_REQUIRE_CAPTCHA', false) || recaptchaConfigured;
   const minFillMs = toPositiveInt(process.env.ANTI_BOT_MIN_FILL_MS, 2500);
-  return { secret, requireCaptcha, minFillMs };
+  return { requireCaptcha, minFillMs };
 }
 
 /**
@@ -124,30 +125,6 @@ async function verifyRecaptchaEnterpriseWithDetails(token) {
   }
 }
 
-async function verifyTurnstileToken(token, remoteIp, secret) {
-  if (!token || !secret) return false;
-  if (typeof fetch !== 'function') return false;
-  try {
-    const payload = new URLSearchParams();
-    payload.set('secret', secret);
-    payload.set('response', String(token));
-    if (remoteIp && envFlag('TURNSTILE_VERIFY_SEND_REMOTEIP', false)) {
-      payload.set('remoteip', String(remoteIp));
-    }
-
-    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: payload.toString(),
-    });
-    if (!response.ok) return false;
-    const data = await response.json();
-    return data?.success === true;
-  } catch {
-    return false;
-  }
-}
-
 function recaptchaSecret() {
   let s = String(process.env.RECAPTCHA_SECRET_KEY || '').trim();
   if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
@@ -160,7 +137,6 @@ function recaptchaSecret() {
 
 module.exports = {
   antiBotConfig,
-  verifyTurnstileToken,
   verifyRecaptchaToken,
   verifyRecaptchaTokenWithDetails,
   verifyRecaptchaEnterpriseWithDetails,

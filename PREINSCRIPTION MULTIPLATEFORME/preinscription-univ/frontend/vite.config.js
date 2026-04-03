@@ -1,12 +1,27 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-export default defineConfig({
+/** Fusionne les VITE_* du monorepo (racine) et du dossier frontend — le frontend l’emporte. */
+function mergedViteEnv(mode) {
+  const rootDir = path.resolve(__dirname, '..')
+  const fromRoot = loadEnv(mode, rootDir, 'VITE_')
+  const fromFrontend = loadEnv(mode, __dirname, 'VITE_')
+  return { ...fromRoot, ...fromFrontend }
+}
+
+export default defineConfig(({ mode }) => {
+  const v = mergedViteEnv(mode)
+  return {
   plugins: [react()],
+  /** Garantit que les clés publiques sont bien prises si .env.production est à la racine du repo. */
+  define: {
+    'import.meta.env.VITE_RECAPTCHA_SITE_KEY': JSON.stringify(v.VITE_RECAPTCHA_SITE_KEY ?? ''),
+    'import.meta.env.VITE_API_URL': JSON.stringify(v.VITE_API_URL ?? ''),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -44,5 +59,6 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  }
   }
 })

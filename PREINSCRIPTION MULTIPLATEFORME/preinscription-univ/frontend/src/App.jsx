@@ -37,6 +37,9 @@ import StaffAcceptesParFormation from './pages/StaffAcceptesParFormation'
 import BienvenueCompte from './pages/BienvenueCompte'
 import MesAccesEtudiant from './pages/MesAccesEtudiant'
 import ResetPasswordMatricule from './pages/ResetPasswordMatricule'
+import VerifyEmail from './pages/VerifyEmail'
+import ForgotPasswordEmail from './pages/ForgotPasswordEmail'
+import ResetPasswordEmail from './pages/ResetPasswordEmail'
 
 function PrivateRoute({ children, roles }) {
   const { user, loading } = useAuth()
@@ -77,6 +80,9 @@ function AppRoutes() {
       <Route path="/connexion" element={user ? <Navigate to={homeRedirect()} /> : <Login />} />
       <Route path="/inscription" element={user ? <Navigate to={homeRedirect()} /> : <Register />} />
       <Route path="/mot-de-passe-oublie-matricule" element={<ResetPasswordMatricule />} />
+      <Route path="/verifier-email" element={<VerifyEmail />} />
+      <Route path="/mot-de-passe-oublie-email" element={<ForgotPasswordEmail />} />
+      <Route path="/reinitialiser-mot-de-passe-email" element={<ResetPasswordEmail />} />
       <Route path="/changer-mot-de-passe-obligatoire" element={<PrivateRoute><ForcePasswordChange /></PrivateRoute>} />
 
       {/* ─── Pages avec sidebar (layout authentifié) ─────── */}

@@ -58,7 +58,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## Fichiers à ne jamais écraser depuis Git sur la prod/test
 
-- `backend/.env` (secrets, JWT, CORS, clés reCAPTCHA / Turnstile)
+- `backend/.env` (secrets, JWT, CORS, clés reCAPTCHA)
 - `frontend/.env` en local ; en prod le build est fait **avec** `VITE_*` au moment du `npm run build` (ou variables d’environnement CI injectées au build)
 
 ## Rollback rapide
