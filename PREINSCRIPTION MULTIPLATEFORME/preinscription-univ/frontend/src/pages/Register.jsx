@@ -736,8 +736,8 @@ export default function Register() {
                       <div className="space-y-3">
                         <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Validation</h2>
                         <p className="text-sm text-slate-600 leading-relaxed">
-                          Contrôlez le récapitulatif, acceptez la politique de création de compte, puis complétez la
-                          vérification anti-bot si un cadre apparaît (obligatoire en production).
+                          Contrôlez le récapitulatif, acceptez la politique de création de compte, puis cochez le
+                          reCAPTCHA lorsqu’il est affiché (obligatoire en production tant que la clé site est configurée).
                         </p>
                       </div>
                       <div className="rounded-2xl border border-blue-100/80 bg-gradient-to-br from-blue-50/90 to-indigo-50/70 px-4 py-4 text-sm text-slate-700 shadow-sm">
@@ -818,9 +818,11 @@ export default function Register() {
 
                       {!useRecaptcha && import.meta.env.PROD && (
                         <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                          Configuration manquante : au build (<code className="font-mono">VITE_RECAPTCHA_SITE_KEY</code>) ou sur
-                          le serveur éditez <code className="font-mono">config-site.js</code> (<code className="font-mono">recaptcha</code>
-                          ), puis rechargez la page.
+                          Configuration manquante : définissez la clé site <strong>reCAPTCHA</strong> — variable{' '}
+                          <code className="font-mono">VITE_RECAPTCHA_SITE_KEY</code> au build, ou champ{' '}
+                          <code className="font-mono">recaptcha</code> dans <code className="font-mono">public/config-site.js</code>{' '}
+                          puis <strong>rebuild</strong> du frontend, ou éditez <code className="font-mono">dist/config-site.js</code> après
+                          déploiement sans rebuild.
                         </p>
                       )}
                     </>
@@ -897,7 +899,7 @@ export default function Register() {
                 </p>
                 {useRecaptcha && (
                   <p className="text-xs text-white/75 mt-2 leading-snug">
-                    Vérification anti-bot requise en production.
+                    reCAPTCHA actif sur cette page en production.
                   </p>
                 )}
               </div>
