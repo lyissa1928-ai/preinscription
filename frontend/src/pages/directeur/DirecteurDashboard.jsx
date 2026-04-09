@@ -1,11 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import StatutBadge from '../../components/StatutBadge'
+import TabConditionsAdmissionEtab from '../../components/TabConditionsAdmissionEtab'
+import { useAuth } from '../../context/AuthContext'
 import { DashboardPage, DashboardHero, Panel, DashboardSpinner } from '../../components/dashboard/DashboardChrome'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n || 0)
 
 export default function DirecteurDashboard() {
+  const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const conditionsAnchorRef = useRef(null)
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -15,6 +21,14 @@ export default function DirecteurDashboard() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (searchParams.get('tab') !== 'conditions') return
+    const t = setTimeout(() => {
+      conditionsAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+    return () => clearTimeout(t)
+  }, [searchParams])
 
   if (loading) {
     return (
@@ -69,6 +83,37 @@ export default function DirecteurDashboard() {
               ))}
             </div>
 
+            <div ref={conditionsAnchorRef} id="conditions-admission-directeur" className="mb-10 scroll-mt-24">
+              <Panel
+                title="Conditions d’admission (candidats — proforma)"
+                meta={
+                  <Link
+                    to="/responsable/gestion-etablissement?tab=conditions"
+                    className="text-xs font-semibold text-blue-700 hover:underline"
+                  >
+                    Gestion filières & formations →
+                  </Link>
+                }
+                bodyClassName="p-6"
+              >
+                <p className="mb-6 text-sm text-slate-600">
+                  Comme pour le responsable pédagogique : plusieurs blocs de conditions peuvent être publiés ; le champ
+                  d’un nouveau bloc est vidé après chaque ajout validé. Affichage aux candidats sur la demande de facture
+                  proforma après le choix de votre établissement.
+                </p>
+                {user?.etablissement_id ? (
+                  <TabConditionsAdmissionEtab
+                    etabId={user.etablissement_id}
+                    etabNom={user.etablissement_nom || stats?.etablissement?.nom}
+                  />
+                ) : (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Aucun établissement n’est rattaché à votre compte.
+                  </p>
+                )}
+              </Panel>
+            </div>
+
             <Panel title="Taux d'acceptation global" bodyClassName="p-6 mb-8">
               <div className="flex items-center gap-4">
                 <div className="h-5 flex-1 overflow-hidden rounded-full bg-slate-200 shadow-inner">
@@ -121,7 +166,7 @@ export default function DirecteurDashboard() {
                   <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-5 shadow-sm">
                     <div>
                       <p className="font-bold text-blue-950">Demandes proforma publiques</p>
-                      <p className="text-sm text-blue-700/90">Formulaires sans compte soumis</p>
+                      <p className="text-sm text-blue-700/90">Demandes proforma (candidats)</p>
                     </div>
                     <p className="text-3xl font-black text-blue-700 tabular-nums">{fmt(stats.demandes_proforma)}</p>
                   </div>

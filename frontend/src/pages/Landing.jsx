@@ -1,21 +1,65 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { FaPhone, FaEnvelope, FaGlobe } from 'react-icons/fa'
+import {
+  FaPhone,
+  FaEnvelope,
+  FaGlobe,
+  FaShieldAlt,
+  FaFileInvoiceDollar,
+  FaUniversity,
+  FaBolt,
+  FaCheckCircle,
+  FaArrowRight,
+  FaChevronDown,
+} from 'react-icons/fa'
 import Navbar from '../components/Navbar'
 
-/* ─── Données statiques ────────────────────────────────────────────────────── */
 const STATS = [
-  { value: '12 000+', label: 'Étudiants inscrits',      icon: '🎓' },
-  { value: '3',       label: 'Établissements partenaires', icon: '🏛️' },
-  { value: '98%',     label: 'Taux de satisfaction',     icon: '⭐' },
-  { value: '15 ans',  label: "D'excellence académique",  icon: '🏆' },
+  { value: '12 000+', label: 'Étudiants accompagnés', icon: '🎓' },
+  { value: '3', label: 'Établissements partenaires', icon: '🏛️' },
+  { value: '98%', label: 'Satisfaction', icon: '⭐' },
+  { value: '15 ans', label: "D'excellence", icon: '🏆' },
+]
+
+const FEATURES = [
+  {
+    icon: FaBolt,
+    title: 'Dossier 100 % numérique',
+    desc: 'Après ouverture du compte, déposez votre préinscription en ligne ou suivez une autre démarche (ex. facture proforma).',
+    accent: 'from-amber-400/20 to-orange-500/10',
+  },
+  {
+    icon: FaShieldAlt,
+    title: 'Données protégées',
+    desc: 'Authentification, traçabilité et espaces étudiants conformes aux usages académiques.',
+    accent: 'from-emerald-400/20 to-teal-500/10',
+  },
+  {
+    icon: FaFileInvoiceDollar,
+    title: 'Facture proforma (autre parcours)',
+    desc: 'Une fois votre compte candidat ouvert, vous pouvez demander une facture indicative — sans passer par le dossier de préinscription complet.',
+    accent: 'from-sky-400/20 to-blue-600/10',
+  },
+  {
+    icon: FaUniversity,
+    title: 'Multi-établissements',
+    desc: 'BTP, commerce et santé : choisissez votre école et explorez les filières publiques.',
+    accent: 'from-violet-400/20 to-indigo-600/10',
+  },
+]
+
+const PARCOURS = [
+  { step: '01', title: 'Explorer', text: 'Parcourez les établissements et les formations (conditions d’admission consultables publiquement).' },
+  { step: '02', title: 'Compte candidat', text: 'Création gratuite et rattachement à un établissement — ce n’est pas encore une préinscription.' },
+  { step: '03', title: 'Agir', text: 'Depuis votre espace : préinscription complète ou demande de facture proforma (deux parcours distincts).' },
+  { step: '04', title: 'Suivi', text: 'Statut des demandes, lettres et factures dans votre tableau de bord.' },
 ]
 
 const TYPE_ETAB_COLORS = {
-  sante:   { bg: 'bg-red-50',    border: 'border-red-200',   text: 'text-red-700',   icon: '🏥' },
-  btp:     { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', icon: '🏗️' },
-  gestion: { bg: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-700',  icon: '📊' },
+  sante: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: '🏥' },
+  btp: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', icon: '🏗️' },
+  gestion: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: '📊' },
 }
 
 const HERO_IMAGES = [
@@ -25,9 +69,9 @@ const HERO_IMAGES = [
 ]
 
 const BRAND_COLORS = {
-  esebat: { prim: '#F97316', sec: '#FB923C' }, // orange
-  escoa: { prim: '#0B2A66', sec: '#1E3A8A' },  // bleu fonce
-  efosante: { prim: '#B91C1C', sec: '#38BDF8' }, // rouge sang + bleu clair
+  esebat: { prim: '#F97316', sec: '#FB923C' },
+  escoa: { prim: '#0B2A66', sec: '#1E3A8A' },
+  efosante: { prim: '#B91C1C', sec: '#38BDF8' },
 }
 
 function detectBrand(name = '') {
@@ -38,7 +82,6 @@ function detectBrand(name = '') {
   return null
 }
 
-/** Lien site web sûr pour href (ajoute https:// si besoin). */
 function siteWebHref(raw) {
   const t = String(raw || '').trim()
   if (!t) return null
@@ -46,10 +89,6 @@ function siteWebHref(raw) {
   return `https://${t}`
 }
 
-/**
- * Découpe une chaîne pouvant contenir plusieurs numéros (séparateurs / | — ; etc.)
- * pour affichage ligne par ligne et liens tel: propres.
- */
 function splitPhoneNumbers(raw) {
   const s = String(raw || '').trim()
   if (!s) return []
@@ -65,34 +104,45 @@ function telHref(digits) {
   return cleaned ? `tel:${cleaned}` : '#'
 }
 
-/* ─── Compteur animé ────────────────────────────────────────────────────────── */
 function AnimatedStat({ value, label, icon, delay = 0 }) {
   const [visible, setVisible] = useState(false)
   const ref = useRef(null)
   useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true) }, { threshold: 0.3 })
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) setVisible(true)
+    }, { threshold: 0.25 })
     if (ref.current) obs.observe(ref.current)
     return () => obs.disconnect()
   }, [])
   return (
-    <div ref={ref} className={`text-center transition-all duration-700 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: `${delay}ms` }}>
-      <div className="text-3xl mb-1">{icon}</div>
-      <div className="text-3xl font-black text-white">{value}</div>
-      <div className="text-sm text-blue-200 mt-1">{label}</div>
+    <div
+      ref={ref}
+      className={`rounded-2xl border border-white/20 bg-white/10 px-4 py-5 backdrop-blur-md transition-all duration-700 ${
+        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+      }`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      <div className="text-2xl mb-1 text-center">{icon}</div>
+      <div className="text-2xl sm:text-3xl font-black text-white text-center tracking-tight">{value}</div>
+      <div className="text-[11px] sm:text-xs text-white/80 mt-1 text-center font-medium leading-snug">{label}</div>
     </div>
   )
 }
 
-/* ─── Page principale ──────────────────────────────────────────────────────── */
 export default function Landing() {
   const location = useLocation()
   const navigate = useNavigate()
   const [etablissements, setEtablissements] = useState([])
+  const [etablissementsLoaded, setEtablissementsLoaded] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [guideStep, setGuideStep] = useState(0)
 
   useEffect(() => {
-    axios.get('/api/etablissements').then(({ data }) => setEtablissements(data.filter(e => e.actif !== false))).catch(() => {})
+    axios
+      .get('/api/etablissements')
+      .then(({ data }) => setEtablissements((data || []).filter((e) => e.actif !== false)))
+      .catch(() => setEtablissements([]))
+      .finally(() => setEtablissementsLoaded(true))
   }, [])
 
   useEffect(() => {
@@ -130,7 +180,7 @@ export default function Landing() {
       title: 'Créer un compte',
       subtitle: 'Accès étudiant sécurisé',
       points: [
-        'Cliquez sur “S’inscrire” depuis la barre de navigation.',
+        'Cliquez sur « S’inscrire » depuis la barre de navigation.',
         'Remplissez vos informations personnelles.',
         'Connectez-vous ensuite à votre espace étudiant.',
       ],
@@ -169,34 +219,37 @@ export default function Landing() {
 
   return (
     <>
-      {/* Animations globales */}
       <style>{`
-        @keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-20px) rotate(5deg); } }
-        @keyframes floatReverse { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(20px) rotate(-5deg); } }
+        @keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-18px) rotate(4deg); } }
+        @keyframes floatReverse { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(18px) rotate(-4deg); } }
         @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        @keyframes pulseGlow { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.05); } }
-        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes slideInRight { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes heroSlides { 0%, 30% { opacity: 1; transform: scale(1.06); } 33%, 97% { opacity: 0; transform: scale(1.02); } 100% { opacity: 0; transform: scale(1.02); } }
-        .float-1 { animation: float 6s ease-in-out infinite; }
-        .float-2 { animation: floatReverse 8s ease-in-out infinite; }
-        .float-3 { animation: float 10s ease-in-out infinite 2s; }
-        .float-4 { animation: floatReverse 7s ease-in-out infinite 1s; }
-        .hero-gradient { background: linear-gradient(135deg, #0f172a, #1e3a8a, #1e40af, #312e81, #0f172a); background-size: 400% 400%; animation: gradientShift 12s ease infinite; }
-        .glow-orb { animation: pulseGlow 4s ease-in-out infinite; }
-        .slide-left { animation: slideInLeft 0.8s ease forwards; }
-        .slide-right { animation: slideInRight 0.8s ease forwards 0.2s; }
-        .fade-up { animation: fadeInUp 0.6s ease forwards; }
-        .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
-        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.12); }
-        .hero-bg-slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; animation: heroSlides 18s ease-in-out infinite; }
-        .hero-bg-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(15,23,42,0.78), color-mix(in srgb, var(--hero-prim) 55%, black) 72%, color-mix(in srgb, var(--hero-sec) 55%, black) 68%, color-mix(in srgb, var(--hero-tri) 50%, black) 65%); }
-        .etab-tint { background: linear-gradient(120deg, color-mix(in srgb, var(--hero-prim) 11%, white), color-mix(in srgb, var(--hero-sec) 12%, white), color-mix(in srgb, var(--hero-tri) 10%, white)); }
+        @keyframes pulseGlow { 0%, 100% { opacity: 0.18; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.04); } }
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes heroSlides { 0%, 26% { opacity: 1; transform: scale(1.05); } 30%, 96% { opacity: 0; transform: scale(1.02); } 100% { opacity: 0; transform: scale(1.02); } }
+        @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+        .float-1 { animation: float 7s ease-in-out infinite; }
+        .float-2 { animation: floatReverse 9s ease-in-out infinite; }
+        .float-3 { animation: float 11s ease-in-out infinite 2s; }
+        .float-4 { animation: floatReverse 8s ease-in-out infinite 1s; }
+        .hero-gradient { background: linear-gradient(135deg, #020617, #0f172a, #1e3a8a, #1e40af, #312e81, #020617); background-size: 400% 400%; animation: gradientShift 22s ease infinite; }
+        .glow-orb { animation: pulseGlow 6s ease-in-out infinite; }
+        .slide-left { animation: slideInLeft 0.95s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .slide-right { animation: slideInRight 0.95s cubic-bezier(0.22,1,0.36,1) 0.12s forwards; opacity: 0; animation-fill-mode: forwards; }
+        .fade-up { animation: fadeInUp 0.65s ease forwards; }
+        .card-hover { transition: transform 0.35s cubic-bezier(0.22,1,0.36,1), box-shadow 0.35s ease; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 24px 48px -12px rgba(15,23,42,0.18); }
+        .hero-bg-slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; animation: heroSlides 27s ease-in-out infinite; }
+        .hero-bg-overlay { position: absolute; inset: 0; background: linear-gradient(165deg, rgba(2,6,23,0.82) 0%, color-mix(in srgb, var(--hero-prim) 48%, #020617) 42%, rgba(15,23,42,0.88) 100%); }
+        .etab-tint { background: linear-gradient(165deg, #f8fafc 0%, color-mix(in srgb, var(--hero-prim) 6%, white) 40%, color-mix(in srgb, var(--hero-sec) 5%, white) 100%); }
+        .mesh-grid { background-image: radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px); background-size: 28px 28px; }
+        .noise-overlay { opacity: 0.035; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+        .headline-shine { background-size: 200% auto; animation: shimmer 8s linear infinite; }
       `}</style>
 
       <div
-        className="min-h-screen flex flex-col bg-white"
+        className="min-h-screen flex flex-col bg-slate-50"
         style={{
           '--hero-prim': palette.prim,
           '--hero-sec': palette.sec,
@@ -205,121 +258,309 @@ export default function Landing() {
       >
         <Navbar />
 
-        {/* ══ HERO ═══════════════════════════════════════════════════════════ */}
-        <section className="hero-gradient relative overflow-hidden text-white min-h-screen flex flex-col justify-center">
+        {etablissementsLoaded && etablissements.length === 0 && (
+          <div className="relative z-20 mx-auto max-w-4xl px-4 pt-4">
+            <div className="rounded-2xl border border-amber-300/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
+              <p className="font-bold">Aucun établissement affiché pour le moment</p>
+              <p className="mt-1 text-amber-900/90">
+                Vérifiez que le backend tourne et que le fichier de base contient des établissements actifs. En cas de
+                perte de données, une sauvegarde peut être restaurée depuis le dossier{' '}
+                <code className="rounded bg-amber-100/80 px-1">backend/database/backups</code>.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ─── HERO ─── */}
+        <section className="hero-gradient relative overflow-hidden text-white min-h-[92vh] sm:min-h-[min(100vh,920px)] flex flex-col justify-center">
           <div className="absolute inset-0 pointer-events-none">
             {HERO_IMAGES.map((src, idx) => (
-              <img key={`hero-${idx}`} src={src} alt="" className="hero-bg-slide" loading={idx === 0 ? 'eager' : 'lazy'} style={{ animationDelay: `${idx * 6}s` }} />
+              <img
+                key={`hero-${idx}`}
+                src={src}
+                alt=""
+                className="hero-bg-slide"
+                loading={idx === 0 ? 'eager' : 'lazy'}
+                style={{ animationDelay: `${idx * 9}s` }}
+              />
             ))}
             <div className="hero-bg-overlay" />
+            <div className="absolute inset-0 mesh-grid opacity-90" />
+            <div className="absolute inset-0 noise-overlay pointer-events-none mix-blend-overlay" />
           </div>
 
-          {/* Orbes flottantes */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="float-1 glow-orb absolute top-1/4 left-1/6 w-80 h-80 bg-blue-500 rounded-full opacity-20 blur-3xl" />
-            <div className="float-2 glow-orb absolute bottom-1/4 right-1/6 w-96 h-96 bg-indigo-400 rounded-full opacity-20 blur-3xl" />
-            <div className="float-3 absolute top-1/3 right-1/3 w-48 h-48 bg-violet-500 rounded-full opacity-10 blur-2xl" />
-            <div className="float-4 absolute bottom-1/3 left-1/3 w-56 h-56 bg-cyan-400 rounded-full opacity-15 blur-2xl" />
-
-            {/* Formes géométriques animées */}
-            <div className="float-1 absolute top-16 right-1/4 w-8 h-8 border-2 border-yellow-400/40 rotate-45" style={{ animationDelay: '1s' }} />
-            <div className="float-2 absolute top-1/3 left-16 w-5 h-5 bg-yellow-400/30 rotate-12" style={{ animationDelay: '2s' }} />
-            <div className="float-3 absolute bottom-1/4 right-16 w-12 h-12 border-2 border-blue-300/30 rounded-full" style={{ animationDelay: '0.5s' }} />
-            <div className="float-4 absolute top-2/3 left-1/4 w-6 h-6 bg-white/10 rotate-45" style={{ animationDelay: '3s' }} />
-            <div className="float-1 absolute bottom-16 left-1/3 w-4 h-4 border border-cyan-300/40" style={{ animationDelay: '1.5s' }} />
-            <div className="float-2 absolute top-1/4 right-12 w-3 h-12 bg-gradient-to-b from-yellow-400/20 to-transparent rounded-full" style={{ animationDelay: '0.8s' }} />
+            <div className="float-1 glow-orb absolute -top-20 -left-20 w-[28rem] h-[28rem] bg-blue-500 rounded-full blur-3xl opacity-20" />
+            <div className="float-2 glow-orb absolute -bottom-32 -right-10 w-[32rem] h-[32rem] bg-indigo-500 rounded-full blur-3xl opacity-15" />
+            <div className="float-3 absolute top-1/4 right-[12%] w-3 h-24 bg-gradient-to-b from-amber-400/30 to-transparent rounded-full hidden lg:block" />
+            <div className="float-4 absolute bottom-1/3 left-[8%] w-20 h-20 border border-white/10 rounded-2xl rotate-12 hidden md:block" />
           </div>
 
-          <div className="relative max-w-7xl mx-auto px-4 py-16 sm:py-20 w-full">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-
-              {/* Texte hero */}
-              <div className="slide-left">
-                <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-full text-sm font-medium mb-6">
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  Préinscriptions ouvertes — 2025-2026
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 w-full">
+            <div className="grid lg:grid-cols-[1.08fr_0.92fr] gap-12 lg:gap-16 items-center">
+              <div className="slide-left max-w-xl lg:max-w-none">
+                <div className="flex flex-wrap items-center gap-2 mb-5">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] sm:text-xs font-semibold tracking-wide backdrop-blur-md">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                    </span>
+                    Préinscriptions 2025-2026
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-medium text-white/50 uppercase tracking-[0.2em]">Sénégal</span>
                 </div>
-                <h1 className="text-5xl sm:text-6xl font-black leading-tight mb-6 tracking-tight">
-                  Votre avenir<br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">
-                    commence ici.
+
+                <h1 className="text-[2.1rem] sm:text-5xl lg:text-[3.35rem] font-black leading-[1.08] tracking-tight mb-5">
+                  <span className="block text-white">Votre admission</span>
+                  <span className="block mt-1 bg-gradient-to-r from-amber-200 via-yellow-300 to-orange-300 bg-clip-text text-transparent headline-shine">
+                    en ligne, sans friction.
                   </span>
                 </h1>
-                <p className="text-xl text-blue-100 mb-6 leading-relaxed max-w-lg">
-                  Plateforme officielle multi-établissements. Déposez votre dossier, obtenez votre lettre et votre facture proforma en ligne, en quelques minutes.
+                <p className="text-base sm:text-lg text-slate-300/95 mb-8 leading-relaxed max-w-xl font-medium">
+                  Ouvrez d’abord un <span className="text-white">compte candidat</span> (identité et école), puis choisissez :{' '}
+                  <span className="text-white">préinscription complète</span> ou{' '}
+                  <span className="text-white">demande de facture proforma</span> — deux démarches distinctes.
                 </p>
 
-                {/* Badges établissements */}
                 <div className="flex flex-wrap gap-2 mb-8">
-                  {etablissements.map(e => (
-                    <div key={e.id} className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-full text-sm">
-                      {e.logo_url
-                        ? <img src={e.logo_url} alt="" className="w-5 h-5 object-contain rounded-full bg-white/20" />
-                        : <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">{e.nom[0]}</span>}
-                      <span className="font-semibold text-sm">{e.nom}</span>
+                  {['Dossier sécurisé', 'Proforma contrôlée', 'Multi-campus'].map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] sm:text-xs font-medium text-slate-200"
+                    >
+                      <FaCheckCircle className="h-3 w-3 text-emerald-400 shrink-0" aria-hidden />
+                      {t}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-8 sm:mb-10 max-w-full">
+                  {etablissements.map((e) => (
+                    <div
+                      key={e.id}
+                      className="flex items-center gap-2 rounded-full border border-white/20 bg-black/20 pl-1 pr-3 py-1 backdrop-blur-md"
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/15 ring-1 ring-white/20">
+                        {e.logo_url ? (
+                          <img src={e.logo_url} alt="" className="h-full w-full object-contain p-0.5" />
+                        ) : (
+                          <span className="text-xs font-bold">{e.nom[0]}</span>
+                        )}
+                      </span>
+                      <span className="text-xs sm:text-sm font-semibold text-white/95 truncate max-w-[10rem] sm:max-w-none">{e.nom}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex flex-wrap gap-4">
-                  <Link to="/inscription" className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-300 hover:to-orange-300 text-blue-900 font-black px-8 py-4 rounded-2xl transition-all shadow-2xl hover:shadow-yellow-400/30 hover:-translate-y-0.5 text-base">
-                    Créer un compte puis préinscrire →
-                  </Link>
-                  <Link
-                    to="/demande-proforma"
-                    className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/30 font-semibold px-6 py-4 rounded-2xl transition-all backdrop-blur-sm text-base"
-                  >
-                    Facture proforma sans compte
-                  </Link>
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-stretch gap-3">
+                    <Link
+                      to="/inscription"
+                      className="group inline-flex justify-center items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-7 py-3.5 text-sm sm:text-base font-black text-slate-900 shadow-lg shadow-orange-500/25 transition-all hover:shadow-orange-400/35 hover:-translate-y-0.5"
+                    >
+                      Créer un compte
+                      <FaArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                    </Link>
+                    <Link
+                      to="/connexion"
+                      className="inline-flex justify-center items-center rounded-2xl border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/10"
+                    >
+                      Connexion
+                    </Link>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                    Sans compte : consultation des{' '}
+                    <Link to="/etablissements" className="font-semibold text-white/90 hover:text-white underline decoration-white/30 underline-offset-2">
+                      établissements
+                    </Link>
+                    {' '}et des conditions d’admission (lecture). La préinscription et la demande de facture proforma se font après{' '}
+                    <Link to="/inscription" className="font-semibold text-amber-200/95 hover:text-white underline decoration-amber-400/40 underline-offset-2">
+                      création de compte
+                    </Link>
+                    .
+                  </p>
                 </div>
               </div>
 
-              {/* Visuel hero (à la place du formulaire) */}
               <div className="slide-right">
-                <div className="rounded-3xl border border-white/30 bg-white/10 backdrop-blur-md p-4 sm:p-5 shadow-2xl">
-                  <div className="grid grid-cols-2 gap-3">
-                    <img src={HERO_IMAGES[0]} alt="BTP" className="w-full h-36 sm:h-44 object-cover rounded-2xl" loading="lazy" />
-                    <img src={HERO_IMAGES[1]} alt="Management" className="w-full h-36 sm:h-44 object-cover rounded-2xl" loading="lazy" />
-                    <img src={HERO_IMAGES[2]} alt="Santé" className="w-full h-36 sm:h-44 object-cover rounded-2xl col-span-2" loading="lazy" />
+                <div className="relative">
+                  <div className="absolute -inset-4 rounded-[2rem] bg-gradient-to-br from-blue-500/20 via-indigo-500/10 to-amber-500/15 blur-2xl" />
+                  <div className="relative overflow-hidden rounded-[1.75rem] border border-white/20 bg-white/[0.07] p-1 shadow-2xl shadow-black/30 backdrop-blur-xl ring-1 ring-white/10">
+                    <div className="rounded-[1.4rem] bg-slate-950/40 p-4 sm:p-5">
+                      <div className="mb-4 flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/40">Aperçu plateforme</p>
+                        <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-bold text-emerald-300 ring-1 ring-emerald-400/30">
+                          En direct
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        <img src={HERO_IMAGES[0]} alt="" className="h-28 sm:h-36 w-full rounded-xl object-cover ring-1 ring-white/10" loading="lazy" />
+                        <img src={HERO_IMAGES[1]} alt="" className="h-28 sm:h-36 w-full rounded-xl object-cover ring-1 ring-white/10" loading="lazy" />
+                        <img src={HERO_IMAGES[2]} alt="" className="col-span-2 h-24 sm:h-28 w-full rounded-xl object-cover object-center ring-1 ring-white/10" loading="lazy" />
+                      </div>
+                      <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-black/25 p-3 text-center">
+                        <div>
+                          <p className="text-lg font-black text-white">3</p>
+                          <p className="text-[9px] font-medium uppercase tracking-wider text-white/45">Écoles</p>
+                        </div>
+                        <div className="border-x border-white/10">
+                          <p className="text-lg font-black text-amber-300">24/7</p>
+                          <p className="text-[9px] font-medium uppercase tracking-wider text-white/45">Accès</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-black text-emerald-300">100%</p>
+                          <p className="text-[9px] font-medium uppercase tracking-wider text-white/45">Web</p>
+                        </div>
+                      </div>
+                      <Link
+                        to="/etablissements"
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/15"
+                      >
+                        Explorer les établissements
+                        <FaArrowRight className="h-3.5 w-3.5" aria-hidden />
+                      </Link>
+                    </div>
                   </div>
-                  <Link to="/demande-proforma" className="mt-4 inline-flex w-full justify-center items-center gap-2 bg-white text-blue-800 font-bold py-3 rounded-xl hover:bg-blue-50 transition-all">
-                    Accéder au formulaire de facture proforma →
-                  </Link>
                 </div>
               </div>
             </div>
+
+            <a
+              href="#avantages"
+              className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-white/40 hover:text-white/70 transition-colors"
+            >
+              Découvrir
+              <FaChevronDown className="h-3 w-3 animate-bounce" aria-hidden />
+            </a>
           </div>
 
-          {/* Vague en bas */}
-          <div className="absolute bottom-0 left-0 right-0">
-            <svg viewBox="0 0 1440 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
-              <path d="M0 60L60 50C120 40 240 20 360 15C480 10 600 20 720 25C840 30 960 30 1080 25C1200 20 1320 10 1380 5L1440 0V60H0Z" fill="white"/>
+          <div className="absolute bottom-0 left-0 right-0 leading-[0]">
+            <svg viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-12 sm:h-16" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="waveGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#f8fafc" />
+                  <stop offset="100%" stopColor="#f1f5f9" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M0 80V40C180 10 360 0 540 18C720 36 900 72 1080 68C1260 64 1380 28 1440 12V80H0Z"
+                fill="url(#waveGrad)"
+              />
             </svg>
           </div>
         </section>
 
-        {/* ══ STATS ══════════════════════════════════════════════════════════ */}
-        <section className="py-16 px-4 relative overflow-hidden" style={{ background: `linear-gradient(90deg, ${palette.prim}, ${palette.sec})` }}>
-          <div className="absolute inset-0 opacity-10">
-            <div className="float-1 absolute top-0 left-1/4 w-64 h-64 bg-white rounded-full -translate-y-1/2 blur-3xl" />
-            <div className="float-2 absolute bottom-0 right-1/4 w-64 h-64 bg-white rounded-full translate-y-1/2 blur-3xl" />
-          </div>
-          <div className="relative max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
-            {STATS.map((s, i) => <AnimatedStat key={i} {...s} delay={i * 100} />)}
+        {/* ─── AVANTAGES ─── */}
+        <section id="avantages" className="relative scroll-mt-20 -mt-1 bg-slate-50 px-4 py-16 sm:py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="mx-auto mb-12 max-w-2xl text-center">
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Pourquoi UniPortail</p>
+              <h2 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Pensé pour les candidats et les écoles</h2>
+              <p className="mt-3 text-slate-600 sm:text-lg">
+                Compte candidat, puis préinscription ou facture proforma : tout est centralisé, sans confondre les étapes.
+              </p>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {FEATURES.map((f, i) => (
+                <div
+                  key={f.title}
+                  className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm transition-all duration-300 hover:border-slate-300 hover:shadow-xl"
+                  style={{ animationDelay: `${i * 80}ms` }}
+                >
+                  <div
+                    className={`absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br ${f.accent} opacity-80 blur-2xl transition-opacity group-hover:opacity-100`}
+                  />
+                  <div className="relative">
+                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-amber-400 shadow-lg shadow-slate-900/20">
+                      <f.icon className="h-5 w-5" aria-hidden />
+                    </div>
+                    <h3 className="text-lg font-black text-slate-900">{f.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{f.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
-        {/* ══ ÉTABLISSEMENTS ════════════════════════════════════════════════ */}
+        {/* ─── PARCOURS ─── */}
+        <section className="border-y border-slate-200/80 bg-white px-4 py-14 sm:py-16 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-10 text-center">
+              <h2 className="text-2xl font-black text-slate-900 sm:text-3xl">Votre parcours en quatre temps</h2>
+              <p className="mt-2 text-slate-500">Compte d’abord, puis préinscription ou facture proforma — jusqu’au suivi de vos demandes.</p>
+            </div>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {PARCOURS.map((p, i) => (
+                <div key={p.step} className="relative">
+                  {i < PARCOURS.length - 1 && (
+                    <div
+                      className="absolute left-[calc(50%+2.5rem)] top-10 hidden h-px w-[calc(100%-1.25rem)] bg-gradient-to-r from-blue-200 to-transparent lg:block"
+                      aria-hidden
+                    />
+                  )}
+                  <div className="relative rounded-2xl border border-slate-100 bg-gradient-to-b from-slate-50 to-white p-5 text-center shadow-sm ring-1 ring-slate-100">
+                    <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-sm font-black text-white shadow-md">
+                      {p.step}
+                    </span>
+                    <h3 className="font-bold text-slate-900">{p.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{p.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── STATS ─── */}
+        <section
+          className="relative overflow-hidden px-4 py-14 sm:py-16 sm:px-6 lg:px-8"
+          style={{ background: `linear-gradient(125deg, ${palette.tri} 0%, ${palette.prim} 48%, ${palette.sec} 100%)` }}
+        >
+          <div className="absolute inset-0 opacity-25">
+            <div className="float-1 absolute -left-20 top-0 h-72 w-72 rounded-full bg-white blur-3xl" />
+            <div className="float-2 absolute -right-10 bottom-0 h-80 w-80 rounded-full bg-cyan-300 blur-3xl" />
+          </div>
+          <div className="relative mx-auto max-w-5xl">
+            <p className="mb-8 text-center text-xs font-bold uppercase tracking-[0.25em] text-white/70">Chiffres clés</p>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
+              {STATS.map((s, i) => (
+                <AnimatedStat key={i} {...s} delay={i * 90} />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── ÉTABLISSEMENTS ─── */}
         {etablissements.length > 0 && (
-          <section className="py-20 px-4 etab-tint">
-            <div className="max-w-7xl mx-auto">
-              <div className="text-center mb-12">
-                <p className="text-blue-600 font-bold text-sm uppercase tracking-widest mb-2">Nos Partenaires</p>
-                <h2 className="text-4xl font-black text-gray-900 mb-3">Nos établissements</h2>
-                <p className="text-gray-500 text-lg max-w-xl mx-auto">Chaque établissement publie ses formations sur la plateforme : créez votre compte rattaché à l’établissement souhaité pour postuler.</p>
+          <section id="etablissements" className="etab-tint scroll-mt-20 px-4 py-16 sm:py-20 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl">
+              <div className="mb-10 flex flex-col items-start justify-between gap-6 sm:mb-12 md:flex-row md:items-end">
+                <div className="max-w-2xl">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Réseau partenaire</p>
+                  <h2 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Nos établissements</h2>
+                  <p className="mt-3 text-slate-600 sm:text-lg">
+                    Chaque école publie ses formations sur la plateforme. Choisissez votre établissement pour préinscrire ou consulter le catalogue public.
+                  </p>
+                </div>
+                <Link
+                  to="/etablissements"
+                  className="group inline-flex shrink-0 items-center gap-2 rounded-2xl border-2 border-slate-900 bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-slate-800 hover:shadow-xl"
+                >
+                  Voir la page complète
+                  <FaArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                </Link>
               </div>
 
-              <div className={`grid gap-6 ${etablissements.length === 1 ? 'grid-cols-1 max-w-md mx-auto' : etablissements.length === 2 ? 'md:grid-cols-2 max-w-2xl mx-auto' : 'md:grid-cols-2 xl:grid-cols-3'}`}>
+              <div
+                className={`grid gap-5 sm:gap-6 ${
+                  etablissements.length === 1
+                    ? 'mx-auto max-w-md grid-cols-1'
+                    : etablissements.length === 2
+                      ? 'mx-auto max-w-4xl md:grid-cols-2'
+                      : 'md:grid-cols-2 xl:grid-cols-3'
+                }`}
+              >
                 {etablissements.map((e, i) => {
                   const typeStyle = TYPE_ETAB_COLORS[e.type] || TYPE_ETAB_COLORS.gestion
                   const brandKey = detectBrand(e.nom)
@@ -328,45 +569,57 @@ export default function Landing() {
                   const cardSec = brand?.sec || e.couleur_secondaire || '#3b82f6'
                   const domainLabel = e.type === 'sante' ? 'Santé' : e.type === 'btp' ? 'BTP / Génie Civil' : 'Commerce / Gestion'
                   return (
-                    <div key={e.id} className={`card-hover bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm fade-up`} style={{ animationDelay: `${i * 150}ms` }}>
-                      {/* Bannière couleur */}
-                      <div className="h-24 relative flex items-end pb-0 overflow-hidden" style={{ background: `linear-gradient(135deg, ${cardPrim}, ${cardSec})` }}>
-                        <div className="float-1 absolute top-2 right-4 w-14 h-14 bg-white/15 rounded-full" />
-                        <div className="float-2 absolute top-4 right-14 w-7 h-7 bg-white/15 rounded-full" />
-                        <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-black/10 to-transparent" />
+                    <div
+                      key={e.id}
+                      className="card-hover fade-up overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-md"
+                      style={{ animationDelay: `${i * 100}ms` }}
+                    >
+                      <div className="relative h-24 overflow-hidden" style={{ background: `linear-gradient(135deg, ${cardPrim}, ${cardSec})` }}>
+                        <div className="float-1 absolute right-6 top-3 h-14 w-14 rounded-full bg-white/15 blur-sm" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
                       </div>
-
-                      <div className="px-6 pb-6 -mt-10 relative">
-                        {/* Logo */}
-                        <div className="w-20 h-20 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-white flex items-center justify-center mb-4">
-                          {e.logo_url
-                            ? <img src={e.logo_url} alt={e.nom} className="w-full h-full object-contain p-1.5" />
-                            : <span className="text-2xl font-black" style={{ color: e.couleur_primaire || '#1e40af' }}>{e.nom[0]}</span>}
-                        </div>
-
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="font-black text-gray-900 text-xl leading-tight tracking-tight">{e.nom}</h3>
-                            <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${typeStyle.bg} ${typeStyle.text} border ${typeStyle.border}`}>
-                              {typeStyle.icon} {domainLabel}
+                      <div className="relative -mt-10 px-5 pb-6">
+                        <div className="mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-lg">
+                          {e.logo_url ? (
+                            <img src={e.logo_url} alt={e.nom} className="h-full w-full object-contain p-1" />
+                          ) : (
+                            <span className="text-2xl font-black" style={{ color: e.couleur_primaire || '#1e40af' }}>
+                              {e.nom[0]}
                             </span>
-                          </div>
+                          )}
                         </div>
-
-                        {e.description && <p className="text-sm text-gray-500 mb-4 line-clamp-2">{e.description}</p>}
-
-                        <div className="space-y-1 text-xs text-gray-500 mb-4">
-                          {e.adresse && <p className="flex items-center gap-1">📍 {e.adresse}</p>}
-                          {e.telephone && <p className="flex items-center gap-1">📞 {e.telephone}</p>}
-                        </div>
-
-                        <Link
-                          to="/demande-proforma"
-                          className="block w-full text-center py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 hover:shadow-md"
-                          style={{ background: `linear-gradient(135deg, ${cardPrim}, ${cardSec})` }}
+                        <h3 className="text-lg font-black leading-tight tracking-tight text-slate-900">{e.nom}</h3>
+                        <span
+                          className={`mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold ${typeStyle.bg} ${typeStyle.text} ${typeStyle.border}`}
                         >
-                          Demander une facture proforma →
-                        </Link>
+                          {typeStyle.icon} {domainLabel}
+                        </span>
+                        {e.description && <p className="mt-3 line-clamp-2 text-sm text-slate-600">{e.description}</p>}
+                        <div className="mt-3 space-y-1 text-xs text-slate-500">
+                          {e.adresse && <p>📍 {e.adresse}</p>}
+                          {e.telephone && <p>📞 {e.telephone}</p>}
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 gap-2">
+                          <Link
+                            to={`/etablissement/${e.id}`}
+                            className="block w-full rounded-xl py-2.5 text-center text-sm font-bold text-white transition-all hover:opacity-95"
+                            style={{ background: `linear-gradient(135deg, ${cardPrim}, ${cardSec})` }}
+                          >
+                            Filières &amp; formations →
+                          </Link>
+                          <Link
+                            to={`/inscription?etablissement_id=${e.id}`}
+                            className="block w-full rounded-xl border-2 border-slate-200 bg-white py-2 text-center text-xs font-semibold text-slate-800 hover:border-slate-300"
+                          >
+                            S’inscrire — cet établissement
+                          </Link>
+                          <Link
+                            to={`/demande-proforma?etablissement_id=${e.id}&tab=conditions`}
+                            className="block w-full rounded-xl border border-slate-200 bg-slate-50 py-2 text-center text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            Facture proforma (compte requis)
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   )
@@ -376,53 +629,64 @@ export default function Landing() {
           </section>
         )}
 
-        {/* ══ CTA FINAL ════════════════════════════════════════════════════ */}
-        <section className="py-24 px-4 relative overflow-hidden text-white" style={{ background: `linear-gradient(135deg, ${palette.tri}, ${palette.prim}, ${palette.sec})` }}>
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="float-1 glow-orb absolute top-0 left-1/4 w-64 h-64 bg-blue-400 rounded-full opacity-20 blur-3xl" />
-            <div className="float-2 glow-orb absolute bottom-0 right-1/4 w-64 h-64 bg-indigo-400 rounded-full opacity-20 blur-3xl" />
+        {/* ─── CTA ─── */}
+        <section
+          className="relative overflow-hidden px-4 py-16 text-white sm:py-20 sm:px-6 lg:px-8"
+          style={{ background: `linear-gradient(135deg, #020617 0%, ${palette.tri} 35%, ${palette.prim} 70%, ${palette.sec} 100%)` }}
+        >
+          <div className="absolute inset-0 opacity-30">
+            <div className="float-1 glow-orb absolute left-1/4 top-0 h-64 w-64 rounded-full bg-amber-400 blur-3xl" />
+            <div className="float-2 absolute bottom-0 right-1/4 h-72 w-72 rounded-full bg-indigo-500 blur-3xl opacity-50" />
           </div>
-          <div className="relative max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 px-4 py-2 rounded-full text-sm font-medium mb-6">
-              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" /> Candidatures ouvertes
+          <div className="relative mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-16">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                Candidatures ouvertes
+              </div>
+              <h2 className="text-3xl font-black leading-tight sm:text-4xl lg:text-[2.6rem]">
+                Prêt à écrire{' '}
+                <span className="bg-gradient-to-r from-amber-300 to-orange-300 bg-clip-text text-transparent">votre avenir</span> ?
+              </h2>
+              <p className="mt-4 max-w-lg text-base leading-relaxed text-blue-100/90">
+                Inscription gratuite, interface claire et accompagnement jusqu’à la validation de votre dossier.
+              </p>
             </div>
-            <h2 className="text-5xl font-black mb-4 leading-tight">
-              Prêt à écrire<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">votre avenir ?</span>
-            </h2>
-            <p className="text-blue-100 text-xl mb-10 max-w-xl mx-auto">
-              Rejoignez des milliers d'étudiants qui ont choisi l'excellence. Inscription gratuite, réponse rapide.
-            </p>
-            <div className="flex flex-wrap gap-4 justify-center">
-              <Link to="/inscription" className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-300 hover:to-orange-300 text-blue-900 font-black px-10 py-4 rounded-2xl text-lg transition-all shadow-2xl hover:-translate-y-0.5">
-                Créer mon compte gratuitement →
+            <div className="flex flex-col gap-3 sm:flex-row lg:flex-col lg:items-stretch">
+              <Link
+                to="/inscription"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-8 py-4 text-center text-base font-black text-slate-900 shadow-xl shadow-orange-500/20 transition-transform hover:-translate-y-0.5"
+              >
+                Créer mon compte gratuitement
+                <FaArrowRight className="h-4 w-4" aria-hidden />
               </Link>
-              <Link to="/connexion" className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/30 font-semibold px-8 py-4 rounded-2xl text-lg transition-all backdrop-blur-sm">
-                Se connecter
+              <Link
+                to="/connexion"
+                className="inline-flex items-center justify-center rounded-2xl border border-white/30 bg-white/10 px-8 py-4 text-center text-base font-semibold backdrop-blur-sm transition-colors hover:bg-white/15"
+              >
+                J’ai déjà un compte
               </Link>
             </div>
           </div>
         </section>
 
-        {/* ══ FOOTER ═══════════════════════════════════════════════════════ */}
-        <footer className="bg-gray-950 text-gray-400 py-12 sm:py-16 px-4 sm:px-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 gap-10 lg:gap-12 lg:grid-cols-12 mb-10 lg:mb-12">
+        {/* ─── FOOTER ─── */}
+        <footer className="bg-[#0a0f1a] px-4 py-12 text-gray-400 sm:px-6 sm:py-14 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="mb-10 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
               <div className="lg:col-span-3">
-                <div className="text-white font-black text-xl mb-3 tracking-tight">UniPréinscription</div>
-                <p className="text-sm text-gray-500 leading-relaxed max-w-xs">
+                <div className="mb-3 text-xl font-black tracking-tight text-white">UniPréinscription</div>
+                <p className="max-w-xs text-sm leading-relaxed text-slate-500">
                   Plateforme officielle multi-établissements de préinscription universitaire au Sénégal.
                 </p>
               </div>
 
               <div className="lg:col-span-6">
-                <h2 className="text-white font-bold mb-4 sm:mb-5 text-xs uppercase tracking-[0.14em]">
-                  Établissements &amp; coordonnées
-                </h2>
+                <h2 className="mb-4 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Établissements &amp; coordonnées</h2>
                 {etablissements.length === 0 ? (
-                  <p className="text-sm text-gray-500">Aucun établissement partenaire pour le moment.</p>
+                  <p className="text-sm text-slate-600">Aucun établissement partenaire pour le moment.</p>
                 ) : (
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 list-none p-0 m-0">
+                  <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3">
                     {etablissements.map((e) => {
                       const telRaw = e.telephone && String(e.telephone).trim()
                       const phones = telRaw ? splitPhoneNumbers(telRaw) : []
@@ -431,20 +695,20 @@ export default function Landing() {
                       const siteHref = siteWebHref(site)
                       const hasContact = phones.length > 0 || mail || siteHref
                       return (
-                        <li key={e.id} className="h-full min-w-0">
-                          <article className="h-full flex flex-col rounded-2xl border border-gray-800/90 bg-gradient-to-b from-gray-900/80 to-gray-950/90 px-4 py-4 shadow-lg shadow-black/20 ring-1 ring-white/5">
-                            <h3 className="font-semibold text-gray-100 text-[15px] leading-snug mb-3 border-b border-gray-800/80 pb-2.5">
+                        <li key={e.id} className="min-w-0">
+                          <article className="flex h-full flex-col rounded-2xl border border-white/10 bg-gradient-to-b from-slate-900/90 to-slate-950 px-4 py-4 shadow-lg ring-1 ring-white/5">
+                            <h3 className="mb-3 border-b border-white/10 pb-2.5 text-[15px] font-semibold leading-snug text-slate-100">
                               {e.nom}
                             </h3>
                             {hasContact ? (
-                              <div className="space-y-2.5 text-[13px] leading-snug flex-1">
+                              <div className="flex-1 space-y-2.5 text-[13px] leading-snug">
                                 {phones.length > 0 && (
                                   <div className="space-y-1.5">
                                     {phones.map((num, idx) => (
                                       <a
                                         key={`${e.id}-tel-${idx}`}
                                         href={telHref(num)}
-                                        className="group flex items-start gap-2.5 text-gray-400 hover:text-white transition-colors"
+                                        className="group flex items-start gap-2.5 text-slate-400 transition-colors hover:text-white"
                                       >
                                         <FaPhone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400/90 group-hover:text-rose-300" aria-hidden />
                                         <span className="break-words">{num}</span>
@@ -455,7 +719,7 @@ export default function Landing() {
                                 {mail && (
                                   <a
                                     href={`mailto:${mail}`}
-                                    className="group flex items-start gap-2.5 text-gray-400 hover:text-white transition-colors break-all"
+                                    className="group flex items-start gap-2.5 break-all text-slate-400 transition-colors hover:text-white"
                                   >
                                     <FaEnvelope className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-400/90 group-hover:text-sky-300" aria-hidden />
                                     <span>{mail}</span>
@@ -466,7 +730,7 @@ export default function Landing() {
                                     href={siteHref}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="group flex items-start gap-2.5 text-gray-400 hover:text-white transition-colors break-all"
+                                    className="group flex items-start gap-2.5 break-all text-slate-400 transition-colors hover:text-white"
                                   >
                                     <FaGlobe className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-400/90 group-hover:text-cyan-300" aria-hidden />
                                     <span>{site || siteHref.replace(/^https?:\/\//i, '')}</span>
@@ -474,7 +738,7 @@ export default function Landing() {
                                 )}
                               </div>
                             ) : (
-                              <p className="text-xs text-gray-600 italic flex-1">Coordonnées à compléter côté administration.</p>
+                              <p className="flex-1 text-xs italic text-slate-600">Coordonnées à compléter côté administration.</p>
                             )}
                           </article>
                         </li>
@@ -485,43 +749,46 @@ export default function Landing() {
               </div>
 
               <nav className="lg:col-span-3" aria-label="Liens utiles">
-                <h2 className="text-white font-bold mb-4 sm:mb-5 text-xs uppercase tracking-[0.14em]">Liens utiles</h2>
+                <h2 className="mb-4 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Liens utiles</h2>
                 <ul className="space-y-2.5 text-sm">
                   <li>
-                    <Link to="/inscription" className="text-gray-400 hover:text-white transition-colors inline-block py-0.5 border-b border-transparent hover:border-gray-600">
+                    <Link to="/etablissements" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
+                      Tous les établissements
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/inscription" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
                       Créer un compte
                     </Link>
                   </li>
                   <li>
-                    <Link to="/connexion" className="text-gray-400 hover:text-white transition-colors inline-block py-0.5 border-b border-transparent hover:border-gray-600">
+                    <Link to="/connexion" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
                       Connexion
                     </Link>
                   </li>
                   <li>
-                    <Link to="/demande-proforma" className="text-gray-400 hover:text-white transition-colors inline-block py-0.5 border-b border-transparent hover:border-gray-600">
-                      Facture proforma (sans compte)
+                    <Link to="/demande-proforma" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
+                      Facture proforma (compte requis)
                     </Link>
                   </li>
                 </ul>
               </nav>
             </div>
 
-            <div className="border-t border-gray-800/90 pt-6 sm:pt-8 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-4 sm:gap-6">
-              <p className="text-xs text-gray-600 order-2 sm:order-1">
-                © {new Date().getFullYear()} UniPréinscription. Tous droits réservés.
-              </p>
+            <div className="flex flex-col flex-wrap items-start justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row sm:items-center">
+              <p className="order-2 text-xs text-slate-600 sm:order-1">© {new Date().getFullYear()} UniPréinscription. Tous droits réservés.</p>
               {etablissements.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2.5 order-1 sm:order-2" aria-label="Logos des établissements partenaires">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-600 hidden sm:inline mr-1">Partenaires</span>
+                <div className="order-1 flex flex-wrap items-center gap-2.5 sm:order-2" aria-label="Logos des établissements partenaires">
+                  <span className="mr-1 hidden text-[10px] uppercase tracking-wider text-slate-600 sm:inline">Partenaires</span>
                   {etablissements.map((e) => (
                     <div
                       key={e.id}
-                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-700/90 overflow-hidden flex items-center justify-center shadow-inner"
+                      className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/15 shadow-inner sm:h-10 sm:w-10"
                       style={{ background: `${e.couleur_primaire || '#4b5563'}26` }}
                       title={e.nom}
                     >
                       {e.logo_url ? (
-                        <img src={e.logo_url} alt="" className="w-full h-full object-contain p-0.5" />
+                        <img src={e.logo_url} alt="" className="h-full w-full object-contain p-0.5" />
                       ) : (
                         <span className="text-[11px] font-bold" style={{ color: e.couleur_primaire || '#9ca3af' }}>
                           {String(e.nom || '?')[0]}
@@ -542,70 +809,77 @@ export default function Landing() {
           onClick={() => {
             setGuideStep(0)
             setShowGuide(true)
-            navigate('/?guide=1', { replace: true })
+            navigate('/?guide=1')
           }}
-          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-xl px-4 py-3 text-sm font-bold transition-all hover:-translate-y-0.5"
+          className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full border border-white/20 bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-2xl shadow-blue-900/40 transition-all hover:-translate-y-0.5 hover:from-blue-500 hover:to-indigo-500"
           title="Ouvrir le guide d'utilisation"
         >
-          ✨ Guide
+          <span aria-hidden>✨</span> Guide
         </button>
       )}
 
       {showGuide && (
-        <div className="fixed inset-0 z-50 bg-black/45 flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
-            <div className="px-5 py-4 bg-gradient-to-r from-blue-700 to-cyan-600 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl">
+            <div className="flex items-center justify-between bg-gradient-to-r from-blue-800 via-blue-700 to-cyan-600 px-5 py-4 text-white">
               <div>
-                <p className="text-xl font-black">Guide d'utilisation</p>
-                <p className="text-sm text-blue-100">Visiteur — étape {safeStep + 1} sur {guideTotal}</p>
+                <p className="text-xl font-black">Guide d&apos;utilisation</p>
+                <p className="text-sm text-blue-100">
+                  Visiteur — étape {safeStep + 1} sur {guideTotal}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => {
                   setShowGuide(false)
-                  navigate('/', { replace: true })
+                  navigate({ pathname: location.pathname, search: '' }, { replace: true })
                 }}
-                className="text-white/90 hover:text-white text-2xl leading-none"
+                title="Fermer"
+                className="text-2xl leading-none text-white/90 hover:text-white"
               >
                 ×
               </button>
             </div>
             <div className="p-5">
-              <div className="flex gap-1.5 mb-4">
+              <div className="mb-4 flex gap-1.5">
                 {publicGuide.map((_, i) => (
-                  <div key={i} className={`h-2 rounded-full flex-1 ${i <= guideStep ? 'bg-cyan-500' : 'bg-gray-200'}`} />
+                  <div key={i} className={`h-2 flex-1 rounded-full ${i <= guideStep ? 'bg-cyan-500' : 'bg-slate-200'}`} />
                 ))}
               </div>
-              <h3 className="text-3xl font-black text-gray-900 leading-tight">{currentGuide.title}</h3>
-              <p className="text-gray-500 mt-1 mb-4">{currentGuide.subtitle}</p>
-              <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 space-y-3">
+              <h3 className="text-3xl font-black leading-tight text-slate-900">{currentGuide.title}</h3>
+              <p className="mt-1 mb-4 text-slate-500">{currentGuide.subtitle}</p>
+              <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
                 {currentGuide.points.map((p, i) => (
                   <div key={i} className="flex items-start gap-3">
-                    <span className="w-7 h-7 shrink-0 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">{i + 1}</span>
-                    <p className="text-gray-700">{p}</p>
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <p className="text-slate-700">{p}</p>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between">
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-4">
               <button
                 type="button"
                 onClick={() => setGuideStep((s) => Math.max(0, s - 1))}
                 disabled={safeStep === 0}
-                className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 font-semibold disabled:opacity-40"
+                className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 disabled:opacity-40"
               >
                 ← Précédent
               </button>
-              <div className="text-xs text-gray-500">Étape {safeStep + 1}/{guideTotal}</div>
+              <div className="text-xs text-slate-500">
+                Étape {safeStep + 1}/{guideTotal}
+              </div>
               <button
                 type="button"
                 onClick={() => {
                   if (safeStep >= guideTotal - 1) {
                     setShowGuide(false)
-                    navigate('/', { replace: true })
+                    navigate({ pathname: location.pathname, search: '' }, { replace: true })
                   } else setGuideStep((s) => s + 1)
                 }}
-                className="px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700"
+                className="rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
               >
                 {safeStep >= guideTotal - 1 ? 'Terminer' : 'Suivant →'}
               </button>

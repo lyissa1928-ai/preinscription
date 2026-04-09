@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
+import { useAuth } from '../../context/AuthContext'
+import TabConditionsAdmissionEtab from '../../components/TabConditionsAdmissionEtab'
 import StatutBadge from '../../components/StatutBadge'
 import {
   DashboardPage,
@@ -13,11 +15,16 @@ import {
 const ONGLETS = [
   { key: 'fad',        label: '🌐 FAD (En ligne)',    type: 'fad' },
   { key: 'presentiel', label: '🏫 Présentiel',        type: 'presentiel' },
-  { key: 'demandes',   label: '🧾 Demandes proforma', type: null }
+  { key: 'demandes',   label: '🧾 Demandes proforma', type: null },
+  { key: 'conditions', label: '📋 Conditions d’admission', type: null },
 ]
 
 export default function ResponsableDashboard() {
-  const [onglet, setOnglet]         = useState('fad')
+  const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [onglet, setOnglet]         = useState(() =>
+    searchParams.get('tab') === 'conditions' ? 'conditions' : 'fad',
+  )
   const [stats, setStats]           = useState(null)
   const [dossiers, setDossiers]     = useState([])
   const [demandes, setDemandes]     = useState([])
@@ -27,6 +34,11 @@ export default function ResponsableDashboard() {
   const [page, setPage]             = useState(1)
   const [loading, setLoading]       = useState(true)
 
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t === 'conditions') setOnglet('conditions')
+  }, [searchParams])
+
   // Stats
   useEffect(() => {
     axios.get('/api/responsable/statistiques').then(({ data }) => setStats(data)).catch(() => {})
@@ -34,7 +46,7 @@ export default function ResponsableDashboard() {
 
   // Dossiers FAD / Présentiel
   useEffect(() => {
-    if (onglet === 'demandes') return
+    if (onglet === 'demandes' || onglet === 'conditions') return
     setLoading(true)
     const params = new URLSearchParams({ page, limit: 12, type: onglet })
     if (filtreStatut) params.append('statut', filtreStatut)
@@ -56,7 +68,15 @@ export default function ResponsableDashboard() {
   }, [onglet])
 
   const handleOnglet = (key) => {
-    setOnglet(key); setPage(1); setSearch(''); setFiltreStatut('')
+    setOnglet(key)
+    setPage(1)
+    setSearch('')
+    setFiltreStatut('')
+    if (key === 'conditions') {
+      setSearchParams({ tab: 'conditions' }, { replace: true })
+    } else {
+      setSearchParams({}, { replace: true })
+    }
   }
 
   const marquerVue = (id) => {
@@ -70,7 +90,7 @@ export default function ResponsableDashboard() {
       <DashboardHero
         eyebrow="Pédagogie"
         title="Espace responsable"
-        subtitle="Traitement des dossiers FAD, présentiel et demandes de facture proforma."
+        subtitle="Dossiers FAD / présentiel, demandes proforma, et publication des conditions d’admission visibles par les candidats."
       />
 
       {stats && (
@@ -108,7 +128,7 @@ export default function ResponsableDashboard() {
         ))}
       </div>
 
-        {onglet !== 'demandes' && (
+        {onglet !== 'demandes' && onglet !== 'conditions' && (
           <Panel title={onglet === 'fad' ? 'Dossiers — formation à distance (FAD)' : 'Dossiers — présentiel'} bodyClassName="p-6">
             <div className="mb-6 flex flex-col gap-3 sm:flex-row">
               <div className="flex-1 relative">
@@ -198,6 +218,37 @@ export default function ResponsableDashboard() {
           </Panel>
         )}
 
+        {onglet === 'conditions' && (
+          <Panel
+            title="Conditions d’admission (candidats)"
+            meta={
+              <Link
+                to="/responsable/gestion-etablissement"
+                className="text-sm font-semibold text-blue-700 hover:underline"
+              >
+                Gestion avancée (filières) →
+              </Link>
+            }
+            bodyClassName="p-6"
+          >
+            <p className="mb-6 text-sm text-slate-600">
+              Ajoutez <strong>plusieurs blocs</strong> de conditions (par thème ou niveau), modifiez ou supprimez-les. Le
+              champ de saisie d’un <strong>nouveau</strong> bloc est vidé après chaque ajout validé. Affichage sur la page
+              « Demande de facture proforma » après choix de votre établissement.
+            </p>
+            {user?.etablissement_id ? (
+              <TabConditionsAdmissionEtab
+                etabId={user.etablissement_id}
+                etabNom={user.etablissement_nom}
+              />
+            ) : (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Aucun établissement n’est rattaché à votre compte. Contactez l’administrateur.
+              </p>
+            )}
+          </Panel>
+        )}
+
         {onglet === 'demandes' && (
           <Panel
             title="Demandes de facture proforma"
@@ -208,7 +259,7 @@ export default function ResponsableDashboard() {
             }
             bodyClassName="p-6"
           >
-            <p className="mb-5 text-sm text-slate-500">Soumises par des visiteurs sans compte.</p>
+            <p className="mb-5 text-sm text-slate-500">Déposées par les candidats (compte + justificatifs) ; validation pédagogique requise.</p>
 
             {loading ? (
               <DashboardSpinner />
@@ -222,14 +273,14 @@ export default function ResponsableDashboard() {
                 {demandes.map((d) => (
                   <div
                     key={d.id}
-                    role={d.statut === 'nouvelle' ? 'button' : undefined}
-                    tabIndex={d.statut === 'nouvelle' ? 0 : undefined}
+                    role={d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'button' : undefined}
+                    tabIndex={d.statut === 'nouvelle' || d.statut === 'en_attente' ? 0 : undefined}
                     className={`rounded-2xl border p-4 transition-all ${
-                      d.statut === 'nouvelle' ? 'border-amber-300/80 bg-gradient-to-br from-amber-50 to-orange-50/50 shadow-md shadow-amber-100/50' : 'border-slate-100 bg-white shadow-sm'
-                    } ${d.statut === 'nouvelle' ? 'cursor-pointer hover:border-amber-400' : ''}`}
-                    onClick={() => d.statut === 'nouvelle' && marquerVue(d.id)}
+                      d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'border-amber-300/80 bg-gradient-to-br from-amber-50 to-orange-50/50 shadow-md shadow-amber-100/50' : 'border-slate-100 bg-white shadow-sm'
+                    } ${d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'cursor-pointer hover:border-amber-400' : ''}`}
+                    onClick={() => (d.statut === 'nouvelle' || d.statut === 'en_attente') && marquerVue(d.id)}
                     onKeyDown={(e) => {
-                      if (d.statut === 'nouvelle' && (e.key === 'Enter' || e.key === ' ')) {
+                      if ((d.statut === 'nouvelle' || d.statut === 'en_attente') && (e.key === 'Enter' || e.key === ' ')) {
                         e.preventDefault()
                         marquerVue(d.id)
                       }
@@ -239,7 +290,7 @@ export default function ResponsableDashboard() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-bold text-gray-900">{d.prenom} {d.nom}</span>
-                          {d.statut === 'nouvelle' && (
+                          {(d.statut === 'nouvelle' || d.statut === 'en_attente') && (
                             <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">NOUVEAU</span>
                           )}
                           <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${d.type_formation === 'en_ligne' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -257,11 +308,11 @@ export default function ResponsableDashboard() {
                       <div className="text-right flex-shrink-0">
                         <div className="font-mono text-xs text-gray-400">{d.reference}</div>
                         <span className={`inline-block mt-1 text-xs px-2 py-1 rounded-full font-semibold ${
-                          d.statut === 'nouvelle' ? 'bg-amber-100 text-amber-700'
+                          d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'bg-amber-100 text-amber-700'
                           : d.statut === 'vue' ? 'bg-blue-100 text-blue-700'
                           : 'bg-gray-100 text-gray-500'
                         }`}>
-                          {d.statut === 'nouvelle' ? 'Nouvelle' : d.statut === 'vue' ? 'Vue' : 'Traitée'}
+                          {d.statut === 'en_attente' ? 'En attente' : d.statut === 'nouvelle' ? 'Nouvelle' : d.statut === 'vue' ? 'Vue' : 'Traitée'}
                         </span>
                       </div>
                     </div>

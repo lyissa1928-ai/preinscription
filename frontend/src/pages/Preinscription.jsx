@@ -20,6 +20,8 @@ import PreinscriptionConditionsBlock from '../components/PreinscriptionCondition
 import { NATIONALITES_SUGGESTIONS_FR } from '../data/nationalites'
 import {
   normalizePreinscriptionNiveau,
+  normalizeNombrePhotosPreinscription,
+  photoSlotKeysForCount,
   getRequiredFileFieldKeys,
   getOptionalCarteScolaireFieldKeys,
   DOC_FIELD_LABELS,
@@ -72,6 +74,67 @@ function eligibiliteSantePourFormation(formation, etablissementId, dernierDiplom
       condition_acces: formation.filiere_condition_acces,
     },
     dernierDiplome,
+  )
+}
+
+/** Une photo d’identité (emplacement photo_1 … photo_n) : aperçu + JPG/PNG uniquement (aligné sur l’API). */
+function PhotoIdentityFileInput({ field, label, files, upFile }) {
+  const file = files[field]
+  const [preview, setPreview] = useState(null)
+  useEffect(() => {
+    if (!file) {
+      setPreview(null)
+      return undefined
+    }
+    const u = URL.createObjectURL(file)
+    setPreview(u)
+    return () => URL.revokeObjectURL(u)
+  }, [file])
+
+  const inputId = `prein-${field}`
+
+  return (
+    <div className="rounded-xl border border-indigo-200/90 bg-gradient-to-br from-indigo-50/50 via-white to-violet-50/30 p-4 shadow-sm">
+      <p className="mb-3 text-sm font-bold text-slate-900">{label}</p>
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <p className="text-xs leading-relaxed text-slate-600">
+          JPG ou PNG, max. 2 Mo. La photo n°1 sera utilisée sur la lettre et l’attestation si la candidature est acceptée.
+        </p>
+        {preview && (
+          <div className="mx-auto shrink-0 overflow-hidden rounded-xl border-2 border-white shadow-md ring-2 ring-indigo-200/80 sm:mx-0">
+            <img src={preview} alt="" className="h-28 w-24 object-cover sm:h-32 sm:w-28" />
+          </div>
+        )}
+      </div>
+      <label
+        htmlFor={inputId}
+        className={`flex min-h-[6.5rem] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-3 py-3 transition-all ${
+          file ? 'border-emerald-400 bg-emerald-50/60' : 'border-slate-300 bg-white/50 hover:border-indigo-400 hover:bg-indigo-50/40'
+        }`}
+      >
+        <input
+          type="file"
+          id={inputId}
+          accept="image/jpeg,image/png,image/jpg"
+          className="hidden"
+          onChange={upFile(field)}
+        />
+        {file ? (
+          <div className="text-center">
+            <div className="mb-1 text-xl font-bold text-emerald-600" aria-hidden>
+              ✓
+            </div>
+            <p className="break-all text-xs font-semibold text-emerald-800">{file.name}</p>
+            <p className="mt-1 text-[11px] text-emerald-600">Cliquer pour remplacer</p>
+          </div>
+        ) : (
+          <div className="text-center">
+            <p className="text-xs font-semibold text-slate-600">Choisir une image</p>
+            <p className="mt-1 text-[11px] text-slate-500">JPG, PNG</p>
+          </div>
+        )}
+      </label>
+    </div>
   )
 }
 
@@ -212,9 +275,14 @@ export default function Preinscription() {
   }
 
   const niveauKey = formation ? normalizePreinscriptionNiveau(formation.niveau) : 'generic'
+  const nombrePhotosFormation = formation
+    ? normalizeNombrePhotosPreinscription(formation.nombre_photos_preinscription)
+    : 1
+  const photoSlots = photoSlotKeysForCount(nombrePhotosFormation)
   const { required: reqFileKeys, oneOf: oneOfFileGroups } = getRequiredFileFieldKeys(
     niveauKey,
     form.nationalite,
+    nombrePhotosFormation,
   )
   const optionalCarteKeys = getOptionalCarteScolaireFieldKeys(niveauKey)
 
@@ -237,6 +305,10 @@ export default function Preinscription() {
     ...optionalCarteKeys.filter((k) => !reqFileKeys.includes(k)),
   ]
 
+  const isPhotoSlot = (f) => /^photo_\d+$/.test(f)
+  const showPhotoField = photoSlots.length > 0
+  const orderedFileFieldsSansPhoto = orderedFileFields.filter((f) => !isPhotoSlot(f))
+
   const canNext = () => {
     if (step === 0) return !!form.formation_id
     if (step === 1) return form.date_naissance && form.lieu_naissance && form.nationalite && form.telephone && form.adresse
@@ -247,7 +319,7 @@ export default function Preinscription() {
   const recaptchaConfigured = Boolean(recaptchaSiteKey)
   const prodNoRecaptcha = import.meta.env.PROD && !recaptchaConfigured
   const canSubmit =
-    areRequiredFilesPresent(files, niveauKey, form.nationalite) &&
+    areRequiredFilesPresent(files, niveauKey, form.nationalite, nombrePhotosFormation) &&
     (!recaptchaConfigured || !!recaptchaToken) &&
     !prodNoRecaptcha
 
@@ -274,7 +346,7 @@ export default function Preinscription() {
     }
   }
 
-  const FileInput = ({ label, field, required }) => (
+  const FileInput = ({ label, field, required, accept = '.pdf,.jpg,.jpeg,.png' }) => (
     <div>
       <label className="label-field">
         {label}
@@ -288,7 +360,7 @@ export default function Preinscription() {
             : 'border-slate-300 bg-slate-50/80 hover:border-blue-400 hover:bg-blue-50/50'
         }`}
       >
-        <input type="file" id={field} accept=".pdf,.jpg,.jpeg,.png" onChange={upFile(field)} className="hidden" />
+        <input type="file" id={field} accept={accept} onChange={upFile(field)} className="hidden" />
         {files[field] ? (
           <div className="text-center">
             <div className="text-emerald-600 text-2xl font-bold mb-1" aria-hidden>
@@ -809,8 +881,29 @@ export default function Preinscription() {
                     </ul>
                   </div>
                 )}
+                {showPhotoField && (
+                  <div className="mb-6 space-y-4">
+                    <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 px-4 py-3 text-sm text-slate-700">
+                      <p className="font-bold text-slate-900">Photos d’identité</p>
+                      <p className="mt-1 text-xs leading-relaxed">
+                        Cette formation exige <strong>{photoSlots.length}</strong> photo(s) (réglage par formation au sein de votre établissement). Formats : JPG ou PNG, 2 Mo max chacune.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {photoSlots.map((slot) => (
+                        <PhotoIdentityFileInput
+                          key={slot}
+                          field={slot}
+                          label={DOC_FIELD_LABELS[slot] || slot}
+                          files={files}
+                          upFile={upFile}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="grid sm:grid-cols-2 gap-5">
-                  {orderedFileFields.map((field) => (
+                  {orderedFileFieldsSansPhoto.map((field) => (
                     <FileInput
                       key={field}
                       label={DOC_FIELD_LABELS[field] || field}

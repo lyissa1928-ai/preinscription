@@ -159,9 +159,10 @@ fi
 
     nano /var/www/uniportail/backend/.env
 
-  Renseignez au minimum pour la prod (reCAPTCHA Google ou Enterprise) :
+  Renseignez au minimum pour la prod (selon votre choix Google ou Cloudflare) :
     RECAPTCHA_SECRET_KEY=...
-    et/ou variables RECAPTCHA_ENTERPRISE_* si vous utilisez Enterprise.
+    et/ou
+    TURNSTILE_SECRET_KEY=...
 
   Côté frontend, les clés publiques se mettent AVANT le build (section H).
 
@@ -180,6 +181,7 @@ H. FRONTEND : VARIABLES VITE (OPTIONNEL) PUIS BUILD
 
     VITE_API_URL=https://uniportail-digital.com
     VITE_RECAPTCHA_SITE_KEY=votre_cle_site_google
+    VITE_TURNSTILE_SITE_KEY=votre_cle_site_cloudflare
 
   Puis build :
 
@@ -277,45 +279,10 @@ curl -sI -H "Host: uniportail-digital.com" http://127.0.0.1/ | head -5
   La page du site doit s’afficher ; les appels /api passent par Nginx vers PM2.
 
 ================================================================================
-L. HTTPS / CERTIFICAT SSL (LET’S ENCRYPT)
-    À faire quand le DNS (A @ et www) pointe vers l’IP du VPS et que le site
-    répond déjà en HTTP.
-
-    Tutoriels détaillés à la racine du projet :
-    - tuto-https-uniportail.txt — HTTPS via panneau Hestia (recommandé si tu
-      ne touches pas à certbot).
-    - tuto-certbot-uniportail.txt — HTTPS avec Certbot (--nginx ou --webroot),
-      prérequis, CORS, précautions Hestia.
+L. CERTIFICAT SSL (LET’S ENCRYPT) — À FAIRE QUAND LE DNS POINTE BIEN VERS LE VPS
 ================================================================================
 
-  Prérequis : ports 80 et 443 ouverts vers le VPS (pare-feu / « Nginx Full »).
-
-  ── Méthode A — VPS avec Hestia (ex. LWS) : À PRIVILÉGIER ─────────────────────
-  Le panneau gère Nginx ; évitez certbot en parallès sans savoir ce que vous
-  faites (double config).
-
-  1) Panneau web (https://VOTRE_IP:8083 ou URL fournie par l’hébergeur).
-  2) Web → domaine uniportail-digital.com → Modifier (ou icône SSL).
-  3) Activer SSL / Let’s Encrypt (parfois « Support SSL » puis « Lets Encrypt »).
-  4) Cocher le domaine + www si proposé ; lancer la génération du certificat.
-  5) Activer la redirection HTTP → HTTPS si l’option existe.
-
-  Ligne de commande Hestia (si vous avez un utilisateur admin et le CLI hstctl) :
-
---------------------------------------------------------------------------------
-# Remplacez admin par l’utilisateur du panneau Hestia (souvent admin sur LWS).
-# Syntaxe typique (selon version Hestia, voir : v-list-letsencrypt-user) :
-/usr/local/hestia/bin/v-add-letsencrypt-domain admin uniportail-digital.com www.uniportail-digital.com
---------------------------------------------------------------------------------
-
-  En cas de doute ou d’erreur CLI, utilisez uniquement le panneau graphique
-  (Web → domaine → SSL / Let’s Encrypt).
-
-  Après activation HTTPS : dans backend/.env, CORS_ORIGINS doit inclure
-  https://uniportail-digital.com (et https://www... si vous l’utilisez), puis :
-  pm2 restart uniportail-api
-
-  ── Méthode B — Serveur Debian « nu » (sans Hestia), Nginx classique ─────────
+  Copier-coller (répondez aux questions : email, acceptation des CGU) :
 
 --------------------------------------------------------------------------------
 certbot --nginx -d uniportail-digital.com -d www.uniportail-digital.com
@@ -407,3 +374,15 @@ P. DÉPANNAGE
 ================================================================================
 FIN DU TUTORIEL
 ================================================================================
+
+
+
+sudo certbot certonly --webroot \
+  -w /var/www/letsencrypt \
+  -d uniportail-digital.com \
+  -d www.uniportail-digital.com \
+  --agree-tos \
+  -m lyissa1928@gmail.com \
+  --non-interactive
+
+

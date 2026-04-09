@@ -32,10 +32,51 @@ export const TEXT_M2 =
   'M2 — CNI ou passeport selon nationalité ; pas de carte scolaire ; relevés M1 ; attestation M1 ; diplôme Licence ou équivalent ; CV ; lettre de motivation.';
 
 export const TEXT_GENERIC =
-  'Pièce d’identité : CNI ou passeport (une seule selon nationalité) ; diplôme et relevé du dernier niveau ; lettre de motivation.';
+  'Pièce d’identité : CNI ou passeport (une seule selon nationalité) ; diplôme et relevé du dernier niveau ; lettre de motivation ; photo d’identité obligatoire.';
 
 /** Cycles où une carte scolaire peut être proposée en option (pas pour l’identité). */
 export const CYCLES_WITH_OPTIONAL_CARTE_SCOLAIRE = ['bt1', 'bts1', 'l1'];
+
+export const MAX_PHOTOS_PREINSCRIPTION = 10;
+
+export function normalizeNombrePhotosPreinscription(raw) {
+  const n = parseInt(String(raw ?? ''), 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(MAX_PHOTOS_PREINSCRIPTION, Math.floor(n));
+}
+
+export function photoSlotKeysForCount(nombrePhotos) {
+  const c = normalizeNombrePhotosPreinscription(nombrePhotos);
+  return Array.from({ length: c }, (_, i) => `photo_${i + 1}`);
+}
+
+/** Première photo utile pour aperçus (photo_1, ou ancien type `photo`). */
+export function primaryPhotoDocumentFromList(documents) {
+  const list = documents || [];
+  const p1 = list.find((d) => d.type_document === 'photo_1');
+  if (p1) return p1;
+  const legacy = list.find((d) => d.type_document === 'photo');
+  if (legacy) return legacy;
+  const numbered = list
+    .filter((d) => /^photo_\d+$/.test(String(d.type_document)))
+    .sort(
+      (a, b) =>
+        parseInt(String(a.type_document).replace(/^photo_/, ''), 10) -
+        parseInt(String(b.type_document).replace(/^photo_/, ''), 10),
+    );
+  return numbered[0] || null;
+}
+
+/** Icône / libellé : photo unique héritée ou slots photo_1 … photo_n. */
+export function isPhotoDocumentType(type_document) {
+  const t = String(type_document || '');
+  return t === 'photo' || /^photo_\d+$/.test(t);
+}
+
+function expandPhotoInRequired(requiredArr, nombrePhotos) {
+  const slots = photoSlotKeysForCount(nombrePhotos);
+  return requiredArr.flatMap((x) => (x === 'photo' ? slots : [x]));
+}
 
 /**
  * @returns {boolean|undefined} false = profil national (Sénégal), true = étranger, undefined = inconnu
@@ -90,7 +131,16 @@ export const DOC_FIELD_LABELS = {
   releve_m1_s2: 'Relevé de notes Master 1 — Semestre 2',
   cv: 'Curriculum vitae (CV)',
   lettre_motivation: 'Lettre de motivation',
-  photo: 'Photo d’identité (optionnelle)',
+  photo_1: 'Photo d’identité n°1',
+  photo_2: 'Photo d’identité n°2',
+  photo_3: 'Photo d’identité n°3',
+  photo_4: 'Photo d’identité n°4',
+  photo_5: 'Photo d’identité n°5',
+  photo_6: 'Photo d’identité n°6',
+  photo_7: 'Photo d’identité n°7',
+  photo_8: 'Photo d’identité n°8',
+  photo_9: 'Photo d’identité n°9',
+  photo_10: 'Photo d’identité n°10',
   diplome: 'Diplôme ou attestation (dernier niveau)',
   releve_notes: 'Relevé de notes',
   releve_l1: 'Relevé de notes — 1ère année (ancien format)',
@@ -147,114 +197,93 @@ const LEVEL_KEYS = [
 /**
  * @returns {{ required: string[], oneOf: string[][] }}
  * oneOf inclut le groupe identité (CNI ou passeport selon nationalité, jamais les deux obligatoires).
+ * @param {number} [nombrePhotos=1] — nombre de photos exigées (formation), 1–10, aligné sur `formation.nombre_photos_preinscription`.
  */
-export function getRequiredFileFieldKeys(niveauKey, nationalite) {
+export function getRequiredFileFieldKeys(niveauKey, nationalite, nombrePhotos = 1) {
   const k = LEVEL_KEYS.includes(niveauKey) ? niveauKey : 'generic';
   const idGroups = getIdentityOneOfGroups(nationalite);
 
-  if (k === 'bt1') {
-    return { required: ['diplome_bfem', 'lettre_motivation'], oneOf: idGroups };
+  let base;
+  if (k === 'bt1') base = ['diplome_bfem', 'lettre_motivation', 'photo'];
+  else if (k === 'bt2') {
+    base = [
+      'releve_bt1',
+      'certificat_scolarite_annee_precedente',
+      'diplome_bfem',
+      'lettre_motivation',
+      'photo',
+    ];
+  } else if (k === 'bts1') {
+    base = [
+      'releve_bac',
+      'bulletin_seconde',
+      'bulletin_premiere',
+      'bulletin_terminale',
+      'diplome_bac',
+      'lettre_motivation',
+      'photo',
+    ];
+  } else if (k === 'bts2') {
+    base = [
+      'releve_bt1',
+      'certificat_scolarite_annee_precedente',
+      'releve_bac',
+      'diplome_bac',
+      'lettre_motivation',
+      'photo',
+    ];
+  } else if (k === 'l1') {
+    base = [
+      'releve_bac',
+      'bulletin_seconde',
+      'bulletin_premiere',
+      'bulletin_terminale',
+      'diplome_bac',
+      'lettre_motivation',
+      'photo',
+    ];
+  } else if (k === 'l2') {
+    base = ['releve_l1_s1', 'releve_l1_s2', 'releve_bac', 'diplome_bac', 'lettre_motivation', 'photo'];
+  } else if (k === 'l3') {
+    base = [
+      'releve_l1_s1',
+      'releve_l1_s2',
+      'releve_l2_s1',
+      'releve_l2_s2',
+      'releve_bac',
+      'diplome_bac',
+      'lettre_motivation',
+      'photo',
+    ];
+  } else if (k === 'm1') {
+    base = [
+      'releve_l1_s1',
+      'releve_l1_s2',
+      'releve_l2_s1',
+      'releve_l2_s2',
+      'releve_l3_s1',
+      'releve_l3_s2',
+      'diplome_licence3_ou_attestation',
+      'cv',
+      'lettre_motivation',
+      'photo',
+    ];
+  } else if (k === 'm2') {
+    base = [
+      'copie_diplome_licence',
+      'attestation_reussite_licence',
+      'attestation_m1',
+      'releve_m1_s1',
+      'releve_m1_s2',
+      'cv',
+      'lettre_motivation',
+      'photo',
+    ];
+  } else {
+    base = ['diplome', 'releve_notes', 'lettre_motivation', 'photo'];
   }
-  if (k === 'bt2') {
-    return {
-      required: [
-        'releve_bt1',
-        'certificat_scolarite_annee_precedente',
-        'diplome_bfem',
-        'lettre_motivation',
-      ],
-      oneOf: idGroups,
-    };
-  }
-  if (k === 'bts1') {
-    return {
-      required: [
-        'releve_bac',
-        'bulletin_seconde',
-        'bulletin_premiere',
-        'bulletin_terminale',
-        'diplome_bac',
-        'lettre_motivation',
-      ],
-      oneOf: idGroups,
-    };
-  }
-  if (k === 'bts2') {
-    return {
-      required: [
-        'releve_bt1',
-        'certificat_scolarite_annee_precedente',
-        'releve_bac',
-        'diplome_bac',
-        'lettre_motivation',
-      ],
-      oneOf: idGroups,
-    };
-  }
-  if (k === 'l1') {
-    return {
-      required: [
-        'releve_bac',
-        'bulletin_seconde',
-        'bulletin_premiere',
-        'bulletin_terminale',
-        'diplome_bac',
-        'lettre_motivation',
-      ],
-      oneOf: idGroups,
-    };
-  }
-  if (k === 'l2') {
-    return {
-      required: ['releve_l1_s1', 'releve_l1_s2', 'releve_bac', 'diplome_bac', 'lettre_motivation'],
-      oneOf: idGroups,
-    };
-  }
-  if (k === 'l3') {
-    return {
-      required: [
-        'releve_l1_s1',
-        'releve_l1_s2',
-        'releve_l2_s1',
-        'releve_l2_s2',
-        'releve_bac',
-        'diplome_bac',
-        'lettre_motivation',
-      ],
-      oneOf: idGroups,
-    };
-  }
-  if (k === 'm1') {
-    return {
-      required: [
-        'releve_l1_s1',
-        'releve_l1_s2',
-        'releve_l2_s1',
-        'releve_l2_s2',
-        'releve_l3_s1',
-        'releve_l3_s2',
-        'diplome_licence3_ou_attestation',
-        'cv',
-        'lettre_motivation',
-      ],
-      oneOf: idGroups,
-    };
-  }
-  if (k === 'm2') {
-    return {
-      required: [
-        'copie_diplome_licence',
-        'attestation_reussite_licence',
-        'attestation_m1',
-        'releve_m1_s1',
-        'releve_m1_s2',
-        'cv',
-        'lettre_motivation',
-      ],
-      oneOf: idGroups,
-    };
-  }
-  return { required: ['diplome', 'releve_notes', 'lettre_motivation'], oneOf: idGroups };
+
+  return { required: expandPhotoInRequired(base, nombrePhotos), oneOf: idGroups };
 }
 
 export function getParagraphsForNiveauKey(niveauKey) {
@@ -281,8 +310,8 @@ export function getOptionalCarteScolaireFieldKeys(niveauKey) {
     : [];
 }
 
-export function areRequiredFilesPresent(files, niveauKey, nationalite) {
-  const { required, oneOf } = getRequiredFileFieldKeys(niveauKey, nationalite);
+export function areRequiredFilesPresent(files, niveauKey, nationalite, nombrePhotos = 1) {
+  const { required, oneOf } = getRequiredFileFieldKeys(niveauKey, nationalite, nombrePhotos);
   for (const x of required) {
     if (!files[x]) return false;
   }

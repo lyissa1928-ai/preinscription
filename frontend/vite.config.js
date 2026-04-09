@@ -41,6 +41,11 @@ export default defineConfig(({ mode }) => {
       '/uploads': {
         target: 'http://localhost:5000',
         changeOrigin: true
+      },
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        ws: true,
+        changeOrigin: true
       }
     }
   },
@@ -57,8 +62,31 @@ export default defineConfig(({ mode }) => {
       '/uploads': {
         target: 'http://localhost:5000',
         changeOrigin: true
+      },
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        ws: true,
+        changeOrigin: true
       }
     }
-  }
+  },
+  test: {
+    environment: 'jsdom',
+    globals: false,
+    include: ['src/**/*.{test,spec}.{js,jsx}'],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        /** Découpage ciblé (évite le chunk « vendor » générique qui crée des cycles avec React). */
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('socket.io-client')) return 'socket'
+          if (id.includes('react-quill') || id.includes('node_modules/quill')) return 'quill'
+          if (id.includes('jspdf')) return 'jspdf'
+        },
+      },
+    },
+  },
   }
 })

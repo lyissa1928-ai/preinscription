@@ -7,7 +7,7 @@ const {
   normalizeMatricule, isValidMatriculeFormat, matriculeTaken,
   normalizeTelephoneForUniqueness, telephoneTaken,
 } = require('../utils/userIdentity');
-const { generateNextMatriculeForEtablissement } = require('../utils/matriculeGenerator');
+const { generateNextMatriculeForEtablissement, generateNextMatriculeDirecteur } = require('../utils/matriculeGenerator');
 const { createBackup, DB_PATH, BACKUP_DIR } = require('../utils/dbBackup');
 const { logAudit } = require('../utils/auditLog');
 const { DOSSIER_STATUSES, canTransitionDossierStatus, requiresRejectionComment } = require('../utils/dossierWorkflow');
@@ -15,6 +15,7 @@ const { createUserNotification } = require('../utils/notificationService');
 const { rateLimit, getClientIp } = require('../utils/rateLimit');
 const { retentionConfigFromEnv, runMaintenancePrune } = require('../utils/maintenance');
 const { getRuntimeMetricsSnapshot } = require('../utils/runtimeMetrics');
+const { proformaDemandeDecision } = require('../services/proformaDemandeDecisionService');
 
 router.use(authMiddleware, adminOnly);
 const adminSensitiveLimiter = rateLimit({
@@ -259,13 +260,16 @@ router.get('/demandes-proforma', (req, res) => {
   res.json(demandes);
 });
 
-// PUT /api/admin/demandes-proforma/:id/statut
+// PUT /api/admin/demandes-proforma/:id/statut — métadonnées internes uniquement (pas acceptee/refusee)
 router.put('/demandes-proforma/:id/statut', (req, res) => {
   const id = parseInt(req.params.id);
   const { statut } = req.body;
-  const STATUTS_VALIDES = ['nouvelle', 'vue', 'en_cours', 'convertie', 'annulee'];
+  const STATUTS_VALIDES = ['nouvelle', 'vue', 'en_cours', 'convertie', 'annulee', 'traitee', 'en_attente'];
   if (!STATUTS_VALIDES.includes(statut)) {
-    return res.status(400).json({ message: 'Statut invalide.' });
+    return res.status(400).json({
+      message:
+        'Statut invalide. Pour accepter ou refuser une demande, utilisez l’endpoint « décision » (validation pédagogique).',
+    });
   }
   const demande = db.get('demandes_proforma').find({ id }).value();
   if (!demande) return res.status(404).json({ message: 'Demande introuvable.' });
@@ -273,11 +277,115 @@ router.put('/demandes-proforma/:id/statut', (req, res) => {
   res.json({ message: 'Statut mis à jour.' });
 });
 
+// PUT /api/admin/demandes-proforma/:id/decision — accepter / refuser (même logique que le staff établissement)
+router.put('/demandes-proforma/:id/decision', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ message: 'Identifiant invalide.' });
+  }
+  const demande = db.get('demandes_proforma').find({ id }).value();
+  if (!demande) return res.status(404).json({ message: 'Demande introuvable.' });
+  const { decision, motif_refus } = req.body;
+  const result = proformaDemandeDecision({
+    demandeId: id,
+    userId: req.user.id,
+    decision,
+    motif_refus,
+  });
+  if (!result.ok) {
+    return res.status(result.status).json({ message: result.message });
+  }
+  res.json({ message: result.message, demande: result.demande });
+});
+
+// PUT /api/admin/demandes-proforma/:id/revoke-acceptation — retire la facture et remet la demande en attente
+router.put('/demandes-proforma/:id/revoke-acceptation', adminSensitiveLimiter, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ message: 'Identifiant invalide.' });
+  }
+  const demande = db.get('demandes_proforma').find({ id }).value();
+  if (!demande) return res.status(404).json({ message: 'Demande introuvable.' });
+  const hasFacture = !!(demande.facture && demande.facture.numero);
+  if (!hasFacture) {
+    return res.status(400).json({ message: 'Aucune facture à retirer sur cette demande.' });
+  }
+  if (demande.statut === 'refusee') {
+    return res.status(400).json({ message: 'Impossible de modifier une demande refusée.' });
+  }
+
+  db.get('demandes_proforma')
+    .find({ id })
+    .assign({
+      statut: 'en_attente',
+      facture: null,
+      lettre_preinscription: null,
+      acceptee_le: null,
+      acceptee_par: null,
+      updated_at: new Date().toISOString(),
+    })
+    .write();
+
+  logAudit(req, 'proforma_revoke_acceptation', 'demande_proforma', id, {
+    reference: demande.reference,
+    ancien_statut: demande.statut,
+  });
+
+  if (demande.etudiant_id) {
+    createUserNotification(demande.etudiant_id, {
+      type: 'demande_proforma',
+      title: 'Demande de facture proforma',
+      message: `Votre demande ${demande.reference || ''} a été remise en attente. La facture proforma n'est plus disponible tant qu'elle n'est pas à nouveau validée.`,
+      link: '/dashboard',
+      meta: { demande_id: id, reference: demande.reference, statut: 'en_attente' },
+    });
+  }
+
+  const updated = db.get('demandes_proforma').find({ id }).value();
+  res.json({
+    message: 'La facture a été retirée. La demande est à nouveau en attente de validation.',
+    demande: updated,
+  });
+});
+
+// POST /api/admin/demandes-proforma/delete-batch — body { ids: number[] } — max 10, suppression définitive
+router.post('/demandes-proforma/delete-batch', adminSensitiveLimiter, (req, res) => {
+  const rawIds = Array.isArray(req.body.ids) ? req.body.ids : [];
+  const ids = [...new Set(rawIds.map((x) => parseInt(x, 10)).filter((n) => Number.isFinite(n)))];
+  if (ids.length === 0) {
+    return res.status(400).json({ message: 'Liste d’identifiants vide.' });
+  }
+  if (ids.length > 10) {
+    return res.status(400).json({
+      message: 'Suppression groupée limitée à 10 demandes par envoi. Cochez au plus 10 lignes sur la page courante ou relancez « Tout supprimer ».',
+    });
+  }
+  const removed = [];
+  const skipped = [];
+  ids.forEach((id) => {
+    const d = db.get('demandes_proforma').find({ id }).value();
+    if (!d) {
+      skipped.push(id);
+      return;
+    }
+    db.get('demandes_proforma').remove({ id }).write();
+    removed.push(id);
+    logAudit(req, 'demande_proforma_hard_delete', 'demande_proforma', id, {
+      reference: d.reference,
+    });
+  });
+  return res.json({
+    message: `${removed.length} demande(s) définitivement supprimée(s) de la base.`,
+    removed,
+    skipped,
+  });
+});
+
 // GET /api/admin/utilisateurs?role=etudiant|staff|all
 router.get('/utilisateurs', (req, res) => {
   const { role = 'all', page, limit, search = '', etablissement_id = '' } = req.query;
   const dossiers = db.get('dossiers').value();
-  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'directeur'];
+  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite'];
 
   let utilisateurs = db.get('utilisateurs').value();
   if (role === 'etudiant') {
@@ -409,7 +517,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     prenom, nom, email, mot_de_passe, mot_de_passe_confirmation,
     role, etablissement_id, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_STAFF = ['responsable', 'agent_admin', 'comptable', 'directeur'];
+  const ROLES_STAFF = ['responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite'];
 
   if (!prenom || !nom || !email || !mot_de_passe || !role || !telephone) {
     return res.status(400).json({
@@ -422,11 +530,18 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   if (!ROLES_STAFF.includes(role)) {
     return res.status(400).json({ message: 'Rôle invalide.' });
   }
-  if (!etablissement_id) {
-    return res.status(400).json({ message: 'L\'établissement est obligatoire pour un compte staff.' });
+
+  const isDirecteurGlobal = role === 'directeur';
+  let etabIdForUser = null;
+  let etab = null;
+  if (!isDirecteurGlobal) {
+    if (!etablissement_id) {
+      return res.status(400).json({ message: 'L\'établissement est obligatoire pour ce rôle staff.' });
+    }
+    etabIdForUser = parseInt(etablissement_id, 10);
+    etab = db.get('etablissements').find({ id: etabIdForUser }).value();
+    if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
   }
-  const etab = db.get('etablissements').find({ id: parseInt(etablissement_id) }).value();
-  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const emailNorm = String(email).trim().toLowerCase();
@@ -436,7 +551,9 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   if (mot_de_passe.length < 6) {
     return res.status(400).json({ message: 'Mot de passe trop court (min 6 caractères).' });
   }
-  const gen = generateNextMatriculeForEtablissement(etablissement_id);
+  const gen = isDirecteurGlobal
+    ? generateNextMatriculeDirecteur()
+    : generateNextMatriculeForEtablissement(etabIdForUser);
   if (gen.error) return res.status(400).json({ message: gen.error });
   const matNorm = normalizeMatricule(gen.matricule);
 
@@ -467,7 +584,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     adresse: adresse ? String(adresse).trim() : '',
     mot_de_passe: hash,
     role,
-    etablissement_id: parseInt(etablissement_id),
+    etablissement_id: isDirecteurGlobal ? null : etabIdForUser,
     actif: true,
     must_change_password: true,
     login_attempts: 0,
@@ -499,7 +616,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     nom, prenom, email, role, actif, etablissement_id, mot_de_passe,
     matricule, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_VALIDES = ['responsable', 'agent_admin', 'comptable', 'directeur', 'etudiant'];
+  const ROLES_VALIDES = ['responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite', 'etudiant'];
   const update = { updated_at: new Date().toISOString(), updated_by: req.user.id };
   let matriculeRegenerated = false;
 
@@ -529,9 +646,32 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
   if (role !== undefined) {
     if (!ROLES_VALIDES.includes(role)) return res.status(400).json({ message: 'Rôle invalide.' });
     update.role = role;
+    if (role === 'directeur') {
+      update.etablissement_id = null;
+      const needDirMat =
+        user.role !== 'directeur' || user.etablissement_id != null;
+      if (needDirMat) {
+        const gen = generateNextMatriculeDirecteur();
+        if (gen.error) return res.status(400).json({ message: gen.error });
+        update.matricule = normalizeMatricule(gen.matricule);
+        matriculeRegenerated = true;
+      }
+    }
+    if (
+      role !== undefined &&
+      role !== 'directeur' &&
+      ['responsable', 'agent_admin', 'comptable'].includes(role) &&
+      user.role === 'directeur' &&
+      etablissement_id === undefined
+    ) {
+      return res.status(400).json({
+        message: 'Pour quitter le rôle directeur, indiquez l’établissement de rattachement.',
+      });
+    }
   }
   if (actif !== undefined) update.actif = !!actif;
-  if (etablissement_id !== undefined) {
+  const effectiveRoleAfter = update.role !== undefined ? update.role : user.role;
+  if (etablissement_id !== undefined && effectiveRoleAfter !== 'directeur') {
     if (etablissement_id) {
       const newEid = parseInt(etablissement_id, 10);
       const etab = db.get('etablissements').find({ id: newEid }).value();
@@ -544,8 +684,18 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
         matriculeRegenerated = true;
       }
     } else {
+      if (['responsable', 'agent_admin', 'comptable'].includes(effectiveRoleAfter)) {
+        return res.status(400).json({
+          message: 'L\'établissement est obligatoire pour ce rôle.',
+        });
+      }
       update.etablissement_id = null;
     }
+  }
+  if (etablissement_id !== undefined && effectiveRoleAfter === 'directeur' && etablissement_id) {
+    return res.status(400).json({
+      message: 'Un directeur de supervision globale n\'est pas rattaché à un établissement.',
+    });
   }
   if (matricule !== undefined && !matriculeRegenerated) {
     if (!isValidMatriculeFormat(matricule)) {
@@ -619,7 +769,7 @@ router.get('/statistiques-globales', (req, res) => {
   const dossiers = db.get('dossiers').value();
   const utilisateurs = db.get('utilisateurs').value();
   const demandes = db.get('demandes_proforma').value();
-  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'directeur'];
+  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite'];
 
   const parRole = {};
   STAFF_ROLES.forEach(r => { parRole[r] = utilisateurs.filter(u => u.role === r).length; });

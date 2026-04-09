@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { FaGraduationCap, FaEye, FaEyeSlash } from 'react-icons/fa'
 import AuthCinematicBackground from '../components/AuthCinematicBackground'
+import { sanitizeNextPath } from '@/lib/navigation'
 
 const BRANDS = [
   {
@@ -29,6 +30,7 @@ const BRANDS = [
 
 export default function Login() {
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const [form, setForm] = useState({ email: '', mot_de_passe: '' })
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -75,11 +77,18 @@ export default function Login() {
         return
       }
       const role = u.role
-      const dest = role === 'admin' ? '/admin'
+      let dest = role === 'admin' ? '/admin'
         : role === 'directeur' ? '/directeur'
+        : role === 'controleur_qualite' ? '/qualite'
         : ['responsable', 'agent_admin', 'comptable'].includes(role) ? '/mon-etablissement'
         : '/dashboard'
-      navigate(dest)
+      const nextUrl =
+        sanitizeNextPath(searchParams.get('next') || searchParams.get('redirect')) ||
+        sanitizeNextPath(location.state?.next)
+      if (role === 'etudiant' && nextUrl) {
+        dest = nextUrl
+      }
+      navigate(dest, { replace: true })
     } catch (err) {
       const d = err.response?.data
       if (d?.code === 'EMAIL_NOT_VERIFIED') {

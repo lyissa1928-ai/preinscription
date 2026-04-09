@@ -34,9 +34,11 @@ export default function VerifyEmail() {
             ? '/admin'
             : role === 'directeur'
               ? '/directeur'
-              : ['responsable', 'agent_admin', 'comptable'].includes(role)
-                ? '/mon-etablissement'
-                : '/dashboard'
+              : role === 'controleur_qualite'
+                ? '/qualite'
+                : ['responsable', 'agent_admin', 'comptable'].includes(role)
+                  ? '/mon-etablissement'
+                  : '/dashboard'
         navigate(dest, { replace: true })
       } catch (err) {
         if (cancelled) return

@@ -17,7 +17,7 @@
       "rc": " SN-DKR2010",
       "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
       "compte_bancaire": "SN094-01001-100011244001-37",
-      "responsable_id": 2,
+      "responsable_id": null,
       "actif": true,
       "created_at": "2026-03-24T14:59:27.505Z",
       "banque": "ECOBANK",
@@ -59,12 +59,12 @@
       "adresse": "Sicap Amitié 2, Dakar – Sénégal",
       "telephone": " (+221) 33 824 59 12 | (+221) 77 051 96 89",
       "email_contact": "efosante@efosante.com",
-      "site_web": "https://www.efosante.com/",
+      "site_web": "efosante.com/",
       "ninea": "",
       "rc": "",
       "arrete": "",
       "compte_bancaire": "",
-      "responsable_id": null,
+      "responsable_id": 5,
       "actif": true,
       "created_at": "2026-03-24T14:59:27.505Z",
       "banque": "",
@@ -378,18 +378,19 @@
       "date_naissance": null,
       "telephone": "7998988989",
       "adresse": "",
-      "mot_de_passe": "$2a$10$/xGCHy.vtrhbD1KJw5nOy.w8x7BigUo8dCbNUAInRxLrICMQtzKyu",
+      "mot_de_passe": "$2a$10$mWDaRagK4oLQ0./4YT44TOaRj8cozQRCzfxi2b/TYD/BV2sRuxcfC",
       "role": "responsable",
       "etablissement_id": 1,
-      "actif": true,
+      "actif": false,
       "must_change_password": false,
       "created_at": "2026-03-24T16:46:13.502Z",
       "created_by": 1,
       "password_changed_at": "2026-03-24T16:46:57.425Z",
-      "updated_at": "2026-03-24T16:46:57.425Z",
+      "updated_at": "2026-04-06T01:24:35.546Z",
       "login_attempts": 0,
       "is_locked": false,
-      "lock_until": null
+      "lock_until": null,
+      "updated_by": 1
     },
     {
       "id": 3,
@@ -437,19 +438,19 @@
       "matricule": "EFO001",
       "date_naissance": null,
       "telephone": "778997654",
-      "adresse": "KEUR MASSAR",
-      "mot_de_passe": "$2a$10$7k6wfzhiW.eVJ25dauNhM.SOZmKpbT8k9i9ScbaByTDswPY9QX8k.",
+      "adresse": "admin@universite.sn",
+      "mot_de_passe": "$2a$10$klkPLi3p/NGmH5RM5BTlB.ejWZn/kBBTyU5Bz3P3lo2lkBdqi9Eca",
       "role": "responsable",
       "etablissement_id": 3,
       "actif": true,
       "must_change_password": false,
       "created_at": "2026-03-24T17:13:02.686Z",
       "created_by": 1,
-      "password_changed_at": "2026-03-24T22:26:04.528Z",
-      "updated_at": "2026-03-24T22:26:04.529Z",
+      "password_changed_at": "2026-04-05T17:27:04.788Z",
+      "updated_at": "2026-04-05T17:27:04.788Z",
       "login_attempts": 0,
-      "is_locked": false,
-      "lock_until": null
+      "is_locked": true,
+      "lock_until": "2026-04-06T00:58:07.470Z"
     },
     {
       "id": 6,
@@ -553,14 +554,14 @@
       "telephone": "78000000",
       "adresse": "",
       "mot_de_passe": "$2a$10$pb/h3z4ZtcvAdLPpniJO1uUz8SjZWMKUKF06dnYmfAtgHKAzWzykS",
-      "role": "agent_admin",
+      "role": "responsable",
       "etablissement_id": 1,
       "actif": true,
       "must_change_password": false,
       "created_at": "2026-03-26T16:46:29.501Z",
       "created_by": 1,
       "password_changed_at": "2026-03-26T16:47:09.670Z",
-      "updated_at": "2026-03-26T16:47:09.670Z",
+      "updated_at": "2026-04-06T01:24:56.078Z",
       "login_attempts": 0,
       "is_locked": false,
       "lock_until": null
@@ -690,6 +691,172 @@
       "is_locked": false,
       "lock_until": null,
       "created_at": "2026-04-02T23:42:21.980Z"
+    },
+    {
+      "id": 20,
+      "nom": "grregve",
+      "prenom": "vevef",
+      "email": "lamine1.diop@ucad.edu.sn",
+      "matricule": "ESE015",
+      "date_naissance": null,
+      "telephone": "770004505",
+      "adresse": "km",
+      "mot_de_passe": "$2a$10$OexbHMW36ZBCPZ/N4V0Ite.Mye3ImwRbiWSyzLPghNRCuUmJDUUj2",
+      "role": "etudiant",
+      "etablissement_id": 1,
+      "must_change_password": false,
+      "login_attempts": 0,
+      "is_locked": false,
+      "lock_until": null,
+      "created_at": "2026-04-03T15:55:55.665Z",
+      "email_verified_at": "2026-04-03T15:55:55.665Z",
+      "email_verify_token": null,
+      "email_verify_expires": null
+    },
+    {
+      "id": 21,
+      "nom": "vsdve",
+      "prenom": "czcdsc",
+      "email": "lamine11.diop@ucad.edu.sn",
+      "matricule": "ESE016",
+      "date_naissance": null,
+      "telephone": "770404505",
+      "adresse": "km",
+      "mot_de_passe": "$2a$10$JddiMPGRoQXBQbuheOvISup4oZ7okCeKtwQNAePueYZwIGfypIVIy",
+      "role": "etudiant",
+      "etablissement_id": 1,
+      "must_change_password": false,
+      "login_attempts": 0,
+      "is_locked": false,
+      "lock_until": null,
+      "created_at": "2026-04-03T16:23:08.765Z",
+      "email_verified_at": "2026-04-03T16:23:08.765Z",
+      "email_verify_token": null,
+      "email_verify_expires": null
+    },
+    {
+      "id": 22,
+      "nom": "MOUDSSA",
+      "prenom": "LO",
+      "email": "lamine110.diop@ucad.edu.sn",
+      "matricule": "ESE017",
+      "date_naissance": null,
+      "telephone": "770004515",
+      "adresse": "km",
+      "mot_de_passe": "$2a$10$LBlNieq7X.CfrX8gwhRCD.hHjb6gKsVIAcTE1UGN4d8IJZ/h7pu36",
+      "role": "etudiant",
+      "etablissement_id": 1,
+      "must_change_password": false,
+      "login_attempts": 0,
+      "is_locked": false,
+      "lock_until": null,
+      "created_at": "2026-04-04T11:44:55.741Z",
+      "email_verified_at": "2026-04-04T11:44:55.741Z",
+      "email_verify_token": null,
+      "email_verify_expires": null
+    },
+    {
+      "id": 23,
+      "nom": "dskd",
+      "prenom": "dslksld",
+      "email": "lamine1100a.diop@ucad.edu.sn",
+      "matricule": "ESE018",
+      "date_naissance": null,
+      "telephone": "08899009900999",
+      "adresse": "ADD",
+      "mot_de_passe": "$2a$10$R.Bb7pR96jFmH45Vs4I8w.GxOp0L3HHl515OnreQXxdWlp4MPH/f.",
+      "role": "etudiant",
+      "etablissement_id": 1,
+      "must_change_password": false,
+      "login_attempts": 0,
+      "is_locked": false,
+      "lock_until": null,
+      "created_at": "2026-04-04T15:40:09.076Z",
+      "email_verified_at": "2026-04-04T15:40:09.076Z",
+      "email_verify_token": null,
+      "email_verify_expires": null
+    },
+    {
+      "id": 24,
+      "nom": "AMATH",
+      "prenom": "SALL",
+      "email": "abdoulayecheikhou1.ly@ucad.edu.sn",
+      "matricule": "ESE019",
+      "date_naissance": null,
+      "telephone": "770004445",
+      "adresse": "km",
+      "mot_de_passe": "$2a$10$cyMPyl4/TdDBuxRCg7VZseZjXyctDGLM2Yvky3R3Ib1X62ALxXxFi",
+      "role": "etudiant",
+      "etablissement_id": 1,
+      "must_change_password": false,
+      "login_attempts": 0,
+      "is_locked": false,
+      "lock_until": null,
+      "created_at": "2026-04-06T21:26:50.002Z",
+      "email_verified_at": "2026-04-06T21:26:50.002Z",
+      "email_verify_token": null,
+      "email_verify_expires": null
+    },
+    {
+      "id": 25,
+      "prenom": "MAILICK",
+      "nom": "LAME",
+      "email": "efosante@universite.sn",
+      "matricule": "ESC002",
+      "date_naissance": "1990-11-11",
+      "telephone": "775465767",
+      "adresse": "",
+      "mot_de_passe": "$2a$10$/vaeHTTFNY/ZqDa7EsOhF.TNCM9HUFvmWQeAaFeEKGNACNE.7g6Su",
+      "role": "agent_admin",
+      "etablissement_id": 2,
+      "actif": true,
+      "must_change_password": true,
+      "login_attempts": 0,
+      "is_locked": false,
+      "lock_until": null,
+      "created_at": "2026-04-07T16:11:19.811Z"
+    },
+    {
+      "id": 26,
+      "prenom": "SALIF",
+      "nom": "SENE",
+      "email": "salif.sene@universite.sn",
+      "matricule": "ESC003",
+      "date_naissance": "2000-11-11",
+      "telephone": "4256374758675",
+      "adresse": "",
+      "mot_de_passe": "$2a$10$p0kr6gPZsQ0Z5/S2/qBTPOeL/yI7RZafAf9N5Ut4iYtZqyvaXXWAG",
+      "role": "controleur_qualite",
+      "etablissement_id": 2,
+      "actif": true,
+      "must_change_password": false,
+      "login_attempts": 0,
+      "is_locked": false,
+      "lock_until": null,
+      "created_at": "2026-04-07T16:12:12.903Z",
+      "updated_at": "2026-04-07T16:12:59.187Z",
+      "password_changed_at": "2026-04-07T16:12:59.187Z"
+    },
+    {
+      "id": 27,
+      "nom": "Matar",
+      "prenom": "SALL",
+      "email": "malick.sall@uniportal.com",
+      "matricule": "ESE020",
+      "date_naissance": null,
+      "telephone": "700293994020",
+      "adresse": "km",
+      "mot_de_passe": "$2a$10$yt78Yh2oow0PLoDpTMooFuy330lbPT8IUHb/QotvxMOMcZusHFrRe",
+      "role": "etudiant",
+      "etablissement_id": 1,
+      "must_change_password": false,
+      "login_attempts": 0,
+      "is_locked": false,
+      "lock_until": null,
+      "created_at": "2026-04-09T11:22:27.043Z",
+      "email_verified_at": "2026-04-09T11:22:27.043Z",
+      "email_verify_token": null,
+      "email_verify_expires": null
     }
   ],
   "dossiers": [
@@ -910,6 +1077,36 @@
       "traite_le": "2026-03-28T07:26:26.484Z",
       "lettre_generee": true,
       "date_acceptation": "2026-03-28T07:26:26.484Z"
+    },
+    {
+      "id": 8,
+      "etudiant_id": 22,
+      "numero_dossier": "PREINSC-2026-98654",
+      "formation_id": 10,
+      "type_formation": "presentiel",
+      "filiere": "BTS / L1,L2 Electromécanique et Systèmes Automatisés",
+      "niveau": "Bac T.S/BT",
+      "formation_niveau_cible": "BTS/L1-L2",
+      "document_rule_profile": "generic",
+      "annee_academique": "2025-2026",
+      "date_naissance": "1999-11-11",
+      "lieu_naissance": "DK",
+      "nationalite": "Zimbabwéenne",
+      "telephone": "9876545678888",
+      "adresse": "KH",
+      "dernier_diplome": "Baccalauréat",
+      "etablissement_origine": "KM",
+      "mention": "Très Bien",
+      "annee_obtention": 2024,
+      "numero_passeport": "877865889889997",
+      "statut": "accepte",
+      "commentaire_admin": null,
+      "created_at": "2026-04-04T11:48:56.705Z",
+      "updated_at": "2026-04-04T11:50:41.817Z",
+      "traite_par": 1,
+      "traite_le": "2026-04-04T11:50:41.817Z",
+      "lettre_generee": true,
+      "date_acceptation": "2026-04-04T11:50:41.817Z"
     }
   ],
   "documents": [
@@ -1136,6 +1333,38 @@
       "nom_fichier": "CCNA SEC.pdf",
       "chemin": "1774682759880-46936385.pdf",
       "created_at": "2026-03-28T07:25:59.898Z"
+    },
+    {
+      "id": 29,
+      "dossier_id": 8,
+      "type_document": "passeport",
+      "nom_fichier": "corrige_tp_reseau_tcp_simple.pdf",
+      "chemin": "29c4ceaf-49e5-45fd-a5a1-024c4ae029e3_1775303336686_generic_passeport.pdf",
+      "created_at": "2026-04-04T11:48:56.705Z"
+    },
+    {
+      "id": 30,
+      "dossier_id": 8,
+      "type_document": "lettre_motivation",
+      "nom_fichier": "Facture-Proforma-DEM-2026-00008 (15).pdf",
+      "chemin": "bd52a512-42ee-4d07-a0f3-ea0f7f2a2ed8_1775303336691_generic_lettre_motivation.pdf",
+      "created_at": "2026-04-04T11:48:56.705Z"
+    },
+    {
+      "id": 31,
+      "dossier_id": 8,
+      "type_document": "diplome",
+      "nom_fichier": "Facture-Proforma-DEM-2026-00011 (1).pdf",
+      "chemin": "5e1b62eb-bd07-46cb-8e1a-334767cb3e67_1775303336694_generic_diplome.pdf",
+      "created_at": "2026-04-04T11:48:56.705Z"
+    },
+    {
+      "id": 32,
+      "dossier_id": 8,
+      "type_document": "releve_notes",
+      "nom_fichier": "appel (7).pdf",
+      "chemin": "8ea80ccc-8416-4e0a-af6f-e28918a8a74f_1775303336697_generic_releve_notes.pdf",
+      "created_at": "2026-04-04T11:48:56.705Z"
     }
   ],
   "formations": [
@@ -1157,7 +1386,14 @@
       "frais_soutenance": 0,
       "autres_frais": 30000,
       "actif": true,
-      "created_at": "2026-03-24T16:25:00.400Z"
+      "created_at": "2026-03-24T16:25:00.400Z",
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Abonnement Bibliotheque + Pack EPI",
+          "montant": 30000
+        }
+      ]
     },
     {
       "id": 5,
@@ -3140,902 +3376,305 @@
       "created_at": "2026-04-01T12:00:00.000Z"
     }
   ],
-  "factures": [
-    {
-      "id": 1,
-      "numero": "FP-2026-25153",
-      "dossier_id": 1,
-      "etudiant_id": 3,
-      "formation_id": 4,
-      "date_emission": "2026-03-24T16:56:22.715Z",
-      "date_echeance": "2026-04-23T16:56:22.715Z",
-      "lignes": [
-        {
-          "description": "Frais d'inscription - Diplôme de Technicien Génie Civil - Bâtiment",
-          "quantite": 1,
-          "prix_unitaire": 160000,
-          "total": 160000
-        },
-        {
-          "description": "Frais de formation annuels - Diplôme de Technicien Génie Civil - Bâtiment (Présentiel)",
-          "quantite": 1,
-          "prix_unitaire": 520000,
-          "total": 520000
-        }
-      ],
-      "montant_ht": 680000,
-      "tva_taux": 0,
-      "montant_tva": 0,
-      "montant_ttc": 680000,
-      "statut": "emise",
-      "etudiant_snapshot": {
-        "nom": "ALI",
-        "prenom": "LY",
-        "email": "ali.seck@test.com",
-        "telephone": "77800999898",
-        "adresse": "KEUR MASSAR",
-        "nationalite": "SENEGALAISE"
-      },
-      "formation_snapshot": {
-        "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
-        "type": "presentiel",
-        "duree": "3 ans",
-        "ville": "Dakar",
-        "niveau_requis": "BFEM/BEP"
-      },
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "adresse": "Dakar",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "ninea": "41591422V2",
-        "compte_bancaire": "SN094-01001-100011244001-37"
-      },
-      "created_at": "2026-03-24T16:56:22.715Z"
-    },
-    {
-      "id": 2,
-      "numero": "FP-2026-64651",
-      "dossier_id": 2,
-      "etudiant_id": 6,
-      "formation_id": 22,
-      "date_emission": "2026-03-24T23:53:08.141Z",
-      "date_echeance": "2026-04-23T23:53:08.141Z",
-      "lignes": [
-        {
-          "description": "Frais d'inscription - BTS / L1,L2 Géomètre Topographe",
-          "quantite": 1,
-          "prix_unitaire": 200000,
-          "total": 200000
-        },
-        {
-          "description": "Frais de formation annuels - BTS / L1,L2 Géomètre Topographe (Présentiel)",
-          "quantite": 1,
-          "prix_unitaire": 740000,
-          "total": 740000
-        }
-      ],
-      "montant_ht": 940000,
-      "tva_taux": 0,
-      "montant_tva": 0,
-      "montant_ttc": 940000,
-      "statut": "emise",
-      "etudiant_snapshot": {
-        "nom": "testeur1",
-        "prenom": "TESTEUR1",
-        "email": "testeur@universite.sn",
-        "telephone": "6789907876776899",
-        "adresse": "KM",
-        "nationalite": "Senegalaise"
-      },
-      "formation_snapshot": {
-        "titre": "BTS / L1,L2 Géomètre Topographe",
-        "type": "presentiel",
-        "duree": "2 ans",
-        "ville": "Dakar",
-        "niveau_requis": "Bac S-L2 /BT"
-      },
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "adresse": "Dakar",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "ninea": "41591422V2",
-        "compte_bancaire": "SN094-01001-100011244001-37"
-      },
-      "created_at": "2026-03-24T23:53:08.141Z"
-    },
-    {
-      "id": 3,
-      "numero": "FP-2026-34532",
-      "dossier_id": 3,
-      "etudiant_id": 7,
-      "formation_id": 5,
-      "date_emission": "2026-03-25T09:45:05.067Z",
-      "date_echeance": "2026-04-24T09:45:05.067Z",
-      "lignes": [
-        {
-          "description": "Frais d'inscription - BTS / L1,L2 Génie Civil et Construction",
-          "quantite": 1,
-          "prix_unitaire": 200000,
-          "total": 200000
-        },
-        {
-          "description": "Frais de formation annuels - BTS / L1,L2 Génie Civil et Construction (Présentiel)",
-          "quantite": 1,
-          "prix_unitaire": 740000,
-          "total": 740000
-        }
-      ],
-      "montant_ht": 940000,
-      "tva_taux": 0,
-      "montant_tva": 0,
-      "montant_ttc": 940000,
-      "statut": "emise",
-      "etudiant_snapshot": {
-        "nom": "modou",
-        "prenom": "lame",
-        "email": "modou.lame@universite.sn",
-        "telephone": "789835556",
-        "adresse": "KM L",
-        "nationalite": "SENEGAL"
-      },
-      "formation_snapshot": {
-        "titre": "BTS / L1,L2 Génie Civil et Construction",
-        "type": "presentiel",
-        "duree": "2 ans",
-        "ville": "Dakar",
-        "niveau_requis": "Bac S/BT"
-      },
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "adresse": "Dakar",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "ninea": "41591422V2",
-        "compte_bancaire": "SN094-01001-100011244001-37"
-      },
-      "created_at": "2026-03-25T09:45:05.067Z"
-    },
-    {
-      "id": 4,
-      "numero": "FP-2026-74146",
-      "dossier_id": 4,
-      "etudiant_id": 8,
-      "formation_id": 21,
-      "date_emission": "2026-03-26T07:36:41.727Z",
-      "date_echeance": "2026-04-25T07:36:41.727Z",
-      "lignes": [
-        {
-          "description": "Frais d'inscription - Master 2 Énergies Renouvelables",
-          "quantite": 1,
-          "prix_unitaire": 180000,
-          "total": 180000
-        },
-        {
-          "description": "Frais de formation annuels - Master 2 Énergies Renouvelables (Présentiel)",
-          "quantite": 1,
-          "prix_unitaire": 1500000,
-          "total": 1500000
-        }
-      ],
-      "montant_ht": 1680000,
-      "tva_taux": 0,
-      "montant_tva": 0,
-      "montant_ttc": 1680000,
-      "statut": "emise",
-      "etudiant_snapshot": {
-        "nom": "FATIMA",
-        "prenom": "LY",
-        "email": "fatima1.ly@universite.sn",
-        "telephone": "7789094940",
-        "adresse": "KM",
-        "nationalite": "SENEGALAISE"
-      },
-      "formation_snapshot": {
-        "titre": "Master 2 Énergies Renouvelables",
-        "type": "presentiel",
-        "duree": "1 an",
-        "ville": "Dakar",
-        "niveau_requis": "Bac+4"
-      },
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "adresse": "Dakar",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "ninea": "41591422V2",
-        "rc": " SN-DKR2010",
-        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
-        "compte_bancaire": "SN094-01001-100011244001-37",
-        "banque": "ECOBANK",
-        "iban": "",
-        "swift": "",
-        "signataire_nom": "",
-        "signataire_fonction": ""
-      },
-      "created_at": "2026-03-26T07:36:41.727Z"
-    },
-    {
-      "id": 5,
-      "numero": "FP-2026-61218",
-      "dossier_id": 5,
-      "etudiant_id": 9,
-      "formation_id": 7,
-      "date_emission": "2026-03-26T07:43:03.695Z",
-      "date_echeance": "2026-04-25T07:43:03.695Z",
-      "lignes": [
-        {
-          "description": "Frais d'inscription - Master 1 Génie Civil et Construction",
-          "quantite": 1,
-          "prix_unitaire": 185000,
-          "total": 185000
-        },
-        {
-          "description": "Frais de formation annuels - Master 1 Génie Civil et Construction (Présentiel)",
-          "quantite": 1,
-          "prix_unitaire": 1185000,
-          "total": 1185000
-        }
-      ],
-      "montant_ht": 1370000,
-      "tva_taux": 0,
-      "montant_tva": 0,
-      "montant_ttc": 1370000,
-      "statut": "emise",
-      "etudiant_snapshot": {
-        "nom": "LEYLA",
-        "prenom": "SALL",
-        "email": "leyla@universite.sn",
-        "telephone": "777839939",
-        "adresse": "KM",
-        "nationalite": "SEN"
-      },
-      "formation_snapshot": {
-        "titre": "Master 1 Génie Civil et Construction",
-        "type": "presentiel",
-        "duree": "1 an",
-        "ville": "Dakar",
-        "niveau_requis": "Bac+3"
-      },
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "adresse": "Dakar",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "ninea": "41591422V2",
-        "rc": " SN-DKR2010",
-        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
-        "compte_bancaire": "SN094-01001-100011244001-37",
-        "banque": "ECOBANK",
-        "iban": "",
-        "swift": "",
-        "signataire_nom": "",
-        "signataire_fonction": ""
-      },
-      "created_at": "2026-03-26T07:43:03.695Z"
-    },
-    {
-      "id": 6,
-      "numero": "FP-2026-57227",
-      "dossier_id": 6,
-      "etudiant_id": 10,
-      "formation_id": 4,
-      "date_emission": "2026-03-26T14:54:14.520Z",
-      "date_echeance": "2026-04-25T14:54:14.520Z",
-      "lignes": [
-        {
-          "description": "Frais d'inscription - Diplôme de Technicien Génie Civil - Bâtiment",
-          "quantite": 1,
-          "prix_unitaire": 160000,
-          "total": 160000
-        },
-        {
-          "description": "Frais de formation annuels - Diplôme de Technicien Génie Civil - Bâtiment (Présentiel)",
-          "quantite": 1,
-          "prix_unitaire": 520000,
-          "total": 520000
-        }
-      ],
-      "montant_ht": 680000,
-      "tva_taux": 0,
-      "montant_tva": 0,
-      "montant_ttc": 680000,
-      "statut": "emise",
-      "etudiant_snapshot": {
-        "nom": "ASTOU",
-        "prenom": "DIOP",
-        "email": "astou.diop@universite.sn",
-        "telephone": "7890003030",
-        "adresse": "KM",
-        "nationalite": "sn"
-      },
-      "formation_snapshot": {
-        "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
-        "type": "presentiel",
-        "duree": "3 ans",
-        "ville": "Dakar",
-        "niveau_requis": "BFEM/BEP"
-      },
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "ninea": "41591422V2",
-        "rc": " SN-DKR2010",
-        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
-        "compte_bancaire": "SN094-01001-100011244001-37",
-        "banque": "ECOBANK",
-        "iban": "",
-        "swift": "ECOCSNDAXXX",
-        "signataire_nom": "",
-        "signataire_fonction": "La direction"
-      },
-      "created_at": "2026-03-26T14:54:14.520Z"
-    },
-    {
-      "id": 7,
-      "numero": "FP-2026-37221",
-      "dossier_id": 7,
-      "etudiant_id": 14,
-      "formation_id": 10,
-      "date_emission": "2026-03-28T07:26:26.495Z",
-      "date_echeance": "2026-04-27T07:26:26.495Z",
-      "lignes": [
-        {
-          "description": "Frais d'inscription - BTS / L1,L2 Electromécanique et Systèmes Automatisés",
-          "quantite": 1,
-          "prix_unitaire": 200000,
-          "total": 200000
-        },
-        {
-          "description": "Frais de formation annuels - BTS / L1,L2 Electromécanique et Systèmes Automatisés (Présentiel)",
-          "quantite": 1,
-          "prix_unitaire": 740000,
-          "total": 740000
-        }
-      ],
-      "montant_ht": 940000,
-      "tva_taux": 0,
-      "montant_tva": 0,
-      "montant_ttc": 940000,
-      "statut": "emise",
-      "etudiant_snapshot": {
-        "nom": "MANSOUR",
-        "prenom": "SECK",
-        "email": "mansour@universite.sn",
-        "telephone": "77781001",
-        "adresse": "KM",
-        "nationalite": "SEN"
-      },
-      "formation_snapshot": {
-        "titre": "BTS / L1,L2 Electromécanique et Systèmes Automatisés",
-        "type": "presentiel",
-        "duree": "2 ans",
-        "ville": "Dakar",
-        "niveau_requis": "Bac T.S/BT"
-      },
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "ninea": "41591422V2",
-        "rc": " SN-DKR2010",
-        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
-        "compte_bancaire": "SN094-01001-100011244001-37",
-        "banque": "ECOBANK",
-        "iban": "",
-        "swift": "ECOCSNDAXXX",
-        "signataire_nom": "",
-        "signataire_fonction": "La direction"
-      },
-      "created_at": "2026-03-28T07:26:26.495Z"
-    }
-  ],
-  "demandes_proforma": [
-    {
-      "id": 6,
-      "reference": "DEM-2026-00006",
-      "prenom": "lo",
-      "nom": "lo",
-      "email": "lo@lo.com",
-      "telephone": "789009876",
-      "niveau": "Bac+2 / Licence 2",
-      "type_formation": "presentiel",
-      "formation_id": 19,
-      "etablissement_id": 1,
-      "formation_titre": "Licence 3 Énergies Renouvelables",
-      "formation_description": "Spécialisation en énergies renouvelables.",
-      "formation_ville": "Dakar",
-      "formation_niveau_requis": "Bac+2",
-      "formation_mensualite": 85000,
-      "details": null,
-      "type_payeur": "etudiant",
-      "payeur": null,
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "type": "btp",
-        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "logo_url": "http://localhost:5000/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "http://localhost:5000/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "ninea": "41591422V2",
-        "compte_bancaire": "SN094-01001-100011244001-37"
-      },
-      "statut": "nouvelle",
-      "created_at": "2026-03-27T11:34:22.336Z",
-      "facture": {
-        "numero": "FACT-PUB-2026-00006",
-        "lignes": [
-          {
-            "designation": "Frais d'inscription — Licence 3 Énergies Renouvelables",
-            "montant": 200000
-          },
-          {
-            "designation": "Scolarité annuelle — Formation présentielle",
-            "montant": 1135000
-          }
-        ],
-        "montant_ht": 1335000,
-        "tva": 0,
-        "montant_ttc": 1335000,
-        "validite_jusqu_au": "2026-04-26T11:34:22.336Z"
-      }
-    },
-    {
-      "id": 5,
-      "reference": "DEM-2026-00005",
-      "prenom": "m",
-      "nom": "lo",
-      "email": "issa@ese.com",
-      "telephone": "776554455",
-      "niveau": "Terminale / Baccalauréat",
-      "type_formation": "presentiel",
-      "formation_id": 80,
-      "etablissement_id": 2,
-      "formation_titre": "Licence 1 Informatique",
-      "formation_description": "Formation de base en informatique couvrant les fondamentaux du développement, des systèmes et des outils numériques.",
-      "formation_ville": "Dakar",
-      "formation_niveau_requis": "Tout bac",
-      "formation_mensualite": 60000,
-      "details": null,
-      "type_payeur": "etudiant",
-      "payeur": null,
-      "etablissement_snapshot": {
-        "nom": "ESCOA",
-        "type": "gestion",
-        "adresse": "Avenue Cheikh Anta DIOP, en face UCAD Dakar / Sénégal",
-        "telephone": "+221 33 843 71 71 / +221 78 196 05 05 / +221 77 295 77 88",
-        "email_contact": "escoa@escoa.edu.sn",
-        "site_web": "escoa.edu.sn",
-        "logo_url": "http://localhost:5000/uploads/etablissements/1774367795931-logo.png",
-        "cachet_url": "http://localhost:5000/uploads/etablissements/1774367795931-cachet.png",
-        "couleur_primaire": "#110de7",
-        "couleur_secondaire": "#110de7",
-        "ninea": "008522832-2V2",
-        "compte_bancaire": ""
-      },
-      "statut": "nouvelle",
-      "created_at": "2026-03-27T10:54:22.269Z",
-      "facture": {
-        "numero": "FACT-PUB-2026-00005",
-        "lignes": [
-          {
-            "designation": "Frais d'inscription — Licence 1 Informatique",
-            "montant": 150000
-          },
-          {
-            "designation": "Scolarité annuelle — Formation présentielle",
-            "montant": 690000
-          }
-        ],
-        "montant_ht": 840000,
-        "tva": 0,
-        "montant_ttc": 840000,
-        "validite_jusqu_au": "2026-04-26T10:54:22.269Z"
-      }
-    },
-    {
-      "id": 4,
-      "reference": "DEM-2026-00004",
-      "prenom": "ASTOU",
-      "nom": "SECK",
-      "email": "a.seck@test.com",
-      "telephone": "778992929",
-      "niveau": "Bac+1 / Licence 1",
-      "type_formation": "presentiel",
-      "formation_id": 8,
-      "etablissement_id": 1,
-      "formation_titre": "Master 2 Génie Civil et Construction",
-      "formation_description": "Formation d’ingénieur de conception en génie civil et construction.",
-      "formation_ville": "Dakar",
-      "formation_niveau_requis": "Bac+4",
-      "formation_mensualite": 120000,
-      "annee_academique": "2025-2026",
-      "details": null,
-      "type_payeur": "etudiant",
-      "payeur": null,
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "type": "btp",
-        "adresse": "Dakar",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "ninea": "41591422V2",
-        "compte_bancaire": "SN094-01001-100011244001-37"
-      },
-      "statut": "nouvelle",
-      "created_at": "2026-03-26T07:19:53.733Z",
-      "facture": {
-        "numero": "FACT-PUB-2026-00004",
-        "lignes": [
-          {
-            "designation": "Frais d'inscription — Master 2 Génie Civil et Construction",
-            "montant": 180000
-          },
-          {
-            "designation": "Scolarité annuelle — Formation présentielle",
-            "montant": 1500000
-          }
-        ],
-        "montant_ht": 1680000,
-        "tva": 0,
-        "montant_ttc": 1680000,
-        "validite_jusqu_au": "2026-04-25T07:19:53.733Z"
-      }
-    },
-    {
-      "id": 3,
-      "reference": "DEM-2026-00003",
-      "prenom": "L",
-      "nom": "D",
-      "email": "a@d.com",
-      "telephone": "3455667777",
-      "niveau": "Bac+1 / Licence 1",
-      "type_formation": "presentiel",
-      "formation_id": 104,
-      "etablissement_id": 3,
-      "formation_titre": "1er année Sage-femme d’État",
-      "formation_description": "Formation en soins obstétricaux de base et suivi de grossesse.",
-      "formation_ville": "Dakar",
-      "formation_niveau_requis": "BAC",
-      "formation_mensualite": 50000,
-      "details": null,
-      "type_payeur": "etudiant",
-      "payeur": null,
-      "etablissement_snapshot": {
-        "nom": "EFOSANTE",
-        "type": "sante",
-        "adresse": "Sicap Amitié 2, Dakar – Sénégal",
-        "telephone": "+221770000003",
-        "email_contact": "contact@gestionexcellence.sn",
-        "site_web": "https://www.efosante.com",
-        "logo_url": "/uploads/etablissements/1774368287330-logo.png",
-        "cachet_url": "/uploads/etablissements/1774368287364-cachet.png",
-        "couleur_primaire": "#f74b65",
-        "couleur_secondaire": "#2d80e6",
-        "ninea": "",
-        "compte_bancaire": ""
-      },
-      "statut": "nouvelle",
-      "created_at": "2026-03-25T16:20:00.627Z",
-      "facture": {
-        "numero": "FACT-PUB-2026-00003",
-        "lignes": [
-          {
-            "designation": "Frais d'inscription — 1er année Sage-femme d’État",
-            "montant": 160000
-          },
-          {
-            "designation": "Scolarité annuelle — Formation présentielle",
-            "montant": null
-          }
-        ],
-        "montant_ht": null,
-        "tva": 0,
-        "montant_ttc": null,
-        "validite_jusqu_au": "2026-04-24T16:20:00.627Z"
-      }
-    },
-    {
-      "id": 2,
-      "reference": "DEM-2026-00002",
-      "prenom": "Modou",
-      "nom": "SALL",
-      "email": "m.s@o.com",
-      "telephone": "788900098",
-      "niveau": "Bac+1 / Licence 1",
-      "type_formation": "presentiel",
-      "formation_id": 11,
-      "etablissement_id": 1,
-      "formation_titre": "Licence 3 Electromécanique et Systèmes Automatisés",
-      "formation_description": "Spécialisation en électromécanique et systèmes automatisés.",
-      "formation_ville": "Dakar",
-      "formation_niveau_requis": "Bac+2",
-      "formation_mensualite": 85000,
-      "details": null,
-      "type_payeur": "etudiant",
-      "payeur": null,
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "type": "btp",
-        "adresse": "Dakar",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "ninea": "41591422V2",
-        "compte_bancaire": "SN094-01001-100011244001-37"
-      },
-      "statut": "nouvelle",
-      "created_at": "2026-03-24T16:43:50.822Z",
-      "facture": {
-        "numero": "FACT-PUB-2026-00002",
-        "lignes": [
-          {
-            "designation": "Frais d'inscription — Licence 3 Electromécanique et Systèmes Automatisés",
-            "montant": 200000
-          },
-          {
-            "designation": "Scolarité annuelle — Formation présentielle",
-            "montant": 1135000
-          }
-        ],
-        "montant_ht": 1335000,
-        "tva": 0,
-        "montant_ttc": 1335000,
-        "validite_jusqu_au": "2026-04-23T16:43:50.822Z"
-      }
-    },
-    {
-      "id": 1,
-      "reference": "DEM-2026-00001",
-      "prenom": "Mansour",
-      "nom": "SOW",
-      "email": "m.sow@l.com",
-      "telephone": "789909303",
-      "niveau": "Bac+1 / Licence 1",
-      "type_formation": "presentiel",
-      "formation_id": null,
-      "etablissement_id": 1,
-      "formation_titre": "Licence 1 Sciences Infirmieres",
-      "formation_description": null,
-      "formation_ville": "Dakar",
-      "formation_niveau_requis": "Baccalaureat",
-      "formation_mensualite": null,
-      "details": null,
-      "type_payeur": "etudiant",
-      "payeur": null,
-      "etablissement_snapshot": {
-        "nom": "Institut Sante Plus",
-        "type": "sante",
-        "adresse": "Dakar",
-        "telephone": "+221770000001",
-        "email_contact": "contact@santeplus.sn",
-        "site_web": "",
-        "logo_url": null,
-        "cachet_url": null,
-        "couleur_primaire": "#0f766e",
-        "couleur_secondaire": "#14b8a6",
-        "ninea": "",
-        "compte_bancaire": ""
-      },
-      "statut": "nouvelle",
-      "created_at": "2026-03-24T15:12:10.682Z",
-      "facture": {
-        "numero": "FACT-PUB-2026-00001",
-        "lignes": [
-          {
-            "designation": "Frais d'inscription — Licence 1 Sciences Infirmieres",
-            "montant": 25000
-          },
-          {
-            "designation": "Scolarité annuelle — Formation présentielle",
-            "montant": 450000
-          }
-        ],
-        "montant_ht": 475000,
-        "tva": 0,
-        "montant_ttc": 475000,
-        "validite_jusqu_au": "2026-04-23T15:12:10.682Z"
-      }
-    },
-    {
-      "id": 7,
-      "reference": "DEM-2026-00007",
-      "prenom": "FATIMA",
-      "nom": "LY",
-      "email": "f@gmail.com",
-      "telephone": "+221709017205",
-      "niveau": "Bac+1 / Licence 1",
-      "type_formation": "presentiel",
-      "formation_id": 5,
-      "etablissement_id": 1,
-      "formation_titre": "BTS / L1,L2 Génie Civil et Construction",
-      "formation_description": "Formation en génie civil et construction.",
-      "formation_ville": "Dakar",
-      "formation_niveau_requis": "Bac S/BT",
-      "formation_mensualite": 60000,
-      "details": null,
-      "type_payeur": "etudiant",
-      "payeur": null,
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "type": "btp",
-        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "logo_url": "http://localhost:5000/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "http://localhost:5000/uploads/etablissements/1774367348780-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "ninea": "41591422V2",
-        "compte_bancaire": "SN094-01001-100011244001-37"
-      },
-      "statut": "nouvelle",
-      "created_at": "2026-03-29T11:28:21.011Z",
-      "facture": {
-        "numero": "FACT-PUB-2026-00007",
-        "lignes": [
-          {
-            "designation": "Frais d'inscription — BTS / L1,L2 Génie Civil et Construction",
-            "montant": 200000
-          },
-          {
-            "designation": "Scolarité annuelle — Formation présentielle",
-            "montant": 740000
-          }
-        ],
-        "montant_ht": 940000,
-        "tva": 0,
-        "montant_ttc": 940000,
-        "validite_jusqu_au": "2026-04-28T11:28:21.011Z"
-      }
-    },
-    {
-      "id": 8,
-      "reference": "DEM-2026-00008",
-      "prenom": "FATIMA",
-      "nom": "LY",
-      "email": "i@gmail.com",
-      "telephone": "+221709017205",
-      "niveau": "Terminale / Baccalauréat",
-      "type_formation": "presentiel",
-      "formation_id": 6,
-      "etablissement_id": 1,
-      "formation_titre": "Licence 3 Génie Civil et Construction",
-      "formation_description": "Formation de spécialisation en génie civil et construction.",
-      "formation_ville": "Dakar",
-      "formation_niveau_requis": "Bac+2",
-      "formation_mensualite": 85000,
-      "formation_duree_mois": 12,
-      "details": null,
-      "type_payeur": "etudiant",
-      "payeur": null,
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "type": "btp",
-        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "logo_url": "http://localhost:5000/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "http://localhost:5000/uploads/etablissements/1774883718214-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "ninea": "41591422V2",
-        "compte_bancaire": "SN094-01001-100011244001-37"
-      },
-      "statut": "nouvelle",
-      "created_at": "2026-03-30T15:16:20.700Z",
-      "facture": {
-        "numero": "FACT-PUB-2026-00008",
-        "lignes": [
-          {
-            "designation": "Frais d'inscription — Licence 3 Génie Civil et Construction",
-            "montant": 200000
-          },
-          {
-            "designation": "Mensualités (12 mois × 85 000 FCFA) — Licence 3 Génie Civil et Construction",
-            "montant": 1020000
-          }
-        ],
-        "lignes_frais_supplementaires": [
-          {
-            "designation": "Autres frais (legacy)",
-            "montant": 45000,
-            "hors_forfait_annuel": true
-          }
-        ],
-        "montant_supplementaires_hors_forfait": 45000,
-        "montant_ht": 1220000,
-        "tva": 0,
-        "montant_ttc": 1220000,
-        "validite_jusqu_au": "2026-04-29T15:16:20.700Z"
-      }
-    }
-  ],
+  "factures": [],
+  "demandes_proforma": [],
   "_nextId": {
     "etablissements": 4,
     "filieres": 25,
     "formations": 122,
-    "utilisateurs": 20,
-    "dossiers": 8,
-    "documents": 29,
-    "factures": 8,
-    "demandes_proforma": 9,
-    "audit_logs": 4,
-    "notifications": 4,
-    "security_events": 8
+    "utilisateurs": 28,
+    "dossiers": 9,
+    "documents": 33,
+    "factures": 9,
+    "demandes_proforma": 13,
+    "audit_logs": 19,
+    "notifications": 8,
+    "security_events": 19,
+    "conditions_admission": 3
   },
   "audit_logs": [
     {
-      "id": 1,
-      "action": "update_status",
-      "entity": "dossier",
+      "id": 18,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 1,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00001"
+      },
+      "created_at": "2026-04-07T15:42:41.243Z"
+    },
+    {
+      "id": 17,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 2,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00002"
+      },
+      "created_at": "2026-04-07T15:42:41.239Z"
+    },
+    {
+      "id": 16,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 3,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00003"
+      },
+      "created_at": "2026-04-07T15:42:41.080Z"
+    },
+    {
+      "id": 15,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 4,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00004"
+      },
+      "created_at": "2026-04-07T15:42:41.077Z"
+    },
+    {
+      "id": 14,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 5,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00005"
+      },
+      "created_at": "2026-04-07T15:42:41.072Z"
+    },
+    {
+      "id": 13,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
       "entity_id": 6,
       "user_id": 1,
       "user_role": "admin",
       "etablissement_id": null,
-      "method": "PUT",
-      "path": "/api/responsable/dossiers/6/statut",
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
       "ip": "::1",
       "details": {
-        "from": "en_attente",
-        "to": "en_attente",
+        "reference": "DEM-2026-00006"
+      },
+      "created_at": "2026-04-07T15:42:41.068Z"
+    },
+    {
+      "id": 12,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 7,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00007"
+      },
+      "created_at": "2026-04-07T15:42:41.062Z"
+    },
+    {
+      "id": 11,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 8,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00008"
+      },
+      "created_at": "2026-04-07T15:42:41.058Z"
+    },
+    {
+      "id": 10,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 9,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00009"
+      },
+      "created_at": "2026-04-07T15:42:41.053Z"
+    },
+    {
+      "id": 9,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 10,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00010"
+      },
+      "created_at": "2026-04-07T15:42:41.047Z"
+    },
+    {
+      "id": 8,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 11,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00011"
+      },
+      "created_at": "2026-04-07T15:42:41.040Z"
+    },
+    {
+      "id": 7,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 12,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00012"
+      },
+      "created_at": "2026-04-07T15:42:41.030Z"
+    },
+    {
+      "id": 6,
+      "action": "proforma_revoke_acceptation",
+      "entity": "demande_proforma",
+      "entity_id": 12,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "PUT",
+      "path": "/api/admin/demandes-proforma/12/revoke-acceptation",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00012",
+        "ancien_statut": "en_attente"
+      },
+      "created_at": "2026-04-07T14:48:34.739Z"
+    },
+    {
+      "id": 5,
+      "action": "update",
+      "entity": "formation",
+      "entity_id": 4,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "PUT",
+      "path": "/api/etablissements/1/formations/4",
+      "ip": "::1",
+      "details": {
+        "etablissement_id": 1,
+        "updates": {
+          "filiere_id": 1,
+          "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+          "type": "presentiel",
+          "niveau": "BT",
+          "niveau_requis": "BFEM/BEP",
+          "duree": "3 ans",
+          "description": "Formation technique en génie civil et bâtiment.",
+          "ville": "Dakar",
+          "places": 0,
+          "frais_inscription": 160000,
+          "mensualite": 40000,
+          "frais_soutenance": 0,
+          "autres_frais": 30000,
+          "duree_mois": 9,
+          "frais_supplementaires": [
+            {
+              "designation": "Abonnement Bibliotheque + Pack EPI",
+              "montant": 30000
+            }
+          ]
+        }
+      },
+      "created_at": "2026-04-04T12:08:59.402Z"
+    },
+    {
+      "id": 4,
+      "action": "update_status",
+      "entity": "dossier",
+      "entity_id": 8,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "PUT",
+      "path": "/api/responsable/dossiers/8/statut",
+      "ip": "::1",
+      "details": {
+        "from": "accepte",
+        "to": "accepte",
         "motif_rejet": null
       },
-      "created_at": "2026-03-27T23:31:15.201Z"
+      "created_at": "2026-04-04T11:50:41.849Z"
+    },
+    {
+      "id": 3,
+      "action": "update_status",
+      "entity": "dossier",
+      "entity_id": 7,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "PUT",
+      "path": "/api/responsable/dossiers/7/statut",
+      "ip": "::1",
+      "details": {
+        "from": "accepte",
+        "to": "accepte",
+        "motif_rejet": null
+      },
+      "created_at": "2026-03-28T07:26:26.490Z"
     },
     {
       "id": 2,
@@ -4056,22 +3695,22 @@
       "created_at": "2026-03-28T06:00:59.967Z"
     },
     {
-      "id": 3,
+      "id": 1,
       "action": "update_status",
       "entity": "dossier",
-      "entity_id": 7,
+      "entity_id": 6,
       "user_id": 1,
       "user_role": "admin",
       "etablissement_id": null,
       "method": "PUT",
-      "path": "/api/responsable/dossiers/7/statut",
+      "path": "/api/responsable/dossiers/6/statut",
       "ip": "::1",
       "details": {
-        "from": "accepte",
-        "to": "accepte",
+        "from": "en_attente",
+        "to": "en_attente",
         "motif_rejet": null
       },
-      "created_at": "2026-03-28T07:26:26.490Z"
+      "created_at": "2026-03-27T23:31:15.201Z"
     }
   ],
   "notifications": [
@@ -4119,25 +3758,71 @@
       },
       "read_at": null,
       "created_at": "2026-03-28T07:26:26.488Z"
+    },
+    {
+      "id": 4,
+      "user_id": 22,
+      "type": "dossier_statut",
+      "title": "Décision sur votre dossier",
+      "message": "Le dossier PREINSC-2026-98654 est maintenant: accepté.",
+      "link": "/dashboard",
+      "meta": {
+        "dossier_id": 8,
+        "numero_dossier": "PREINSC-2026-98654",
+        "statut": "accepte"
+      },
+      "read_at": null,
+      "created_at": "2026-04-04T11:50:41.831Z"
+    },
+    {
+      "id": 5,
+      "user_id": 24,
+      "type": "demande_proforma",
+      "title": "Demande de facture proforma acceptée",
+      "message": "Votre demande DEM-2026-00012 a été acceptée. Vous pouvez télécharger la facture proforma, la lettre et l’attestation depuis votre espace.",
+      "link": "/dashboard",
+      "meta": {
+        "demande_id": 12,
+        "reference": "DEM-2026-00012",
+        "statut": "acceptee"
+      },
+      "read_at": null,
+      "created_at": "2026-04-06T22:23:52.719Z"
+    },
+    {
+      "id": 6,
+      "user_id": 24,
+      "type": "demande_proforma",
+      "title": "Demande de facture proforma",
+      "message": "Votre demande DEM-2026-00012 a été remise en attente. La facture proforma n'est plus disponible tant qu'elle n'est pas à nouveau validée.",
+      "link": "/dashboard",
+      "meta": {
+        "demande_id": 12,
+        "reference": "DEM-2026-00012",
+        "statut": "en_attente"
+      },
+      "read_at": null,
+      "created_at": "2026-04-07T14:48:34.745Z"
+    },
+    {
+      "id": 7,
+      "user_id": 24,
+      "type": "demande_proforma",
+      "title": "Demande de facture proforma acceptée",
+      "message": "Votre demande DEM-2026-00012 a été acceptée. Vous pouvez télécharger la facture proforma et l’attestation de préinscription depuis votre espace.",
+      "link": "/dashboard",
+      "meta": {
+        "demande_id": 12,
+        "reference": "DEM-2026-00012",
+        "statut": "acceptee"
+      },
+      "read_at": null,
+      "created_at": "2026-04-07T14:48:53.136Z"
     }
   ],
   "security_events": [
     {
-      "id": 1,
-      "type": "auth_login_failed",
-      "severity": "warning",
-      "user_id": null,
-      "user_role": null,
-      "method": "POST",
-      "path": "/api/auth/connexion",
-      "ip": "::1",
-      "details": {
-        "email": "x@test.com"
-      },
-      "created_at": "2026-03-27T14:31:44.664Z"
-    },
-    {
-      "id": 2,
+      "id": 18,
       "type": "auth_login_failed",
       "severity": "warning",
       "user_id": null,
@@ -4148,10 +3833,111 @@
       "details": {
         "email": "adama.sarr@esebat.com"
       },
-      "created_at": "2026-03-27T23:34:15.622Z"
+      "created_at": "2026-04-06T01:23:09.407Z"
     },
     {
-      "id": 3,
+      "id": 17,
+      "type": "auth_account_locked",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "fatima.ly@universite.sn",
+        "user_id": 5
+      },
+      "created_at": "2026-04-06T00:45:49.820Z"
+    },
+    {
+      "id": 16,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "fatima.ly@universite.sn"
+      },
+      "created_at": "2026-04-06T00:43:07.479Z"
+    },
+    {
+      "id": 15,
+      "type": "auth_account_locked_after_failures",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "fatima.ly@universite.sn",
+        "user_id": 5,
+        "attempts": 3
+      },
+      "created_at": "2026-04-06T00:43:07.474Z"
+    },
+    {
+      "id": 14,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "fatima.ly@universite.sn"
+      },
+      "created_at": "2026-04-06T00:42:53.223Z"
+    },
+    {
+      "id": 13,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "fatima.ly@universite.sn"
+      },
+      "created_at": "2026-04-06T00:42:32.829Z"
+    },
+    {
+      "id": 12,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "fatima.ly@universite.sn"
+      },
+      "created_at": "2026-04-05T17:24:59.328Z"
+    },
+    {
+      "id": 11,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "fatima.ly@universite.sn"
+      },
+      "created_at": "2026-04-05T17:24:42.523Z"
+    },
+    {
+      "id": 10,
       "type": "auth_login_failed",
       "severity": "warning",
       "user_id": null,
@@ -4162,10 +3948,38 @@
       "details": {
         "email": "adama.sarr@esebat.com"
       },
-      "created_at": "2026-03-27T23:34:27.768Z"
+      "created_at": "2026-04-04T23:26:15.982Z"
     },
     {
-      "id": 4,
+      "id": 9,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "adama.sarr@esebat.com"
+      },
+      "created_at": "2026-04-04T23:25:57.414Z"
+    },
+    {
+      "id": 8,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "amine110.diop@ucad.edu.sn"
+      },
+      "created_at": "2026-04-04T11:53:25.866Z"
+    },
+    {
+      "id": 7,
       "type": "inscription_captcha_not_configured",
       "severity": "error",
       "user_id": null,
@@ -4176,21 +3990,7 @@
       "details": {
         "endpoint": "/api/auth/inscription"
       },
-      "created_at": "2026-03-29T06:12:41.696Z"
-    },
-    {
-      "id": 5,
-      "type": "inscription_captcha_not_configured",
-      "severity": "error",
-      "user_id": null,
-      "user_role": null,
-      "method": "POST",
-      "path": "/api/auth/inscription",
-      "ip": "::1",
-      "details": {
-        "endpoint": "/api/auth/inscription"
-      },
-      "created_at": "2026-03-29T06:12:46.596Z"
+      "created_at": "2026-03-29T06:18:58.675Z"
     },
     {
       "id": 6,
@@ -4207,7 +4007,7 @@
       "created_at": "2026-03-29T06:15:02.234Z"
     },
     {
-      "id": 7,
+      "id": 5,
       "type": "inscription_captcha_not_configured",
       "severity": "error",
       "user_id": null,
@@ -4218,7 +4018,81 @@
       "details": {
         "endpoint": "/api/auth/inscription"
       },
-      "created_at": "2026-03-29T06:18:58.675Z"
+      "created_at": "2026-03-29T06:12:46.596Z"
+    },
+    {
+      "id": 4,
+      "type": "inscription_captcha_not_configured",
+      "severity": "error",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/inscription",
+      "ip": "::1",
+      "details": {
+        "endpoint": "/api/auth/inscription"
+      },
+      "created_at": "2026-03-29T06:12:41.696Z"
+    },
+    {
+      "id": 3,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "adama.sarr@esebat.com"
+      },
+      "created_at": "2026-03-27T23:34:27.768Z"
+    },
+    {
+      "id": 2,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "adama.sarr@esebat.com"
+      },
+      "created_at": "2026-03-27T23:34:15.622Z"
+    },
+    {
+      "id": 1,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "x@test.com"
+      },
+      "created_at": "2026-03-27T14:31:44.664Z"
+    }
+  ],
+  "conditions_admission": [
+    {
+      "id": 1,
+      "etablissement_id": 1,
+      "texte": "<h3>Conditions de préinscription</h3><p><strong>1. Demande :</strong></p><p>Précisez la <strong>filière</strong>, le <strong>niveau</strong> et le mode (<strong style=\"color: rgb(37, 99, 235);\">Présentiel</strong> ou <strong style=\"color: rgb(37, 99, 235);\">En ligne</strong>).</p><p>Joindre un <strong>dossier complet</strong> selon le niveau.</p><p><strong>2. Licence 3 :</strong></p><p>Bac + relevé, BTS/DUT/L2 (domaine accepté), relevés 1re &amp; 2e année + copie <strong>CNI</strong> ou <strong>passeport</strong>.</p><p><strong>3. Master 1 :</strong></p><p>Bac + relevé, Licence 3, relevés 1re, 2e &amp; 3e année + CNI/passeport.</p><p><span style=\"color: rgb(6, 95, 70);\"> DTS (3 ans) → fournir preuve d’équivalence Licence. </span></p><p><strong>4. Master 2 :</strong></p><p>Bac + relevé, Licence 3 + Master 1, relevés 1re à 4e année + CNI/passeport.</p><p><strong>Exigence Ministérielle :</strong></p><p>Dossier étudié rapidement → envoi lettre de préinscription/proforma (coût, durée, modalités).</p><p><strong>Important :</strong> copies légalisées obligatoires + <strong>BAC exigé pour tous les niveaux</strong>.</p>",
+      "updated_at": "2026-04-07T14:25:56.292Z",
+      "updated_by_user_id": 1,
+      "ordre": 1
+    },
+    {
+      "id": 2,
+      "etablissement_id": 3,
+      "texte": "<h3>Conditions d’admission</h3><p>Être titulaire du <strong>baccalauréat</strong> ou d’un diplôme reconnu équivalent.</p><p>Être apte sur les plans <strong>physique, mental et moral</strong>.</p><p><strong>Diplôme délivré :</strong></p><p>Certification nationale (<strong>Diplôme d’État</strong>) ou <strong>attestation</strong>.</p><p><strong>Frais d’inscription :</strong></p><p>1ère année : frais administratifs + assurance + bibliothèque inclus.</p><p>2e &amp; 3e années : mêmes frais inclus.</p><p><strong>Pièces à fournir :</strong></p><p>• Copie légalisée de la <strong>carte d’identité</strong></p><p>• Copie légalisée du <strong>dernier diplôme</strong></p><p>• <strong>Extrait de naissance</strong> (moins de 3 mois)</p><p>• <strong>Certificat de nationalité</strong></p><p>• <strong>03 photos d’identité</strong></p><p>• Certificat de <strong>visite et contre-visite médicale</strong></p><p>• <strong>Casier judiciaire</strong> (moins de 3 mois)</p>",
+      "updated_at": "2026-04-07T14:29:04.929Z",
+      "updated_by_user_id": 1,
+      "ordre": 1
     }
   ]
 }

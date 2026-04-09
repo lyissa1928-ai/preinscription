@@ -47,9 +47,11 @@ export default function ResetPasswordEmail() {
           ? '/admin'
           : role === 'directeur'
             ? '/directeur'
-            : ['responsable', 'agent_admin', 'comptable'].includes(role)
-              ? '/mon-etablissement'
-              : '/dashboard'
+            : role === 'controleur_qualite'
+              ? '/qualite'
+              : ['responsable', 'agent_admin', 'comptable'].includes(role)
+                ? '/mon-etablissement'
+                : '/dashboard'
       navigate(dest, { replace: true })
     } catch (err) {
       toast.error(err.response?.data?.message || 'Lien invalide ou expiré.')

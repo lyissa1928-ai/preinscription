@@ -54,11 +54,47 @@
     font-family: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: 'rlig' 1, 'calt' 1;
   }
+  ::selection {
+    @apply bg-blue-500/20 text-blue-950;
+  }
+}
+
+/* Fond espace connecté : mesh + grain léger */
+@layer utilities {
+  .app-shell-bg {
+    @apply relative min-h-screen bg-slate-50;
+    background-image:
+      radial-gradient(ellipse 120% 80% at 50% -20%, rgba(99, 102, 241, 0.09), transparent 50%),
+      radial-gradient(ellipse 80% 50% at 100% 0%, rgba(168, 85, 247, 0.06), transparent 45%),
+      radial-gradient(ellipse 60% 40% at 0% 100%, rgba(14, 165, 233, 0.07), transparent 50%);
+  }
+  .app-shell-bg::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.12;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 128px 128px;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300/80 hover:bg-slate-400;
+  }
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex h-10 items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex h-10 items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-secondary {
     @apply inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-5 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
@@ -109,7 +145,7 @@
     @apply w-full border-collapse text-sm;
   }
   .dashboard-table thead tr {
-    @apply border-b border-border bg-muted/50;
+    @apply border-b border-border bg-gradient-to-r from-slate-50/95 to-indigo-50/40;
   }
   .dashboard-table th {
     @apply px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground;

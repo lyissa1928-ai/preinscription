@@ -7,11 +7,105 @@ import { forfaitAnnuelFromFormation } from '../lib/formationTarifs'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n || 0)
 
+const TYPE_FORMATION_META = {
+  presentiel: { label: 'Présentiel', emoji: '🏫', desc: 'Cours en présentiel sur site' },
+  en_ligne: { label: 'À distance (FAD)', emoji: '🌐', desc: 'Formation à distance en ligne' },
+}
+
 const ROLE_LINKS = {
   responsable: { label: 'Traiter les dossiers',    path: '/responsable',  icon: '📋' },
   agent_admin:  { label: 'Contrôle administratif', path: '/agent-admin',   icon: '🗂️' },
   comptable:    { label: 'Finance & Facturation',   path: '/comptable',    icon: '💰' },
   directeur:    { label: 'Supervision générale',    path: '/directeur',    icon: '👁️' },
+  controleur_qualite: { label: 'Qualité & conformité', path: '/qualite', icon: '✅' },
+}
+
+function FormationCatalogueCard({ f, primary, secondary, isEtudiant }) {
+  return (
+    <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+      <div className="h-1.5 shrink-0" style={{ background: `linear-gradient(90deg, ${primary}, ${secondary})` }} />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 sm:p-5">
+        <div className="mb-2 flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className={`max-w-full truncate text-[11px] font-bold sm:text-xs px-2.5 py-1 rounded-full ${f.type === 'en_ligne' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`} title={f.type === 'en_ligne' ? 'FAD' : (f.ville || 'Présentiel')}>
+            {f.type === 'en_ligne' ? '🌐 FAD' : `🏫 ${f.ville || 'Présentiel'}`}
+          </span>
+          {f.niveau_requis && (
+            <span className="max-w-[10rem] truncate text-[11px] text-gray-400 sm:text-xs" title={f.niveau_requis}>{f.niveau_requis}</span>
+          )}
+        </div>
+        <h3 className="mb-2 line-clamp-3 min-h-0 text-[15px] font-bold leading-snug text-gray-900 sm:text-base">{f.titre}</h3>
+        {f.filiere_duree_cycle && (
+          <p className="mb-1 line-clamp-2 text-xs text-gray-700">Durée cycle : <span className="font-semibold">{f.filiere_duree_cycle}</span></p>
+        )}
+        {f.filiere_condition_acces && (
+          <p className="mb-1 line-clamp-2 text-xs text-gray-700">Accès : {f.filiere_condition_acces}</p>
+        )}
+        {f.niveau && <p className="mb-1 text-xs text-gray-600">Niveau : {f.niveau}</p>}
+        {f.description && <p className="mb-2 line-clamp-2 text-xs text-gray-500">{f.description}</p>}
+        <details className="mb-2 min-w-0 text-xs">
+          <summary className="cursor-pointer font-semibold text-blue-700 hover:text-blue-800">Conditions d&apos;entrée</summary>
+          <div className="mt-2 max-h-36 overflow-y-auto rounded-lg border border-gray-100 bg-slate-50/90 p-2">
+            <PreinscriptionConditionsBlock formationNiveau={f.niveau} />
+          </div>
+        </details>
+        <div className="mt-auto border-t border-gray-100 pt-3">
+          {isEtudiant ? (
+            <div className="space-y-2">
+              {(f.places_restantes != null || (f.places != null && f.places !== '')) && (
+                <p className="text-center text-[11px] text-gray-500 sm:text-xs">
+                  {f.places_restantes != null ? (
+                    <>
+                      <span className="font-semibold text-gray-700">{f.places_restantes}</span>
+                      {' '}
+                      place{Number(f.places_restantes) !== 1 ? 's' : ''} restante
+                      {Number(f.places_restantes) !== 1 ? 's' : ''} (indicatif)
+                      {typeof f.candidatures_actives === 'number' && f.candidatures_actives > 0 && (
+                        <span className="mt-0.5 block text-[10px] text-gray-400">
+                          {f.candidatures_actives} candidature
+                          {f.candidatures_actives > 1 ? 's' : ''} active{f.candidatures_actives > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-gray-700">{f.places}</span> place
+                      {Number(f.places) > 1 ? 's' : ''} (indicatif)
+                    </>
+                  )}
+                </p>
+              )}
+              <Link
+                to={`/preinscription/${f.id}`}
+                className="block w-full rounded-xl py-2.5 text-center text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-95"
+                style={{ background: primary }}
+              >
+                Candidater
+              </Link>
+              <p className="text-[10px] leading-snug text-gray-400 text-center px-0.5">Montants communiqués sur la facture proforma après instruction.</p>
+            </div>
+          ) : (
+            <div className="flex min-w-0 flex-wrap items-end justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-black text-base" style={{ color: primary }}>{fmt(forfaitAnnuelFromFormation(f))} <span className="text-xs font-normal text-gray-400">FCFA/an</span></div>
+                <div className="text-xs text-gray-500 break-words">
+                  Inscription {fmt(f.frais_inscription)}
+                  {f.mensualite > 0 && (
+                    <> · {fmt(f.mensualite)}/mois{f.duree_mois ? ` × ${f.duree_mois} mois` : ''}</>
+                  )}
+                </div>
+              </div>
+              {f.places && (
+                <div className="shrink-0 text-center">
+                  <div className="text-sm font-black text-gray-700">{f.places}</div>
+                  <div className="text-xs text-gray-400">places</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function EtablissementHome() {
@@ -20,8 +114,13 @@ export default function EtablissementHome() {
   const [formations, setFormations] = useState([])
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [filtreType, setFiltreType] = useState('all')
-  const [filtreNiveau, setFiltreNiveau] = useState('all')
+  /** 'all' | 'presentiel' | 'en_ligne' — filtre par mode (pas par niveau diplôme) */
+  const [filtreMode, setFiltreMode] = useState('all')
+  /** 'filieres' | 'types' | 'liste' */
+  const [catalogueStep, setCatalogueStep] = useState('filieres')
+  const [selectedFiliereNom, setSelectedFiliereNom] = useState(null)
+  /** 'presentiel' | 'en_ligne' */
+  const [selectedFormationType, setSelectedFormationType] = useState(null)
 
   const etabId = user?.etablissement_id
 
@@ -30,8 +129,7 @@ export default function EtablissementHome() {
     Promise.all([
       axios.get(`/api/etablissements/${etabId}`),
       axios.get(`/api/formations?etablissement_id=${etabId}`),
-      // Statistiques des demandes proforma de l'établissement
-      user.role === 'responsable' || user.role === 'agent_admin' || user.role === 'comptable' || user.role === 'directeur'
+      user.role === 'responsable' || user.role === 'admin'
         ? axios.get('/api/responsable/statistiques').catch(() => ({ data: null }))
         : Promise.resolve({ data: null })
     ]).then(([etabRes, formRes, statsRes]) => {
@@ -42,13 +140,31 @@ export default function EtablissementHome() {
       .finally(() => setLoading(false))
   }, [etabId])
 
+  useEffect(() => {
+    setCatalogueStep('filieres')
+    setSelectedFiliereNom(null)
+    setSelectedFormationType(null)
+  }, [filtreMode])
+
   if (!etabId) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="text-5xl mb-4">⚠️</div>
-          <p className="text-gray-600 font-semibold">Aucun établissement associé à votre compte.</p>
-          <p className="text-gray-400 text-sm mt-1">Contactez l'administrateur principal.</p>
+      <div className="flex items-center justify-center min-h-[16rem] px-4">
+        <div className="text-center max-w-md">
+          <div className="text-5xl mb-4">👁️</div>
+          <p className="text-gray-700 font-semibold">
+            {user?.role === 'directeur'
+              ? 'Les directeurs ont une vue globale : pas de catalogue rattaché à une seule école ici.'
+              : 'Aucun établissement associé à votre compte.'}
+          </p>
+          <p className="text-gray-500 text-sm mt-2">
+            {user?.role === 'directeur' ? (
+              <>
+                Ouvrez la <Link to="/directeur" className="font-semibold text-blue-700 hover:underline">supervision</Link> pour suivre l’activité sur tous les établissements.
+              </>
+            ) : (
+              <>Contactez l&apos;administrateur principal.</>
+            )}
+          </p>
         </div>
       </div>
     )
@@ -70,12 +186,17 @@ export default function EtablissementHome() {
   const secondary = etab.couleur_secondaire || '#3b82f6'
   const roleLink  = ROLE_LINKS[user?.role]
 
-  const niveauxDisponibles = [...new Set(formations.map(f => f.niveau_requis).filter(Boolean))].sort()
-  const formationsFiltrees = formations
-    .filter(f => filtreType === 'all' || f.type === filtreType)
-    .filter(f => filtreNiveau === 'all' || f.niveau_requis === filtreNiveau)
+  const modesPresents = (() => {
+    const s = new Set()
+    for (const f of formations) {
+      if (f.type === 'presentiel' || f.type === 'en_ligne') s.add(f.type)
+    }
+    return ['presentiel', 'en_ligne'].filter((t) => s.has(t))
+  })()
+  const formationsFiltrees = formations.filter(
+    (f) => filtreMode === 'all' || f.type === filtreMode
+  )
 
-  const isEtudiant = user?.role === 'etudiant'
   const formationsParFiliere = (() => {
     const map = new Map()
     for (const f of formationsFiltrees) {
@@ -86,50 +207,84 @@ export default function EtablissementHome() {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'fr'))
   })()
 
+  const listeFiliereSelectionnee = selectedFiliereNom
+    ? (formationsParFiliere.find(([n]) => n === selectedFiliereNom)?.[1] || [])
+    : []
+
+  const typesDisponiblesPourFiliere = (() => {
+    const order = ['presentiel', 'en_ligne']
+    const set = new Set()
+    for (const f of listeFiliereSelectionnee) {
+      if (f.type === 'presentiel' || f.type === 'en_ligne') set.add(f.type)
+    }
+    return order.filter((t) => set.has(t))
+  })()
+
+  const formationsListeFinale = listeFiliereSelectionnee.filter(
+    (f) => f.type === selectedFormationType
+  )
+
+  const isEtudiant = user?.role === 'etudiant'
+
+  const goFilieres = () => {
+    setCatalogueStep('filieres')
+    setSelectedFiliereNom(null)
+    setSelectedFormationType(null)
+  }
+  const goTypes = () => {
+    setCatalogueStep('types')
+    setSelectedFormationType(null)
+  }
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 w-full space-y-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden px-3 py-6 sm:px-4 sm:py-8 space-y-6 sm:space-y-8">
 
       {/* ── EN-TÊTE ÉTABLISSEMENT ─────────────────────────────── */}
-      <div className="rounded-3xl overflow-hidden shadow-lg">
-        {/* Bannière */}
-        <div className="h-28 relative" style={{ background: `linear-gradient(135deg, ${primary}, ${secondary})` }}>
+      <div className="rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg">
+        <div className="h-24 sm:h-28 relative" style={{ background: `linear-gradient(135deg, ${primary}, ${secondary})` }}>
           <div className="absolute inset-0 overflow-hidden opacity-20">
             <div className="absolute top-2 right-8 w-24 h-24 rounded-full bg-white" />
             <div className="absolute bottom-0 left-1/4 w-16 h-16 rounded-full bg-white" />
           </div>
         </div>
-        <div className="bg-white px-8 pb-6 -mt-10 relative">
-          <div className="flex items-end gap-5 flex-wrap">
-            {/* Logo */}
-            <div className="w-20 h-20 rounded-2xl border-4 border-white shadow-xl overflow-hidden bg-white flex items-center justify-center flex-shrink-0">
-              {etab.logo_url
-                ? <img src={etab.logo_url} alt={etab.nom} className="w-full h-full object-contain" />
-                : <span className="text-3xl font-black" style={{ color: primary }}>{etab.nom[0]}</span>}
-            </div>
-            <div className="flex-1 min-w-0 pt-10">
-              <h1 className="text-2xl font-black text-gray-900 truncate">{etab.nom}</h1>
-              <div className="flex flex-wrap gap-3 mt-1 text-sm text-gray-500">
-                {etab.adresse    && <span>📍 {etab.adresse}</span>}
-                {etab.telephone  && <span>📞 {etab.telephone}</span>}
-                {etab.email_contact && <span>✉️ {etab.email_contact}</span>}
+        <div className="bg-white px-4 pb-5 sm:px-6 sm:pb-6 -mt-10 relative">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-5">
+            <div className="flex min-w-0 flex-1 items-end gap-3 sm:gap-5">
+              <div className="h-16 w-16 sm:h-20 sm:w-20 shrink-0 rounded-2xl border-4 border-white bg-white shadow-xl flex items-center justify-center overflow-hidden">
+                {etab.logo_url
+                  ? <img src={etab.logo_url} alt="" className="h-full w-full object-contain" />
+                  : <span className="text-2xl font-black sm:text-3xl" style={{ color: primary }}>{etab.nom[0]}</span>}
+              </div>
+              <div className="min-w-0 flex-1 pt-6 sm:pt-10">
+                <h1 className="text-xl font-black leading-tight text-gray-900 break-words sm:text-2xl">{etab.nom}</h1>
+                <div className="mt-2 flex flex-col gap-1.5 text-xs text-gray-500 sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-1 sm:text-sm">
+                  {etab.adresse && (
+                    <span className="min-w-0 break-words"><span aria-hidden>📍 </span>{etab.adresse}</span>
+                  )}
+                  {etab.telephone && (
+                    <span className="shrink-0 break-all"><span aria-hidden>📞 </span>{etab.telephone}</span>
+                  )}
+                  {etab.email_contact && (
+                    <span className="min-w-0 break-all"><span aria-hidden>✉️ </span>{etab.email_contact}</span>
+                  )}
+                </div>
               </div>
             </div>
-            {/* Accès rapide rôle */}
             {roleLink && (
               <Link to={roleLink.path}
-                className="flex items-center gap-2 text-white font-bold px-5 py-2.5 rounded-xl shadow-md hover:opacity-90 transition-all flex-shrink-0"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-center text-sm font-bold text-white shadow-md transition-opacity hover:opacity-90 sm:min-w-0"
                 style={{ background: primary }}>
-                <span>{roleLink.icon}</span> {roleLink.label}
+                <span aria-hidden>{roleLink.icon}</span>
+                <span className="leading-tight">{roleLink.label}</span>
               </Link>
             )}
           </div>
           {etab.description && (
-            <p className="mt-4 text-gray-500 text-sm leading-relaxed max-w-2xl">{etab.description}</p>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-500">{etab.description}</p>
           )}
         </div>
       </div>
 
-      {/* ── STATISTIQUES ────────────────────────────────────────── */}
       {stats && !isEtudiant && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
@@ -147,7 +302,7 @@ export default function EtablissementHome() {
         </div>
       )}
 
-      {['responsable', 'directeur', 'comptable', 'agent_admin'].includes(user?.role) && (
+      {['responsable', 'directeur', 'comptable', 'agent_admin', 'controleur_qualite'].includes(user?.role) && (
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -179,175 +334,267 @@ export default function EtablissementHome() {
       )}
 
       {/* ── FORMATIONS DE L'ÉTABLISSEMENT ───────────────────────── */}
-      <div>
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <div>
-            <h2 className="text-xl font-black text-gray-900">{isEtudiant ? 'Filières et formations' : 'Formations proposées'}</h2>
-            <p className="text-sm text-gray-400 mt-0.5">
+      <div className="min-w-0">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-lg font-black text-gray-900 sm:text-xl">
+              {isEtudiant ? 'Filières et formations' : 'Formations proposées'}
+            </h2>
+            <p className="mt-0.5 text-xs text-gray-400 sm:text-sm">
               {formationsFiltrees.length}/{formations.length} formation{formations.length !== 1 ? 's' : ''}
+              {filtreMode !== 'all'
+                ? ` · mode : ${filtreMode === 'presentiel' ? 'présentiel' : 'à distance'}`
+                : ''}
             </p>
             {isEtudiant && (
-              <p className="text-sm text-gray-600 mt-2 max-w-2xl leading-relaxed">
-                Consultez les filières et formations proposées par votre établissement. Les tarifs ne sont pas affichés ici ; utilisez le bouton « Candidater » pour déposer un dossier de préinscription.
+              <p className="mt-2 max-w-2xl text-xs leading-relaxed text-gray-600 sm:text-sm">
+                Choisissez une filière, puis un mode (présentiel ou à distance), pour voir les formations. Les tarifs ne sont pas affichés ici — utilisez « Candidater » pour déposer un dossier.
               </p>
             )}
           </div>
           {(user?.role === 'responsable' || user?.role === 'directeur') && (
             <Link to="/responsable/gestion-etablissement"
-              className="text-sm font-bold px-4 py-2 rounded-xl border-2 transition-all hover:opacity-80"
+              className="text-sm font-bold px-4 py-2 rounded-xl border-2 transition-all hover:opacity-80 shrink-0 self-start"
               style={{ color: primary, borderColor: primary }}>
               + Filières & formations
             </Link>
           )}
         </div>
 
-        {/* Filtres type + niveau */}
-        {formations.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-5">
-            {[
-              { val: 'all', label: 'Tous' },
-              { val: 'presentiel', label: '🏫 Présentiel' },
-              { val: 'en_ligne', label: '🌐 FAD' },
-            ].map(t => (
-              <button key={t.val} onClick={() => setFiltreType(t.val)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${filtreType === t.val ? 'text-white border-transparent' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}
-                style={filtreType === t.val ? { background: primary } : {}}>
-                {t.label}
+        {formations.length > 0 && modesPresents.length > 0 && (
+          <div className="mb-4 sm:mb-5 -mx-1 px-1 flex gap-2 overflow-x-auto pb-2 overscroll-x-contain [scrollbar-width:thin] touch-pan-x">
+            <span className="shrink-0 self-center text-[11px] font-semibold text-gray-400 pr-1">Mode</span>
+            <button
+              type="button"
+              onClick={() => setFiltreMode('all')}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${filtreMode === 'all' ? 'text-white border-transparent' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}
+              style={filtreMode === 'all' ? { background: secondary } : {}}
+              title="Toutes les formations"
+            >
+              Tous
+            </button>
+            {modesPresents.includes('presentiel') && (
+              <button
+                type="button"
+                onClick={() => setFiltreMode('presentiel')}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${filtreMode === 'presentiel' ? 'text-white border-transparent' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}
+                style={filtreMode === 'presentiel' ? { background: secondary } : {}}
+                title="Présentiel"
+              >
+                Présentiel
               </button>
-            ))}
-            {niveauxDisponibles.length > 0 && (
-              <>
-                <div className="w-px bg-gray-200" />
-                {['all', ...niveauxDisponibles].map(n => (
-                  <button key={n} onClick={() => setFiltreNiveau(n)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${filtreNiveau === n ? 'text-white border-transparent' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}
-                    style={filtreNiveau === n ? { background: secondary } : {}}>
-                    {n === 'all' ? 'Tous niveaux' : n}
-                  </button>
-                ))}
-              </>
+            )}
+            {modesPresents.includes('en_ligne') && (
+              <button
+                type="button"
+                onClick={() => setFiltreMode('en_ligne')}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${filtreMode === 'en_ligne' ? 'text-white border-transparent' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}
+                style={filtreMode === 'en_ligne' ? { background: secondary } : {}}
+                title="À distance"
+              >
+                Distance
+              </button>
             )}
           </div>
+        )}
+
+        {/* Fil d'Ariane catalogue */}
+        {formationsFiltrees.length > 0 && catalogueStep !== 'filieres' && (
+          <nav className="mb-4 flex flex-wrap items-center gap-1.5 text-xs sm:text-sm" aria-label="Navigation catalogue">
+            <button type="button" onClick={goFilieres} className="font-semibold text-blue-700 hover:underline">
+              Filières
+            </button>
+            {selectedFiliereNom && (
+              <>
+                <span className="text-gray-300">/</span>
+                {catalogueStep === 'types' ? (
+                  <span className="font-bold text-gray-800 truncate max-w-[min(100%,12rem)] sm:max-w-none">{selectedFiliereNom}</span>
+                ) : (
+                  <button type="button" onClick={goTypes} className="font-semibold text-blue-700 hover:underline truncate max-w-[min(100%,12rem)] sm:max-w-none">
+                    {selectedFiliereNom}
+                  </button>
+                )}
+              </>
+            )}
+            {catalogueStep === 'liste' && selectedFormationType && (
+              <>
+                <span className="text-gray-300">/</span>
+                <span className="font-bold text-gray-800">{TYPE_FORMATION_META[selectedFormationType]?.label || selectedFormationType}</span>
+              </>
+            )}
+          </nav>
         )}
 
         {formationsFiltrees.length === 0 ? (
           <div className="bg-gray-50 rounded-2xl p-12 text-center border-2 border-dashed border-gray-200">
             <div className="text-5xl mb-4">📚</div>
             <p className="font-bold text-gray-700 mb-1">
-              {formations.length === 0 ? 'Aucune formation enregistrée' : 'Aucune formation ne correspond aux filtres'}
+              {formations.length === 0 ? 'Aucune formation enregistrée' : 'Aucune formation ne correspond au filtre (mode)'}
             </p>
             <p className="text-gray-400 text-sm">
               {formations.length === 0
                 ? 'Contactez l\'administrateur pour ajouter des formations.'
-                : <button onClick={() => { setFiltreType('all'); setFiltreNiveau('all') }} className="text-blue-600 underline">Réinitialiser les filtres</button>}
+                : <button type="button" onClick={() => setFiltreMode('all')} className="text-blue-600 underline">Voir tous les modes</button>}
             </p>
           </div>
         ) : (
-          <div className="space-y-10">
-            {formationsParFiliere.map(([filiereNom, liste], idx) => (
-              <section key={filiereNom} aria-labelledby={`filiere-heading-${idx}`}>
-                <h3 id={`filiere-heading-${idx}`} className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: primary }} aria-hidden />
-                  {filiereNom}
-                </h3>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {liste.map((f) => (
-                    <div key={f.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden flex flex-col">
-                      <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${primary}, ${secondary})` }} />
-                      <div className="p-5 flex-1 flex flex-col">
-                        <div className="flex items-center gap-2 mb-3 flex-wrap">
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${f.type === 'en_ligne' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {f.type === 'en_ligne' ? '🌐 FAD' : `🏫 ${f.ville || 'Présentiel'}`}
-                          </span>
-                          {f.niveau_requis && <span className="text-xs text-gray-400">{f.niveau_requis}</span>}
-                        </div>
-                        <h3 className="font-bold text-gray-900 mb-2 leading-snug">{f.titre}</h3>
-                        {f.filiere_duree_cycle && (
-                          <p className="text-xs text-gray-700 mb-1">Durée du cycle (filière) : <span className="font-semibold">{f.filiere_duree_cycle}</span></p>
-                        )}
-                        {f.filiere_condition_acces && (
-                          <p className="text-xs text-gray-700 mb-2">Condition d&apos;accès : {f.filiere_condition_acces}</p>
-                        )}
-                        {f.niveau && <p className="text-xs text-gray-600 mb-2">Niveau : {f.niveau}</p>}
-                        {f.description && <p className="text-xs text-gray-500 mb-3 line-clamp-2">{f.description}</p>}
-                        <details className="mb-3 text-xs">
-                          <summary className="cursor-pointer font-semibold text-blue-700">Conditions d&apos;entrée (texte de référence)</summary>
-                          <div className="mt-2">
-                            <PreinscriptionConditionsBlock formationNiveau={f.niveau} />
-                          </div>
-                        </details>
-                        <div className="border-t border-gray-100 pt-3 mt-auto">
-                          {isEtudiant ? (
-                            <div className="space-y-2">
-                              {f.places != null && f.places !== '' && (
-                                <p className="text-xs text-gray-500 text-center">
-                                  <span className="font-semibold text-gray-700">{f.places}</span> place{Number(f.places) > 1 ? 's' : ''} (indicatif)
-                                </p>
-                              )}
-                              <Link
-                                to={`/preinscription/${f.id}`}
-                                className="block w-full text-center text-sm font-bold py-2.5 rounded-xl text-white shadow-sm hover:opacity-95 transition-opacity"
-                                style={{ background: primary }}
-                              >
-                                Candidater
-                              </Link>
-                              <p className="text-[10px] text-center text-gray-400 leading-snug">Les montants vous seront communiqués sur la facture proforma après instruction du dossier.</p>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-between gap-2">
-                              <div>
-                                <div className="font-black text-base" style={{ color: primary }}>{fmt(forfaitAnnuelFromFormation(f))} <span className="text-xs font-normal text-gray-400">FCFA/an</span></div>
-                                <div className="text-xs text-gray-500">
-                                  Inscription {fmt(f.frais_inscription)}
-                                  {f.mensualite > 0 && (
-                                    <> · {fmt(f.mensualite)}/mois{f.duree_mois ? ` × ${f.duree_mois} mois` : ''}</>
-                                  )}
-                                </div>
-                              </div>
-                              {f.places && (
-                                <div className="text-center shrink-0">
-                                  <div className="text-sm font-black text-gray-700">{f.places}</div>
-                                  <div className="text-xs text-gray-400">places</div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
+          <>
+            {/* Étape 1 : cartes filières */}
+            {catalogueStep === 'filieres' && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {formationsParFiliere.map(([filiereNom, liste]) => {
+                  const nPresentiel = liste.filter((x) => x.type === 'presentiel').length
+                  const nDistance = liste.filter((x) => x.type === 'en_ligne').length
+                  return (
+                    <button
+                      key={filiereNom}
+                      type="button"
+                      onClick={() => {
+                        setSelectedFiliereNom(filiereNom)
+                        setCatalogueStep('types')
+                      }}
+                      className="group min-h-0 min-w-0 text-left rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <div className="mb-3 flex items-start gap-2">
+                        <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: primary }} aria-hidden />
+                        <span className="min-w-0 flex-1 text-base font-bold leading-snug text-gray-900 group-hover:text-blue-800 break-words">
+                          {filiereNom}
+                        </span>
                       </div>
-                    </div>
-                  ))}
+                      <p className="text-sm text-gray-500">
+                        {liste.length} formation{liste.length !== 1 ? 's' : ''}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
+                        {nPresentiel > 0 && (
+                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-800">🏫 Présentiel · {nPresentiel}</span>
+                        )}
+                        {nDistance > 0 && (
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800">🌐 Distance · {nDistance}</span>
+                        )}
+                      </div>
+                      <p className="mt-4 text-xs font-bold text-blue-700 group-hover:underline">Voir les modes →</p>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Étape 2 : types présentiel / distance */}
+            {catalogueStep === 'types' && selectedFiliereNom && (
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={goFilieres}
+                  className="text-sm font-semibold text-gray-600 hover:text-blue-700"
+                >
+                  ← Retour aux filières
+                </button>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">
+                  Mode de formation — {selectedFiliereNom}
+                </h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-3xl">
+                  {typesDisponiblesPourFiliere.map((t) => {
+                    const meta = TYPE_FORMATION_META[t]
+                    const count = listeFiliereSelectionnee.filter((f) => f.type === t).length
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => {
+                          setSelectedFormationType(t)
+                          setCatalogueStep('liste')
+                        }}
+                        className="rounded-2xl border-2 border-gray-100 bg-white p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        <div className="text-3xl mb-2">{meta?.emoji}</div>
+                        <div className="text-lg font-black text-gray-900">{meta?.label}</div>
+                        <p className="mt-1 text-sm text-gray-500">{meta?.desc}</p>
+                        <p className="mt-4 text-sm font-bold text-blue-700">
+                          {count} formation{count !== 1 ? 's' : ''} →
+                        </p>
+                      </button>
+                    )
+                  })}
                 </div>
-              </section>
-            ))}
-          </div>
+                {typesDisponiblesPourFiliere.length === 0 && (
+                  <p className="text-sm text-gray-500">Aucun mode reconnu pour cette filière.</p>
+                )}
+              </div>
+            )}
+
+            {/* Étape 3 : liste des formations */}
+            {catalogueStep === 'liste' && selectedFiliereNom && selectedFormationType && (
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={goTypes}
+                  className="text-sm font-semibold text-gray-600 hover:text-blue-700"
+                >
+                  ← Retour aux modes
+                </button>
+                <h3 className="text-base font-bold text-gray-900">
+                  {TYPE_FORMATION_META[selectedFormationType]?.emoji}{' '}
+                  {TYPE_FORMATION_META[selectedFormationType]?.label}
+                  <span className="font-normal text-gray-500"> — {selectedFiliereNom}</span>
+                </h3>
+                {formationsListeFinale.length === 0 ? (
+                  <p className="text-sm text-gray-500">Aucune formation dans cette catégorie.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:gap-5">
+                    {formationsListeFinale.map((f) => (
+                      <FormationCatalogueCard
+                        key={f.id}
+                        f={f}
+                        primary={primary}
+                        secondary={secondary}
+                        isEtudiant={isEtudiant}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* ── ACCÈS RAPIDES ───────────────────────────────────────── */}
-      {!isEtudiant && (
-        <div>
-          <h2 className="text-xl font-black text-gray-900 mb-4">Accès rapides</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              roleLink && { ...roleLink, desc: 'Gérer les dossiers de préinscription' },
-              { label: 'Demandes proforma',  path: '/responsable/demandes-proforma', icon: '🧾', desc: 'Factures proforma de l\'établissement' },
-              user?.role === 'responsable' && { label: 'Valider des dossiers', path: '/responsable', icon: '✅', desc: 'Accepter ou refuser des candidatures' },
-              user?.role === 'agent_admin'  && { label: 'Vérifier les documents', path: '/agent-admin', icon: '📎', desc: 'Contrôle de complétude des dossiers' },
-              user?.role === 'comptable'    && { label: 'Finance', path: '/comptable', icon: '💰', desc: 'Gestion financière et facturation' },
-              user?.role === 'directeur'    && { label: 'Supervision', path: '/directeur', icon: '👁️', desc: 'Vue globale de l\'établissement' },
-            ].filter(Boolean).slice(0, 4).map((item, i) => (
-              <Link key={i} to={item.path}
-                className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group">
-                <div className="text-2xl mb-3">{item.icon}</div>
-                <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-sm">{item.label}</div>
-                <div className="text-xs text-gray-400 mt-1">{item.desc}</div>
-              </Link>
-            ))}
+      {!isEtudiant && (() => {
+        const proformaRoles = ['responsable', 'admin', 'directeur', 'agent_admin', 'comptable', 'controleur_qualite']
+        const showProforma = proformaRoles.includes(user?.role)
+        const quick = [
+          roleLink && { ...roleLink, desc: 'Gérer les dossiers de préinscription' },
+          showProforma && {
+            label: 'Demandes proforma',
+            path: '/responsable/demandes-proforma',
+            icon: '🧾',
+            desc: "Demandes de facture proforma et validation",
+          },
+          user?.role === 'responsable' && { label: 'Valider des dossiers', path: '/responsable', icon: '✅', desc: 'Accepter ou refuser des candidatures' },
+          user?.role === 'agent_admin' && { label: 'Vérifier les documents', path: '/agent-admin', icon: '📎', desc: 'Contrôle de complétude des dossiers' },
+          user?.role === 'comptable' && { label: 'Finance', path: '/comptable', icon: '💰', desc: 'Gestion financière et facturation' },
+          user?.role === 'directeur' && { label: 'Supervision', path: '/directeur', icon: '👁️', desc: "Vue globale de l'établissement" },
+          user?.role === 'controleur_qualite' && { label: 'Qualité', path: '/qualite', icon: '✅', desc: 'Contrôle et conformité' },
+        ].filter(Boolean)
+        return (
+          <div>
+            <h2 className="text-xl font-black text-gray-900 mb-4">Accès rapides</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {quick.map((item, i) => (
+                <Link
+                  key={`${item.path}-${i}`}
+                  to={item.path}
+                  className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
+                >
+                  <div className="text-2xl mb-3">{item.icon}</div>
+                  <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-sm">{item.label}</div>
+                  <div className="text-xs text-gray-400 mt-1">{item.desc}</div>
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
-      {/* Infos légales */}
       {(etab.ninea || etab.rc || etab.arrete) && (
         <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 text-xs text-gray-500 space-y-1">
           <p className="font-bold text-gray-700 text-sm mb-2">Informations légales</p>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
@@ -49,12 +49,6 @@ export default function AttestationPreinscription() {
     }
   }, [data])
 
-  const qrSrc = useMemo(() => {
-    if (!data?.attestation_extensions?.verification_id) return null
-    const payload = data.attestation_extensions.verification_id
-    return `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(payload)}`
-  }, [data])
-
   const handlePrint = () => window.print()
 
   if (loading) {
@@ -88,11 +82,11 @@ export default function AttestationPreinscription() {
     etudiant,
     candidat,
     etablissement: etab,
-    photo_url: rawPhoto,
     formation_libelle,
     filiere_libelle,
     niveau_libelle,
     annee_academique,
+    photo_url: rawPhoto,
     attestation_extensions: ext = {},
   } = data
 
@@ -103,13 +97,13 @@ export default function AttestationPreinscription() {
   const photoSrc = mediaUrl(rawPhoto)
   const cachetSrc = mediaUrl(etab?.cachet_url)
   const refAtt = ext.reference_attestation || `ATT-${new Date().getFullYear()}-${String(dossier.id).padStart(5, '0')}`
-  const verificationId = ext.verification_id || `${refAtt}-${String(dossier.id).padStart(4, '0')}`
 
   const prenomT = (etudiant.prenom || '').trim()
   const nomT = (etudiant.nom || '').trim()
   const nomComplet = [prenomT, nomT].filter(Boolean).join(' ') || '—'
+  const nDossier = candidat?.numero_dossier || dossier.numero_dossier
 
-  const texteCorps = `Nous attestons que l’étudiant(e) ${nomComplet} est admis(e) en ${formation_libelle} au titre de l’année académique ${annee_academique}.`
+  const texteCorps = `Nous attestons que ${nomComplet} est admis(e) en ${formation_libelle} pour l’année académique ${annee_academique}, sous réserve des formalités d’inscription définitive.`
 
   return (
     <div className="lettre-print-scope min-h-screen bg-slate-200 py-8 px-4">
@@ -140,151 +134,140 @@ export default function AttestationPreinscription() {
           </button>
         </div>
         <p className="text-xs text-gray-700 bg-amber-50/90 border border-amber-100 rounded-lg px-4 py-2.5 leading-relaxed">
-          <span className="font-semibold text-amber-900">PDF propre :</span> dans la fenêtre d’impression, désactivez « En-têtes et pieds de page » avant d’enregistrer en PDF.
+          <span className="font-semibold text-amber-900">PDF :</span> désactivez « En-têtes et pieds de page » dans l’impression.
         </p>
       </div>
 
       <div className="print-page max-w-3xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden">
         <div className="h-2" style={bandStyle} />
 
-        <div className="px-10 pt-8 pb-6">
-          <div className="flex items-start justify-between gap-6 flex-wrap">
-            <div className="flex items-start gap-4 min-w-0">
+        <div className="px-8 pt-8 pb-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-3 min-w-0">
               {logoSrc ? (
                 <img
                   src={logoSrc}
                   alt=""
-                  className="w-16 h-16 object-contain rounded-xl border border-gray-100 bg-white p-1 shadow shrink-0"
+                  className="w-16 h-16 object-contain rounded-lg border border-gray-100 bg-white p-1 shrink-0"
                 />
               ) : (
                 <div
-                  className="w-16 h-16 rounded-xl flex items-center justify-center shadow text-white text-sm font-bold shrink-0"
+                  className="w-16 h-16 rounded-lg flex items-center justify-center shadow text-white text-xs font-bold shrink-0"
                   style={{ background: `linear-gradient(135deg, ${primary}, ${secondary})` }}
                 >
                   {(etab?.nom || 'U').slice(0, 2).toUpperCase()}
                 </div>
               )}
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Attestation de préinscription</p>
-                <h1 className="text-xl font-black mt-1" style={{ color: primary }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Attestation de préinscription</p>
+                <h1 className="text-xl font-black mt-0.5" style={{ color: primary }}>
                   {etab?.nom || 'Établissement'}
                 </h1>
-                {etab?.adresse && <p className="text-sm text-gray-600 mt-1">{etab.adresse}</p>}
+                {etab?.adresse && <p className="text-xs text-gray-600 mt-1 max-w-md">{etab.adresse}</p>}
                 {(etab?.telephone || etab?.email_contact) && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-[11px] text-gray-500 mt-0.5">
                     {[etab.telephone, etab.email_contact].filter(Boolean).join(' · ')}
                   </p>
                 )}
               </div>
             </div>
-            <div className="text-right text-xs text-gray-500 shrink-0">
-              <p className="font-mono font-bold text-gray-800">{refAtt}</p>
+            <div className="text-right text-[11px] text-gray-500 shrink-0">
+              <p className="font-mono font-semibold text-gray-800">{refAtt}</p>
               <p>Émis le {fmtDate(new Date())}</p>
             </div>
           </div>
         </div>
 
-        <div className="mx-10 border-t-2 border-gray-100" />
+        <div className="mx-8 border-t border-gray-100" />
 
-        <div className="px-10 py-8 space-y-8 text-gray-800">
+        <div className="px-8 py-6 space-y-6 text-gray-800">
           <div className="grid md:grid-cols-3 gap-6 items-start">
-            <div className="md:col-span-2 space-y-4">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">Informations étudiant</h2>
-              <dl className="grid sm:grid-cols-2 gap-3 text-sm">
+            <div className="md:col-span-2 space-y-3">
+              <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500">Candidat</h2>
+              <dl className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <div>
-                  <dt className="text-gray-400 text-xs uppercase">Nom et prénom</dt>
+                  <dt className="text-gray-400 text-[11px] uppercase">Nom et prénom</dt>
                   <dd className="font-semibold">{nomComplet}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-400 text-xs uppercase">N° dossier</dt>
-                  <dd className="font-mono font-semibold">{candidat?.numero_dossier || dossier.numero_dossier}</dd>
+                  <dt className="text-gray-400 text-[11px] uppercase">N° dossier</dt>
+                  <dd className="font-mono font-semibold">{nDossier || '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-400 text-xs uppercase">Date de naissance</dt>
-                  <dd className="font-semibold">{fmtDate(candidat?.date_naissance || dossier.date_naissance)}</dd>
+                  <dt className="text-gray-400 text-[11px] uppercase">Date de naissance</dt>
+                  <dd className="font-medium">{fmtDate(candidat?.date_naissance || dossier.date_naissance)}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-400 text-xs uppercase">Nationalité</dt>
-                  <dd className="font-semibold">{candidat?.nationalite || dossier.nationalite || '—'}</dd>
+                  <dt className="text-gray-400 text-[11px] uppercase">Nationalité</dt>
+                  <dd className="font-medium">{candidat?.nationalite || dossier.nationalite || '—'}</dd>
                 </div>
               </dl>
             </div>
-            <div className="text-center">
+            <div className="text-center md:text-left">
               <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Photo</p>
               {photoSrc ? (
                 <img
                   src={photoSrc}
-                  alt="Étudiant"
-                  className="w-28 h-36 object-cover rounded-xl border-4 shadow-md mx-auto"
-                  style={{ borderColor: primary }}
+                  alt=""
+                  className="w-24 h-32 object-cover rounded-lg border-2 mx-auto md:mx-0 shadow-sm"
+                  style={{ borderColor: `${primary}55` }}
                 />
               ) : (
-                <div className="w-28 h-36 rounded-xl border-2 border-dashed border-gray-200 mx-auto flex items-center justify-center text-gray-400 text-xs">
+                <div className="w-24 h-32 rounded-lg border border-dashed border-gray-200 mx-auto md:mx-0 flex items-center justify-center text-[10px] text-gray-400 px-1">
                   Non fournie
                 </div>
               )}
             </div>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-slate-50/80 px-5 py-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">Formation</h2>
+          <div className="rounded-xl border border-gray-100 bg-slate-50/90 px-4 py-3">
+            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">Formation</h2>
             <dl className="grid sm:grid-cols-2 gap-3 text-sm">
               <div>
-                <dt className="text-gray-400 text-xs uppercase">Filière</dt>
+                <dt className="text-gray-400 text-[11px] uppercase">Filière</dt>
                 <dd className="font-semibold">{filiere_libelle || '—'}</dd>
               </div>
               <div>
-                <dt className="text-gray-400 text-xs uppercase">Formation</dt>
+                <dt className="text-gray-400 text-[11px] uppercase">Intitulé</dt>
                 <dd className="font-semibold">{formation_libelle}</dd>
               </div>
               <div>
-                <dt className="text-gray-400 text-xs uppercase">Niveau</dt>
-                <dd className="font-semibold">{niveau_libelle}</dd>
+                <dt className="text-gray-400 text-[11px] uppercase">Niveau</dt>
+                <dd className="font-medium">{niveau_libelle}</dd>
               </div>
               <div>
-                <dt className="text-gray-400 text-xs uppercase">Année académique</dt>
-                <dd className="font-semibold">{annee_academique}</dd>
+                <dt className="text-gray-400 text-[11px] uppercase">Année académique</dt>
+                <dd className="font-medium">{annee_academique}</dd>
               </div>
             </dl>
           </div>
 
-          <div className="border-l-4 pl-5 py-1" style={{ borderColor: primary }}>
-            <p className="text-base leading-relaxed font-medium">{texteCorps}</p>
+          <div className="border-l-4 pl-4 py-0.5" style={{ borderColor: primary }}>
+            <p className="text-[15px] leading-relaxed font-medium">{texteCorps}</p>
             {ext.texte_officiel_base && (
               <p className="text-sm text-gray-600 mt-3 leading-relaxed">{ext.texte_officiel_base}</p>
             )}
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 pt-4 items-end">
-            <div className="text-center md:text-left">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Vérification</p>
-              {qrSrc && (
-                <img src={qrSrc} alt="QR code" className="w-[140px] h-[140px] mx-auto md:mx-0 border border-gray-100 rounded-lg bg-white p-1" />
-              )}
-              <p className="text-[11px] text-gray-400 mt-2 font-mono break-all">{verificationId}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Cachet établissement</p>
-              {cachetSrc ? (
-                <img src={cachetSrc} alt="Cachet" className="max-h-32 mx-auto object-contain" />
-              ) : (
-                <div
-                  className="mx-auto w-36 h-24 rounded-xl border-2 border-dashed flex items-center justify-center text-gray-400 text-xs px-2"
-                  style={{ borderColor: `${primary}44` }}
-                >
-                  Cachet
-                </div>
-              )}
-            </div>
-            <div className="text-center md:text-right">
-              <p className="text-sm font-bold text-gray-900">{etab?.signataire_nom || 'Le Responsable pédagogique'}</p>
-              <p className="text-xs text-gray-500">{etab?.signataire_fonction || 'Pour le Directeur des études'}</p>
-              <p className="text-xs text-gray-400 mt-4">Fait à {etab?.nom || '…'}, le {fmtDate(new Date())}</p>
-            </div>
+          <div className="flex flex-col items-center pt-6 pb-2">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-3">Cachet de la direction</p>
+            {cachetSrc ? (
+              <img src={cachetSrc} alt="Cachet" className="max-h-36 mx-auto object-contain" />
+            ) : (
+              <div
+                className="mx-auto w-40 h-28 rounded-xl border-2 border-dashed flex items-center justify-center text-gray-400 text-xs px-2"
+                style={{ borderColor: `${primary}44` }}
+              >
+                Cachet
+              </div>
+            )}
+            <p className="text-sm font-bold text-gray-900 mt-6">{etab?.signataire_nom || 'Le Responsable pédagogique'}</p>
+            <p className="text-xs text-gray-500">{etab?.signataire_fonction || 'Pour la direction'}</p>
+            <p className="text-xs text-gray-400 mt-3">Fait à {etab?.nom || '…'}, le {fmtDate(new Date())}</p>
           </div>
 
-          <p className="text-center text-[11px] text-gray-400 pt-4 border-t border-dashed border-gray-100">
-            Document électronique — valable avec le QR de référence interne · {refAtt}
+          <p className="text-center text-[10px] text-gray-400 pt-2 border-t border-dashed border-gray-100">
+            Document officiel — {refAtt} — ne remplace pas l’inscription définitive.
           </p>
         </div>
 

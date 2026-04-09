@@ -15,6 +15,12 @@ import {
   FaChevronRight,
   FaPlus,
   FaLayerGroup,
+  FaEdit,
+  FaTrashAlt,
+  FaUndo,
+  FaUserCog,
+  FaShieldAlt,
+  FaExclamationTriangle,
 } from 'react-icons/fa'
 import { TabFacturesEtab } from './TabFacturesEtab'
 import { TabAcceptesParFormation } from './TabAcceptesParFormation'
@@ -101,14 +107,16 @@ const TYPES_ETAB = [
   { val: 'gestion', label: '📊 Commerce / Informatique / Administration' },
 ]
 const ROLES_STAFF = [
-  { val: 'responsable', label: 'Responsable Pédagogique' },
-  { val: 'agent_admin', label: 'Agent Administratif' },
+  { val: 'responsable', label: 'Responsable pédagogique' },
+  { val: 'agent_admin', label: 'Agent administratif' },
   { val: 'comptable', label: 'Comptable' },
+  { val: 'controleur_qualite', label: 'Contrôleur qualité' },
   { val: 'directeur', label: 'Directeur' },
 ]
 const ROLE_COLORS = {
   responsable: 'bg-teal-100 text-teal-700', agent_admin: 'bg-orange-100 text-orange-700',
   comptable: 'bg-violet-100 text-violet-700', directeur: 'bg-blue-100 text-blue-700',
+  controleur_qualite: 'bg-cyan-100 text-cyan-800',
 }
 
 // ─── Helper label ──────────────────────────────────────────────────────────────
@@ -527,6 +535,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
     filiere_id: '', titre: '', type: 'presentiel', niveau: '', niveau_requis: '', duree: '', description: '', ville: '', places: '',
     frais_inscription: '', mensualite: '', duree_mois: '', frais_soutenance: '', autres_frais: '0',
     frais_supplementaires: [],
+    nombre_photos_preinscription: '1',
   }
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
@@ -571,6 +580,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       frais_soutenance: String(f.frais_soutenance || ''),
       autres_frais: String(f.autres_frais || '0'),
       frais_supplementaires: supp.length ? supp : [],
+      nombre_photos_preinscription: String(f.nombre_photos_preinscription ?? 1),
     })
     setShowForm(true)
   }
@@ -595,6 +605,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         frais_supplementaires: normalizeFraisSuppFromForm(form.frais_supplementaires),
         frais_soutenance: parseInt(form.frais_soutenance, 10) || 0,
         autres_frais: parseInt(form.autres_frais, 10) || 0,
+        nombre_photos_preinscription: Math.min(10, Math.max(1, parseInt(form.nombre_photos_preinscription, 10) || 1)),
       }
       if (editing) {
         const { data } = await axios.put(`/api/etablissements/${etabId}/formations/${editing.id}`, body)
@@ -768,6 +779,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
           null,
           0
         ),
+        nombre_photos_preinscription: String(f.nombre_photos_preinscription ?? 1),
         actif: f.actif !== false,
       }))
     if (rows.length === 0) {
@@ -806,6 +818,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         frais_soutenance: '0',
         autres_frais: '0',
         frais_supplementaires_json: '[]',
+        nombre_photos_preinscription: '1',
         actif: true,
       },
     ]))
@@ -839,6 +852,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         autres_frais: parseInt(r.autres_frais || 0, 10),
         frais_supplementaires: parseFraisSuppJson(r.frais_supplementaires_json),
         actif: !!r.actif,
+        nombre_photos_preinscription: Math.min(10, Math.max(1, parseInt(r.nombre_photos_preinscription, 10) || 1)),
       }))
       const { data } = await axios.put(`/api/etablissements/${etabId}/formations/batch`, { items: payload })
       await onRefreshFilieres?.()
@@ -1236,6 +1250,18 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                   <L>Places disponibles</L>
                   <input className="input-field" type="number" min="0" value={form.places} onChange={up('places')} />
                 </div>
+                <div>
+                  <L>Photos d’identité (préinscription)</L>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={form.nombre_photos_preinscription}
+                    onChange={up('nombre_photos_preinscription')}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Nombre de photos à fournir pour chaque dossier (1 à 10), selon cette formation.</p>
+                </div>
                 {form.type === 'presentiel' && (
                   <div>
                     <L>Ville</L>
@@ -1507,6 +1533,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                       <th className="py-2.5 px-2">Mens.</th>
                       <th className="py-2.5 px-2">Sout.</th>
                       <th className="py-2.5 px-2">Autres</th>
+                      <th className="py-2.5 px-2 w-12" title="Photos d’identité (préinscription)">Ph.</th>
                       <th className="py-2.5 px-2 whitespace-nowrap">Forfait annuel</th>
                       <th className="py-2.5 px-2 min-w-[7rem]">Frais sup. JSON</th>
                       <th className="py-2.5 px-2 text-center">Actif</th>
@@ -1642,6 +1669,17 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                               onChange={(e) => updateBatchRow(i, { autres_frais: e.target.value })}
                             />
                           </td>
+                          <td className="py-2 px-2">
+                            <input
+                              type="number"
+                              min="1"
+                              max="10"
+                              title="Nombre de photos exigées (1–10)"
+                              className="input-field py-1.5 w-full min-w-[2.5rem]"
+                              value={r.nombre_photos_preinscription ?? '1'}
+                              onChange={(e) => updateBatchRow(i, { nombre_photos_preinscription: e.target.value })}
+                            />
+                          </td>
                           <td className="py-2 px-2 text-xs font-bold text-slate-800 whitespace-nowrap tabular-nums">
                             {fmt(r.prix)}
                           </td>
@@ -1706,22 +1744,70 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
 // Onglet 4 — Membres
 // ═══════════════════════════════════════════════════════════════════════
 const EMPTY_MEMBRE_FORM = {
-  prenom: '', nom: '', email: '', telephone: '', adresse: '',
+  prenom: '', nom: '', email: '', telephone: '', adresse: '', date_naissance: '',
   mot_de_passe: '', mot_de_passe_confirmation: '', role: 'responsable',
+}
+
+const EMPTY_EDIT_FORM = {
+  prenom: '', nom: '', email: '', telephone: '', adresse: '', role: 'responsable', actif: true,
+  mot_de_passe: '', mot_de_passe_confirmation: '',
 }
 
 function TabMembres({ etabId, membres: init, responsable_id }) {
   const [membres, setMembres] = useState(init || [])
+  const [q, setQ] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_MEMBRE_FORM)
   const [saving, setSaving] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [permanentFor, setPermanentFor] = useState(null)
+  const [confirmEmail, setConfirmEmail] = useState('')
+  const [permanentSaving, setPermanentSaving] = useState(false)
+
+  useEffect(() => {
+    setMembres(init || [])
+  }, [init])
 
   const up = f => e => setForm(p => ({ ...p, [f]: e.target.value }))
+  const upEdit = f => e => {
+    const v = f === 'actif' ? e.target.checked : e.target.value
+    setEditForm(p => ({ ...p, [f]: v }))
+  }
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    if (!s) return membres
+    return membres.filter(m => {
+      const blob = `${m.prenom} ${m.nom} ${m.email} ${m.matricule || ''} ${m.role}`.toLowerCase()
+      return blob.includes(s)
+    })
+  }, [membres, q])
+
+  const openEdit = m => {
+    setEditId(m.id)
+    setEditForm({
+      prenom: m.prenom || '',
+      nom: m.nom || '',
+      email: m.email || '',
+      telephone: m.telephone || '',
+      adresse: m.adresse || '',
+      role: m.role || 'responsable',
+      actif: m.actif !== false,
+      mot_de_passe: '',
+      mot_de_passe_confirmation: '',
+    })
+  }
 
   const handleCreate = async e => {
     e.preventDefault()
     if (form.mot_de_passe !== form.mot_de_passe_confirmation) {
       toast.error('Les mots de passe ne correspondent pas.')
+      return
+    }
+    if (!form.date_naissance?.trim()) {
+      toast.error('La date de naissance est obligatoire.')
       return
     }
     setSaving(true)
@@ -1740,8 +1826,38 @@ function TabMembres({ etabId, membres: init, responsable_id }) {
     } finally { setSaving(false) }
   }
 
+  const handleSaveEdit = async e => {
+    e.preventDefault()
+    if (!editId) return
+    if (editForm.mot_de_passe && editForm.mot_de_passe !== editForm.mot_de_passe_confirmation) {
+      toast.error('Les mots de passe ne correspondent pas.')
+      return
+    }
+    setSavingEdit(true)
+    try {
+      const payload = {
+        prenom: editForm.prenom,
+        nom: editForm.nom,
+        email: editForm.email,
+        telephone: editForm.telephone,
+        adresse: editForm.adresse,
+        role: editForm.role,
+        actif: editForm.actif,
+      }
+      if (editForm.mot_de_passe?.trim()) payload.mot_de_passe = editForm.mot_de_passe
+      const { data } = await axios.put(`/api/etablissements/${etabId}/membres/${editId}`, payload)
+      const mem = data.membre
+      setMembres(prev => prev.map(m => (m.id === editId ? { ...m, ...mem } : m)))
+      toast.success(data.message || 'Membre mis à jour.')
+      setEditId(null)
+      setEditForm(EMPTY_EDIT_FORM)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur.')
+    } finally { setSavingEdit(false) }
+  }
+
   const handleDeactivate = async (id, nom) => {
-    if (!confirm(`Désactiver ${nom} ?`)) return
+    if (!window.confirm(`Désactiver ${nom} ? Le compte ne pourra plus se connecter.`)) return
     try {
       await axios.delete(`/api/etablissements/${etabId}/membres/${id}`)
       setMembres(prev => prev.map(m => m.id === id ? { ...m, actif: false } : m))
@@ -1751,69 +1867,216 @@ function TabMembres({ etabId, membres: init, responsable_id }) {
     }
   }
 
+  const handleReactivate = async id => {
+    try {
+      const { data } = await axios.put(`/api/etablissements/${etabId}/membres/${id}`, { actif: true })
+      const mem = data.membre
+      setMembres(prev => prev.map(m => (m.id === id ? { ...m, ...mem } : m)))
+      toast.success('Compte réactivé.')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur.')
+    }
+  }
+
+  const handlePermanentDelete = async e => {
+    e.preventDefault()
+    if (!permanentFor) return
+    setPermanentSaving(true)
+    try {
+      await axios.post(`/api/etablissements/${etabId}/membres/${permanentFor.id}/supprimer-definitif`, {
+        confirmation_email: confirmEmail.trim(),
+      })
+      setMembres(prev => prev.filter(m => m.id !== permanentFor.id))
+      toast.success('Compte supprimé définitivement.')
+      setPermanentFor(null)
+      setConfirmEmail('')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur.')
+    } finally { setPermanentSaving(false) }
+  }
+
+  const actifs = membres.filter(m => m.actif !== false).length
+
   return (
-    <div>
-      <div className="flex justify-between items-start gap-4 mb-5">
-        <div>
-          <p className="text-sm text-gray-500">{membres.length} membre(s) du staff</p>
-          <p className="text-xs text-gray-400 mt-1">Les comptes étudiants ne figurent pas dans cette liste.</p>
+    <div className="space-y-6">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 sm:p-8 text-white shadow-xl">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-400/20 blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-12 left-1/4 h-32 w-64 rounded-full bg-violet-500/15 blur-2xl" aria-hidden />
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-cyan-200/90 ring-1 ring-white/10">
+              <FaShieldAlt className="h-3 w-3" aria-hidden />
+              Équipe &amp; accès
+            </div>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Membres du staff</h2>
+            <p className="mt-1 max-w-xl text-sm text-slate-300">
+              Gérez les rôles, l’identité et l’état des comptes. Les étudiants ne sont pas listés ici.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <span className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-1.5 text-sm font-medium ring-1 ring-white/10">
+                <FaUsers className="h-4 w-4 text-cyan-300" aria-hidden />
+                {membres.length} compte{membres.length > 1 ? 's' : ''}
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-100 ring-1 ring-emerald-400/30">
+                {actifs} actif{actifs > 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setShowForm(true); setForm(EMPTY_MEMBRE_FORM) }}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-900/40 transition hover:brightness-110 active:scale-[0.98]"
+          >
+            <FaPlus className="h-4 w-4" aria-hidden />
+            Ajouter un membre
+          </button>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary text-sm flex-shrink-0">+ Ajouter un membre</button>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative max-w-md flex-1">
+          <FaSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+          <input
+            className="input-field w-full pl-10"
+            placeholder="Rechercher par nom, email, matricule, rôle…"
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            aria-label="Filtrer les membres"
+          />
+        </div>
+        <p className="text-xs text-slate-500">
+          {filtered.length} résultat{filtered.length > 1 ? 's' : ''}
+          {q.trim() ? ` sur ${membres.length}` : ''}
+        </p>
       </div>
 
       {membres.length === 0 ? (
-        <div className="text-center py-12 text-gray-400"><div className="text-5xl mb-3">👥</div><p>Aucun membre rattaché.</p></div>
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 py-16 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-200 to-slate-100 text-3xl shadow-inner">👥</div>
+          <p className="font-semibold text-slate-700">Aucun membre rattaché</p>
+          <p className="mt-1 text-sm text-slate-500">Créez un premier compte pour cet établissement.</p>
+        </div>
       ) : (
-        <div className="space-y-2">
-          {membres.map(m => (
-            <div key={m.id} className={`flex items-center gap-3 p-3 rounded-xl border ${!m.actif ? 'opacity-50 bg-gray-50' : 'bg-white border-gray-100 hover:bg-gray-50'}`}>
-              <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center flex-shrink-0">
-                {(m.prenom?.[0] || '?')}{(m.nom?.[0] || '')}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map(m => (
+            <div
+              key={m.id}
+              className={`group relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md ${
+                m.actif === false
+                  ? 'border-slate-200 opacity-90 grayscale-[0.35]'
+                  : 'border-slate-100 hover:border-cyan-200/80'
+              }`}
+            >
+              <div
+                className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-500 via-teal-500 to-indigo-500 opacity-80"
+                aria-hidden
+              />
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 text-sm font-black text-slate-700 shadow-inner ring-1 ring-slate-200/80">
+                  {(m.prenom?.[0] || '?').toUpperCase()}
+                  {(m.nom?.[0] || '').toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold text-slate-900">
+                    {m.prenom} {m.nom}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">{m.email}</p>
+                  {m.matricule && (
+                    <p className="mt-1 font-mono text-[11px] font-semibold text-slate-600">{m.matricule}</p>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className={`text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${ROLE_COLORS[m.role] || 'bg-gray-100 text-gray-600'}`}>
+                      {ROLES_STAFF.find(r => r.val === m.role)?.label || m.role}
+                    </span>
+                    {m.id === responsable_id && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                        <FaUserTie className="h-3 w-3" aria-hidden />
+                        Désigné resp.
+                      </span>
+                    )}
+                    {m.actif === false && (
+                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold uppercase text-red-700 ring-1 ring-red-100">
+                        Inactif
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 text-sm">{m.prenom} {m.nom}</p>
-                <p className="text-xs text-gray-400">{m.email}</p>
-                {m.matricule && <p className="text-xs font-mono text-gray-500 mt-0.5">{m.matricule}</p>}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ROLE_COLORS[m.role] || 'bg-gray-100 text-gray-600'}`}>
-                  {ROLES_STAFF.find(r => r.val === m.role)?.label || m.role}
-                </span>
-                {m.id === responsable_id && <span className="text-xs bg-yellow-100 text-yellow-700 font-semibold px-2 py-0.5 rounded-full">Responsable</span>}
-                {m.actif !== false && (
-                  <button onClick={() => handleDeactivate(m.id, `${m.prenom} ${m.nom}`)} className="text-xs text-red-600 border border-red-200 hover:border-red-400 px-2 py-1 rounded-lg">Désactiver</button>
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => openEdit(m)}
+                  className="inline-flex flex-1 min-w-[6rem] items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50/50"
+                >
+                  <FaEdit className="h-3.5 w-3.5" aria-hidden />
+                  Modifier
+                </button>
+                {m.actif !== false ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeactivate(m.id, `${m.prenom} ${m.nom}`)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-100 bg-red-50/80 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                  >
+                    <FaUserCog className="h-3.5 w-3.5 opacity-80" aria-hidden />
+                    Désactiver
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleReactivate(m.id)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100"
+                  >
+                    <FaUndo className="h-3.5 w-3.5" aria-hidden />
+                    Réactiver
+                  </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => { setPermanentFor(m); setConfirmEmail('') }}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-800"
+                  title="Suppression irréversible"
+                >
+                  <FaTrashAlt className="h-3.5 w-3.5" aria-hidden />
+                  Supprimer
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
+      {filtered.length === 0 && membres.length > 0 && (
+        <p className="text-center text-sm text-slate-500">Aucun membre ne correspond à votre recherche.</p>
+      )}
+
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100 sticky top-0 bg-white">
-              <h3 className="font-bold text-gray-900">Ajouter un membre</h3>
-              <button type="button" onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-700 text-2xl">×</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
+          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-4">
+              <h3 className="text-lg font-bold text-slate-900">Nouveau membre</h3>
+              <button type="button" onClick={() => setShowForm(false)} className="text-2xl text-slate-400 hover:text-slate-700" aria-label="Fermer">
+                ×
+              </button>
             </div>
-            <form onSubmit={handleCreate} className="p-5 space-y-4">
+            <form onSubmit={handleCreate} className="space-y-4 p-5">
               <div className="grid grid-cols-2 gap-3">
                 <div><L>Prénom *</L><input className="input-field" value={form.prenom} onChange={up('prenom')} required /></div>
                 <div><L>Nom *</L><input className="input-field" value={form.nom} onChange={up('nom')} required /></div>
               </div>
-              <p className="text-xs text-gray-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-                Le <strong>matricule</strong> est généré automatiquement à partir du nom de cet établissement (3 lettres + 3 chiffres).
+              <p className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                Le <strong>matricule</strong> est généré automatiquement (préfixe lié à l’établissement).
               </p>
+              <div><L>Date de naissance *</L><input className="input-field" type="date" value={form.date_naissance} onChange={up('date_naissance')} required /></div>
               <div><L>Email *</L><input className="input-field" type="email" value={form.email} onChange={up('email')} required /></div>
               <div>
                 <L>Téléphone *</L>
                 <input className="input-field" type="tel" value={form.telephone} onChange={up('telephone')} required />
-                <p className="text-xs text-gray-500 mt-1">Unique sur toute la plateforme (même nom autorisé).</p>
+                <p className="mt-1 text-xs text-slate-500">Unique sur toute la plateforme.</p>
               </div>
-              <div><L>Adresse <span className="text-gray-400 font-normal">(recommandé)</span></L><input className="input-field" value={form.adresse} onChange={up('adresse')} placeholder="Optionnel" /></div>
+              <div><L>Adresse</L><input className="input-field" value={form.adresse} onChange={up('adresse')} placeholder="Optionnel" /></div>
               <div><L>Mot de passe *</L><input className="input-field" type="password" value={form.mot_de_passe} onChange={up('mot_de_passe')} required minLength={6} /></div>
-              <div><L>Confirmer le mot de passe *</L><input className="input-field" type="password" value={form.mot_de_passe_confirmation} onChange={up('mot_de_passe_confirmation')} required minLength={6} /></div>
-              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              <div><L>Confirmer *</L><input className="input-field" type="password" value={form.mot_de_passe_confirmation} onChange={up('mot_de_passe_confirmation')} required minLength={6} /></div>
+              <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                 Première connexion : changement de mot de passe obligatoire.
               </p>
               <div>
@@ -1822,7 +2085,7 @@ function TabMembres({ etabId, membres: init, responsable_id }) {
                   {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
                 </select>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">Annuler</button>
                 <button type="submit" disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-40">
                   {saving ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : null}
@@ -1831,6 +2094,114 @@ function TabMembres({ etabId, membres: init, responsable_id }) {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {editId != null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
+          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-cyan-50/80 to-white px-5 py-4">
+              <h3 className="text-lg font-bold text-slate-900">Modifier le membre</h3>
+              <button type="button" onClick={() => { setEditId(null); setEditForm(EMPTY_EDIT_FORM) }} className="text-2xl text-slate-400 hover:text-slate-700" aria-label="Fermer">
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="space-y-4 p-5">
+              {editId === responsable_id && (
+                <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <FaExclamationTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" aria-hidden />
+                  <p>
+                    Cette personne est le <strong>responsable désigné</strong>. Si vous changez son rôle, vérifiez l’onglet « Responsable » pour désigner un autre responsable pédagogique.
+                  </p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div><L>Prénom *</L><input className="input-field" value={editForm.prenom} onChange={upEdit('prenom')} required /></div>
+                <div><L>Nom *</L><input className="input-field" value={editForm.nom} onChange={upEdit('nom')} required /></div>
+              </div>
+              <div><L>Email *</L><input className="input-field" type="email" value={editForm.email} onChange={upEdit('email')} required /></div>
+              <div>
+                <L>Téléphone *</L>
+                <input className="input-field" type="tel" value={editForm.telephone} onChange={upEdit('telephone')} required />
+              </div>
+              <div><L>Adresse</L><input className="input-field" value={editForm.adresse} onChange={upEdit('adresse')} /></div>
+              <div>
+                <L>Rôle *</L>
+                <select className="input-field" value={editForm.role} onChange={upEdit('role')} required>
+                  {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
+                </select>
+              </div>
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-cyan-600" checked={editForm.actif} onChange={upEdit('actif')} />
+                <span className="text-sm font-semibold text-slate-800">Compte actif (peut se connecter)</span>
+              </label>
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Réinitialiser le mot de passe</p>
+                <p className="mt-1 text-xs text-slate-500">Laissez vide pour ne pas changer. L’utilisateur devra le modifier à la prochaine connexion.</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div><L>Nouveau mot de passe</L><input className="input-field" type="password" value={editForm.mot_de_passe} onChange={upEdit('mot_de_passe')} minLength={6} autoComplete="new-password" /></div>
+                  <div><L>Confirmation</L><input className="input-field" type="password" value={editForm.mot_de_passe_confirmation} onChange={upEdit('mot_de_passe_confirmation')} minLength={6} /></div>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => { setEditId(null); setEditForm(EMPTY_EDIT_FORM) }} className="btn-secondary flex-1">Annuler</button>
+                <button type="submit" disabled={savingEdit} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-40">
+                  {savingEdit ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : null}
+                  Enregistrer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {permanentFor && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <form onSubmit={handlePermanentDelete} className="w-full max-w-md overflow-hidden rounded-2xl border border-rose-200 bg-white shadow-2xl">
+            <div className="bg-gradient-to-r from-rose-600 to-red-700 px-5 py-4 text-white">
+              <h3 className="flex items-center gap-2 text-lg font-bold">
+                <FaExclamationTriangle className="h-5 w-5" aria-hidden />
+                Suppression définitive
+              </h3>
+              <p className="mt-1 text-sm text-rose-100">
+                Cette action est <strong>irréversible</strong>. Toutes les données de connexion de ce compte seront effacées.
+              </p>
+            </div>
+            <div className="space-y-4 p-5">
+              <p className="text-sm text-slate-700">
+                Compte : <strong>{permanentFor.prenom} {permanentFor.nom}</strong>
+                <br />
+                <span className="text-slate-500">{permanentFor.email}</span>
+              </p>
+              <div>
+                <L>Confirmez en saisissant l’email exact du compte *</L>
+                <input
+                  className="input-field font-mono text-sm"
+                  value={confirmEmail}
+                  onChange={e => setConfirmEmail(e.target.value)}
+                  placeholder={permanentFor.email}
+                  autoComplete="off"
+                  required
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  className="btn-secondary flex-1"
+                  onClick={() => { setPermanentFor(null); setConfirmEmail('') }}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={permanentSaving}
+                  className="flex-1 rounded-lg bg-gradient-to-r from-rose-600 to-red-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110 disabled:opacity-50"
+                >
+                  {permanentSaving ? '…' : 'Supprimer définitivement'}
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
       )}
     </div>
@@ -1845,7 +2216,7 @@ function TabResponsable({ etabId, responsable: initResp, membres }) {
   const [selectedId, setSelectedId] = useState(initResp?.id ? String(initResp.id) : '')
   const [saving, setSaving] = useState(false)
 
-  const eligibles = membres.filter(m => ['responsable', 'directeur'].includes(m.role) && m.actif !== false)
+  const eligibles = membres.filter(m => m.role === 'responsable' && m.actif !== false)
 
   const handleSave = async () => {
     setSaving(true)
@@ -1882,7 +2253,7 @@ function TabResponsable({ etabId, responsable: initResp, membres }) {
         <p className="font-semibold text-gray-800 mb-3">Désigner un responsable</p>
         {eligibles.length === 0 ? (
           <div className="p-4 bg-amber-50 rounded-xl text-sm text-amber-700">
-            ⚠ Créez d'abord un membre avec le rôle <strong>Responsable pédagogique</strong> ou <strong>Directeur</strong>.
+            ⚠ Créez d&apos;abord un membre avec le rôle <strong>Responsable pédagogique</strong>.
           </div>
         ) : (
           <>

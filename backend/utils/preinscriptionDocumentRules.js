@@ -34,9 +34,49 @@ const TEXT_M2 =
   'M2 — CNI ou passeport selon nationalité ; pas de carte scolaire ; relevés M1 ; attestation M1 ; diplôme Licence ; CV ; lettre de motivation.';
 
 const TEXT_GENERIC =
-  'Pièce d’identité : CNI ou passeport (une seule selon nationalité) ; diplôme et relevé du dernier niveau ; lettre de motivation.';
+  'Pièce d’identité : CNI ou passeport (une seule selon nationalité) ; diplôme et relevé du dernier niveau ; lettre de motivation ; photo d’identité obligatoire.';
 
 const CYCLES_WITH_OPTIONAL_CARTE_SCOLAIRE = ['bt1', 'bts1', 'l1'];
+
+const MAX_PHOTOS_PREINSCRIPTION = 10;
+
+function normalizeNombrePhotosPreinscription(raw) {
+  const n = parseInt(String(raw ?? ''), 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(MAX_PHOTOS_PREINSCRIPTION, Math.floor(n));
+}
+
+function photoSlotKeysForCount(nombrePhotos) {
+  const c = normalizeNombrePhotosPreinscription(nombrePhotos);
+  return Array.from({ length: c }, (_, i) => `photo_${i + 1}`);
+}
+
+function expandRequiredPhotosToken(requiredArr, nombrePhotos) {
+  const slots = photoSlotKeysForCount(nombrePhotos);
+  const out = [];
+  for (const x of requiredArr) {
+    if (x === 'photo') slots.forEach((s) => out.push(s));
+    else out.push(x);
+  }
+  return out;
+}
+
+/** Première photo utile pour lettre / attestation (photo_1, ou ancien type `photo`). */
+function primaryPhotoDocumentFromList(documents) {
+  const list = documents || [];
+  const p1 = list.find((d) => d.type_document === 'photo_1');
+  if (p1) return p1;
+  const legacy = list.find((d) => d.type_document === 'photo');
+  if (legacy) return legacy;
+  const numbered = list
+    .filter((d) => /^photo_\d+$/.test(String(d.type_document)))
+    .sort(
+      (a, b) =>
+        parseInt(String(a.type_document).replace(/^photo_/, ''), 10) -
+        parseInt(String(b.type_document).replace(/^photo_/, ''), 10),
+    );
+  return numbered[0] || null;
+}
 
 /** Champs fichiers acceptés par multer pour POST /api/etudiant/dossier */
 const DOSSIER_UPLOAD_FIELD_NAMES = [
@@ -66,7 +106,16 @@ const DOSSIER_UPLOAD_FIELD_NAMES = [
   'releve_m1_s2',
   'cv',
   'lettre_motivation',
-  'photo',
+  'photo_1',
+  'photo_2',
+  'photo_3',
+  'photo_4',
+  'photo_5',
+  'photo_6',
+  'photo_7',
+  'photo_8',
+  'photo_9',
+  'photo_10',
   'diplome',
   'releve_notes',
   'releve_l1',
@@ -148,12 +197,17 @@ const LEVEL_KEYS = [
 /**
  * @returns {{ ok: boolean, missingKeys: string[], message?: string }}
  */
-function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite) {
+function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite, nombrePhotos = 1) {
   const key = LEVEL_KEYS.includes(niveauKey) ? niveauKey : 'generic';
   const missing = [];
 
   const need = (field) => {
     if (!hasFile(reqFiles, field)) missing.push(field);
+  };
+
+  const n = normalizeNombrePhotosPreinscription(nombrePhotos);
+  const needPhotoSlots = () => {
+    for (let i = 1; i <= n; i++) need(`photo_${i}`);
   };
 
   if (!hasRequiredIdentity(reqFiles, nationalite)) {
@@ -163,6 +217,7 @@ function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite) {
   if (key === 'bt1') {
     need('diplome_bfem');
     need('lettre_motivation');
+    needPhotoSlots();
     return finish(missing);
   }
 
@@ -171,6 +226,7 @@ function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite) {
     need('certificat_scolarite_annee_precedente');
     need('diplome_bfem');
     need('lettre_motivation');
+    needPhotoSlots();
     return finish(missing);
   }
 
@@ -181,6 +237,7 @@ function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite) {
     need('bulletin_terminale');
     need('diplome_bac');
     need('lettre_motivation');
+    needPhotoSlots();
     return finish(missing);
   }
 
@@ -190,6 +247,7 @@ function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite) {
     need('releve_bac');
     need('diplome_bac');
     need('lettre_motivation');
+    needPhotoSlots();
     return finish(missing);
   }
 
@@ -200,6 +258,7 @@ function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite) {
     need('bulletin_terminale');
     need('diplome_bac');
     need('lettre_motivation');
+    needPhotoSlots();
     return finish(missing);
   }
 
@@ -209,6 +268,7 @@ function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite) {
     need('releve_bac');
     need('diplome_bac');
     need('lettre_motivation');
+    needPhotoSlots();
     return finish(missing);
   }
 
@@ -220,6 +280,7 @@ function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite) {
     need('releve_bac');
     need('diplome_bac');
     need('lettre_motivation');
+    needPhotoSlots();
     return finish(missing);
   }
 
@@ -233,6 +294,7 @@ function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite) {
     need('diplome_licence3_ou_attestation');
     need('cv');
     need('lettre_motivation');
+    needPhotoSlots();
     return finish(missing);
   }
 
@@ -244,12 +306,14 @@ function validateDossierUploadsForNiveau(reqFiles, niveauKey, nationalite) {
     need('releve_m1_s2');
     need('cv');
     need('lettre_motivation');
+    needPhotoSlots();
     return finish(missing);
   }
 
   need('diplome');
   need('releve_notes');
   need('lettre_motivation');
+  needPhotoSlots();
   return finish(missing);
 }
 
@@ -298,20 +362,21 @@ function optionalCarteKeysForNiveau(niveauKey) {
 /**
  * @returns {{ required: string[], identityKeys: string[], optionalCarteKeys: string[] }}
  */
-function getDocumentChecklistDefinition(niveauKey, nationalite) {
+function getDocumentChecklistDefinition(niveauKey, nationalite, nombrePhotos = 1) {
   const k = LEVEL_KEYS.includes(niveauKey) ? niveauKey : 'generic';
   const nat = nationalite == null ? '' : String(nationalite);
   const identityKeys = identityKeysForChecklist(nat);
   const optionalCarteKeys = optionalCarteKeysForNiveau(k);
 
   const defs = {
-    bt1: { required: ['diplome_bfem', 'lettre_motivation'], identityKeys, optionalCarteKeys },
+    bt1: { required: ['diplome_bfem', 'lettre_motivation', 'photo'], identityKeys, optionalCarteKeys },
     bt2: {
       required: [
         'releve_bt1',
         'certificat_scolarite_annee_precedente',
         'diplome_bfem',
         'lettre_motivation',
+        'photo',
       ],
       identityKeys,
       optionalCarteKeys: [],
@@ -324,6 +389,7 @@ function getDocumentChecklistDefinition(niveauKey, nationalite) {
         'bulletin_terminale',
         'diplome_bac',
         'lettre_motivation',
+        'photo',
       ],
       identityKeys,
       optionalCarteKeys,
@@ -335,6 +401,7 @@ function getDocumentChecklistDefinition(niveauKey, nationalite) {
         'releve_bac',
         'diplome_bac',
         'lettre_motivation',
+        'photo',
       ],
       identityKeys,
       optionalCarteKeys: [],
@@ -347,12 +414,13 @@ function getDocumentChecklistDefinition(niveauKey, nationalite) {
         'bulletin_terminale',
         'diplome_bac',
         'lettre_motivation',
+        'photo',
       ],
       identityKeys,
       optionalCarteKeys,
     },
     l2: {
-      required: ['releve_l1_s1', 'releve_l1_s2', 'releve_bac', 'diplome_bac', 'lettre_motivation'],
+      required: ['releve_l1_s1', 'releve_l1_s2', 'releve_bac', 'diplome_bac', 'lettre_motivation', 'photo'],
       identityKeys,
       optionalCarteKeys: [],
     },
@@ -365,6 +433,7 @@ function getDocumentChecklistDefinition(niveauKey, nationalite) {
         'releve_bac',
         'diplome_bac',
         'lettre_motivation',
+        'photo',
       ],
       identityKeys,
       optionalCarteKeys: [],
@@ -380,6 +449,7 @@ function getDocumentChecklistDefinition(niveauKey, nationalite) {
         'diplome_licence3_ou_attestation',
         'cv',
         'lettre_motivation',
+        'photo',
       ],
       identityKeys,
       optionalCarteKeys: [],
@@ -393,19 +463,26 @@ function getDocumentChecklistDefinition(niveauKey, nationalite) {
         'releve_m1_s2',
         'cv',
         'lettre_motivation',
+        'photo',
       ],
       identityKeys,
       optionalCarteKeys: [],
     },
-    generic: { required: ['diplome', 'releve_notes', 'lettre_motivation'], identityKeys, optionalCarteKeys: [] },
+    generic: { required: ['diplome', 'releve_notes', 'lettre_motivation', 'photo'], identityKeys, optionalCarteKeys: [] },
   };
-  return defs[k] || defs.generic;
+  const raw = defs[k] || defs.generic;
+  return {
+    required: expandRequiredPhotosToken(raw.required, nombrePhotos),
+    identityKeys: raw.identityKeys,
+    optionalCarteKeys: raw.optionalCarteKeys,
+  };
 }
 
-function computeMissingDocumentTypes(documents, niveauKey, nationalite) {
+function computeMissingDocumentTypes(documents, niveauKey, nationalite, nombrePhotos = 1) {
   const nat = nationalite == null ? '' : String(nationalite);
-  const { required, identityKeys } = getDocumentChecklistDefinition(niveauKey, nat);
+  const { required, identityKeys } = getDocumentChecklistDefinition(niveauKey, nat, nombrePhotos);
   const types = new Set((documents || []).map((d) => d.type_document));
+  if (types.has('photo')) types.add('photo_1');
   const missing = [];
   for (const r of required) {
     if (!types.has(r)) missing.push(r);
@@ -427,8 +504,12 @@ module.exports = {
   TEXT_M1,
   TEXT_M2,
   TEXT_GENERIC,
+  MAX_PHOTOS_PREINSCRIPTION,
   DOSSIER_UPLOAD_FIELD_NAMES,
   normalizePreinscriptionNiveau,
+  normalizeNombrePhotosPreinscription,
+  photoSlotKeysForCount,
+  primaryPhotoDocumentFromList,
   validateDossierUploadsForNiveau,
   getInfoParagraphsForNiveauKey,
   getDocumentChecklistDefinition,

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { sanitizeNextPath } from '@/lib/navigation'
 import { FaGraduationCap, FaCopy } from 'react-icons/fa'
 import toast from 'react-hot-toast'
 
@@ -10,6 +11,8 @@ const TTL_MS = 15 * 60 * 1000
 export default function BienvenueCompte() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const afterWelcome = sanitizeNextPath(location.state?.next) || '/dashboard'
 
   const { passwordOnce, expired } = useMemo(() => {
     try {
@@ -33,7 +36,7 @@ export default function BienvenueCompte() {
 
   const continuer = () => {
     sessionStorage.removeItem(STORAGE_KEY)
-    navigate('/dashboard', { replace: true })
+    navigate(afterWelcome, { replace: true })
   }
 
   return (
@@ -43,6 +46,11 @@ export default function BienvenueCompte() {
         <h1 className="text-2xl font-bold text-gray-900">Bienvenue sur UniPréinscription</h1>
         <p className="text-gray-600 mt-2 text-sm">
           Conservez ces informations en lieu sûr. Le mot de passe affiché ici ne pourra plus être récupéré tel quel.
+        </p>
+        <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-left text-sm text-slate-700">
+          <strong className="text-slate-900">Créer un compte ne signifie pas préinscription.</strong> Une fois connecté, vous pourrez
+          soit déposer un <strong>dossier de préinscription</strong>, soit faire une <strong>demande de facture proforma</strong> — au
+          choix, depuis votre tableau de bord.
         </p>
       </div>
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
 const { authMiddleware, comptableOrAdmin } = require('../middleware/auth');
+const { isFactureSupprimee } = require('../utils/factureVisibility');
 
 router.use(authMiddleware, comptableOrAdmin);
 
@@ -9,9 +10,8 @@ const fmt = (n) => Number(n || 0).toLocaleString('fr-FR');
 
 // ─── GET /api/comptable/dashboard ────────────────────────────────────────────
 router.get('/dashboard', (req, res) => {
-  const demandes = db.get('demandes_proforma').value();
-  const dossiers = db.get('dossiers').value();
-  const factures = db.get('factures').value();
+  const demandes = db.get('demandes_proforma').value() || [];
+  const dossiers = db.get('dossiers').value() || [];
 
   const demandesAvecFacture = demandes.filter(d => d.facture);
 
@@ -35,7 +35,7 @@ router.get('/dashboard', (req, res) => {
 
   // Factures internes (dossiers acceptés)
   const dossiersAcceptes = dossiers.filter(d => d.statut === 'accepte');
-  const formations = db.get('formations').value();
+  const formations = db.get('formations').value() || [];
   const montantInterne = dossiersAcceptes.reduce((sum, d) => {
     const f = formations.find(f => f.id === d.formation_id);
     return sum + (f ? (f.prix || 0) : 0);
@@ -69,7 +69,7 @@ router.get('/proformas', (req, res) => {
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
 
-  let demandes = db.get('demandes_proforma').value().filter(d => d.facture);
+  let demandes = (db.get('demandes_proforma').value() || []).filter(d => d.facture);
   if (type) demandes = demandes.filter(d => d.type_formation === type);
   if (statut) demandes = demandes.filter(d => d.statut === statut);
 
@@ -90,7 +90,7 @@ router.get('/proformas/:reference', (req, res) => {
 
 // ─── GET /api/comptable/tarifs ────────────────────────────────────────────────
 router.get('/tarifs', (req, res) => {
-  const formations = db.get('formations').filter({ actif: true }).value();
+  const formations = (db.get('formations').value() || []).filter((f) => f.actif === true);
   res.json({
     en_ligne: formations
       .filter(f => f.type === 'en_ligne')
@@ -125,14 +125,14 @@ router.get('/dossiers', (req, res) => {
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
 
-  const utilisateurs = db.get('utilisateurs').value();
-  const formations = db.get('formations').value();
-  const factures = db.get('factures').value();
+  const utilisateurs = db.get('utilisateurs').value() || [];
+  const formations = db.get('formations').value() || [];
+  const factures = db.get('factures').value() || [];
 
-  let dossiers = db.get('dossiers').value().map(d => {
+  let dossiers = (db.get('dossiers').value() || []).map(d => {
     const u = utilisateurs.find(u => u.id === d.etudiant_id) || {};
     const f = formations.find(f => f.id === d.formation_id) || {};
-    const facture = factures.find(fac => fac.dossier_id === d.id) || null;
+    const facture = factures.find((fac) => fac.dossier_id === d.id && !isFactureSupprimee(fac)) || null;
     return {
       id: d.id, numero_dossier: d.numero_dossier, statut: d.statut,
       validation_financiere: d.validation_financiere,

@@ -1,6 +1,7 @@
 const db = require('../database/db');
 const { snapshotFromFormation } = require('../utils/etablissementSnapshot');
 const { buildLignesForfaitAnnuel } = require('../utils/formationTarifs');
+const { isFactureSupprimee } = require('../utils/factureVisibility');
 
 function genererNumeroFacture() {
   const year = new Date().getFullYear();
@@ -51,7 +52,7 @@ function syncStoredFactureById(factureId) {
   const fid = parseInt(factureId, 10);
   if (Number.isNaN(fid)) return null;
   const facture = db.get('factures').find({ id: fid }).value();
-  if (!facture) return null;
+  if (!facture || isFactureSupprimee(facture)) return null;
   const dossier = facture.dossier_id ? db.get('dossiers').find({ id: facture.dossier_id }).value() : null;
   const formation = dossier?.formation_id ? db.get('formations').find({ id: dossier.formation_id }).value() : null;
   if (!formation) return facture;
@@ -76,6 +77,9 @@ function genererOuRecupererFactureDossier(dossierId) {
 
   const existing = db.get('factures').find({ dossier_id: id }).value();
   if (existing) {
+    if (isFactureSupprimee(existing)) {
+      return null;
+    }
     if (!existing.etablissement_snapshot && etabSnap) {
       db.get('factures').find({ id: existing.id }).assign({ etablissement_snapshot: etabSnap }).write();
     }
