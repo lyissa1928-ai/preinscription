@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
 import { io } from 'socket.io-client'
 import { useAuth } from '../context/AuthContext'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { mediaUrl } from '../utils/mediaUrl'
 import { resolveApiBaseUrl } from '../utils/resolveApiBaseUrl'
@@ -63,6 +63,8 @@ function socketBaseUrl() {
 
 export default function ChatPage() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const lastOpenedPeerFromQuery = useRef(null)
   const [tab, setTab] = useState('chats') // chats | contacts
   const [mobileChat, setMobileChat] = useState(false)
   const [conversations, setConversations] = useState([])
@@ -105,6 +107,61 @@ export default function ChatPage() {
     loadConversations()
     loadContacts()
   }, [loadConversations, loadContacts])
+
+  const openPeer = useCallback(
+    async (peer) => {
+      if (!peer?.id) return
+      setSelectedPeer(peer)
+      setMobileChat(true)
+      setMessages([])
+      try {
+        await loadMessages(peer.id)
+        await axios.post(`/api/chat/peer/${peer.id}/read`)
+        socketRef.current?.emit('chat:read', { peerId: peer.id })
+        loadConversations()
+      } catch {
+        setMessages([])
+        throw new Error('chat_open_failed')
+      }
+    },
+    [loadMessages, loadConversations],
+  )
+
+  /** Deep link : /chat?peer=<utilisateur_id>&prenom=&nom= (ex. depuis une demande de préinscription) */
+  useEffect(() => {
+    const raw = searchParams.get('peer')
+    if (!raw) {
+      lastOpenedPeerFromQuery.current = null
+      return
+    }
+    if (!user?.etablissement_id) return
+    const pid = parseInt(raw, 10)
+    if (!Number.isFinite(pid)) return
+    if (lastOpenedPeerFromQuery.current === pid) return
+    lastOpenedPeerFromQuery.current = pid
+
+    const fromContact = contacts.find((c) => c.id === pid)
+    const fromConv = conversations.find((c) => c.peer?.id === pid)
+    const peer =
+      fromContact ||
+      fromConv?.peer || {
+        id: pid,
+        prenom: searchParams.get('prenom') || '',
+        nom: searchParams.get('nom') || '',
+        role: searchParams.get('peerRole') || 'etudiant',
+        matricule: null,
+        etablissement_id: null,
+      }
+
+    openPeer(peer).catch(() => {
+      lastOpenedPeerFromQuery.current = null
+      toast.error(
+        'Impossible d’ouvrir la conversation avec cet étudiant (droits insuffisants, autre établissement ou compte introuvable).',
+      )
+      setSelectedPeer(null)
+      setMobileChat(false)
+    })
+  }, [user?.etablissement_id, searchParams, contacts, conversations, openPeer])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -164,20 +221,6 @@ export default function ChatPage() {
       socketRef.current = null
     }
   }, [user?.id, loadConversations])
-
-  const openPeer = async (peer) => {
-    setSelectedPeer(peer)
-    setMobileChat(true)
-    setMessages([])
-    try {
-      await loadMessages(peer.id)
-      await axios.post(`/api/chat/peer/${peer.id}/read`)
-      socketRef.current?.emit('chat:read', { peerId: peer.id })
-      loadConversations()
-    } catch {
-      setMessages([])
-    }
-  }
 
   const sendMessage = () => {
     const t = input.trim()

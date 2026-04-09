@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
+import { chatWithStudentUrl } from '../../utils/chatWithStudentUrl'
 import TabConditionsAdmissionEtab from '../../components/TabConditionsAdmissionEtab'
 import StatutBadge from '../../components/StatutBadge'
 import {
@@ -84,6 +85,9 @@ export default function ResponsableDashboard() {
       setDemandes(prev => prev.map(d => d.id === id ? { ...d, statut: 'vue' } : d))
     }).catch(() => {})
   }
+
+  const canChatterEtudiant =
+    user?.role === 'responsable' && user?.etablissement_id != null
 
   return (
     <DashboardPage>
@@ -184,12 +188,23 @@ export default function ResponsableDashboard() {
                             <StatutBadge statut={d.statut} />
                           </td>
                           <td>
-                            <Link
-                              to={`/responsable/dossier/${d.id}`}
-                              className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50/80 px-2.5 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:border-blue-400 hover:bg-blue-100"
-                            >
-                              Traiter →
-                            </Link>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Link
+                                to={`/responsable/dossier/${d.id}`}
+                                className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50/80 px-2.5 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:border-blue-400 hover:bg-blue-100"
+                              >
+                                Traiter →
+                              </Link>
+                              {canChatterEtudiant && d.etudiant_id != null && Number(d.etudiant_id) > 0 && (
+                                <Link
+                                  to={chatWithStudentUrl(d.etudiant_id, d.prenom, d.nom)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50/90 px-2.5 py-1.5 text-xs font-bold text-emerald-800 transition-colors hover:border-emerald-400 hover:bg-emerald-100"
+                                  title="Messagerie avec le candidat"
+                                >
+                                  💬 Chatter
+                                </Link>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -288,8 +303,17 @@ export default function ResponsableDashboard() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                           <span className="font-bold text-gray-900">{d.prenom} {d.nom}</span>
+                          {canChatterEtudiant && d.etudiant_id != null && Number(d.etudiant_id) > 0 && (
+                            <Link
+                              to={chatWithStudentUrl(d.etudiant_id, d.prenom, d.nom)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center rounded-lg border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-800 shadow-sm hover:bg-emerald-50"
+                            >
+                              💬 Chatter
+                            </Link>
+                          )}
                           {(d.statut === 'nouvelle' || d.statut === 'en_attente') && (
                             <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">NOUVEAU</span>
                           )}
