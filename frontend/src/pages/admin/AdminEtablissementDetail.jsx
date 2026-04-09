@@ -2277,21 +2277,31 @@ function TabResponsable({ etabId, responsable: initResp, membres }) {
 // ═══════════════════════════════════════════════════════════════════════
 // Page principale
 // ═══════════════════════════════════════════════════════════════════════
-const TABS = [
+const TABS_ALL = [
   { id: 'identite', label: 'Identité', Icon: FaUniversity },
   { id: 'filieres', label: 'Filières', Icon: FaBook },
   { id: 'formations', label: 'Formations', Icon: FaGraduationCap },
   { id: 'acceptes', label: 'Acceptés', Icon: FaCheckCircle },
   { id: 'factures', label: 'Factures', Icon: FaFileInvoice },
-  { id: 'membres', label: 'Membres', Icon: FaUsers },
-  { id: 'responsable', label: 'Responsable', Icon: FaUserTie },
+  { id: 'membres', label: 'Membres', Icon: FaUsers, adminOnly: true },
+  { id: 'responsable', label: 'Responsable', Icon: FaUserTie, adminOnly: true },
 ]
 
 export default function AdminEtablissementDetail() {
+  const { user } = useAuth()
   const { id } = useParams()
   const [etab, setEtab] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('identite')
+  const tabsVisible = useMemo(
+    () => TABS_ALL.filter((t) => !t.adminOnly || user?.role === 'admin'),
+    [user?.role],
+  )
+
+  useEffect(() => {
+    if (user?.role !== 'directeur') return
+    if (tab === 'membres' || tab === 'responsable') setTab('identite')
+  }, [user?.role, tab])
 
   const kpi = useMemo(() => {
     if (!etab) return { filieres: 0, formations: 0, membres: 0 }
@@ -2396,7 +2406,7 @@ export default function AdminEtablissementDetail() {
               {[
                 { label: 'Filières', value: kpi.filieres, Icon: FaBook },
                 { label: 'Formations', value: kpi.formations, Icon: FaGraduationCap },
-                { label: 'Membres', value: kpi.membres, Icon: FaUsers },
+                ...(user?.role === 'admin' ? [{ label: 'Membres', value: kpi.membres, Icon: FaUsers }] : []),
               ].map(({ label, value, Icon }) => (
                 <div
                   key={label}
@@ -2421,7 +2431,7 @@ export default function AdminEtablissementDetail() {
             role="tablist"
             aria-label="Sections établissement"
           >
-            {TABS.map((t) => {
+            {tabsVisible.map((t) => {
               const Icon = t.Icon
               const active = tab === t.id
               return (

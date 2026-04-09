@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import PreinscriptionConditionsBlock from '../components/PreinscriptionConditionsBlock'
@@ -16,7 +16,7 @@ const ROLE_LINKS = {
   responsable: { label: 'Traiter les dossiers',    path: '/responsable',  icon: '📋' },
   agent_admin:  { label: 'Contrôle administratif', path: '/agent-admin',   icon: '🗂️' },
   comptable:    { label: 'Finance & Facturation',   path: '/comptable',    icon: '💰' },
-  directeur:    { label: 'Supervision générale',    path: '/directeur',    icon: '👁️' },
+  directeur:    { label: 'Administration',            path: '/admin',        icon: '👁️' },
   controleur_qualite: { label: 'Qualité & conformité', path: '/qualite', icon: '✅' },
 }
 
@@ -146,24 +146,21 @@ export default function EtablissementHome() {
     setSelectedFormationType(null)
   }, [filtreMode])
 
+  /** Directeur sans rattachement : ne pas afficher la page vide — tableau de bord unique. */
+  if (user?.role === 'directeur' && user?.etablissement_id == null) {
+    return <Navigate to="/admin" replace />
+  }
+
   if (!etabId) {
     return (
       <div className="flex items-center justify-center min-h-[16rem] px-4">
         <div className="text-center max-w-md">
           <div className="text-5xl mb-4">👁️</div>
           <p className="text-gray-700 font-semibold">
-            {user?.role === 'directeur'
-              ? 'Les directeurs ont une vue globale : pas de catalogue rattaché à une seule école ici.'
-              : 'Aucun établissement associé à votre compte.'}
+            Aucun établissement associé à votre compte.
           </p>
           <p className="text-gray-500 text-sm mt-2">
-            {user?.role === 'directeur' ? (
-              <>
-                Ouvrez la <Link to="/directeur" className="font-semibold text-blue-700 hover:underline">supervision</Link> pour suivre l’activité sur tous les établissements.
-              </>
-            ) : (
-              <>Contactez l&apos;administrateur principal.</>
-            )}
+            Contactez l&apos;administrateur principal.
           </p>
         </div>
       </div>
@@ -572,7 +569,7 @@ export default function EtablissementHome() {
           user?.role === 'responsable' && { label: 'Valider des dossiers', path: '/responsable', icon: '✅', desc: 'Accepter ou refuser des candidatures' },
           user?.role === 'agent_admin' && { label: 'Vérifier les documents', path: '/agent-admin', icon: '📎', desc: 'Contrôle de complétude des dossiers' },
           user?.role === 'comptable' && { label: 'Finance', path: '/comptable', icon: '💰', desc: 'Gestion financière et facturation' },
-          user?.role === 'directeur' && { label: 'Supervision', path: '/directeur', icon: '👁️', desc: "Vue globale de l'établissement" },
+          user?.role === 'directeur' && { label: 'Administration', path: '/admin', icon: '👁️', desc: 'Vue globale de la plateforme' },
           user?.role === 'controleur_qualite' && { label: 'Qualité', path: '/qualite', icon: '✅', desc: 'Contrôle et conformité' },
         ].filter(Boolean)
         return (

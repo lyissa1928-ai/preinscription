@@ -33,7 +33,7 @@ export default function VerifyEmail() {
           role === 'admin'
             ? '/admin'
             : role === 'directeur'
-              ? '/directeur'
+              ? '/admin'
               : role === 'controleur_qualite'
                 ? '/qualite'
                 : ['responsable', 'agent_admin', 'comptable'].includes(role)

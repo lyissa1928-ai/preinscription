@@ -7,8 +7,10 @@ const { publicAssetUrl } = require('../utils/publicAssetUrl');
 router.use(authMiddleware, directeurOrAdmin);
 
 // ─── Helper : filtre dossiers par établissement ───────────────────────────────
+// Admin et directeur : vue sur tous les établissements (pas de filtre par rattachement).
 function filterByEtab(req, dossiers, formations) {
-  const etabId = req.user.role !== 'admin' ? req.user.etablissement_id : null;
+  const bypass = req.user.role === 'admin' || req.user.role === 'directeur';
+  const etabId = bypass ? null : req.user.etablissement_id;
   if (!etabId) return { dossiers, etabId: null };
   const etabFormationIds = formations.filter(f => f.etablissement_id === etabId).map(f => f.id);
   const filtered = dossiers.filter(d => {
