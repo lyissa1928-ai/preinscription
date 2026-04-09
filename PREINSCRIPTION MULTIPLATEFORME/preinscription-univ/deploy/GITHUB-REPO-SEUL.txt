@@ -1,0 +1,116 @@
+================================================================================
+UniPortail (preinscription-univ) — dépôt GitHub DÉDIÉ + déploiement serveur
+================================================================================
+
+Objectif : ne plus déployer tout le mono-repo "projet-IA" sur le VPS. Un seul
+dépôt = uniquement le contenu de preinscription-univ (racine = package.json).
+
+--------------------------------------------------------------------------------
+ÉTAPE 1 — Créer le dépôt vide sur GitHub
+--------------------------------------------------------------------------------
+
+1. Connectez-vous à https://github.com/new
+2. Nom suggéré : uniportail  (ou preinscription-univ)
+3. Laissez SANS README, SANS .gitignore (dépôt vide).
+4. Créez le dépôt et notez l’URL, par ex. :
+   https://github.com/lyissa1928-ai/uniportail.git
+
+--------------------------------------------------------------------------------
+ÉTAPE 2 — Pousser la branche extraite (sur votre PC, dossier "projet IA")
+--------------------------------------------------------------------------------
+
+La branche Git locale "split-uniportail-standalone" contient uniquement
+l’historique du dossier preinscription-univ (racine du futur dépôt).
+
+Remplacez URL_PAR_VOTRE_REPO par l’URL HTTPS ou SSH du nouveau dépôt :
+
+  cd "chemin/vers/projet IA"
+  git push URL_PAR_VOTRE_REPO split-uniportail-standalone:main
+
+Exemple HTTPS :
+  git push https://github.com/lyissa1928-ai/uniportail.git split-uniportail-standalone:main
+
+Si GitHub demande une authentification, utilisez un Personal Access Token (HTTPS)
+ou une clé SSH (git@github.com:lyissa1928-ai/uniportail.git).
+
+Pour utiliser ce dépôt ensuite au quotidien :
+  git remote add uniportail URL_PAR_VOTRE_REPO
+  git fetch uniportail
+  git checkout -b main uniportail/main
+
+(ou clonez le nouveau dépôt dans un nouveau dossier et travaillez dedans.)
+
+--------------------------------------------------------------------------------
+ÉTAPE 3 — Serveur de production (VPS)
+--------------------------------------------------------------------------------
+
+A. Sauvegardes OBLIGATOIRES avant toute manipulation :
+
+  SAUVE_JSON="/chemin/vers/.../backend/database/preinscription.json"
+  cp "$SAUVE_JSON" /root/preinscription-$(date +%Y%m%d-%H%M).json
+  tar czf /root/uniportail-uploads-$(date +%Y%m%d-%H%M).tar.gz \
+    /chemin/vers/.../backend/uploads
+
+B. Choisir un dossier d’installation DÉDIÉ (exemple) :
+
+  APP=/home/admin/web/uniportail-digital.com/app-uniportail
+  sudo mkdir -p "$APP"
+  sudo chown -R admin:admin "$APP"    # adaptez utilisateur/groupe
+
+C. Cloner UNIQUEMENT le nouveau dépôt :
+
+  cd /home/admin/web/uniportail-digital.com
+  git clone https://github.com/lyissa1928-ai/uniportail.git app-uniportail
+  cd app-uniportail
+
+D. Remettre la configuration et les données de prod :
+
+  - Copier backend/.env depuis l’ancienne install (ne pas commiter ce fichier).
+  - Copier preinscription.json et uploads depuis la sauvegarde :
+
+  cp /root/preinscription-YYYYMMDD-HHMM.json backend/database/preinscription.json
+  # ou décompresser uploads depuis le .tar.gz vers backend/uploads/
+
+E. Installer et builder :
+
+  npm run install:all
+  npm run build
+
+F. PM2 (nom d’exemple ; vérifiez avec : pm2 list) :
+
+  cd backend
+  pm2 start server.js --name uniportail-api
+  # ou si vous aviez déjà un ecosystem : pm2 restart uniportail-api
+  pm2 save
+
+G. Nginx : faire pointer le site vers le NOUVEAU dossier dist du frontend
+  (souvent .../app-uniportail/frontend/dist) et le proxy /api vers le port
+  Node (ex. 5000). Puis :
+
+  sudo nginx -t && sudo systemctl reload nginx
+
+--------------------------------------------------------------------------------
+ÉTAPE 4 — Ancien dossier "uniportail" (mono-repo)
+--------------------------------------------------------------------------------
+
+Vous pouvez le renommer ou le supprimer une fois le nouveau site validé, pour
+éviter la confusion avec agriculture, gestion-scolaire, etc.
+
+  mv /home/admin/web/uniportail-digital.com/uniportail \
+     /home/admin/web/uniportail-digital.com/ancien-monorepo-projet-IA
+
+Ne supprimez pas tant que le nouveau déploiement n’est pas testé.
+
+--------------------------------------------------------------------------------
+Régénérer la branche split après nouveaux commits dans le mono-repo
+--------------------------------------------------------------------------------
+
+Depuis la racine du mono-repo "projet IA" :
+
+  git branch -D split-uniportail-standalone
+  git subtree split --prefix="PREINSCRIPTION MULTIPLATEFORME/preinscription-univ" -b split-uniportail-standalone
+  git push URL_DU_DEPOT_UNIPORTAIL split-uniportail-standalone:main
+
+================================================================================
+FIN
+================================================================================
