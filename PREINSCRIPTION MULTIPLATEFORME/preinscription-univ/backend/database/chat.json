@@ -1,0 +1,70 @@
+{
+  "messages": [
+    {
+      "id": 1,
+      "conversation_key": "e1:u2:u13",
+      "etablissement_id": 1,
+      "sender_id": 2,
+      "body": "bjr",
+      "created_at": "2026-04-04T23:34:41.323Z"
+    },
+    {
+      "id": 2,
+      "conversation_key": "e1:u11:u27",
+      "etablissement_id": 1,
+      "sender_id": 27,
+      "body": "BJR",
+      "created_at": "2026-04-09T11:23:46.141Z",
+      "attachment_url": null,
+      "attachment_name": null,
+      "attachment_mime": null,
+      "attachment_size": null
+    }
+  ],
+  "conversations": [
+    {
+      "key": "e1:u2:u13",
+      "etablissement_id": 1,
+      "participants": [
+        2,
+        13
+      ],
+      "updated_at": "2026-04-04T23:34:41.328Z",
+      "last_message_body": "bjr",
+      "last_sender_id": 2,
+      "created_at": "2026-04-04T23:34:41.328Z"
+    },
+    {
+      "key": "e1:u11:u27",
+      "etablissement_id": 1,
+      "participants": [
+        11,
+        27
+      ],
+      "updated_at": "2026-04-09T11:23:46.142Z",
+      "last_message_body": "BJR",
+      "last_sender_id": 27,
+      "created_at": "2026-04-09T11:23:46.142Z"
+    }
+  ],
+  "reads": [
+    {
+      "user_id": 2,
+      "conversation_key": "e1:u2:u13",
+      "last_read_at": "2026-04-05T12:45:07.411Z"
+    },
+    {
+      "user_id": 22,
+      "conversation_key": "e1:u10:u22",
+      "last_read_at": "2026-04-04T23:37:48.354Z"
+    },
+    {
+      "user_id": 27,
+      "conversation_key": "e1:u11:u27",
+      "last_read_at": "2026-04-09T11:23:41.792Z"
+    }
+  ],
+  "_nextId": {
+    "messages": 3
+  }
+}

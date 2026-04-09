@@ -30,7 +30,17 @@ const ICONS = {
   controle:    <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />,
   pedago:      <Icon d="M12 14l9-5-9-5-9 5 9 5z" d2="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />,
   preinscription: <Icon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />,
+  /** File de demandes (liste + puces) — distinct du crayon « formulaire » */
+  demandesListe: (
+    <Icon
+      d="M8.25 6.75h12M8.25 12h12m-12 5.25h12"
+      d2="M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
+    />
+  ),
+  conditions: <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
   identifiants: <Icon d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />,
+  chat:        <Icon d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />,
+  docsChat:    <Icon d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />,
   logout:      <Icon d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />,
   menu:        <Icon d="M4 6h16M4 12h16M4 18h16" />,
   close:       <Icon d="M6 18L18 6M6 6l12 12" />,
@@ -41,9 +51,22 @@ const ICONS = {
 const MENUS = {
   admin: [
     { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
-    { label: 'Tableau de bord', to: '/admin', icon: ICONS.dashboard, exact: true },
+    {
+      label: 'Tableau de bord',
+      to: '/admin',
+      icon: ICONS.dashboard,
+      exact: true,
+      isActive: (loc) => loc.pathname === '/admin' && new URLSearchParams(loc.search).get('tab') !== 'conditions',
+    },
+    {
+      label: 'Conditions d’admission',
+      to: '/admin?tab=conditions',
+      icon: ICONS.conditions,
+      isActive: (loc) => loc.pathname === '/admin' && new URLSearchParams(loc.search).get('tab') === 'conditions',
+    },
     { label: 'Établissements', to: '/admin/etablissements', icon: ICONS.etablissements },
-    { label: 'Demandes Proforma', to: '/admin/proforma', icon: ICONS.preinscription },
+    { label: 'Demandes proforma', to: '/admin/proforma', icon: ICONS.demandesListe },
+    { label: 'Factures par établissement', to: '/admin/factures-etablissement', icon: ICONS.finance },
     { label: 'Utilisateurs', to: '/admin/utilisateurs', icon: ICONS.users },
     { label: 'Journal d’audit', to: '/admin/audit-logs', icon: ICONS.audit },
     { label: 'Événements sécurité', to: '/admin/security-events', icon: ICONS.shield },
@@ -56,29 +79,73 @@ const MENUS = {
   responsable: [
     { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
     { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
-    { label: 'Tableau de bord', to: '/responsable', icon: ICONS.dashboard, exact: true },
-    { label: 'Dossiers', to: '/responsable', icon: ICONS.dossiers, exact: true },
+    { label: 'Messages', to: '/chat', icon: ICONS.chat },
+    { label: 'Documents chat', to: '/mon-etablissement/documents-chat', icon: ICONS.docsChat },
+    {
+      label: 'Dossiers & suivi',
+      to: '/responsable',
+      icon: ICONS.dossiers,
+      exact: true,
+      isActive: (loc) => loc.pathname === '/responsable' && new URLSearchParams(loc.search).get('tab') !== 'conditions',
+    },
+    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    {
+      label: 'Conditions d’admission',
+      to: '/responsable?tab=conditions',
+      icon: ICONS.conditions,
+      isActive: (loc) => loc.pathname === '/responsable' && new URLSearchParams(loc.search).get('tab') === 'conditions',
+    },
   ],
   agent_admin: [
     { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
     { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
-    { label: 'Tableau de bord', to: '/agent-admin', icon: ICONS.dashboard, exact: true },
-    { label: 'Contrôle dossiers', to: '/agent-admin', icon: ICONS.controle, exact: true },
+    { label: 'Messages', to: '/chat', icon: ICONS.chat },
+    { label: 'Documents chat', to: '/mon-etablissement/documents-chat', icon: ICONS.docsChat },
+    { label: 'Dossiers & contrôle', to: '/agent-admin', icon: ICONS.controle, exact: true },
+    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
   ],
   comptable: [
     { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
     { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Messages', to: '/chat', icon: ICONS.chat },
+    { label: 'Documents chat', to: '/mon-etablissement/documents-chat', icon: ICONS.docsChat },
+    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Factures dossiers', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
     { label: 'Finance', to: '/comptable', icon: ICONS.finance, exact: true },
   ],
   directeur: [
     { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
     { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
-    { label: 'Supervision', to: '/directeur', icon: ICONS.stats, exact: true },
+    { label: 'Messages', to: '/chat', icon: ICONS.chat },
+    { label: 'Documents chat', to: '/mon-etablissement/documents-chat', icon: ICONS.docsChat },
+    {
+      label: 'Supervision',
+      to: '/directeur',
+      icon: ICONS.stats,
+      exact: true,
+      isActive: (loc) => loc.pathname === '/directeur' && new URLSearchParams(loc.search).get('tab') !== 'conditions',
+    },
+    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    {
+      label: 'Conditions d’admission',
+      to: '/directeur?tab=conditions',
+      icon: ICONS.conditions,
+      isActive: (loc) => loc.pathname === '/directeur' && new URLSearchParams(loc.search).get('tab') === 'conditions',
+    },
+  ],
+  controleur_qualite: [
+    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
+    { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Messages', to: '/chat', icon: ICONS.chat },
+    { label: 'Documents chat', to: '/mon-etablissement/documents-chat', icon: ICONS.docsChat },
+    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Qualité & conformité', to: '/qualite', icon: ICONS.controle, exact: true },
   ],
   etudiant: [
     { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
     { label: 'Mon espace', to: '/dashboard', icon: ICONS.dashboard },
     { label: 'Filières & formations', to: '/mon-etablissement', icon: ICONS.formations },
+    { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mes identifiants', to: '/mes-acces', icon: ICONS.identifiants },
     { label: 'Préinscription', to: '/preinscription', icon: ICONS.preinscription },
   ],
@@ -90,34 +157,43 @@ const ROLE_CONFIG = {
   agent_admin: { label: 'Agent Administratif',color: 'from-orange-600 to-orange-800',badge: 'bg-orange-500' },
   comptable:   { label: 'Comptable',          color: 'from-violet-700 to-violet-900',badge: 'bg-violet-500' },
   directeur:   { label: 'Directeur',          color: 'from-blue-800 to-blue-950',    badge: 'bg-blue-600' },
+  controleur_qualite: { label: 'Contrôleur qualité', color: 'from-cyan-800 to-slate-900', badge: 'bg-cyan-600' },
   etudiant:    { label: 'Étudiant',           color: 'from-blue-600 to-blue-800',    badge: 'bg-blue-500' },
 }
 
 /* ─── NavLink item ───────────────────────────────────────────────── */
 function NavItem({ item, collapsed, onClick }) {
   const location = useLocation()
-  const isActive = item.exact
-    ? location.pathname === item.to
-    : location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+  const basePath = typeof item.to === 'string' ? item.to.split('?')[0] : item.to?.pathname || ''
+  const isActive =
+    typeof item.isActive === 'function'
+      ? item.isActive(location)
+      : item.exact
+        ? location.pathname === basePath
+        : location.pathname === basePath || location.pathname.startsWith(`${basePath}/`)
 
   return (
     <Link
       to={item.to}
       onClick={onClick}
+      aria-current={isActive ? 'page' : undefined}
       title={collapsed ? item.label : undefined}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group
+      className={`relative flex items-center gap-3 rounded-xl py-2.5 pl-3 pr-3 text-sm font-medium transition-all duration-150 group
         ${isActive
           ? 'bg-white/20 text-white shadow-inner'
           : 'text-white/70 hover:bg-white/10 hover:text-white'
         }`}
     >
+      {isActive && (
+        <span
+          className="absolute left-1 top-1/2 h-7 w-0.5 -translate-y-1/2 rounded-full bg-white shadow-sm"
+          aria-hidden
+        />
+      )}
       <span className={`transition-all ${isActive ? 'text-white' : 'text-white/60 group-hover:text-white'}`}>
         {item.icon}
       </span>
-      {!collapsed && <span className="truncate">{item.label}</span>}
-      {!collapsed && isActive && (
-        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />
-      )}
+      {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
     </Link>
   )
 }

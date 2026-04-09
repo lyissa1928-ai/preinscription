@@ -1,6 +1,7 @@
 const db = require('../database/db');
 const { snapshotFromFormation, snapshotFromEtablissementId } = require('./etablissementSnapshot');
 const { isDossierAcceptePourLettre } = require('./dossierLettreEligible');
+const { primaryPhotoDocumentFromList } = require('./preinscriptionDocumentRules');
 
 /**
  * Données JSON pour l’attestation de préinscription (dossier accepté uniquement).
@@ -33,7 +34,7 @@ function buildAttestationPayloadForDossier(dossierId) {
   }
 
   const documents = db.get('documents').filter({ dossier_id: id }).value();
-  const photoDoc = documents.find((d) => d.type_document === 'photo');
+  const photoDoc = primaryPhotoDocumentFromList(documents);
   const etablissement =
     snapshotFromFormation(formation) || snapshotFromEtablissementId(u.etablissement_id);
 
@@ -73,4 +74,68 @@ function buildAttestationPayloadForDossier(dossierId) {
   return { body };
 }
 
-module.exports = { buildAttestationPayloadForDossier };
+/**
+ * Attestation pour une demande de facture proforma acceptée (sans dossier de préinscription).
+ */
+function buildAttestationPayloadForDemandeProforma(demandeId) {
+  const id = parseInt(String(demandeId), 10);
+  if (Number.isNaN(id)) return { error: { status: 400, message: 'Identifiant de demande invalide' } };
+
+  const demande = db.get('demandes_proforma').find({ id }).value();
+  if (!demande) return { error: { status: 404, message: 'Demande introuvable' } };
+  if (demande.statut !== 'acceptee') {
+    return {
+      error: {
+        status: 403,
+        message: 'L’attestation n’est disponible qu’après acceptation de votre demande par le service pédagogique.',
+      },
+    };
+  }
+
+  const uid = demande.etudiant_id != null ? Number(demande.etudiant_id) : null;
+  const u = uid ? db.get('utilisateurs').find({ id: uid }).value() || {} : {};
+  const formation = demande.formation_id
+    ? db.get('formations').find({ id: demande.formation_id }).value()
+    : null;
+
+  let filiere_libelle = null;
+  if (formation?.filiere_id != null) {
+    const fil = db.get('filieres').find({ id: formation.filiere_id }).value();
+    if (fil?.nom) filiere_libelle = fil.nom;
+  }
+
+  const etablissement =
+    snapshotFromFormation(formation) || snapshotFromEtablissementId(demande.etablissement_id);
+
+  const y = new Date().getFullYear();
+  const reference_attestation = `ATT-DEM-${y}-${String(demande.id).padStart(5, '0')}`;
+  const verification_id = `${reference_attestation}-${String(demande.id).padStart(4, '0')}`;
+
+  const body = {
+    type: 'demande_proforma',
+    demande,
+    etudiant: {
+      nom: u.nom || demande.nom,
+      prenom: u.prenom || demande.prenom,
+      email: u.email || demande.email,
+    },
+    formation,
+    filiere_libelle,
+    formation_libelle: formation?.titre || demande.formation_titre || '—',
+    niveau_libelle: formation?.niveau || demande.niveau || '—',
+    annee_academique: `${y}-${y + 1}`,
+    etablissement,
+    photo_url: null,
+    date_generation: new Date().toISOString(),
+    attestation_extensions: {
+      reference_attestation,
+      verification_id,
+      texte_officiel_base:
+        'Nous attestons que la demande de préinscription ci-dessous a été acceptée sous réserve du règlement des frais conformément à la facture proforma.',
+    },
+  };
+
+  return { body };
+}
+
+module.exports = { buildAttestationPayloadForDossier, buildAttestationPayloadForDemandeProforma };

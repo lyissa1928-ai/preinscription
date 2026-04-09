@@ -13,7 +13,7 @@ function isValidMatriculeFormat(m) {
 function matriculeTaken(normalizedMatricule, excludeUserId) {
   const m = normalizeMatricule(normalizedMatricule);
   if (!m) return false;
-  return db.get('utilisateurs').value().some(
+  return (db.get('utilisateurs').value() || []).some(
     u => (excludeUserId == null || u.id !== excludeUserId) && normalizeMatricule(u.matricule) === m
   );
 }
@@ -27,7 +27,7 @@ function normalizeTelephoneForUniqueness(t) {
 function telephoneTaken(normalizedDigits, excludeUserId) {
   const n = normalizedDigits;
   if (!n) return false;
-  return db.get('utilisateurs').value().some((u) => {
+  return (db.get('utilisateurs').value() || []).some((u) => {
     if (excludeUserId != null && u.id === excludeUserId) return false;
     return normalizeTelephoneForUniqueness(u.telephone) === n;
   });

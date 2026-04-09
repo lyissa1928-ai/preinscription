@@ -335,6 +335,13 @@ export class UsersService {
         },
         select: userSelect,
       });
+      /** Directeur (Service pédagogique) : rattachement par défaut aux campus sans responsable pédagogique. */
+      if (dto.role.trim() === 'SERVICE_PEDAGOGIQUE') {
+        await this.prisma.campus.updateMany({
+          where: { responsablePedagogiqueId: null },
+          data: { responsablePedagogiqueId: user.id },
+        });
+      }
       return user;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError) {

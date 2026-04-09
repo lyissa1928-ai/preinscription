@@ -19,6 +19,8 @@
     "seed": "cd backend && npx prisma db seed"
   },
   "devDependencies": {
-    "concurrently": "^9.0.0"
+    "@tailwindcss/postcss": "^4",
+    "concurrently": "^9.0.0",
+    "tailwindcss": "^4"
   }
 }

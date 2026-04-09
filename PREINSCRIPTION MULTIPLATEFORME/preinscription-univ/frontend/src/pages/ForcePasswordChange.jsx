@@ -57,9 +57,11 @@ export default function ForcePasswordChange() {
         ? '/admin'
         : user.role === 'directeur'
           ? '/directeur'
-          : ['responsable', 'agent_admin', 'comptable'].includes(user.role)
-            ? '/mon-etablissement'
-            : '/dashboard'
+          : user.role === 'controleur_qualite'
+            ? '/qualite'
+            : ['responsable', 'agent_admin', 'comptable'].includes(user.role)
+              ? '/mon-etablissement'
+              : '/dashboard'
     return <Navigate to={dest} replace />
   }
 
@@ -101,9 +103,11 @@ export default function ForcePasswordChange() {
           ? '/admin'
           : user.role === 'directeur'
             ? '/directeur'
-            : ['responsable', 'agent_admin', 'comptable'].includes(user.role)
-              ? '/mon-etablissement'
-              : '/dashboard'
+            : user.role === 'controleur_qualite'
+              ? '/qualite'
+              : ['responsable', 'agent_admin', 'comptable'].includes(user.role)
+                ? '/mon-etablissement'
+                : '/dashboard'
       navigate(dest, { replace: true })
     } catch (err) {
       const msg = err.response?.data?.message || 'Erreur lors du changement de mot de passe.'

@@ -1,26 +1,33 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { TabFilieres, TabFormations } from '../admin/AdminEtablissementDetail'
 import { TabFacturesEtab } from '../admin/TabFacturesEtab'
 import { TabAcceptesParFormation } from '../admin/TabAcceptesParFormation'
-import { FaBook, FaGraduationCap, FaCheckCircle, FaFileInvoice } from 'react-icons/fa'
+import { FaBook, FaGraduationCap, FaCheckCircle, FaFileInvoice, FaClipboardList } from 'react-icons/fa'
+import TabConditionsAdmissionEtab from '../../components/TabConditionsAdmissionEtab'
 
 const TABS = [
   { id: 'filieres', label: 'Filières', Icon: FaBook },
   { id: 'formations', label: 'Formations', Icon: FaGraduationCap },
+  { id: 'conditions', label: 'Conditions d’admission', Icon: FaClipboardList },
   { id: 'acceptes', label: 'Acceptés', Icon: FaCheckCircle },
   { id: 'factures', label: 'Factures', Icon: FaFileInvoice },
 ]
 
 export default function ResponsableGestionEtab() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
   const etabId = user?.etablissement_id
   const [etab, setEtab] = useState(null)
-  const [tab, setTab] = useState('filieres')
+  const [tab, setTab] = useState(() => (searchParams.get('tab') === 'conditions' ? 'conditions' : 'filieres'))
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'conditions') setTab('conditions')
+  }, [searchParams])
 
   const load = () => {
     if (!etabId) return
@@ -133,6 +140,9 @@ export default function ResponsableGestionEtab() {
             onRefreshFilieres={refreshFilieresOnly}
             onRefreshFormations={refreshFormationsOnly}
           />
+        )}
+        {tab === 'conditions' && (
+          <TabConditionsAdmissionEtab etabId={etab.id} etabNom={etab.nom} />
         )}
         {tab === 'acceptes' && (
           <TabAcceptesParFormation etabId={etab.id} />

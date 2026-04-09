@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
-const { authMiddleware, responsableOrAdmin, staffLettreAttestation } = require('../middleware/auth');
+const { authMiddleware, responsableOrAdmin, staffLettreAttestation, staffProformaDecision } = require('../middleware/auth');
+const { proformaDemandeDecision } = require('../services/proformaDemandeDecisionService');
 const { genererOuRecupererFactureDossier } = require('../services/factureService');
 const { snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
 const { logAudit } = require('../utils/auditLog');
@@ -9,7 +10,7 @@ const { DOSSIER_STATUSES, canTransitionDossierStatus, requiresRejectionComment }
 const { createUserNotification } = require('../utils/notificationService');
 const { buildAttestationPayloadForDossier } = require('../utils/buildAttestationPayload');
 const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
-const { buildLignesForfaitAnnuel } = require('../utils/formationTarifs');
+const { primaryPhotoDocumentFromList } = require('../utils/preinscriptionDocumentRules');
 
 // ─── Lettres / attestations (staff établissement, même périmètre que facture dossier) ─
 // Enregistrées avant le guard responsableOrAdmin pour autoriser agent_admin, comptable, directeur.
@@ -30,7 +31,7 @@ router.get('/lettre/:dossierId', authMiddleware, staffLettreAttestation, (req, r
     ? db.get('formations').find({ id: dossier.formation_id }).value()
     : null;
   const documents = db.get('documents').filter({ dossier_id: id }).value();
-  const photoDoc = documents.find((d) => d.type_document === 'photo');
+  const photoDoc = primaryPhotoDocumentFromList(documents);
   const etablissement =
     snapshotFromFormation(formation) || snapshotFromEtablissementId(u.etablissement_id);
 
@@ -70,6 +71,74 @@ router.get('/attestation/:dossierId', authMiddleware, staffLettreAttestation, (r
   res.json(built.body);
 });
 
+// ─── DEMANDES PROFORMA (staff établissement + admin — avant le guard responsable seul) ─
+router.get('/demandes-proforma', authMiddleware, staffProformaDecision, (req, res) => {
+  const { statut, type, page = 1, limit = 15 } = req.query;
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+
+  let demandes = db.get('demandes_proforma').value();
+  const formationIds = getEtabFormationIds(req) || [];
+  const etabId = req.user.role !== 'admin' ? req.user.etablissement_id : null;
+  if (etabId) {
+    demandes = demandes.filter((d) => demandeAppartientAEtablissement(d, etabId, formationIds));
+  }
+
+  if (statut) demandes = demandes.filter((d) => d.statut === statut);
+  if (type) demandes = demandes.filter((d) => d.type_formation === type);
+
+  demandes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const total = demandes.length;
+  const paginated = demandes.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+  res.json({
+    demandes: paginated,
+    pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) },
+  });
+});
+
+router.put('/demandes-proforma/:id/statut', authMiddleware, staffProformaDecision, (req, res) => {
+  const { statut } = req.body;
+  if (!['nouvelle', 'vue', 'traitee', 'en_attente'].includes(statut)) {
+    return res.status(400).json({
+      message:
+        'Statut invalide. Utilisez la décision (accepter / refuser) pour clôturer une demande — pas ce champ.',
+    });
+  }
+  const id = parseInt(req.params.id);
+  const demande = db.get('demandes_proforma').find({ id }).value();
+  if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
+  if (!assertDemandePourResponsable(req, demande)) {
+    return res.status(403).json({ message: 'Cette demande ne concerne pas votre établissement.' });
+  }
+
+  const patch = { statut, updated_at: new Date().toISOString() };
+  db.get('demandes_proforma').find({ id }).assign(patch).write();
+  res.json({ message: 'Statut mis à jour' });
+});
+
+router.put('/demandes-proforma/:id/decision', authMiddleware, staffProformaDecision, (req, res) => {
+  const id = parseInt(req.params.id);
+  const demande = db.get('demandes_proforma').find({ id }).value();
+  if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
+  if (!assertDemandePourResponsable(req, demande)) {
+    return res.status(403).json({ message: 'Cette demande ne concerne pas votre établissement.' });
+  }
+
+  const { decision, motif_refus } = req.body;
+  const result = proformaDemandeDecision({
+    demandeId: id,
+    userId: req.user.id,
+    decision,
+    motif_refus,
+  });
+  if (!result.ok) {
+    return res.status(result.status).json({ message: result.message });
+  }
+  res.json({ message: result.message, demande: result.demande });
+});
+
 router.use(authMiddleware, responsableOrAdmin);
 
 // ─── Helpers accès par établissement ─────────────────────────────────────────
@@ -77,7 +146,7 @@ router.use(authMiddleware, responsableOrAdmin);
 function getEtabFormationIds(req) {
   const etabId = req.user.role !== 'admin' ? req.user.etablissement_id : null;
   if (!etabId) return null;
-  return db.get('formations').filter({ etablissement_id: etabId }).value().map(f => f.id);
+  return (db.get('formations').value() || []).filter((f) => f.etablissement_id === etabId).map((f) => f.id);
 }
 
 function dossierAppartientAEtablissement(dossier, etabId) {
@@ -106,25 +175,6 @@ function assertDemandePourResponsable(req, demande) {
   if (req.user.role === 'admin') return true;
   const fIds = getEtabFormationIds(req) || [];
   return demandeAppartientAEtablissement(demande, req.user.etablissement_id, fIds);
-}
-
-function buildFactureDemandeFromFormation(demande, formation) {
-  const tarif = buildLignesForfaitAnnuel(formation);
-  const montantHT = tarif.montant_ht;
-  const year = new Date().getFullYear();
-  const numero = demande.facture?.numero && !String(demande.facture.numero).includes('undefined')
-    ? demande.facture.numero
-    : `FACT-PUB-${year}-${String(demande.id).padStart(5, '0')}`;
-  return {
-    numero,
-    lignes: tarif.lignes,
-    lignes_frais_supplementaires: tarif.lignes_supplementaires,
-    montant_supplementaires_hors_forfait: tarif.montant_supplementaires,
-    montant_ht: montantHT,
-    tva: 0,
-    montant_ttc: montantHT,
-    validite_jusqu_au: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-  };
 }
 
 // ─── DOSSIERS ────────────────────────────────────────────────────────────────
@@ -206,7 +256,7 @@ router.get('/statistiques', (req, res) => {
     presentiel: counts(presentiel),
     total: dossiers.length,
     demandes_proforma: demandes.length,
-    nouvelles_demandes: demandes.filter(d => d.statut === 'nouvelle').length
+    nouvelles_demandes: demandes.filter(d => d.statut === 'nouvelle' || d.statut === 'en_attente').length
   });
 });
 
@@ -297,106 +347,6 @@ router.put('/dossiers/:id/statut', (req, res) => {
       : `Dossier mis à jour avec le statut : ${statut}`,
     lettre_disponible: statut === 'accepte',
     facture
-  });
-});
-
-// ─── DEMANDES PROFORMA ───────────────────────────────────────────────────────
-
-router.get('/demandes-proforma', (req, res) => {
-  const { statut, type, page = 1, limit = 15 } = req.query;
-  const pageNum = parseInt(page);
-  const limitNum = parseInt(limit);
-
-  let demandes = db.get('demandes_proforma').value();
-  const formationIds = getEtabFormationIds(req) || [];
-  const etabId = req.user.role !== 'admin' ? req.user.etablissement_id : null;
-  if (etabId) {
-    demandes = demandes.filter(d => demandeAppartientAEtablissement(d, etabId, formationIds));
-  }
-
-  if (statut) demandes = demandes.filter(d => d.statut === statut);
-  if (type) demandes = demandes.filter(d => d.type_formation === type);
-
-  demandes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-  const total = demandes.length;
-  const paginated = demandes.slice((pageNum - 1) * limitNum, pageNum * limitNum);
-
-  res.json({ demandes: paginated, pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) } });
-});
-
-router.put('/demandes-proforma/:id/statut', (req, res) => {
-  const { statut } = req.body;
-  if (!['nouvelle', 'vue', 'traitee', 'acceptee', 'refusee'].includes(statut)) {
-    return res.status(400).json({ message: 'Statut invalide' });
-  }
-  const id = parseInt(req.params.id);
-  const demande = db.get('demandes_proforma').find({ id }).value();
-  if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
-  if (!assertDemandePourResponsable(req, demande)) {
-    return res.status(403).json({ message: 'Cette demande ne concerne pas votre établissement.' });
-  }
-
-  const patch = { statut, updated_at: new Date().toISOString() };
-  db.get('demandes_proforma').find({ id }).assign(patch).write();
-  res.json({ message: 'Statut mis à jour' });
-});
-
-/** Accepter ou refuser une demande proforma : lettre + facture à jour si acceptation */
-router.put('/demandes-proforma/:id/decision', (req, res) => {
-  const { decision, motif_refus } = req.body;
-  if (!['accepter', 'refuser'].includes(decision)) {
-    return res.status(400).json({ message: 'Décision invalide (accepter ou refuser).' });
-  }
-
-  const id = parseInt(req.params.id);
-  const demande = db.get('demandes_proforma').find({ id }).value();
-  if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
-  if (!assertDemandePourResponsable(req, demande)) {
-    return res.status(403).json({ message: 'Cette demande ne concerne pas votre établissement.' });
-  }
-
-  if (decision === 'refuser') {
-    if (!motif_refus || !String(motif_refus).trim()) {
-      return res.status(400).json({ message: 'Motif de refus obligatoire.' });
-    }
-    db.get('demandes_proforma').find({ id }).assign({
-      statut: 'refusee',
-      motif_refus: String(motif_refus).trim(),
-      refusee_le: new Date().toISOString(),
-      refusee_par: req.user.id,
-      updated_at: new Date().toISOString()
-    }).write();
-    return res.json({ message: 'Demande refusée.' });
-  }
-
-  const formation = db.get('formations').find({ id: demande.formation_id }).value();
-  if (!formation) return res.status(404).json({ message: 'Formation introuvable.' });
-
-  const facture = buildFactureDemandeFromFormation(demande, formation);
-  const refLettre = `LPI-DEM-${new Date().getFullYear()}-${String(demande.id).padStart(5, '0')}`;
-
-  db.get('demandes_proforma').find({ id }).assign({
-    statut: 'acceptee',
-    facture,
-    lettre_preinscription: {
-      reference: refLettre,
-      date_emission: new Date().toISOString(),
-      beneficiaire_prenom: demande.prenom,
-      beneficiaire_nom: demande.nom,
-      formation_titre: formation.titre,
-      type_formation: demande.type_formation
-    },
-    acceptee_le: new Date().toISOString(),
-    acceptee_par: req.user.id,
-    updated_at: new Date().toISOString(),
-    motif_refus: null
-  }).write();
-
-  const updated = db.get('demandes_proforma').find({ id }).value();
-  res.json({
-    message: 'Demande acceptée. Lettre de préinscription et facture proforma mises à disposition du demandeur (espace étudiant si compte au même email).',
-    demande: updated
   });
 });
 

@@ -7,8 +7,14 @@ export default function AuthenticatedLayout() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-700 border-t-transparent" />
+      <div className="app-shell-bg relative flex h-screen items-center justify-center">
+        <div className="relative z-10 flex flex-col items-center gap-4">
+          <div className="relative h-14 w-14">
+            <div className="absolute inset-0 rounded-full border-[3px] border-indigo-200/80" />
+            <div className="absolute inset-0 animate-spin rounded-full border-[3px] border-transparent border-t-indigo-600 border-r-violet-500" />
+          </div>
+          <p className="text-sm font-semibold text-slate-500">Chargement…</p>
+        </div>
       </div>
     )
   }
@@ -22,10 +28,10 @@ export default function AuthenticatedLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="app-shell-bg relative flex h-screen overflow-hidden">
       <Sidebar />
       {/* Décalage sur mobile pour la topbar fixe */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto md:pt-0 pt-14">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-y-auto pt-14 scrollbar-thin md:pt-0">
         <Outlet />
       </div>
     </div>

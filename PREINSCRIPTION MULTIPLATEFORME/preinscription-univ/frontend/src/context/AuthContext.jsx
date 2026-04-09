@@ -32,13 +32,30 @@ export function AuthProvider({ children }) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
       // Rafraîchir depuis la DB — garantit etablissement_id et autres champs à jour
       axios
-        .get('/api/auth/me')
+        .get('/api/auth/me', { timeout: 20000 })
         .then(({ data }) => {
-          const fresh = { ...parsed, ...data }
-          localStorage.setItem('user', JSON.stringify(fresh))
-          setUser(fresh)
+          if (!data || typeof data !== 'object') {
+            setLoading(false)
+            return
+          }
+          try {
+            const fresh = { ...parsed, ...data }
+            localStorage.setItem('user', JSON.stringify(fresh))
+            setUser(fresh)
+          } catch {
+            /* JSON ou fusion impossible — garder la session locale */
+            setUser(parsed)
+          }
         })
-        .catch(() => {})
+        .catch((err) => {
+          const st = err.response?.status
+          if (st === 401 || st === 403) {
+            localStorage.removeItem('token')
+            localStorage.removeItem('user')
+            delete axios.defaults.headers.common['Authorization']
+            setUser(null)
+          }
+        })
         .finally(() => setLoading(false))
     } else {
       setLoading(false)

@@ -50,7 +50,27 @@ function generateNextMatriculeForEtablissement(etablissementId) {
   return { matricule: prefix + String(next).padStart(3, '0') };
 }
 
+/**
+ * Matricule pour un directeur sans rattachement établissement (supervision globale) : DIR + 3 chiffres.
+ * @returns {{ matricule?: string, error?: string }}
+ */
+function generateNextMatriculeDirecteur() {
+  const prefix = 'DIR';
+  const re = new RegExp(`^${prefix}(\\d{3})$`, 'i');
+  let max = 0;
+  for (const u of db.get('utilisateurs').value()) {
+    const m = normalizeMatricule(u.matricule).match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  const next = max + 1;
+  if (next > 999) {
+    return { error: 'Nombre maximum de matricules atteint pour les comptes directeur (DIR999).' };
+  }
+  return { matricule: prefix + String(next).padStart(3, '0') };
+}
+
 module.exports = {
   threeLetterPrefixFromEtablissementNom,
   generateNextMatriculeForEtablissement,
+  generateNextMatriculeDirecteur,
 };

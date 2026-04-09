@@ -16,6 +16,8 @@ const { verifyDiskFile, unlinkQuiet } = require('../utils/verifyUploadedFile');
 const { optionalClamScanFile } = require('../utils/optionalClamScan');
 const { computePrixAnnuel, normalizeFraisSupplementaires } = require('../utils/formationTarifs');
 const { syncStoredFactureById } = require('../services/factureService');
+const { isFactureSupprimee } = require('../utils/factureVisibility');
+const { JWT_SECRET } = require('../utils/jwtHelpers');
 
 function parseDureeMoisInput(v) {
   if (v === undefined || v === null || v === '') return 0;
@@ -251,13 +253,13 @@ function normalizeFormationType(v) {
 /** Retire formation_id des enregistrements liés avant suppression définitive d'une formation. */
 function detachFormationReferences(formationId) {
   const id = formationId;
-  db.get('dossiers').filter({ formation_id: id }).value().forEach((row) => {
+  (db.get('dossiers').value() || []).filter((row) => row.formation_id === id).forEach((row) => {
     db.get('dossiers').find({ id: row.id }).assign({ formation_id: null }).write();
   });
-  db.get('demandes_proforma').filter({ formation_id: id }).value().forEach((row) => {
+  (db.get('demandes_proforma').value() || []).filter((row) => row.formation_id === id).forEach((row) => {
     db.get('demandes_proforma').find({ id: row.id }).assign({ formation_id: null }).write();
   });
-  db.get('factures').filter({ formation_id: id }).value().forEach((row) => {
+  (db.get('factures').value() || []).filter((row) => row.formation_id === id).forEach((row) => {
     db.get('factures').find({ id: row.id }).assign({ formation_id: null }).write();
   });
 }
@@ -279,17 +281,18 @@ router.get('/', (req, res) => {
   let userRole = null;
   if (isAuth) {
     try {
-      const jwt = require('jsonwebtoken');
-      const JWT_SECRET = process.env.JWT_SECRET || 'preinscription_secret_key_2024';
+      const jwtLib = require('jsonwebtoken');
       const token = req.headers.authorization.split(' ')[1];
-      userRole = jwt.verify(token, JWT_SECRET).role;
+      userRole = jwtLib.verify(token, JWT_SECRET).role;
     } catch { /* token invalide → traitement comme public */ }
   }
 
   // Admin voit tous (y compris inactifs), les autres voient seulement actifs
-  const etabs = userRole === 'admin'
-    ? db.get('etablissements').value()
-    : db.get('etablissements').filter({ actif: true }).value();
+  const rawEtabs =
+    userRole === 'admin'
+      ? db.get('etablissements').value()
+      : db.get('etablissements').filter({ actif: true }).value();
+  const etabs = Array.isArray(rawEtabs) ? rawEtabs : [];
 
   const enrichis = etabs.map(e => {
     // Données publiques minimales pour les non-authentifiés
@@ -617,7 +620,7 @@ router.get('/:id/factures/export', etabFacturesAccess, (req, res) => {
     ? new Set(idsParam.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !Number.isNaN(n)))
     : null;
   const all = db.get('factures').value();
-  let subset = all.filter((f) => factureBelongsToEtablissement(f, etabId));
+  let subset = all.filter((f) => factureBelongsToEtablissement(f, etabId) && !isFactureSupprimee(f));
   if (idSet && idSet.size > 0) {
     subset = subset.filter((f) => idSet.has(f.id));
   }
@@ -632,13 +635,20 @@ router.get('/:id/factures/export', etabFacturesAccess, (req, res) => {
   return res.send(html);
 });
 
-// POST /api/etablissements/:id/factures/delete-batch — body { ids: number[] }
+const FACTURES_PAGE_MAX = 10;
+
+// POST /api/etablissements/:id/factures/delete-batch — body { ids: number[] } — max 10 id. par requête
 router.post('/:id/factures/delete-batch', etabFacturesAccess, (req, res) => {
   const etabId = parseInt(req.params.id, 10);
   const rawIds = Array.isArray(req.body.ids) ? req.body.ids : [];
   const ids = rawIds.map((x) => parseInt(x, 10)).filter((n) => !Number.isNaN(n));
   if (ids.length === 0) {
     return res.status(400).json({ message: 'Liste d’identifiants vide.' });
+  }
+  if (ids.length > FACTURES_PAGE_MAX) {
+    return res.status(400).json({
+      message: `Suppression groupée limitée à ${FACTURES_PAGE_MAX} facture(s) par envoi. Cochez au plus ${FACTURES_PAGE_MAX} ligne(s) ou utilisez « Tout supprimer » (plusieurs lots automatiques).`,
+    });
   }
   const removed = [];
   const skipped = [];
@@ -651,23 +661,37 @@ router.post('/:id/factures/delete-batch', etabFacturesAccess, (req, res) => {
     db.get('factures').remove({ id: fid }).write();
     removed.push(fid);
   });
+  if (removed.length) {
+    logAudit(req, 'factures_hard_delete_batch', 'etablissement', etabId, {
+      count: removed.length,
+      facture_ids: removed,
+    });
+  }
   return res.json({
-    message: `${removed.length} facture(s) supprimée(s).`,
+    message: `${removed.length} facture(s) définitivement supprimée(s) de la base.`,
     removed,
     skipped,
   });
 });
 
-// GET /api/etablissements/:id/factures — liste synthétique
+// GET /api/etablissements/:id/factures?page=1&limit=10 — liste paginée (10 max. par page)
 router.get('/:id/factures', etabFacturesAccess, (req, res) => {
   const etabId = parseInt(req.params.id, 10);
   const etab = db.get('etablissements').find({ id: etabId }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limitRaw = parseInt(req.query.limit, 10);
+  const limit = Math.min(FACTURES_PAGE_MAX, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : FACTURES_PAGE_MAX));
   const all = db.get('factures').value();
   const factures = all
-    .filter((f) => factureBelongsToEtablissement(f, etabId))
+    .filter((f) => factureBelongsToEtablissement(f, etabId) && !isFactureSupprimee(f))
     .sort((a, b) => new Date(b.date_emission || 0) - new Date(a.date_emission || 0));
-  const list = factures.map((f) => ({
+  const total = factures.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * limit;
+  const slice = factures.slice(start, start + limit);
+  const items = slice.map((f) => ({
     id: f.id,
     numero: f.numero,
     dossier_id: f.dossier_id,
@@ -678,7 +702,13 @@ router.get('/:id/factures', etabFacturesAccess, (req, res) => {
     etudiant_snapshot: f.etudiant_snapshot,
     formation_snapshot: f.formation_snapshot,
   }));
-  return res.json(list);
+  return res.json({
+    items,
+    total,
+    page: safePage,
+    limit,
+    totalPages,
+  });
 });
 
 // GET /api/etablissements/:id — détail complet
@@ -692,8 +722,8 @@ router.get('/:id', (req, res) => {
     return res.status(403).json({ message: 'Accès refusé.' });
   }
 
-  const filieres  = db.get('filieres').filter({ etablissement_id: id }).value().map((f) => {
-    const list = db.get('formations').filter({ filiere_id: f.id, etablissement_id: id }).value();
+  const filieres = (db.get('filieres').value() || []).filter((f) => f.etablissement_id === id).map((f) => {
+    const list = (db.get('formations').value() || []).filter((x) => x.filiere_id === f.id && x.etablissement_id === id);
     const actives = list.filter((x) => x.actif !== false);
     return {
       ...f,
@@ -704,13 +734,13 @@ router.get('/:id', (req, res) => {
       nb_formations_en_ligne: actives.filter((x) => x.type === 'en_ligne').length,
     };
   });
-  const formations = db.get('formations').filter({ etablissement_id: id }).value().map(f => {
+  const formations = (db.get('formations').value() || []).filter((f) => f.etablissement_id === id).map((f) => {
     const filiere = db.get('filieres').find({ id: f.filiere_id }).value();
     return { ...f, filiere_nom: filiere?.nom || null };
   });
-  const membres = db.get('utilisateurs')
+  const membres = (db.get('utilisateurs').value() || [])
     .filter((u) => u.etablissement_id === id && isEtabStaffMember(u))
-    .map(u => ({
+    .map((u) => ({
       id: u.id,
       prenom: u.prenom,
       nom: u.nom,
@@ -721,8 +751,7 @@ router.get('/:id', (req, res) => {
       role: u.role,
       actif: u.actif,
       created_at: u.created_at,
-    }))
-    .value();
+    }));
   const responsable = etab.responsable_id
     ? db.get('utilisateurs').find({ id: etab.responsable_id }).pick(['id', 'prenom', 'nom', 'email', 'role']).value()
     : null;
@@ -791,8 +820,8 @@ router.put('/:id/responsable', adminOnly, (req, res) => {
 // GET /api/etablissements/:id/filieres
 router.get('/:id/filieres', (req, res) => {
   const etablissement_id = parseInt(req.params.id);
-  const filieres = db.get('filieres').filter({ etablissement_id }).value().map(f => {
-    const list = db.get('formations').filter({ filiere_id: f.id, etablissement_id }).value();
+  const filieres = (db.get('filieres').value() || []).filter((f) => f.etablissement_id === etablissement_id).map((f) => {
+    const list = (db.get('formations').value() || []).filter((x) => x.filiere_id === f.id && x.etablissement_id === etablissement_id);
     const actives = list.filter((x) => x.actif !== false);
     const nb_formations = list.length;
     const nb_formations_actives = actives.length;
@@ -861,7 +890,7 @@ router.delete('/:etabId/filieres/:id', etabPedagogieWrite, (req, res) => {
     return res.status(404).json({ message: 'Filière introuvable.' });
   }
 
-  const list = db.get('formations').filter({ filiere_id: id, etablissement_id: etabId }).value();
+  const list = (db.get('formations').value() || []).filter((x) => x.filiere_id === id && x.etablissement_id === etabId);
   const actives = list.filter((x) => x.actif !== false);
   if (actives.length > 0) {
     return res.status(400).json({
@@ -887,7 +916,7 @@ router.delete('/:etabId/filieres/:id', etabPedagogieWrite, (req, res) => {
 // GET /api/etablissements/:id/formations
 router.get('/:id/formations', (req, res) => {
   const etablissement_id = parseInt(req.params.id);
-  const formations = db.get('formations').filter({ etablissement_id }).value().map(f => {
+  const formations = (db.get('formations').value() || []).filter((f) => f.etablissement_id === etablissement_id).map((f) => {
     const filiere = db.get('filieres').find({ id: f.filiere_id }).value();
     return { ...f, filiere_nom: filiere?.nom || null };
   });
@@ -905,6 +934,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     ville, places,
     frais_inscription, mensualite, frais_soutenance, autres_frais,
     duree_mois, frais_supplementaires,
+    nombre_photos_preinscription,
   } = req.body;
 
   if (!titre || !type || !filiere_id) return res.status(400).json({ message: 'Titre, type et filière obligatoires.' });
@@ -926,6 +956,11 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     return res.status(400).json({ message: 'Les champs numériques doivent être des entiers positifs ou nuls.' });
   }
 
+  const { normalizeNombrePhotosPreinscription } = require('../utils/preinscriptionDocumentRules');
+  const nPhotos = normalizeNombrePhotosPreinscription(
+    nombre_photos_preinscription != null ? nombre_photos_preinscription : 1,
+  );
+
   const id = db.nextId('formations');
   let formation = {
     id, etablissement_id, filiere_id: fid,
@@ -941,6 +976,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     frais_soutenance: fraisSoutenanceN,
     autres_frais: autresFraisN,
     frais_supplementaires: fraisSupp,
+    nombre_photos_preinscription: nPhotos,
     actif: true,
     created_at: new Date().toISOString()
   };
@@ -1096,7 +1132,7 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
     'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree',
     'description', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
-    'duree_mois', 'frais_supplementaires',
+    'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
   ];
   const updates = {};
   fields.forEach(f => {
@@ -1112,6 +1148,10 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
     const numFields = ['filiere_id', 'places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais'];
     updates[f] = numFields.includes(f) ? parseInt(req.body[f]) : req.body[f];
   });
+  if (updates.nombre_photos_preinscription !== undefined) {
+    const { normalizeNombrePhotosPreinscription } = require('../utils/preinscriptionDocumentRules');
+    updates.nombre_photos_preinscription = normalizeNombrePhotosPreinscription(updates.nombre_photos_preinscription);
+  }
   if (updates.type !== undefined) {
     updates.type = normalizeFormationType(updates.type);
     if (!['presentiel', 'en_ligne'].includes(updates.type)) {
@@ -1152,7 +1192,7 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
     'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree',
     'description', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
-    'duree_mois', 'frais_supplementaires',
+    'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
   ]);
   const numericFields = new Set([
     'filiere_id', 'places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'duree_mois',
@@ -1183,6 +1223,11 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
       }
       updates[k] = v;
     });
+
+    if (updates.nombre_photos_preinscription !== undefined) {
+      const { normalizeNombrePhotosPreinscription } = require('../utils/preinscriptionDocumentRules');
+      updates.nombre_photos_preinscription = normalizeNombrePhotosPreinscription(updates.nombre_photos_preinscription);
+    }
 
     if (updates.type !== undefined) {
       updates.type = normalizeFormationType(updates.type);
@@ -1398,6 +1443,8 @@ router.get('/:id/membres', adminOnly, (req, res) => {
       prenom: u.prenom,
       nom: u.nom,
       email: u.email,
+      telephone: u.telephone || '',
+      adresse: u.adresse || '',
       matricule: u.matricule || null,
       role: u.role,
       actif: u.actif !== false,
@@ -1426,7 +1473,7 @@ router.post('/:id/membres', adminOnly, (req, res) => {
     return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
   }
 
-  const ROLES_AUTORISÉS = ['responsable', 'agent_admin', 'comptable', 'directeur'];
+  const ROLES_AUTORISÉS = ['responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'directeur'];
   if (!ROLES_AUTORISÉS.includes(role)) return res.status(400).json({ message: 'Rôle invalide.' });
 
   const gen = generateNextMatriculeForEtablissement(etablissement_id);
@@ -1484,40 +1531,126 @@ router.post('/:id/membres', adminOnly, (req, res) => {
   });
 });
 
-// PUT /api/etablissements/:etabId/membres/:id — modifier/désactiver
+// PUT /api/etablissements/:etabId/membres/:id — modifier (identité, rôle, actif, mot de passe optionnel)
 router.put('/:etabId/membres/:id', adminOnly, (req, res) => {
-  const id = parseInt(req.params.id);
+  const etabId = parseInt(req.params.etabId, 10);
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(etabId) || Number.isNaN(id)) {
+    return res.status(400).json({ message: 'Identifiant invalide.' });
+  }
   const user = db.get('utilisateurs').find({ id }).value();
   if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+  if (user.etablissement_id !== etabId) {
+    return res.status(404).json({ message: 'Ce membre n’appartient pas à cet établissement.' });
+  }
   if (user.role === 'etudiant') {
     return res.status(400).json({ message: 'Les comptes étudiants ne sont pas gérés dans la liste des membres du staff.' });
   }
 
-  const { role, actif } = req.body;
-  const updates = {};
+  const {
+    role, actif, prenom, nom, email, telephone, adresse, mot_de_passe,
+  } = req.body;
+  const ROLES_STAFF = ['responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'directeur'];
+  const updates = { updated_at: new Date().toISOString() };
+
   if (role !== undefined) {
-    const ROLES_STAFF = ['responsable', 'agent_admin', 'comptable', 'directeur'];
     if (!ROLES_STAFF.includes(role)) {
       return res.status(400).json({ message: 'Rôle invalide pour un membre du staff.' });
     }
     updates.role = role;
   }
-  if (actif !== undefined) updates.actif = actif;
+  if (actif !== undefined) updates.actif = !!actif;
+  if (prenom !== undefined) updates.prenom = String(prenom).trim();
+  if (nom !== undefined) updates.nom = String(nom).trim();
+  if (email !== undefined) {
+    const emailNorm = String(email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) {
+      return res.status(400).json({ message: 'Email invalide.' });
+    }
+    const exist = db.get('utilisateurs').find({ email: emailNorm }).value();
+    if (exist && exist.id !== id) {
+      return res.status(409).json({ message: 'Cet email est déjà utilisé.' });
+    }
+    updates.email = emailNorm;
+  }
+  if (telephone !== undefined) {
+    const telTrim = String(telephone).trim();
+    const telNorm = normalizeTelephoneForUniqueness(telTrim);
+    if (telNorm.length < 8) {
+      return res.status(400).json({ message: 'Téléphone invalide ou trop court (8 chiffres min.).' });
+    }
+    if (telephoneTaken(telNorm, id)) {
+      return res.status(409).json({ message: 'Ce numéro est déjà associé à un autre compte.' });
+    }
+    updates.telephone = telTrim;
+  }
+  if (adresse !== undefined) updates.adresse = adresse != null ? String(adresse).trim() : '';
+  if (mot_de_passe != null && String(mot_de_passe).trim() !== '') {
+    if (String(mot_de_passe).length < 6) {
+      return res.status(400).json({ message: 'Mot de passe trop court (min. 6 caractères).' });
+    }
+    updates.mot_de_passe = bcrypt.hashSync(mot_de_passe, 10);
+    updates.must_change_password = true;
+  }
 
   db.get('utilisateurs').find({ id }).assign(updates).write();
-  res.json({ message: 'Membre mis à jour.' });
+  const fresh = db.get('utilisateurs').find({ id }).value();
+  res.json({
+    message: 'Membre mis à jour.',
+    membre: {
+      id: fresh.id,
+      prenom: fresh.prenom,
+      nom: fresh.nom,
+      email: fresh.email,
+      matricule: fresh.matricule,
+      role: fresh.role,
+      actif: fresh.actif !== false,
+      telephone: fresh.telephone,
+      adresse: fresh.adresse,
+    },
+  });
 });
 
-// DELETE /api/etablissements/:etabId/membres/:id — désactiver
+// DELETE /api/etablissements/:etabId/membres/:id — désactiver (soft)
 router.delete('/:etabId/membres/:id', adminOnly, (req, res) => {
-  const id = parseInt(req.params.id);
+  const etabId = parseInt(req.params.etabId, 10);
+  const id = parseInt(req.params.id, 10);
   const user = db.get('utilisateurs').find({ id }).value();
   if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+  if (user.etablissement_id !== etabId) {
+    return res.status(404).json({ message: 'Ce membre n’appartient pas à cet établissement.' });
+  }
   if (user.role === 'etudiant') {
     return res.status(400).json({ message: 'Les comptes étudiants ne font pas partie du staff de l’établissement.' });
   }
-  db.get('utilisateurs').find({ id }).assign({ actif: false }).write();
+  db.get('utilisateurs').find({ id }).assign({ actif: false, updated_at: new Date().toISOString() }).write();
   res.json({ message: 'Compte désactivé.' });
+});
+
+// POST /api/etablissements/:etabId/membres/:id/supprimer-definitif — suppression base (admin)
+router.post('/:etabId/membres/:id/supprimer-definitif', adminOnly, (req, res) => {
+  const etabId = parseInt(req.params.etabId, 10);
+  const id = parseInt(req.params.id, 10);
+  const user = db.get('utilisateurs').find({ id }).value();
+  if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+  if (user.etablissement_id !== etabId) {
+    return res.status(404).json({ message: 'Ce membre n’appartient pas à cet établissement.' });
+  }
+  if (user.role === 'admin') {
+    return res.status(403).json({ message: 'Impossible de supprimer un administrateur depuis cet écran.' });
+  }
+  if (user.role === 'etudiant') {
+    return res.status(400).json({ message: 'Opération réservée aux comptes staff.' });
+  }
+  const confirmation_email = String(req.body?.confirmation_email || '').trim().toLowerCase();
+  const expected = String(user.email || '').trim().toLowerCase();
+  if (!expected || confirmation_email !== expected) {
+    return res.status(400).json({
+      message: 'Saisissez l’adresse e-mail exacte du compte pour confirmer la suppression définitive.',
+    });
+  }
+  db.get('utilisateurs').remove({ id }).write();
+  res.json({ message: 'Compte supprimé définitivement.' });
 });
 
 module.exports = router;

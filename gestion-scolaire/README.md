@@ -108,6 +108,54 @@ cd backend && npm test           # Tests unitaires
 cd backend && npm run test:e2e   # Tests e2e
 ```
 
+## Développement local (checklist)
+
+À faire sur votre machine **avant** de pousser sur Git ou de déployer :
+
+1. **Variables** : `cp .env.example .env` et `cp backend/.env.example backend/.env` (adapter `JWT_SECRET` en local si besoin).
+2. **Dépendances** : à la racine `gestion-scolaire`, `npm install` puis `cd backend && npm install` et `cd ../frontend && npm install` (ou équivalent monorepo).
+3. **Base** : `npm run migrate` puis optionnel `npm run seed` pour les comptes de test.
+4. **Lancer** : `npm run dev` → API [http://localhost:3000](http://localhost:3000), front [http://localhost:3001](http://localhost:3001).
+5. **Vérifier** : `GET http://localhost:3000/health`, connexion Swagger `http://localhost:3000/api/docs`, parcours critique (login + une page métier).
+
+En cas d’erreur Prisma : `cd backend && npx prisma generate` puis relancer les migrations.
+
+## GitHub (remote et migration du dépôt)
+
+**Nouveau dépôt**
+
+```bash
+cd gestion-scolaire
+git init
+git add .
+git commit -m "Initial import"
+git branch -M main
+git remote add origin https://github.com/VOTRE_ORG/VOTRE_REPO.git
+git push -u origin main
+```
+
+**Dépôt déjà cloné ailleurs** : ajouter le remote `origin` pointant vers la bonne URL GitHub, puis `git fetch origin` et `git pull origin main` (ou fusionner selon votre stratégie). Évitez de committer `.env`, `backend/.env`, fichiers SQLite de dev si vous ne voulez pas les versionner (voir `.gitignore`).
+
+## Mise à jour sur le serveur (après migration GitHub)
+
+Ordre conseillé sur la machine de production (adapter les chemins utilisateur) :
+
+```bash
+cd /chemin/vers/gestion-scolaire
+git pull origin main
+npm install
+cd backend && npm install && npx prisma migrate deploy && cd ../frontend && npm install && cd ..
+npm run build
+# Redémarrer le process Node (ex. PM2) et recharger le front si servi séparément
+```
+
+Pour le détail (Apache, PM2, PostgreSQL, SSL), voir [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+### Rôle « Service pédagogique » (directeur)
+
+- Droits **fédérateurs** : vue sur l’ensemble des campus / établissements (RBAC).
+- À la **création** d’un compte directeur, le backend rattache ce profil comme **responsable pédagogique** sur les campus qui n’avaient pas encore de responsable (les campus déjà pourvus conservent leur responsable).
+
 ## Production
 
 En production, définir **JWT_SECRET** dans `backend/.env` (min. 32 caractères). Sans cela, le backend refusera de démarrer. Voir `backend/.env.example`.

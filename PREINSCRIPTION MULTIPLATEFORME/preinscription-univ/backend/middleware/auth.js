@@ -56,26 +56,39 @@ const responsableOnly  = roleGuard('responsable');
 const agentAdminOnly   = roleGuard('agent_admin');
 const comptableOnly    = roleGuard('comptable');
 const directeurOnly    = roleGuard('directeur');
+const controleurQualiteOnly = roleGuard('controleur_qualite');
 
 const responsableOrAdmin = roleGuard('responsable', 'admin');
+/** Validation demande facture proforma : pédagogique, finance, qualité, direction, admin établ. / plateforme */
+const staffProformaDecision = roleGuard(
+  'admin',
+  'responsable',
+  'directeur',
+  'agent_admin',
+  'comptable',
+  'controleur_qualite'
+);
 /** Lecture lettre / attestation (même périmètre établissement que la facture dossier) */
 const staffLettreAttestation = roleGuard(
   'admin',
   'responsable',
   'agent_admin',
   'comptable',
-  'directeur'
+  'directeur',
+  'controleur_qualite'
 );
 const agentAdminOrAdmin  = roleGuard('agent_admin', 'admin');
 const comptableOrAdmin   = roleGuard('comptable', 'admin');
 const directeurOrAdmin   = roleGuard('directeur', 'admin');
+const controleurQualiteOrAdmin = roleGuard('controleur_qualite', 'admin');
 
 // Tout membre du staff (non étudiant)
-const staffOnly = roleGuard('admin', 'responsable', 'agent_admin', 'comptable', 'directeur');
+const staffOnly = roleGuard('admin', 'responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite');
 
 module.exports = {
   authMiddleware,
-  adminOnly, responsableOnly, agentAdminOnly, comptableOnly, directeurOnly,
-  responsableOrAdmin, staffLettreAttestation, agentAdminOrAdmin, comptableOrAdmin, directeurOrAdmin,
+  adminOnly, responsableOnly, agentAdminOnly, comptableOnly, directeurOnly, controleurQualiteOnly,
+  responsableOrAdmin, staffProformaDecision, staffLettreAttestation, agentAdminOrAdmin, comptableOrAdmin, directeurOrAdmin,
+  controleurQualiteOrAdmin,
   staffOnly
 };

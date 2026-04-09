@@ -7,7 +7,8 @@ const ROLES_STAFF = [
   { val: 'responsable', label: 'Responsable pédagogique' },
   { val: 'agent_admin', label: 'Agent administratif' },
   { val: 'comptable', label: 'Comptable / Finance' },
-  { val: 'directeur', label: 'Directeur' }
+  { val: 'directeur', label: 'Directeur' },
+  { val: 'controleur_qualite', label: 'Contrôleur qualité' },
 ]
 
 const ROLE_COLORS = {
@@ -16,12 +17,13 @@ const ROLE_COLORS = {
   agent_admin: 'bg-orange-100 text-orange-700',
   comptable:   'bg-purple-100 text-purple-700',
   directeur:   'bg-blue-100 text-blue-700',
+  controleur_qualite: 'bg-cyan-100 text-cyan-800',
   etudiant:    'bg-gray-100 text-gray-700'
 }
 const ROLE_LABELS = {
   admin: 'Administrateur', responsable: 'Resp. Pédagogique',
   agent_admin: 'Agent Administratif', comptable: 'Comptable',
-  directeur: 'Directeur', etudiant: 'Étudiant'
+  directeur: 'Directeur', controleur_qualite: 'Contrôleur qualité', etudiant: 'Étudiant'
 }
 
 function RoleBadge({ role }) {
@@ -143,9 +145,16 @@ export default function AdminUsers() {
       toast.error('Les mots de passe ne correspondent pas.')
       return
     }
+    if (createForm.role !== 'directeur' && !createForm.etablissement_id) {
+      toast.error('Sélectionnez un établissement pour ce rôle.')
+      return
+    }
     setSaving(true)
     try {
-      const { data } = await axios.post('/api/admin/utilisateurs', createForm)
+      const { data } = await axios.post('/api/admin/utilisateurs', {
+        ...createForm,
+        etablissement_id: createForm.role === 'directeur' ? null : createForm.etablissement_id,
+      })
       const mat = data.utilisateur?.matricule
       toast.success(mat ? `Compte créé. Matricule : ${mat}` : 'Compte créé.')
       setShowCreate(false)
@@ -167,9 +176,19 @@ export default function AdminUsers() {
   }
   const handleEdit = async (e) => {
     e.preventDefault()
+    if (
+      editForm.role !== 'directeur' &&
+      editForm.role !== 'etudiant' &&
+      ['responsable', 'agent_admin', 'comptable'].includes(editForm.role) &&
+      !editForm.etablissement_id
+    ) {
+      toast.error('Indiquez un établissement pour ce rôle.')
+      return
+    }
     setEditSaving(true)
     try {
       const payload = { ...editForm }
+      if (payload.role === 'directeur') payload.etablissement_id = null
       if (!payload.mot_de_passe) delete payload.mot_de_passe
       await axios.put(`/api/admin/utilisateurs/${editUser.id}`, payload)
       const etabChanged = String(editForm.etablissement_id || '') !== String(editUser.etablissement_id || '')
@@ -255,8 +274,20 @@ export default function AdminUsers() {
     } catch (err) { toast.error(err.response?.data?.message || 'Erreur.') }
   }
 
-  const upCreate = (f) => (e) => setCreateForm(p => ({ ...p, [f]: e.target.value }))
-  const upEdit   = (f) => (e) => setEditForm(p => ({ ...p, [f]: e.target.value }))
+  const upCreate = (f) => (e) => {
+    const v = e.target.value
+    setCreateForm((p) => {
+      if (f === 'role' && v === 'directeur') return { ...p, role: v, etablissement_id: '' }
+      return { ...p, [f]: v }
+    })
+  }
+  const upEdit = (f) => (e) => {
+    const v = e.target.value
+    setEditForm((p) => {
+      if (f === 'role' && v === 'directeur') return { ...p, role: v, etablissement_id: '' }
+      return { ...p, [f]: v }
+    })
+  }
 
   /* ── Grouper par établissement (pour affichage) ── */
   const grouped = useMemo(() => {
@@ -455,7 +486,16 @@ export default function AdminUsers() {
               <Field label="Nom" required><input className="input-field" value={createForm.nom} onChange={upCreate('nom')} required /></Field>
             </div>
             <p className="text-xs text-gray-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-              Le <strong>matricule</strong> sera généré automatiquement : 3 lettres (nom de l’établissement choisi) + 3 chiffres (ex. <span className="font-mono">UNI001</span>).
+              {createForm.role === 'directeur' ? (
+                <>
+                  Le <strong>matricule</strong> sera du type <span className="font-mono">DIR001</span> (supervision globale, sans rattachement à un établissement).
+                </>
+              ) : (
+                <>
+                  Le <strong>matricule</strong> sera généré automatiquement : 3 lettres (nom de l’établissement choisi) + 3 chiffres (ex.{' '}
+                  <span className="font-mono">UNI001</span>).
+                </>
+              )}
             </p>
             <Field label="Email" required><input type="email" className="input-field" value={createForm.email} onChange={upCreate('email')} required /></Field>
             <Field label="Téléphone" required note="unique (8 chiffres min., espaces et + ignorés)">
@@ -476,13 +516,22 @@ export default function AdminUsers() {
                 {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
               </select>
             </Field>
-            <Field label="Établissement" required>
-              <select className="input-field" value={createForm.etablissement_id} onChange={upCreate('etablissement_id')} required>
-                <option value="">-- Sélectionner --</option>
-                {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
-              </select>
-              <p className="text-xs text-gray-400 mt-1">Ce staff ne verra que les données de cet établissement.</p>
-            </Field>
+            {createForm.role === 'directeur' ? (
+              <div className="rounded-xl border border-blue-100 bg-blue-50/90 px-3 py-3 text-sm text-blue-900">
+                <p className="font-semibold">Directeur — supervision globale</p>
+                <p className="text-xs text-blue-800/90 mt-1 leading-relaxed">
+                  Aucun établissement à choisir : ce compte a une vue sur <strong>toute l’activité</strong> (dossiers, statistiques) sur la plateforme, comme l’administrateur pour les données métier.
+                </p>
+              </div>
+            ) : (
+              <Field label="Établissement" required>
+                <select className="input-field" value={createForm.etablissement_id} onChange={upCreate('etablissement_id')} required>
+                  <option value="">-- Sélectionner --</option>
+                  {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Ce compte ne voit que les données de cet établissement.</p>
+              </Field>
+            )}
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1">Annuler</button>
               <button type="submit" disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-40">
@@ -522,17 +571,26 @@ export default function AdminUsers() {
                 {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
               </select>
             </Field>
-            <Field label="Établissement" required={editForm.role !== 'etudiant'}>
-              <select
-                className="input-field"
-                value={editForm.etablissement_id}
-                onChange={upEdit('etablissement_id')}
-                required={editForm.role !== 'etudiant'}
-              >
-                <option value="">-- {editForm.role === 'etudiant' ? 'Aucun' : 'Sélectionner'} --</option>
-                {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
-              </select>
-            </Field>
+            {editForm.role === 'directeur' ? (
+              <div className="rounded-xl border border-blue-100 bg-blue-50/90 px-3 py-3 text-sm text-blue-900">
+                <p className="font-semibold">Rattachement établissement</p>
+                <p className="text-xs text-blue-800/90 mt-1">
+                  Compte directeur : <strong>aucun établissement</strong> (vue globale). Pour rattacher ce compte à une école, changez le rôle vers Responsable, Agent ou Comptable puis choisissez l’établissement.
+                </p>
+              </div>
+            ) : (
+              <Field label="Établissement" required={editForm.role !== 'etudiant'}>
+                <select
+                  className="input-field"
+                  value={editForm.etablissement_id}
+                  onChange={upEdit('etablissement_id')}
+                  required={editForm.role !== 'etudiant'}
+                >
+                  <option value="">-- {editForm.role === 'etudiant' ? 'Aucun' : 'Sélectionner'} --</option>
+                  {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+                </select>
+              </Field>
+            )}
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={() => setEditUser(null)} className="btn-secondary flex-1">Annuler</button>
               <button type="submit" disabled={editSaving} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-40">

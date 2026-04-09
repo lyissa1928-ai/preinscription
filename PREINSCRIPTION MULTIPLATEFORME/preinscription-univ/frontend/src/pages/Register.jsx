@@ -17,13 +17,13 @@ import {
   FaChevronLeft,
   FaChevronRight,
   FaShieldAlt,
-  FaSearch,
 } from 'react-icons/fa'
 import AuthCinematicBackground from '../components/AuthCinematicBackground'
 import RegistrationMascot from '../components/RegistrationMascot'
 import { cn } from '@/lib/utils'
 import { passwordStrength } from '@/lib/passwordStrength'
 import { getRecaptchaSiteKey } from '@/lib/siteKeys'
+import { sanitizeNextPath } from '@/lib/navigation'
 import {
   trimStr,
   normalizeEmail,
@@ -46,6 +46,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+import RegisterSchoolFlow, { initialSchoolUi } from '../components/register/RegisterSchoolFlow'
 
 const BRANDS = [
   {
@@ -102,6 +103,15 @@ function normalize(s) {
     .replace(/\p{M}/gu, '')
 }
 
+/** Barre d’accent visuel (bordure) si le nom d’établissement correspond à une marque connue. */
+function brandAccentClassForNom(nom) {
+  const n = normalize(nom || '')
+  for (const b of BRANDS) {
+    if (n.includes(normalize(b.nom))) return b.couleurs
+  }
+  return 'from-slate-500 to-slate-600'
+}
+
 export default function Register() {
   const [form, setForm] = useState({
     nom: '',
@@ -112,8 +122,12 @@ export default function Register() {
     adresse: '',
     mot_de_passe: '',
     confirm: '',
+    /** Optionnel : formation visée (récap uniquement — non envoyé à l’API) */
+    formation_id: '',
   })
   const [step, setStep] = useState(1)
+  const [schoolUi, setSchoolUi] = useState(initialSchoolUi)
+  const schoolCatalogueEtabRef = useRef(null)
   const [etablissements, setEtablissements] = useState([])
   const [etabSearch, setEtabSearch] = useState('')
   const [loading, setLoading] = useState(false)
@@ -131,6 +145,8 @@ export default function Register() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const etablissementIdFromQuery = searchParams.get('etablissement_id') ?? ''
+
+  const nextAfterSignup = sanitizeNextPath(searchParams.get('next') || searchParams.get('redirect'))
 
   const strength = useMemo(() => passwordStrength(form.mot_de_passe), [form.mot_de_passe])
 
@@ -266,7 +282,7 @@ export default function Register() {
         toast.success(data.message || 'Consultez votre boîte e-mail pour confirmer votre compte.')
         navigate('/connexion', {
           replace: true,
-          state: { pendingEmailVerification: normalizeEmail(form.email) },
+          state: { pendingEmailVerification: normalizeEmail(form.email), next: nextAfterSignup },
         })
         return
       }
@@ -281,7 +297,7 @@ export default function Register() {
         /* ignore */
       }
       toast.success('Compte créé — notez vos identifiants sur l’écran suivant.')
-      navigate('/bienvenue-compte', { replace: true })
+      navigate('/bienvenue-compte', { replace: true, state: { next: nextAfterSignup } })
     } catch (err) {
       recaptchaRef.current?.reset()
       setRecaptchaToken('')
@@ -303,6 +319,11 @@ export default function Register() {
 
   const selectedEtab = etablissements.find((e) => String(e.id) === String(form.etablissement_id))
 
+  const formationRecap = useMemo(() => {
+    if (!form.formation_id) return null
+    return schoolUi.catalogue.find((f) => String(f.id) === String(form.formation_id)) || null
+  }, [form.formation_id, schoolUi.catalogue])
+
   const etabHeroImage = useMemo(() => resolveEtabHeroImage(selectedEtab?.nom), [selectedEtab?.nom])
 
   const currentStepMeta = STEPS[Math.min(STEPS.length, Math.max(1, step)) - 1]
@@ -323,79 +344,99 @@ export default function Register() {
       `}</style>
       <AuthCinematicBackground showProgressDots focusedImageUrl={etabHeroImage ?? undefined} />
 
-      <div className="relative z-10 w-full max-w-[1200px] xl:max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-[1fr_minmax(0,650px)] gap-6 lg:gap-8 xl:gap-10 items-start">
-          {/* Colonne gauche — branding */}
-          <div className="hidden lg:block pt-4 lg:sticky lg:top-8">
-            <div className="rounded-2xl border border-white/35 bg-white/10 backdrop-blur-md p-3 mb-6">
-              <div className="grid grid-cols-3 gap-2">
-                {BRANDS.map((b) => (
-                  <div
-                    key={b.nom}
-                    className="rounded-xl border border-white/40 bg-white/15 backdrop-blur-sm p-1.5 shadow-lg transition-transform duration-300 hover:-translate-y-1"
-                  >
-                    <img src={b.image} alt="" className="w-full h-12 object-cover rounded-md mb-1.5" loading="lazy" />
-                    <div className={`h-1 rounded-full bg-gradient-to-r ${b.couleurs} mb-1`} />
-                    <p className="text-[10px] font-bold text-white tracking-wide">{b.nom}</p>
-                    <p className="text-[9px] text-white/70">{b.domaine}</p>
-                  </div>
-                ))}
-              </div>
+      <div className="relative z-10 w-full max-w-[1320px] mx-auto px-0 sm:px-1">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.22fr)] gap-8 lg:gap-10 xl:gap-12 items-start">
+          {/* Colonne gauche — message court (moins de charge cognitive) */}
+          <div className="hidden lg:block pt-2 lg:sticky lg:top-8 max-w-[380px]">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/12 border border-white/30 text-[11px] font-semibold text-white/95 backdrop-blur-sm mb-5">
+              <FaGraduationCap className="text-amber-300 shrink-0" aria-hidden />
+              UniPortail — inscription
             </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 border border-white/35 text-xs font-semibold text-white backdrop-blur-sm mb-4">
-              <FaGraduationCap className="text-amber-300" />
-              UniPréinscription — inscription étudiant
-            </div>
-            <h1 className="text-3xl xl:text-4xl font-black text-white tracking-tight leading-tight drop-shadow-[0_2px_24px_rgba(0,0,0,0.35)]">
-              Créez votre espace
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-white to-cyan-200 mt-1">
-                en quelques étapes
-              </span>
+            <h1 className="text-[1.65rem] xl:text-4xl font-black text-white tracking-tight leading-[1.15] drop-shadow-[0_2px_20px_rgba(0,0,0,0.35)]">
+              Ouvrez votre compte étudiant
             </h1>
-            <p className="text-blue-100/90 mt-4 text-sm leading-relaxed max-w-md">
-              Un compte unique pour déposer votre dossier, suivre votre préinscription et accéder à vos documents
-              (facture proforma, lettres, etc.).
+            <p className="text-white/85 mt-3 text-sm leading-relaxed">
+              Quelques minutes pour vous identifier, choisir votre établissement et sécuriser l’accès à votre dossier de
+              préinscription.
             </p>
-            <ul className="mt-8 space-y-3 text-sm text-white/90">
+            <ul className="mt-7 space-y-2.5 text-sm text-white/90">
               {[
-                'Matricule attribué automatiquement après votre établissement',
-                'E-mail et téléphone uniques pour sécuriser votre accès',
-                'Protection anti-bot (reCAPTCHA) en production',
+                'Dossier et suivi au même endroit',
+                'Matricule généré selon votre établissement',
+                'Données utilisées uniquement pour l’administration scolaire',
               ].map((t) => (
-                <li key={t} className="flex items-start gap-2">
-                  <FaCheck className="text-emerald-400 mt-0.5 shrink-0" />
+                <li key={t} className="flex items-start gap-2.5">
+                  <FaCheck className="text-emerald-400 mt-0.5 shrink-0" aria-hidden />
                   <span>{t}</span>
                 </li>
               ))}
             </ul>
+            {selectedEtab && (
+              <div
+                className="mt-8 rounded-2xl border border-white/35 bg-white/10 backdrop-blur-md px-4 py-3 shadow-lg shadow-black/10"
+                role="status"
+                aria-live="polite"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-wider text-white/65">Rattachement choisi</p>
+                <p className="text-white font-semibold text-sm mt-1 leading-snug">{selectedEtab.nom}</p>
+                {formationRecap && (
+                  <p className="text-white/90 text-xs mt-2 leading-snug border-t border-white/20 pt-2">
+                    <span className="text-white/60 font-semibold uppercase text-[10px]">Orientation</span>
+                    <br />
+                    <span className="font-medium">{formationRecap.titre}</span>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Colonne droite — formulaire max ~650px, pleine largeur sur mobile */}
-          <div className="w-full max-w-[min(100%,650px)] mx-auto lg:mx-0">
-            <div className="text-center lg:hidden mb-6">
-              <FaGraduationCap className="text-amber-300 text-4xl mx-auto mb-2" />
-              <h2 className="text-2xl font-black text-white">Créer un compte</h2>
-              <p className="text-blue-100 text-sm mt-1">UniPréinscription</p>
+          {/* Colonne droite — formulaire mis en avant */}
+          <div className="w-full min-w-0 max-w-[min(100%,720px)] lg:max-w-none mx-auto lg:mx-0 lg:justify-self-stretch">
+            <div className="text-center lg:hidden mb-5">
+              <FaGraduationCap className="text-amber-300 text-3xl mx-auto mb-2" aria-hidden />
+              <h2 className="text-xl font-black text-white tracking-tight">Créer un compte</h2>
+              <p className="text-blue-100/90 text-sm mt-1 max-w-xs mx-auto leading-snug">
+                Identité et rattachement à un établissement — la préinscription ou la demande proforma viennent après connexion.
+              </p>
             </div>
 
-            <div className="flex flex-col items-stretch gap-5 xl:flex-row xl:items-end xl:gap-0 xl:max-w-[650px] xl:mx-auto">
-              {/* Mascotte mobile */}
-              <div className="flex justify-center xl:hidden -mt-1 mb-1">
+            <div className="relative w-full min-w-0">
+              {/* Mascotte légère uniquement sur mobile étroit (évite la distraction sur tablette / desktop) */}
+              <div className="flex justify-center sm:hidden mb-2 -mt-1">
                 <RegistrationMascot compact />
               </div>
 
-              {/* Mascotte desktop — à gauche du formulaire */}
-              <div className="relative z-[11] hidden shrink-0 xl:flex xl:w-[200px] xl:flex-col xl:items-center xl:justify-end xl:pb-10 xl:pr-1">
-                <RegistrationMascot />
-              </div>
-
-              <div className="relative min-w-0 flex-1 xl:pl-1">
-                {/* Lien visuel corde → panneau */}
-                <div
-                  className="pointer-events-none absolute -left-1 top-[28%] hidden h-px w-4 bg-gradient-to-r from-white/40 to-transparent xl:block"
-                  aria-hidden="true"
-                />
-                <Card className="rounded-[1.35rem] border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_50px_-12px_rgba(15,23,42,0.35),0_0_0_1px_rgba(255,255,255,0.6)_inset] ring-1 ring-slate-900/[0.04] backdrop-blur-xl overflow-hidden">
+              <Card className="rounded-[1.35rem] border border-slate-200/80 bg-white text-slate-900 shadow-[0_24px_56px_-14px_rgba(15,23,42,0.38),0_0_0_1px_rgba(255,255,255,0.65)_inset] ring-1 ring-slate-900/[0.05] backdrop-blur-xl overflow-hidden">
+              {selectedEtab && (
+                <div className="flex items-center gap-3 px-4 py-3 sm:px-6 border-b border-slate-100/90 bg-gradient-to-r from-slate-50/95 via-white to-blue-50/40">
+                  {etabHeroImage ? (
+                    <img
+                      src={etabHeroImage}
+                      alt=""
+                      className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl object-cover border border-slate-200/90 shadow-sm shrink-0"
+                      width={44}
+                      height={44}
+                    />
+                  ) : (
+                    <div
+                      className={cn(
+                        'h-10 w-10 sm:h-11 sm:w-11 rounded-xl shrink-0 shadow-inner border border-slate-200/80 bg-gradient-to-br',
+                        brandAccentClassForNom(selectedEtab.nom),
+                      )}
+                      aria-hidden
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Votre établissement</p>
+                    <p className="text-sm font-bold text-slate-900 truncate">{selectedEtab.nom}</p>
+                  </div>
+                  {step === 2 && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-700 bg-blue-100/90 px-2 py-1 rounded-md shrink-0">
+                      {schoolUi.phase === 'done' ? 'Récap' : 'Parcours'}
+                    </span>
+                  )}
+                </div>
+              )}
               {/* Barre de progression */}
               <div className="relative px-4 pt-5 pb-4 sm:px-6 xl:px-8 bg-gradient-to-br from-slate-50 via-white to-blue-50/40 border-b border-slate-100">
                 <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-500 opacity-90" aria-hidden />
@@ -447,6 +488,7 @@ export default function Register() {
                         size="sm"
                         title={s.id < step ? `Revenir à : ${s.label}` : undefined}
                         disabled={s.id > step}
+                        aria-current={active ? 'step' : undefined}
                         onClick={() => {
                           if (s.id < step) setStep(s.id)
                         }}
@@ -473,11 +515,18 @@ export default function Register() {
                   {step === 1 && (
                     <>
                       <div className="space-y-3">
-                        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Votre identité</h2>
+                        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Identité administrative</h2>
                         <p className="text-sm text-slate-600 leading-relaxed">
-                          Ces informations servent à constituer votre dossier administratif et à vous identifier sans ambiguïté.
-                          Utilisez la même graphie que sur vos pièces d’identité ou votre baccalauréat.
+                          Indiquez votre nom et prénom <strong className="text-slate-800">comme sur une pièce officielle</strong> (CNI,
+                          passeport, diplôme). C’est la référence pour votre dossier et votre futur matricule.
                         </p>
+                        <div
+                          className="rounded-xl border border-blue-100 bg-blue-50/70 px-3.5 py-2.5 text-xs text-slate-700 leading-snug"
+                          role="note"
+                        >
+                          <span className="font-semibold text-slate-800">Astuce :</span> en cas de plusieurs prénoms, saisissez le prénom
+                          principal tel qu’il figure sur vos documents.
+                        </div>
                       </div>
                       <div className="grid sm:grid-cols-2 gap-x-5 gap-y-5">
                         <div className="space-y-2">
@@ -515,64 +564,20 @@ export default function Register() {
                   )}
 
                   {step === 2 && (
-                    <>
-                      <div className="space-y-3">
-                        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Votre établissement</h2>
-                        <p className="text-sm text-slate-600 leading-relaxed">
-                          Le choix détermine votre <strong className="text-slate-800">rattachement</strong> et le préfixe de
-                          votre futur <strong className="text-slate-800">matricule</strong> (généré automatiquement : 3
-                          lettres + 3 chiffres). L’arrière-plan s’adapte à l’établissement sélectionné pour vous aider à
-                          visualiser votre orientation.
-                        </p>
-                      </div>
-                      <div className="relative">
-                        <FaSearch className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 text-slate-400 text-sm" />
-                        <Input
-                          type="search"
-                          className={cn('pl-9', fieldClass)}
-                          placeholder="Rechercher un établissement…"
-                          value={etabSearch}
-                          onChange={(e) => setEtabSearch(e.target.value)}
-                          aria-label="Filtrer les établissements"
-                        />
-                        <FieldHint>Filtrez la liste si vous connaissez déjà le nom de l’école.</FieldHint>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-etab" className="text-sm font-medium text-slate-700">
-                          Établissement <span className="text-red-500">*</span>
-                        </Label>
-                        <select
-                          id="reg-etab"
-                          className={cn(
-                            fieldClass,
-                            'flex w-full px-3 py-2 text-sm text-slate-900 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50'
-                          )}
-                          value={form.etablissement_id}
-                          onChange={update('etablissement_id')}
-                        >
-                          <option value="">— Choisir —</option>
-                          {etablissementsFiltres.map((e) => (
-                            <option key={e.id} value={e.id}>
-                              {e.nom}
-                            </option>
-                          ))}
-                        </select>
-                        <FieldHint>Obligatoire : votre compte étudiant sera lié à cet établissement pour la préinscription.</FieldHint>
-                        {selectedEtab && (
-                          <p className="text-xs text-emerald-700 mt-2 font-medium flex items-center gap-1">
-                            <FaCheck /> {selectedEtab.nom}
-                          </p>
-                        )}
-                        {etablissements.length === 0 && (
-                          <p className="text-xs text-amber-700 mt-2 font-medium">
-                            Aucun établissement disponible pour l’instant. Contactez l’administration.
-                          </p>
-                        )}
-                        {etablissements.length > 0 && etablissementsFiltres.length === 0 && (
-                          <p className="text-xs text-amber-700 mt-2">Aucun résultat pour « {etabSearch} ».</p>
-                        )}
-                      </div>
-                    </>
+                    <RegisterSchoolFlow
+                      form={form}
+                      setForm={setForm}
+                      schoolUi={schoolUi}
+                      setSchoolUi={setSchoolUi}
+                      schoolCatalogueEtabRef={schoolCatalogueEtabRef}
+                      etablissements={etablissements}
+                      etablissementsFiltres={etablissementsFiltres}
+                      etabSearch={etabSearch}
+                      setEtabSearch={setEtabSearch}
+                      fieldClass={fieldClass}
+                      brandAccentClassForNom={brandAccentClassForNom}
+                      selectedEtab={selectedEtab}
+                    />
                   )}
 
                   {step === 3 && (
@@ -749,6 +754,12 @@ export default function Register() {
                           <li>
                             <span className="text-slate-400">Établissement :</span> {selectedEtab?.nom || '—'}
                           </li>
+                          {formationRecap && (
+                            <li>
+                              <span className="text-slate-400">Formation visée :</span>{' '}
+                              <span className="font-medium text-slate-800">{formationRecap.titre}</span>
+                            </li>
+                          )}
                           <li>
                             <span className="text-slate-400">E-mail :</span> {form.email}
                           </li>
@@ -809,13 +820,6 @@ export default function Register() {
                         </div>
                       )}
 
-                      {!useRecaptcha && import.meta.env.DEV && (
-                        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                          Dev : sans captcha, le serveur doit autoriser l’inscription (ex.{' '}
-                          <code className="font-mono">AUTH_INSCRIPTION_BYPASS_CAPTCHA=1</code>).
-                        </p>
-                      )}
-
                       {!useRecaptcha && import.meta.env.PROD && (
                         <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                           Configuration manquante : définissez la clé site <strong>reCAPTCHA</strong> — variable{' '}
@@ -851,8 +855,13 @@ export default function Register() {
                           onClick={goNext}
                           disabled={etablissements.length === 0 && step === 2}
                           className="w-full sm:w-auto min-h-[3rem] rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-10 py-3 text-base font-bold text-white shadow-xl shadow-blue-600/35 ring-2 ring-white/25 hover:-translate-y-0.5 hover:shadow-blue-500/45 hover:brightness-[1.03] disabled:opacity-40 disabled:hover:translate-y-0 disabled:ring-0"
+                          aria-label={
+                            step < STEPS.length
+                              ? `Passer à l’étape ${step + 1} : ${STEPS[step]?.label ?? ''}`
+                              : undefined
+                          }
                         >
-                          Continuer <FaChevronRight className="text-sm ml-1.5 opacity-95" />
+                          Continuer <FaChevronRight className="text-sm ml-1.5 opacity-95" aria-hidden />
                         </Button>
                       ) : (
                         <Button
@@ -884,7 +893,6 @@ export default function Register() {
               </div>
             </Card>
             </div>
-            </div>
 
             <div className="mt-6 max-w-md mx-auto space-y-3">
               <div className="rounded-2xl border border-white/25 bg-slate-950/55 backdrop-blur-md px-5 py-4 text-center shadow-[0_8px_32px_rgba(0,0,0,0.35)]">
@@ -913,8 +921,8 @@ export default function Register() {
               </p>
             </div>
           </div>
+          </div>
         </div>
-      </div>
 
       <Dialog open={showPolicy} onOpenChange={setShowPolicy}>
         <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden border-slate-100 p-0 sm:max-w-2xl">

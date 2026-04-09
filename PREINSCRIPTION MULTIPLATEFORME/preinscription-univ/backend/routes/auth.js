@@ -94,6 +94,23 @@ const resendVerifyLimiter = rateLimit({
     `resend-verify:${getClientIp(req)}:${String(req.body?.email || '').trim().toLowerCase()}`,
 });
 
+/** Données établissement non sensibles pour le contexte utilisateur connecté */
+function buildPublicEtablissementPayload(etab, req) {
+  if (!etab) return null;
+  return {
+    id: etab.id,
+    nom: etab.nom,
+    type: etab.type || null,
+    adresse: etab.adresse || '',
+    telephone: etab.telephone || '',
+    email_contact: etab.email_contact || '',
+    site_web: etab.site_web || '',
+    couleur_primaire: etab.couleur_primaire || null,
+    couleur_secondaire: etab.couleur_secondaire || null,
+    logo_url: publicAssetUrl(req, etab.logo_url) || null,
+  };
+}
+
 function buildPublicUserPayload(user, req) {
   const etab = user.etablissement_id
     ? db.get('etablissements').find({ id: user.etablissement_id }).value()
@@ -109,7 +126,21 @@ function buildPublicUserPayload(user, req) {
     etablissement_nom: etab?.nom || null,
     etablissement_couleur: etab?.couleur_primaire || null,
     etablissement_logo: publicAssetUrl(req, etab?.logo_url) || null,
+    etablissement: buildPublicEtablissementPayload(etab, req),
     must_change_password: user.must_change_password === true,
+  };
+}
+
+/** Profil complet pour GET /api/auth/me (hors secrets) */
+function buildMeResponse(user, req) {
+  const base = buildPublicUserPayload(user, req);
+  return {
+    ...base,
+    telephone: user.telephone != null ? String(user.telephone) : '',
+    adresse: user.adresse != null ? String(user.adresse) : '',
+    date_naissance: user.date_naissance ?? null,
+    email_verified_at: user.email_verified_at || null,
+    actif: user.actif !== false,
   };
 }
 
@@ -481,25 +512,7 @@ router.get('/me', (req, res) => {
     if (!user) return res.status(404).json({ message: 'Utilisateur introuvable' });
     if (user.actif === false) return res.status(403).json({ message: 'Compte désactivé' });
 
-    const etab = user.etablissement_id
-      ? db.get('etablissements').find({ id: user.etablissement_id }).value()
-      : null;
-
-    const {
-      mot_de_passe,
-      email_verify_token: _evt,
-      email_verify_expires: _eve,
-      password_reset_token: _prt,
-      password_reset_expires: _pre,
-      ...safe
-    } = user;
-    res.json({
-      ...safe,
-      must_change_password: user.must_change_password === true,
-      etablissement_nom: etab?.nom || null,
-      etablissement_couleur: etab?.couleur_primaire || null,
-      etablissement_logo: publicAssetUrl(req, etab?.logo_url) || null,
-    });
+    res.json(buildMeResponse(user, req));
   } catch {
     res.status(401).json({ message: 'Token invalide ou expiré' });
   }
@@ -523,7 +536,7 @@ router.post('/reinitialiser-mot-de-passe-matricule', resetPwdLimiter, (req, res)
     return res.status(400).json({ message: 'Matricule invalide.' });
   }
 
-  const user = db.get('utilisateurs').value().find(
+  const user = (db.get('utilisateurs').value() || []).find(
     (u) => normalizeMatricule(u.matricule) === m
   );
   if (!user || user.role !== 'etudiant') {
@@ -551,7 +564,7 @@ router.post('/verifier-email', async (req, res) => {
   const token = String(req.body?.token || '').trim();
   if (!token) return res.status(400).json({ message: 'Lien invalide (token manquant).' });
 
-  const user = db.get('utilisateurs').value().find((u) => u.email_verify_token === token);
+  const user = (db.get('utilisateurs').value() || []).find((u) => u.email_verify_token === token);
   if (!user) {
     return res.status(400).json({ message: 'Lien invalide ou déjà utilisé.' });
   }
@@ -684,7 +697,7 @@ router.post('/reinitialiser-mot-de-passe-email', (req, res) => {
     return res.status(400).json({ message: vp.message, code: 'PASSWORD_POLICY' });
   }
 
-  const user = db.get('utilisateurs').value().find((u) => u.password_reset_token === token);
+  const user = (db.get('utilisateurs').value() || []).find((u) => u.password_reset_token === token);
   if (!user || user.role !== 'etudiant') {
     logSecurityEvent(req, 'auth_reset_email_bad_token', {}, 'warning');
     return res.status(400).json({ message: 'Lien invalide ou expiré.' });

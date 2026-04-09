@@ -177,8 +177,19 @@ export class ReportsService {
     return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
   }
 
+  /** Rôles avec vue multi-campus (directeur fédérateur, admin). */
+  private static readonly FEDERATION_DASHBOARD_ROLES = new Set([
+    'SERVICE_PEDAGOGIQUE',
+    'ADMIN',
+    'SUPER_ADMIN',
+  ]);
+
   /** Tableau de bord pédagogie : KPIs réels + activités du jour + alertes + mon campus si rattaché */
-  async getPedagogyDashboard(anneeUniv?: number, userId?: string) {
+  async getPedagogyDashboard(
+    anneeUniv?: number,
+    userId?: string,
+    userRole?: string,
+  ) {
     const year = anneeUniv ?? new Date().getFullYear();
     const now = new Date();
     const jourSemaine = now.getDay();
@@ -275,6 +286,8 @@ export class ReportsService {
       nbCohortes: number;
       seancesAujourdHui: number;
       activitesDuJour: typeof activitesDuJour;
+      /** Synthétique : directeur / admin sans rattachement unique à un campus */
+      vueFederatrice?: boolean;
     } | null = null;
     if (monCampusRaw) {
       const activitesCampus = activitesDuJour.filter(
@@ -290,6 +303,21 @@ export class ReportsService {
         activitesDuJour: activitesCampus.map(
           ({ campusId: _c, ...rest }) => rest,
         ),
+      };
+    } else if (
+      userId &&
+      userRole &&
+      ReportsService.FEDERATION_DASHBOARD_ROLES.has(userRole)
+    ) {
+      monCampus = {
+        id: '__FEDERATION__',
+        code: 'ALL',
+        nom: 'Tous les établissements (vue directeur)',
+        nbSalles: totalSalles,
+        nbCohortes: cohortsTotal,
+        seancesAujourdHui: activitesDuJour.length,
+        activitesDuJour: activitesDuJour.map(({ campusId: _c, ...rest }) => rest),
+        vueFederatrice: true,
       };
     }
 

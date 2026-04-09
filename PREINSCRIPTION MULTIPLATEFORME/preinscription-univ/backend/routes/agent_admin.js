@@ -4,20 +4,25 @@ const db = require('../database/db');
 const { authMiddleware, agentAdminOrAdmin } = require('../middleware/auth');
 const {
   normalizePreinscriptionNiveau,
+  normalizeNombrePhotosPreinscription,
   getDocumentChecklistDefinition,
   computeMissingDocumentTypes,
 } = require('../utils/preinscriptionDocumentRules');
 
 router.use(authMiddleware, agentAdminOrAdmin);
 
-function docsMetaForDossier(dossier, documents) {
+function docsMetaForDossier(dossier, documents, formation) {
   const profile = dossier.document_rule_profile || normalizePreinscriptionNiveau(dossier.formation_niveau_cible);
-  const def = getDocumentChecklistDefinition(profile, dossier.nationalite);
+  const nPhotos = formation
+    ? normalizeNombrePhotosPreinscription(formation.nombre_photos_preinscription)
+    : 1;
+  const def = getDocumentChecklistDefinition(profile, dossier.nationalite, nPhotos);
   const docs_requis = [...def.required, ...def.identityKeys];
   const docs_manquants = computeMissingDocumentTypes(
     documents,
     profile,
     dossier.nationalite,
+    nPhotos,
   );
   return { docs_requis, docs_manquants, document_rule_profile: profile };
 }
@@ -26,7 +31,7 @@ function docsMetaForDossier(dossier, documents) {
 function filterDossiersByEtab(req, dossiers) {
   const etabId = req.user.role !== 'admin' ? req.user.etablissement_id : null;
   if (!etabId) return dossiers;
-  const formationIds = db.get('formations').filter({ etablissement_id: etabId }).value().map(f => f.id);
+  const formationIds = (db.get('formations').value() || []).filter((f) => f.etablissement_id === etabId).map((f) => f.id);
   return dossiers.filter(d => {
     if (d.etablissement_id) return d.etablissement_id === etabId;
     if (d.formation_id) return formationIds.includes(d.formation_id);
@@ -36,13 +41,15 @@ function filterDossiersByEtab(req, dossiers) {
 
 // ─── GET /api/agent-admin/dashboard ──────────────────────────────────────────
 router.get('/dashboard', (req, res) => {
-  const dossiers = filterDossiersByEtab(req, db.get('dossiers').value());
-  const docs = db.get('documents').value();
+  const dossiers = filterDossiersByEtab(req, db.get('dossiers').value() || []);
+  const docs = db.get('documents').value() || [];
+  const formations = db.get('formations').value() || [];
 
   const enrichis = dossiers.map((d) => {
     const dDocs = docs.filter((doc) => doc.dossier_id === d.id);
     const docsIds = dDocs.map((doc) => doc.type_document);
-    const { docs_manquants } = docsMetaForDossier(d, dDocs);
+    const fo = d.formation_id ? formations.find((x) => x.id === d.formation_id) : null;
+    const { docs_manquants } = docsMetaForDossier(d, dDocs, fo);
     return { ...d, nb_documents: docsIds.length, docs_manquants };
   });
 
@@ -75,14 +82,16 @@ router.get('/dossiers', (req, res) => {
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
 
-  const docs = db.get('documents').value();
-  const utilisateurs = db.get('utilisateurs').value();
+  const docs = db.get('documents').value() || [];
+  const utilisateurs = db.get('utilisateurs').value() || [];
+  const formations = db.get('formations').value() || [];
 
-  let dossiers = filterDossiersByEtab(req, db.get('dossiers').value()).map((d) => {
+  let dossiers = filterDossiersByEtab(req, db.get('dossiers').value() || []).map((d) => {
     const u = utilisateurs.find((x) => x.id === d.etudiant_id) || {};
     const dDocs = docs.filter((doc) => doc.dossier_id === d.id);
     const docsIds = dDocs.map((doc) => doc.type_document);
-    const { docs_manquants } = docsMetaForDossier(d, dDocs);
+    const fo = d.formation_id ? formations.find((x) => x.id === d.formation_id) : null;
+    const { docs_manquants } = docsMetaForDossier(d, dDocs, fo);
     return { ...d, nom: u.nom, prenom: u.prenom, email: u.email, nb_documents: docsIds.length, docs_manquants };
   });
 
@@ -114,7 +123,7 @@ router.get('/dossiers/:id', (req, res) => {
   const documents = db.get('documents').filter({ dossier_id: id }).value();
   const formation = db.get('formations').find({ id: dossier.formation_id }).value();
 
-  const { docs_requis, docs_manquants } = docsMetaForDossier(dossier, documents);
+  const { docs_requis, docs_manquants } = docsMetaForDossier(dossier, documents, formation);
 
   res.json({
     dossier: { ...dossier, nom: u.nom, prenom: u.prenom, email: u.email },

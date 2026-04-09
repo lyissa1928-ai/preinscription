@@ -2,8 +2,15 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { mediaUrl } from '../../utils/mediaUrl'
 
 const fmt = n => new Intl.NumberFormat('fr-FR').format(n || 0)
+
+function justifUrl(rel) {
+  if (!rel) return '#'
+  const p = String(rel).replace(/^\//, '')
+  return mediaUrl(`/uploads/${p}`)
+}
 
 export default function ResponsableDemandesProforma() {
   const [demandes, setDemandes] = useState([])
@@ -46,7 +53,7 @@ export default function ResponsableDemandesProforma() {
         decision: type === 'accepter' ? 'accepter' : 'refuser',
         motif_refus: type === 'refuser' ? motifRefus.trim() : undefined
       })
-      toast.success(type === 'accepter' ? 'Demande acceptée — lettre et facture disponibles pour le demandeur.' : 'Demande refusée.')
+      toast.success(type === 'accepter' ? 'Demande acceptée — facture proforma et attestation disponibles pour le demandeur.' : 'Demande refusée.')
       setModal(null)
       load()
     } catch (err) {
@@ -62,7 +69,10 @@ export default function ResponsableDemandesProforma() {
         <div>
           <Link to="/mon-etablissement" className="text-sm text-gray-500 hover:text-blue-700">← Mon établissement</Link>
           <h1 className="text-2xl font-bold text-gray-900 mt-2">Demandes de préinscription (proforma)</h1>
-          <p className="text-gray-500 text-sm mt-1">Uniquement les demandes rattachées à votre établissement</p>
+          <p className="text-gray-500 text-sm mt-1">
+            Uniquement les demandes de votre établissement. Le candidat ne reçoit la facture proforma et
+            l’attestation de préinscription qu’après votre <strong>acceptation</strong> (ou celle d’un administrateur).
+          </p>
         </div>
         <Link to="/responsable" className="btn-secondary text-sm">Dossiers complets →</Link>
       </div>
@@ -79,15 +89,15 @@ export default function ResponsableDemandesProforma() {
           {demandes.map(d => (
             <div
               key={d.id}
-              className={`card p-4 border ${d.statut === 'nouvelle' ? 'border-amber-200 bg-amber-50/50' : 'border-gray-100'}`}
-              onClick={() => d.statut === 'nouvelle' && marquerVue(d.id)}
+              className={`card p-4 border ${d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'border-amber-200 bg-amber-50/50' : 'border-gray-100'}`}
+              onClick={() => (d.statut === 'nouvelle' || d.statut === 'en_attente') && marquerVue(d.id)}
               role="presentation"
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-gray-900">{d.prenom} {d.nom}</span>
-                    {d.statut === 'nouvelle' && (
+                    {(d.statut === 'nouvelle' || d.statut === 'en_attente') && (
                       <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">NOUVEAU</span>
                     )}
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${d.type_formation === 'en_ligne' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -97,6 +107,15 @@ export default function ResponsableDemandesProforma() {
                   <p className="text-sm font-medium text-gray-700 mt-1">{d.formation_titre}</p>
                   <p className="text-xs text-gray-500 mt-1">📧 {d.email} · 📞 {d.telephone}</p>
                   <p className="text-xs text-gray-400 mt-1 font-mono">{d.reference} · {new Date(d.created_at).toLocaleDateString('fr-FR')}</p>
+                  {d.justificatifs && (
+                    <div className="flex flex-wrap gap-2 mt-2 text-xs" onClick={e => e.stopPropagation()}>
+                      <a href={justifUrl(d.justificatifs.diplome)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-semibold">Diplôme</a>
+                      <span className="text-gray-300">|</span>
+                      <a href={justifUrl(d.justificatifs.releve)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-semibold">Relevé</a>
+                      <span className="text-gray-300">|</span>
+                      <a href={justifUrl(d.justificatifs.formation)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-semibold">Formation</a>
+                    </div>
+                  )}
                   {d.facture?.montant_ttc != null && (
                     <p className="text-sm font-semibold text-blue-700 mt-2">{fmt(d.facture.montant_ttc)} FCFA</p>
                   )}
@@ -105,10 +124,10 @@ export default function ResponsableDemandesProforma() {
                   <span className={`text-xs font-semibold px-2 py-1 rounded-full self-start sm:self-end ${
                     d.statut === 'acceptee' ? 'bg-emerald-100 text-emerald-800'
                     : d.statut === 'refusee' ? 'bg-red-100 text-red-700'
-                    : d.statut === 'nouvelle' ? 'bg-amber-100 text-amber-800'
+                    : d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'bg-amber-100 text-amber-800'
                     : 'bg-gray-100 text-gray-600'
                   }`}>
-                    {d.statut === 'acceptee' ? 'Acceptée' : d.statut === 'refusee' ? 'Refusée' : d.statut === 'nouvelle' ? 'Nouvelle' : d.statut === 'vue' ? 'Vue' : d.statut}
+                    {d.statut === 'acceptee' ? 'Acceptée' : d.statut === 'refusee' ? 'Refusée' : d.statut === 'en_attente' ? 'En attente' : d.statut === 'nouvelle' ? 'Nouvelle' : d.statut === 'vue' ? 'Vue' : d.statut}
                   </span>
                   {d.statut !== 'acceptee' && d.statut !== 'refusee' && (
                     <div className="flex gap-2">
@@ -157,7 +176,7 @@ export default function ResponsableDemandesProforma() {
             </p>
             {modal.type === 'accepter' && (
               <p className="text-xs text-emerald-700 mt-3 bg-emerald-50 rounded-lg p-3">
-                Une lettre de préinscription et une facture proforma (montants à jour) seront disponibles pour le demandeur sur son espace étudiant (même adresse e-mail).
+                La facture proforma et l&apos;attestation seront disponibles sur l&apos;espace du candidat après validation.
               </p>
             )}
             {modal.type === 'refuser' && (

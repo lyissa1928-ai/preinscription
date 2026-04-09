@@ -1,7 +1,10 @@
 /**
- * Clés publiques sans rebuild : éditez ce fichier sur le serveur (dans dist/ après build),
- * ou dans public/ avant build. Laisser vide si vous utilisez uniquement .env.production (VITE_*).
+ * Config sans rebuild : copié dans dist/ au build ; éditable sur le serveur après déploiement.
+ * - apiBaseUrl : origine du serveur Node (API). Ex. '' si nginx proxy /api sur le même domaine,
+ *   ou 'https://api.mondomaine.com' si le front et l’API sont sur des origines différentes.
+ *   Sans ça, les requêtes /api peuvent partir sur l’hébergeur statique → 404 HTML.
  */
 window.__PREINSCRIPTION_SITE_KEYS__ = {
   recaptcha: '',
+  apiBaseUrl: '',
 }

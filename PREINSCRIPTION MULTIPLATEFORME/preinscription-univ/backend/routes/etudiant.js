@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const fs = require('fs');
 const path = require('path');
 const db = require('../database/db');
-const { unlinkQuiet } = require('../utils/verifyUploadedFile');
+const { unlinkQuiet, detectDossierMagicFormat } = require('../utils/verifyUploadedFile');
 const { authMiddleware } = require('../middleware/auth');
 const { snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
 const { rateLimit, getClientIp } = require('../utils/rateLimit');
@@ -17,14 +18,18 @@ const {
 } = require('../utils/antiBot');
 const {
   normalizePreinscriptionNiveau,
+  normalizeNombrePhotosPreinscription,
+  photoSlotKeysForCount,
+  primaryPhotoDocumentFromList,
   validateDossierUploadsForNiveau,
   DOSSIER_UPLOAD_FIELD_NAMES,
 } = require('../utils/preinscriptionDocumentRules');
 const { processAndPersistDossierFile } = require('../utils/secureDossierUpload');
-const { buildAttestationPayloadForDossier } = require('../utils/buildAttestationPayload');
+const { buildAttestationPayloadForDossier, buildAttestationPayloadForDemandeProforma } = require('../utils/buildAttestationPayload');
+const { publicAssetUrl } = require('../utils/publicAssetUrl');
 const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
 const { genererOuRecupererFactureDossier } = require('../services/factureService');
-const { mergeFactureProformaFromFormation, getDureeMoisEffectif } = require('../utils/formationTarifs');
+const { getDureeMoisEffectif } = require('../utils/formationTarifs');
 
 const uploadsStudentDir = path.join(__dirname, '../uploads');
 
@@ -47,7 +52,49 @@ const upload = multer({
   },
 });
 
+/** Photo d’identité : images uniquement (pas de PDF). */
+const uploadPhotoOnly = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (['.jpg', '.jpeg', '.png'].includes(ext)) cb(null, true);
+    else cb(new Error('Pour la photo d’identité, utilisez une image JPG ou PNG.'));
+  },
+});
+
 const dossierUploadFields = DOSSIER_UPLOAD_FIELD_NAMES.map((name) => ({ name, maxCount: 1 }));
+
+const proformaJustificatifFields = [
+  { name: 'justificatif_diplome', maxCount: 1 },
+  { name: 'justificatif_releve', maxCount: 1 },
+  { name: 'justificatif_formation', maxCount: 1 },
+];
+
+function cleanupProformaUploads(files) {
+  if (!files) return;
+  Object.values(files).forEach((arr) => {
+    if (arr?.[0]?.path) unlinkQuiet(arr[0].path);
+  });
+}
+
+function persistProformaJustificatif(file, demandeId, kind) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const safe = ['.pdf', '.jpg', '.jpeg', '.png'].includes(ext) ? ext : '.pdf';
+  const dir = path.join(__dirname, '../uploads/proforma-justificatifs');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const base = `demande-${demandeId}-${kind}${safe}`;
+  const dest = path.join(dir, base);
+  fs.renameSync(file.path, dest);
+  return `proforma-justificatifs/${base}`;
+}
+
+const proformaSubmitLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 6,
+  message: 'Trop de demandes. Réessayez dans quelques minutes.',
+  keyGenerator: (req) => `proforma_submit:${getClientIp(req)}:${req.user?.id || 'anon'}`,
+});
 
 function cleanupDossierFiles(reqFiles, securedMap) {
   if (reqFiles) {
@@ -67,6 +114,13 @@ const dossierSubmitLimiter = rateLimit({
   max: 8,
   message: 'Trop de tentatives de soumission. Réessayez dans quelques minutes.',
   keyGenerator: (req) => `dossier_submit:${getClientIp(req)}:${req.user?.id || 'anon'}`,
+});
+
+const dossierPhotoLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 24,
+  message: 'Trop d’envois de photo. Réessayez dans quelques minutes.',
+  keyGenerator: (req) => `dossier_photo:${getClientIp(req)}:${req.user?.id || 'anon'}`,
 });
 
 function genererNumeroDossier() {
@@ -159,7 +213,7 @@ router.post(
   if (!Number.isFinite(fid)) {
     return abortUploads(400, { message: 'Formation invalide' });
   }
-  const dossiersEtudiant = db.get('dossiers').value().filter((d) => Number(d.etudiant_id) === Number(etudiantId));
+  const dossiersEtudiant = (db.get('dossiers').value() || []).filter((d) => Number(d.etudiant_id) === Number(etudiantId));
   const pourCetteFormation = dossiersEtudiant.filter((d) => Number(d.formation_id) === fid);
   const enCours = pourCetteFormation.find((d) => ['en_attente', 'en_cours'].includes(d.statut));
   if (enCours) {
@@ -188,10 +242,12 @@ router.post(
   }
 
   const documentRuleProfile = normalizePreinscriptionNiveau(formation.niveau);
+  const nombrePhotosFormation = normalizeNombrePhotosPreinscription(formation.nombre_photos_preinscription);
   const rulesCheck = validateDossierUploadsForNiveau(
     req.files,
     documentRuleProfile,
     nationalite,
+    nombrePhotosFormation,
   );
   if (!rulesCheck.ok) {
     cleanupDossierFiles(req.files, null);
@@ -222,6 +278,25 @@ router.post(
   } catch (e) {
     cleanupDossierFiles(req.files, securedByField);
     return res.status(400).json({ message: e.message || 'Fichier invalide.' });
+  }
+
+  for (const pk of photoSlotKeysForCount(nombrePhotosFormation)) {
+    if (!securedByField[pk]) continue;
+    const photoPath = path.join(uploadsStudentDir, securedByField[pk].finalName);
+    let buf;
+    try {
+      buf = fs.readFileSync(photoPath);
+    } catch {
+      cleanupDossierFiles(req.files, securedByField);
+      return res.status(400).json({ message: 'Photo d’identité illisible.' });
+    }
+    const magic = detectDossierMagicFormat(buf);
+    if (magic !== 'jpeg' && magic !== 'png') {
+      cleanupDossierFiles(req.files, securedByField);
+      return res.status(400).json({
+        message: 'La photo d’identité doit être une image JPG ou PNG (pas un PDF).',
+      });
+    }
   }
 
   const id = db.nextId('dossiers');
@@ -302,12 +377,308 @@ router.get('/profil', authMiddleware, (req, res) => {
   res.json(safeUser);
 });
 
-// GET /api/etudiant/demandes-proforma — demandes liées à l'email du compte
+// POST /api/etudiant/dossiers/:dossierId/photo — remplacer la photo d’identité (dossier en attente / en cours uniquement)
+router.post(
+  '/dossiers/:dossierId/photo',
+  authMiddleware,
+  dossierPhotoLimiter,
+  (req, res, next) => {
+    uploadPhotoOnly.single('photo')(req, res, (err) => {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ message: 'La photo est limitée à 2 Mo.' });
+        }
+        return res.status(400).json({ message: err.message || 'Erreur lors de l’envoi du fichier.' });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    if (req.user.role !== 'etudiant') {
+      if (req.file?.path) unlinkQuiet(req.file.path);
+      return res.status(403).json({ message: 'Réservé aux comptes étudiants.' });
+    }
+    const dossierId = parseInt(String(req.params.dossierId), 10);
+    if (!Number.isFinite(dossierId)) {
+      if (req.file?.path) unlinkQuiet(req.file.path);
+      return res.status(400).json({ message: 'Identifiant dossier invalide.' });
+    }
+    const dossier = db.get('dossiers').find({ id: dossierId }).value();
+    if (!dossier) {
+      if (req.file?.path) unlinkQuiet(req.file.path);
+      return res.status(404).json({ message: 'Dossier non trouvé.' });
+    }
+    if (Number(dossier.etudiant_id) !== Number(req.user.id)) {
+      if (req.file?.path) unlinkQuiet(req.file.path);
+      return res.status(403).json({ message: 'Accès non autorisé.' });
+    }
+    const statutsPhotoModifiables = ['en_attente', 'en_cours'];
+    if (!statutsPhotoModifiables.includes(dossier.statut)) {
+      if (req.file?.path) unlinkQuiet(req.file.path);
+      return res.status(400).json({
+        message:
+          'La photo ne peut être modifiée que tant que le dossier est en attente ou en cours d’examen.',
+      });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: 'Veuillez sélectionner une photo (JPG ou PNG).' });
+    }
+
+    const documentRuleProfile = normalizePreinscriptionNiveau(
+      dossier.formation_niveau_cible || dossier.document_rule_profile || 'generic',
+    );
+    const tempAbs = path.join(uploadsStudentDir, req.file.filename);
+    let out;
+    try {
+      out = await processAndPersistDossierFile({
+        uploadsDir: uploadsStudentDir,
+        tempAbsPath: tempAbs,
+        originalname: req.file.originalname,
+        niveauKey: documentRuleProfile,
+        fieldKey: 'photo_1',
+      });
+    } catch (e) {
+      unlinkQuiet(tempAbs);
+      return res.status(400).json({ message: e.message || 'Fichier invalide.' });
+    }
+    if (!out.ok) {
+      unlinkQuiet(tempAbs);
+      return res.status(400).json({ message: out.message || 'Fichier invalide.' });
+    }
+
+    const allDocs = db.get('documents').value() || [];
+    const oldPhotos = allDocs.filter(
+      (d) =>
+        d.dossier_id === dossierId &&
+        (d.type_document === 'photo_1' || d.type_document === 'photo'),
+    );
+    for (const old of oldPhotos) {
+      unlinkQuiet(path.join(uploadsStudentDir, old.chemin));
+      db.get('documents').remove({ id: old.id }).write();
+    }
+
+    const now = new Date().toISOString();
+    const docId = db.nextId('documents');
+    db.get('documents')
+      .push({
+        id: docId,
+        dossier_id: dossierId,
+        type_document: 'photo_1',
+        nom_fichier: req.file.originalname,
+        chemin: out.finalName,
+        created_at: now,
+      })
+      .write();
+
+    res.json({
+      message: 'Photo d’identité mise à jour.',
+      document: {
+        id: docId,
+        dossier_id: dossierId,
+        type_document: 'photo_1',
+        nom_fichier: req.file.originalname,
+        chemin: out.finalName,
+        created_at: now,
+      },
+    });
+  },
+);
+
+// POST /api/etudiant/demande-proforma — justificatifs + mise en attente validation pédagogique
+router.post(
+  '/demande-proforma',
+  authMiddleware,
+  proformaSubmitLimiter,
+  (req, res, next) => {
+    upload.fields(proformaJustificatifFields)(req, res, (err) => {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ message: 'Chaque document est limité à 2 Mo.' });
+        }
+        return res.status(400).json({ message: err.message || 'Erreur lors de l’envoi des fichiers.' });
+      }
+      next();
+    });
+  },
+  (req, res) => {
+    if (req.user.role !== 'etudiant') {
+      cleanupProformaUploads(req.files);
+      return res.status(403).json({ message: 'Réservé aux comptes candidats (étudiants).' });
+    }
+    const files = req.files;
+    if (!files?.justificatif_diplome?.[0] || !files?.justificatif_releve?.[0] || !files?.justificatif_formation?.[0]) {
+      cleanupProformaUploads(req.files);
+      return res.status(400).json({
+        message:
+          'Les trois justificatifs sont obligatoires : dernier diplôme, relevé de notes, document attestant la formation demandée (PDF, JPG ou PNG).',
+      });
+    }
+
+    const user = db.get('utilisateurs').find({ id: req.user.id }).value();
+    if (!user) {
+      cleanupProformaUploads(req.files);
+      return res.status(404).json({ message: 'Utilisateur introuvable.' });
+    }
+
+    const telephone = String(req.body.telephone || user.telephone || '').trim();
+    if (!telephone || telephone.length < 8) {
+      cleanupProformaUploads(req.files);
+      return res.status(400).json({ message: 'Numéro de téléphone valide obligatoire (au moins 8 caractères).' });
+    }
+
+    const {
+      type_formation, formation_id, etablissement_id, niveau, details,
+      type_payeur,
+      payeur_nom, payeur_prenom, payeur_relation, payeur_telephone,
+      payeur_org_nom, payeur_org_ninea, payeur_org_contact,
+    } = req.body;
+
+    if (!type_formation || !formation_id) {
+      cleanupProformaUploads(req.files);
+      return res.status(400).json({ message: 'Formation et mode obligatoires.' });
+    }
+    if (etablissement_id == null || String(etablissement_id).trim() === '') {
+      cleanupProformaUploads(req.files);
+      return res.status(400).json({ message: 'Veuillez sélectionner un établissement.' });
+    }
+
+    const fid = parseInt(formation_id, 10);
+    const formation = db.get('formations').find({ id: fid }).value();
+    if (!formation) {
+      cleanupProformaUploads(req.files);
+      return res.status(404).json({ message: 'Formation introuvable ou identifiant invalide.' });
+    }
+    if (formation.actif === false) {
+      cleanupProformaUploads(req.files);
+      return res.status(404).json({
+        message: 'Cette formation n’est plus proposée (désactivée).',
+      });
+    }
+    if (formation.type !== type_formation) {
+      cleanupProformaUploads(req.files);
+      return res.status(400).json({ message: 'La formation choisie ne correspond pas au type sélectionné.' });
+    }
+
+    const etabIdBody = parseInt(String(etablissement_id), 10);
+    if (!Number.isFinite(etabIdBody) || etabIdBody !== Number(formation.etablissement_id)) {
+      cleanupProformaUploads(req.files);
+      return res.status(400).json({
+        message: 'La formation ne correspond pas à l’établissement choisi.',
+      });
+    }
+
+    const etabId = etabIdBody;
+    if (user.etablissement_id != null && Number(user.etablissement_id) !== etabId) {
+      cleanupProformaUploads(req.files);
+      return res.status(403).json({
+        message:
+          'Votre compte est rattaché à un établissement : la demande doit porter sur cet établissement et ses formations.',
+      });
+    }
+    const etab = db.get('etablissements').find({ id: etabId }).value();
+    const etablissement_snapshot = etab
+      ? {
+          nom: etab.nom,
+          type: etab.type,
+          adresse: etab.adresse || '',
+          telephone: etab.telephone || '',
+          email_contact: etab.email_contact || '',
+          site_web: etab.site_web || '',
+          logo_url: publicAssetUrl(req, etab.logo_url),
+          cachet_url: publicAssetUrl(req, etab.cachet_url),
+          couleur_primaire: etab.couleur_primaire || '#1e40af',
+          couleur_secondaire: etab.couleur_secondaire || '#3b82f6',
+          ninea: etab.ninea || '',
+          compte_bancaire: etab.compte_bancaire || '',
+        }
+      : null;
+
+    const id = db.nextId('demandes_proforma');
+    const reference = `DEM-${new Date().getFullYear()}-${String(id).padStart(5, '0')}`;
+
+    let diplomeRel;
+    let releveRel;
+    let formationRel;
+    try {
+      diplomeRel = persistProformaJustificatif(files.justificatif_diplome[0], id, 'diplome');
+      releveRel = persistProformaJustificatif(files.justificatif_releve[0], id, 'releve');
+      formationRel = persistProformaJustificatif(files.justificatif_formation[0], id, 'formation');
+    } catch {
+      cleanupProformaUploads(req.files);
+      return res.status(500).json({ message: 'Erreur lors de l’enregistrement des fichiers.' });
+    }
+
+    const demande = {
+      id,
+      reference,
+      etudiant_id: user.id,
+      prenom: String(user.prenom || '').trim(),
+      nom: String(user.nom || '').trim(),
+      email: String(user.email || '').trim().toLowerCase(),
+      telephone,
+      niveau: niveau ? String(niveau).trim() : null,
+      type_formation,
+      formation_id: parseInt(formation_id, 10),
+      etablissement_id: etabId,
+      formation_titre: formation.titre,
+      formation_description: formation.description || null,
+      formation_ville: formation.ville || null,
+      formation_niveau_requis: formation.niveau_requis || null,
+      formation_mensualite: formation.mensualite || null,
+      formation_duree_mois: getDureeMoisEffectif(formation),
+      details: details ? String(details).trim() : null,
+      type_payeur: type_payeur || 'etudiant',
+      payeur:
+        type_payeur === 'tuteur'
+          ? {
+              prenom: (payeur_prenom || '').trim(),
+              nom: (payeur_nom || '').trim(),
+              relation: (payeur_relation || '').trim(),
+              telephone: (payeur_telephone || '').trim(),
+            }
+          : type_payeur === 'organisation'
+            ? {
+                org_nom: (payeur_org_nom || '').trim(),
+                ninea: (payeur_org_ninea || '').trim(),
+                contact: (payeur_org_contact || '').trim(),
+              }
+            : null,
+      etablissement_snapshot,
+      justificatifs: {
+        diplome: diplomeRel,
+        releve: releveRel,
+        formation: formationRel,
+      },
+      statut: 'en_attente',
+      facture: null,
+      created_at: new Date().toISOString(),
+    };
+
+    db.get('demandes_proforma').push(demande).write();
+
+    res.status(201).json({
+      message:
+        'Demande enregistrée. Elle sera examinée par le service pédagogique ; vous pourrez télécharger la facture proforma et l’attestation de préinscription après validation.',
+      reference,
+      id,
+    });
+  },
+);
+
+// GET /api/etudiant/demandes-proforma — demandes liées au compte (email ou etudiant_id)
 router.get('/demandes-proforma', authMiddleware, (req, res) => {
   const user = db.get('utilisateurs').find({ id: req.user.id }).value();
   if (!user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
   const email = (user.email || '').toLowerCase();
-  const list = db.get('demandes_proforma').value().filter(d => (d.email || '').toLowerCase() === email);
+  const uid = Number(user.id);
+  const list = db
+    .get('demandes_proforma')
+    .value()
+    .filter(
+      (d) =>
+        (d.email || '').toLowerCase() === email ||
+        (d.etudiant_id != null && Number(d.etudiant_id) === uid),
+    );
   list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   res.json(list);
 });
@@ -352,7 +723,7 @@ router.get('/lettre/:dossierId', authMiddleware, (req, res) => {
     ? db.get('formations').find({ id: dossier.formation_id }).value()
     : null;
   const documents = db.get('documents').filter({ dossier_id: id }).value();
-  const photoDoc = documents.find(d => d.type_document === 'photo');
+  const photoDoc = primaryPhotoDocumentFromList(documents);
   const etablissement =
     snapshotFromFormation(formation) || snapshotFromEtablissementId(u.etablissement_id);
 
@@ -393,37 +764,27 @@ router.get('/attestation/:dossierId', authMiddleware, (req, res) => {
   res.json(built.body);
 });
 
-// GET /api/etudiant/lettre-demande/:demandeId — lettre pour demande proforma acceptée (même email)
-router.get('/lettre-demande/:demandeId', authMiddleware, (req, res) => {
-  const id = parseInt(req.params.demandeId);
+// GET /api/etudiant/attestation-demande/:demandeId — attestation (demande proforma acceptée)
+router.get('/attestation-demande/:demandeId', authMiddleware, (req, res) => {
+  const id = parseInt(String(req.params.demandeId), 10);
+  if (Number.isNaN(id)) return res.status(400).json({ message: 'Identifiant invalide' });
   const demande = db.get('demandes_proforma').find({ id }).value();
   if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
   const user = db.get('utilisateurs').find({ id: req.user.id }).value();
-  if (!user || (user.email || '').toLowerCase() !== (demande.email || '').toLowerCase()) {
-    return res.status(403).json({ message: 'Accès refusé' });
-  }
-  if (demande.statut !== 'acceptee') {
-    return res.status(403).json({ message: 'Cette demande n\'a pas été acceptée.' });
-  }
+  const sameEmail = user && (user.email || '').toLowerCase() === (demande.email || '').toLowerCase();
+  const sameId =
+    demande.etudiant_id != null && user && Number(demande.etudiant_id) === Number(user.id);
+  if (!sameEmail && !sameId) return res.status(403).json({ message: 'Accès refusé' });
+  const built = buildAttestationPayloadForDemandeProforma(id);
+  if (built.error) return res.status(built.error.status).json({ message: built.error.message });
+  res.json(built.body);
+});
 
-  const formation = db.get('formations').find({ id: demande.formation_id }).value();
-  const etabSnap = demande.etablissement_snapshot || snapshotFromFormation(formation);
-  let demandeOut = demande;
-  if (formation && demande.facture) {
-    demandeOut = {
-      ...demande,
-      facture: mergeFactureProformaFromFormation(formation, demande.facture),
-      formation_mensualite: formation.mensualite ?? demande.formation_mensualite,
-      formation_duree_mois: getDureeMoisEffectif(formation),
-    };
-  }
-  res.json({
-    type: 'demande',
-    demande: demandeOut,
-    formation,
-    lettre: demande.lettre_preinscription || null,
-    etablissement_snapshot: etabSnap,
-    date_generation: new Date().toISOString()
+// GET /api/etudiant/lettre-demande/:demandeId — déprécié : pas de lettre pour le flux demande proforma (facture + attestation uniquement)
+router.get('/lettre-demande/:demandeId', authMiddleware, (req, res) => {
+  res.status(403).json({
+    message:
+      'Pour une demande de facture proforma, seuls la facture proforma et l’attestation de préinscription sont disponibles (pas de lettre de préinscription).',
   });
 });
 

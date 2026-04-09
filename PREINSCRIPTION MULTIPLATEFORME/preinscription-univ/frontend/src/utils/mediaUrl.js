@@ -1,7 +1,8 @@
+import { resolveApiBaseUrl } from './resolveApiBaseUrl'
+
 /**
  * URL affichable pour un fichier API (/uploads/...).
- * Si l’API renvoie déjà une URL absolue, elle est renvoyée telle quelle.
- * Sinon, préfixe optionnel VITE_API_URL (front et API sur domaines différents).
+ * Aligné sur resolveApiBaseUrl (config-site.js en prod, proxy en dev).
  */
 export function mediaUrl(pathOrUrl) {
   if (pathOrUrl == null || pathOrUrl === '') return null
@@ -9,7 +10,7 @@ export function mediaUrl(pathOrUrl) {
   if (!s) return null
   if (/^https?:\/\//i.test(s)) return s
   const path = s.startsWith('/') ? s : `/${s}`
-  const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+  const base = resolveApiBaseUrl()
   if (base) return `${base}${path}`
   return path
 }

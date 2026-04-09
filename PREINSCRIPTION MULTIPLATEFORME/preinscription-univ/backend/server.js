@@ -1,10 +1,12 @@
 require('dotenv').config();
+const http = require('http');
 const express = require('express');
 const { inscriptionCaptchaEnforced } = require('./utils/antiBot');
 const cors = require('cors');
 const path = require('path');
 const { runMaintenancePrune, retentionConfigFromEnv } = require('./utils/maintenance');
 const { recordRequest, getRuntimeMetricsSnapshot } = require('./utils/runtimeMetrics');
+const { runHealthChecks } = require('./utils/healthCheck');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -56,8 +58,10 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+/** Limite élevée : conditions d’admission (HTML Quill), exports, etc. — l’ancienne défaut ~100 ko provoquait 413 silencieux. */
+const BODY_LIMIT = process.env.JSON_BODY_LIMIT || '5mb';
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Metrics middleware (best effort, sans impact métier).
@@ -77,28 +81,45 @@ app.use((req, res, next) => {
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/public', require('./routes/public'));             // Public — sans auth
+app.use('/api/conditions-admission', require('./routes/conditionsAdmission'));
 app.use('/api/etudiant', require('./routes/etudiant'));
 app.use('/api/admin', require('./routes/admin'));               // Administrateur
 app.use('/api/responsable', require('./routes/responsable'));   // Responsable pédagogique
 app.use('/api/agent-admin', require('./routes/agent_admin'));   // Agent administratif
 app.use('/api/comptable', require('./routes/comptable'));       // Comptable / Finance
 app.use('/api/directeur', require('./routes/directeur'));       // Directeur
+app.use('/api/qualite', require('./routes/qualite'));          // Contrôleur qualité
 app.use('/api/etablissements', require('./routes/etablissements'));
 app.use('/api/formations', require('./routes/formations'));
 app.use('/api/factures', require('./routes/factures'));
+app.use('/api/chat', require('./routes/chat'));
 
-app.get('/api/health', (req, res) => {
+function sendHealth(req, res) {
   const m = getRuntimeMetricsSnapshot();
-  return res.json({
-    status: 'OK',
+  const checks = runHealthChecks();
+  const payload = {
+    status: checks.ok ? 'OK' : 'DEGRADED',
     time: new Date().toISOString(),
+    checks: {
+      database: checks.database.ok ? 'ok' : 'error',
+      uploads: checks.uploads.ok ? 'ok' : 'error',
+      chat_file: checks.chat_file.ok ? 'ok' : 'error',
+    },
     uptime_s: m.uptime_s,
     requests_total: m.requests_total,
     errors_5xx: m.errors_5xx,
     avg_duration_ms: m.avg_duration_ms,
     memory_mb: m.memory_mb,
-  });
-});
+  };
+  if (!checks.database.ok && checks.database.error) payload.database_error = checks.database.error;
+  if (!checks.uploads.ok && checks.uploads.error) payload.uploads_error = checks.uploads.error;
+  if (!checks.chat_file.ok && checks.chat_file.error) payload.chat_file_error = checks.chat_file.error;
+  res.status(checks.ok ? 200 : 503).json(payload);
+}
+
+app.get('/api/health', sendHealth);
+/** Alias pour reverse-proxy / probes qui attendent souvent /health */
+app.get('/health', sendHealth);
 
 // Maintenance startup (rétention logs/notifications/backups), best-effort.
 try {
@@ -110,11 +131,20 @@ try {
 }
 
 app.use((err, req, res, next) => {
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({
+      message: 'Données trop volumineuses pour le serveur (corps JSON). Réduisez le texte ou contactez l’administrateur.',
+    });
+  }
   console.error(err.stack);
   res.status(500).json({ message: err.message || 'Erreur serveur interne' });
 });
 
-const server = app.listen(PORT, () => {
+const server = http.createServer(app);
+const { initChatSocket } = require('./socket/chatSocket');
+initChatSocket(server, { allowedCorsOrigins });
+
+server.listen(PORT, () => {
   console.log(`🚀 Serveur : http://localhost:${PORT}`);
   if (!inscriptionCaptchaEnforced()) {
     console.warn(

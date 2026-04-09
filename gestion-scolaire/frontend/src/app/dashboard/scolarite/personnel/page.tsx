@@ -130,6 +130,11 @@ export default function PersonnelPage() {
         <form onSubmit={handleCreate} className="mt-6 p-4 bg-white rounded-lg shadow border">
           <h3 className="font-medium mb-4">Créer un membre du personnel</h3>
           <p className="text-sm text-slate-600 mb-4">Tous les champs marqués d’un astérisque (*) sont obligatoires. L’email doit être unique (aucun autre compte étudiant, enseignant ou personnel).</p>
+          {form.role === 'SERVICE_PEDAGOGIQUE' && (
+            <p className="text-sm text-blue-800 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-4">
+              <strong>Service pédagogique :</strong> ce compte a une vue fédératrice sur tous les établissements (campus). À la création, le système vous rattache comme responsable pédagogique sur les sites qui n’en avaient pas encore.
+            </p>
+          )}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="block text-sm text-slate-700 mb-1">Email *</label>
@@ -169,7 +174,7 @@ export default function PersonnelPage() {
                 <option value="ADMIN">Admin</option>
                 <option value="SUPER_ADMIN">Super admin</option>
                 <option value="SCOLARITE">Scolarité</option>
-                <option value="SERVICE_PEDAGOGIQUE">Service pédagogique</option>
+                <option value="SERVICE_PEDAGOGIQUE">Service pédagogique (directeur — tous les campus)</option>
                 <option value="CHEF_COMPTABLE">Chef comptable</option>
                 <option value="AUDITOR">Auditeur</option>
                 <option value="CAISSIER">Caissier</option>

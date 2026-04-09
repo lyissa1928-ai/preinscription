@@ -33,11 +33,12 @@ export class ReportsController {
   @Roles(...PEDAGOGIE_OR_ADMIN)
   getPedagogyDashboard(
     @Query('anneeUniv') anneeUniv?: string,
-    @CurrentUser() user?: { sub: string },
+    @CurrentUser() user?: { sub: string; role: string },
   ) {
     return this.service.getPedagogyDashboard(
       anneeUniv ? +anneeUniv : undefined,
       user?.sub,
+      user?.role,
     );
   }
 

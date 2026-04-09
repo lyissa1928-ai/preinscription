@@ -47,6 +47,7 @@ type PedagogyDashboardStats = {
     nbCohortes: number;
     seancesAujourdHui: number;
     activitesDuJour: PedagogyDashboardStats['activitesDuJour'];
+    vueFederatrice?: boolean;
   } | null;
 };
 
@@ -147,7 +148,14 @@ export default function PedagogieDashboard() {
       />
 
       {stats?.monCampus && (
-        <Card title="Mon campus" description={`Votre site de rattachement : ${stats.monCampus.nom}`}>
+        <Card
+          title={stats.monCampus.vueFederatrice ? 'Périmètre établissements' : 'Mon campus'}
+          description={
+            stats.monCampus.vueFederatrice
+              ? `${stats.monCampus.nom} — accès à l’ensemble des sites (directeur fédérateur).`
+              : `Votre site de rattachement : ${stats.monCampus.nom}`
+          }
+        >
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-secondary)] px-4 py-2">
               <span className="text-sm font-medium text-[var(--foreground-muted)]">Salles</span>
@@ -166,12 +174,14 @@ export default function PedagogieDashboard() {
               className="ml-auto inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-secondary)]"
               style={{ borderColor: 'var(--color-border)' }}
             >
-              Voir le campus
+              {stats.monCampus.vueFederatrice ? 'Voir tous les campus' : 'Voir le campus'}
             </Link>
           </div>
           {stats.monCampus.activitesDuJour.length > 0 && (
             <div className="mt-4">
-              <p className="mb-2 text-sm font-medium text-[var(--foreground-muted)]">Activités du jour sur ce campus</p>
+              <p className="mb-2 text-sm font-medium text-[var(--foreground-muted)]">
+                {stats.monCampus.vueFederatrice ? 'Activités du jour (tous sites)' : 'Activités du jour sur ce campus'}
+              </p>
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b" style={{ borderColor: 'var(--color-border)' }}>
