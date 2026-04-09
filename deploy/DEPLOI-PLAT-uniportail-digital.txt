@@ -1,0 +1,82 @@
+================================================================================
+Déploiement « à plat » : tout le contenu de preinscription-univ directement dans
+  /home/admin/web/uniportail-digital.com/uniportail
+(sans dossier PREINSCRIPTION MULTIPLATEFORME/preinscription-univ sur le serveur)
+================================================================================
+
+Principe : Git reste cloné dans un dossier SOURCE (avec l’arborescence GitHub).
+Après chaque `git pull`, on copie uniquement les fichiers de l’app vers uniportail.
+
+--------------------------------------------------------------------------------
+Installation une seule fois sur le VPS
+--------------------------------------------------------------------------------
+
+1) Dossier SOURCE (mono-repo complet, pour git pull) :
+
+  mkdir -p /home/admin/web/uniportail-digital.com/uniportail-src
+  cd /home/admin/web/uniportail-digital.com/uniportail-src
+  git clone https://github.com/lyissa1928-ai/projet-IA.git .
+
+2) Dossier CIBLE (fichiers à plat, celui que Nginx / PM2 utilisent) :
+
+  mkdir -p /home/admin/web/uniportail-digital.com/uniportail
+
+3) Première copie + dépendances + build :
+
+  rsync -a --delete \
+    --exclude 'backend/.env' \
+    --exclude 'backend/database/preinscription.json' \
+    --exclude 'backend/uploads/' \
+    "PREINSCRIPTION MULTIPLATEFORME/preinscription-univ/" \
+    /home/admin/web/uniportail-digital.com/uniportail/
+
+  cd /home/admin/web/uniportail-digital.com/uniportail
+  cp backend/.env.example backend/.env
+  nano backend/.env
+  npm run install:all
+  npm run build
+  cd backend && pm2 start server.js --name uniportail-api && pm2 save
+
+  (Si vous aviez déjà un .env et preinscription.json : les copier dans
+   uniportail/backend/ AVANT le premier rsync, ou après, à la main.)
+
+--------------------------------------------------------------------------------
+À chaque mise à jour (code depuis GitHub)
+--------------------------------------------------------------------------------
+
+  cd /home/admin/web/uniportail-digital.com/uniportail-src
+  git pull origin main
+
+  rsync -a --delete \
+    --exclude 'backend/.env' \
+    --exclude 'backend/database/preinscription.json' \
+    --exclude 'backend/uploads/' \
+    "PREINSCRIPTION MULTIPLATEFORME/preinscription-univ/" \
+    /home/admin/web/uniportail-digital.com/uniportail/
+
+  cd /home/admin/web/uniportail-digital.com/uniportail
+  npm run install:all
+  npm run build
+  cd backend && pm2 restart uniportail-api
+
+--------------------------------------------------------------------------------
+Nginx
+--------------------------------------------------------------------------------
+
+La racine du site (fichiers statiques) doit pointer vers :
+  /home/admin/web/uniportail-digital.com/uniportail/frontend/dist
+
+Le proxy /api vers le port Node (ex. 5000) inchangé.
+
+--------------------------------------------------------------------------------
+Alternative (un seul dossier, sans uniportail-src)
+--------------------------------------------------------------------------------
+
+Créer un dépôt GitHub qui ne contient QUE preinscription-univ à la racine, puis :
+
+  git clone https://github.com/VOTRE-COMPTE/uniportail.git \
+    /home/admin/web/uniportail-digital.com/uniportail
+
+(voir deploy/GITHUB-REPO-SEUL.txt pour extraire cette branche depuis le mono-repo.)
+
+================================================================================
