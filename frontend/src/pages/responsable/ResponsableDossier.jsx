@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { useAuth } from '../../context/AuthContext'
+import { chatWithStudentUrl } from '../../utils/chatWithStudentUrl'
 import StatutBadge from '../../components/StatutBadge'
 import PreinscriptionConditionsBlock from '../../components/PreinscriptionConditionsBlock'
 import { isDossierAcceptePourDocuments } from '../../utils/dossierStatut'
@@ -38,6 +40,7 @@ function SectionTitle({ icon, children }) {
 
 export default function ResponsableDossier() {
   const { id } = useParams()
+  const { user } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -100,6 +103,12 @@ export default function ResponsableDossier() {
   const allowedTransitions = ALLOWED_TRANSITIONS[dossier.statut || 'en_attente'] || ['en_attente']
 
   const isAccepte = isDossierAcceptePourDocuments(dossier.statut)
+
+  const showChatterCandidat =
+    user?.role === 'responsable' &&
+    user?.etablissement_id != null &&
+    dossier.etudiant_id != null &&
+    Number(dossier.etudiant_id) > 0
 
   const decisionBlock = (
     <>
@@ -264,15 +273,25 @@ export default function ResponsableDossier() {
       {/* En-tête */}
       <header className="mb-8 rounded-2xl border border-slate-200/90 bg-white/90 p-5 shadow-sm ring-1 ring-slate-100/80 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-8">
-          <Link
-            to="/responsable"
-            className="inline-flex w-fit shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-          >
-            <span aria-hidden className="text-base leading-none">
-              ←
-            </span>
-            Retour
-          </Link>
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <Link
+              to="/responsable"
+              className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+            >
+              <span aria-hidden className="text-base leading-none">
+                ←
+              </span>
+              Retour
+            </Link>
+            {showChatterCandidat && (
+              <Link
+                to={chatWithStudentUrl(dossier.etudiant_id, dossier.prenom, dossier.nom)}
+                className="inline-flex w-fit items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-sm font-bold text-emerald-900 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-100"
+              >
+                💬 Chatter avec le candidat
+              </Link>
+            )}
+          </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Dossier {dossier.numero_dossier}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">

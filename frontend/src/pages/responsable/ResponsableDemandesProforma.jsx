@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { mediaUrl } from '../../utils/mediaUrl'
+import { useAuth } from '../../context/AuthContext'
+import { chatWithStudentUrl } from '../../utils/chatWithStudentUrl'
 
 const fmt = n => new Intl.NumberFormat('fr-FR').format(n || 0)
 
@@ -13,6 +15,9 @@ function justifUrl(rel) {
 }
 
 export default function ResponsableDemandesProforma() {
+  const { user } = useAuth()
+  const canChatterEtudiant =
+    user?.role === 'responsable' && user?.etablissement_id != null
   const [demandes, setDemandes] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
@@ -121,6 +126,15 @@ export default function ResponsableDemandesProforma() {
                   )}
                 </div>
                 <div className="flex flex-col items-stretch sm:items-end gap-2">
+                  {canChatterEtudiant && d.etudiant_id != null && Number(d.etudiant_id) > 0 && (
+                    <Link
+                      to={chatWithStudentUrl(d.etudiant_id, d.prenom, d.nom)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs font-bold text-center sm:text-right rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900 hover:bg-emerald-100"
+                    >
+                      💬 Chatter avec le candidat
+                    </Link>
+                  )}
                   <span className={`text-xs font-semibold px-2 py-1 rounded-full self-start sm:self-end ${
                     d.statut === 'acceptee' ? 'bg-emerald-100 text-emerald-800'
                     : d.statut === 'refusee' ? 'bg-red-100 text-red-700'
