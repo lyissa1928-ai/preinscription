@@ -14,6 +14,10 @@ export default function DirecteurDashboard() {
   const conditionsAnchorRef = useRef(null)
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [etabs, setEtabs] = useState([])
+  const [conditionsEtabId, setConditionsEtabId] = useState(() =>
+    user?.etablissement_id != null ? Number(user.etablissement_id) : null,
+  )
 
   useEffect(() => {
     axios.get('/api/directeur/dashboard')
@@ -21,6 +25,24 @@ export default function DirecteurDashboard() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    axios
+      .get('/api/etablissements')
+      .then(({ data }) => {
+        const list = Array.isArray(data) ? data : []
+        setEtabs(list)
+        setConditionsEtabId((prev) => {
+          if (list.length === 0) return null
+          const ids = list.map((e) => Number(e.id))
+          if (prev != null && ids.includes(Number(prev))) return Number(prev)
+          const u = user?.etablissement_id
+          if (u != null && ids.includes(Number(u))) return Number(u)
+          return Number(list[0].id)
+        })
+      })
+      .catch(() => setEtabs([]))
+  }, [user?.etablissement_id])
 
   useEffect(() => {
     if (searchParams.get('tab') !== 'conditions') return
@@ -99,17 +121,45 @@ export default function DirecteurDashboard() {
                 <p className="mb-6 text-sm text-slate-600">
                   Comme pour le responsable pédagogique : plusieurs blocs de conditions peuvent être publiés ; le champ
                   d’un nouveau bloc est vidé après chaque ajout validé. Affichage aux candidats sur la demande de facture
-                  proforma après le choix de votre établissement.
+                  proforma après le choix de l’établissement. En tant que directeur, vous pouvez gérer les conditions pour
+                  chaque établissement via la liste ci-dessous.
                 </p>
-                {user?.etablissement_id ? (
-                  <TabConditionsAdmissionEtab
-                    etabId={user.etablissement_id}
-                    etabNom={user.etablissement_nom || stats?.etablissement?.nom}
-                  />
-                ) : (
+                {etabs.length === 0 ? (
                   <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    Aucun établissement n’est rattaché à votre compte.
+                    Aucun établissement disponible.
                   </p>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                      <label className="text-sm font-semibold text-slate-700" htmlFor="directeur-conditions-etab">
+                        Établissement
+                      </label>
+                      <select
+                        id="directeur-conditions-etab"
+                        className="max-w-md rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        value={conditionsEtabId ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setConditionsEtabId(v === '' ? null : Number(v))
+                        }}
+                      >
+                        {etabs.map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {e.nom}
+                            {e.actif === false ? ' (inactif)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <TabConditionsAdmissionEtab
+                      etabId={conditionsEtabId}
+                      etabNom={
+                        etabs.find((e) => Number(e.id) === Number(conditionsEtabId))?.nom ||
+                        user?.etablissement_nom ||
+                        stats?.etablissement?.nom
+                      }
+                    />
+                  </div>
                 )}
               </Panel>
             </div>

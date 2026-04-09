@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
 const bcrypt = require('bcryptjs');
-const { authMiddleware, adminOnly } = require('../middleware/auth');
+const { authMiddleware, adminOnly, adminOrDirecteur } = require('../middleware/auth');
 const {
   normalizeMatricule, isValidMatriculeFormat, matriculeTaken,
   normalizeTelephoneForUniqueness, telephoneTaken,
@@ -17,7 +17,15 @@ const { retentionConfigFromEnv, runMaintenancePrune } = require('../utils/mainte
 const { getRuntimeMetricsSnapshot } = require('../utils/runtimeMetrics');
 const { proformaDemandeDecision } = require('../services/proformaDemandeDecisionService');
 
-router.use(authMiddleware, adminOnly);
+router.use(authMiddleware);
+router.use((req, res, next) => {
+  const path = (req.path || '').split('?')[0];
+  // Gestion des comptes utilisateurs : réservée à l’administrateur (le directeur n’a aucune prérogative utilisateur).
+  if (path === '/utilisateurs' || path.startsWith('/utilisateurs/')) {
+    return adminOnly(req, res, next);
+  }
+  return adminOrDirecteur(req, res, next);
+});
 const adminSensitiveLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,

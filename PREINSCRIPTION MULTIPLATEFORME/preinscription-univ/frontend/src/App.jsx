@@ -32,7 +32,6 @@ import {
   AgentAdminDashboard,
   AgentAdminDossier,
   ComptableDashboard,
-  DirecteurDashboard,
   QualiteDashboard,
   PublicFactureView,
   PublicProformaPage,
@@ -77,7 +76,7 @@ function AppRoutes() {
     if (!user) return '/'
     if (user.must_change_password) return '/changer-mot-de-passe-obligatoire'
     if (user.role === 'admin') return '/admin'
-    if (user.role === 'directeur') return '/directeur'
+    if (user.role === 'directeur') return '/admin'
     if (user.role === 'controleur_qualite') return '/qualite'
     if (['responsable', 'agent_admin', 'comptable'].includes(user.role)) return '/mon-etablissement'
     return '/dashboard'
@@ -154,8 +153,8 @@ function AppRoutes() {
         } />
 
         {/* Responsable */}
-        <Route path="/responsable" element={<PrivateRoute roles={['responsable', 'admin']}><ResponsableDashboard /></PrivateRoute>} />
-        <Route path="/responsable/dossier/:id" element={<PrivateRoute roles={['responsable', 'admin']}><ResponsableDossier /></PrivateRoute>} />
+        <Route path="/responsable" element={<PrivateRoute roles={['responsable', 'admin', 'directeur']}><ResponsableDashboard /></PrivateRoute>} />
+        <Route path="/responsable/dossier/:id" element={<PrivateRoute roles={['responsable', 'admin', 'directeur']}><ResponsableDossier /></PrivateRoute>} />
         <Route path="/responsable/gestion-etablissement" element={
           <PrivateRoute roles={['responsable', 'directeur']}>
             <ResponsableGestionEtab />
@@ -164,30 +163,30 @@ function AppRoutes() {
         <Route path="/responsable/demandes-proforma" element={<PrivateRoute roles={['responsable', 'admin', 'directeur', 'agent_admin', 'comptable', 'controleur_qualite']}><ResponsableDemandesProforma /></PrivateRoute>} />
 
         {/* Agent admin */}
-        <Route path="/agent-admin" element={<PrivateRoute roles={['agent_admin', 'admin']}><AgentAdminDashboard /></PrivateRoute>} />
-        <Route path="/agent-admin/dossier/:id" element={<PrivateRoute roles={['agent_admin', 'admin']}><AgentAdminDossier /></PrivateRoute>} />
+        <Route path="/agent-admin" element={<PrivateRoute roles={['agent_admin', 'admin', 'directeur']}><AgentAdminDashboard /></PrivateRoute>} />
+        <Route path="/agent-admin/dossier/:id" element={<PrivateRoute roles={['agent_admin', 'admin', 'directeur']}><AgentAdminDossier /></PrivateRoute>} />
 
         {/* Comptable */}
-        <Route path="/comptable" element={<PrivateRoute roles={['comptable', 'admin']}><ComptableDashboard /></PrivateRoute>} />
+        <Route path="/comptable" element={<PrivateRoute roles={['comptable', 'admin', 'directeur']}><ComptableDashboard /></PrivateRoute>} />
 
         {/* Directeur */}
-        <Route path="/directeur" element={<PrivateRoute roles={['directeur', 'admin']}><DirecteurDashboard /></PrivateRoute>} />
+        <Route path="/directeur" element={<PrivateRoute roles={['directeur']}><Navigate to="/admin" replace /></PrivateRoute>} />
 
         {/* Contrôleur qualité */}
-        <Route path="/qualite" element={<PrivateRoute roles={['controleur_qualite', 'admin']}><QualiteDashboard /></PrivateRoute>} />
+        <Route path="/qualite" element={<PrivateRoute roles={['controleur_qualite', 'admin', 'directeur']}><QualiteDashboard /></PrivateRoute>} />
 
         {/* Admin */}
-        <Route path="/admin" element={<PrivateRoute roles={['admin']}><AdminDashboard /></PrivateRoute>} />
-        <Route path="/admin/dossier/:id" element={<PrivateRoute roles={['admin']}><AdminDossier /></PrivateRoute>} />
+        <Route path="/admin" element={<PrivateRoute roles={['admin', 'directeur']}><AdminDashboard /></PrivateRoute>} />
+        <Route path="/admin/dossier/:id" element={<PrivateRoute roles={['admin', 'directeur']}><AdminDossier /></PrivateRoute>} />
         <Route path="/admin/utilisateurs" element={<PrivateRoute roles={['admin']}><AdminUsers /></PrivateRoute>} />
-        <Route path="/admin/etablissements" element={<PrivateRoute roles={['admin']}><AdminEtablissements /></PrivateRoute>} />
-        <Route path="/admin/etablissements/:id" element={<PrivateRoute roles={['admin']}><AdminEtablissementDetail /></PrivateRoute>} />
-        <Route path="/admin/proforma" element={<PrivateRoute roles={['admin']}><AdminProforma /></PrivateRoute>} />
-        <Route path="/admin/factures-etablissement" element={<PrivateRoute roles={['admin']}><AdminFacturesEtabPage /></PrivateRoute>} />
-        <Route path="/admin/audit-logs" element={<PrivateRoute roles={['admin']}><AdminAuditLogs /></PrivateRoute>} />
-        <Route path="/admin/security-events" element={<PrivateRoute roles={['admin']}><AdminSecurityEvents /></PrivateRoute>} />
-        <Route path="/admin/maintenance" element={<PrivateRoute roles={['admin']}><AdminMaintenance /></PrivateRoute>} />
-        <Route path="/admin/runtime-monitoring" element={<PrivateRoute roles={['admin']}><AdminRuntimeMonitoring /></PrivateRoute>} />
+        <Route path="/admin/etablissements" element={<PrivateRoute roles={['admin', 'directeur']}><AdminEtablissements /></PrivateRoute>} />
+        <Route path="/admin/etablissements/:id" element={<PrivateRoute roles={['admin', 'directeur']}><AdminEtablissementDetail /></PrivateRoute>} />
+        <Route path="/admin/proforma" element={<PrivateRoute roles={['admin', 'directeur']}><AdminProforma /></PrivateRoute>} />
+        <Route path="/admin/factures-etablissement" element={<PrivateRoute roles={['admin', 'directeur']}><AdminFacturesEtabPage /></PrivateRoute>} />
+        <Route path="/admin/audit-logs" element={<PrivateRoute roles={['admin', 'directeur']}><AdminAuditLogs /></PrivateRoute>} />
+        <Route path="/admin/security-events" element={<PrivateRoute roles={['admin', 'directeur']}><AdminSecurityEvents /></PrivateRoute>} />
+        <Route path="/admin/maintenance" element={<PrivateRoute roles={['admin', 'directeur']}><AdminMaintenance /></PrivateRoute>} />
+        <Route path="/admin/runtime-monitoring" element={<PrivateRoute roles={['admin', 'directeur']}><AdminRuntimeMonitoring /></PrivateRoute>} />
       </Route>
 
       {/* Chat : route dédiée (layout + index) pour éviter les soucis de matching sous layout sans path */}

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
-const { authMiddleware, adminOnly } = require('../middleware/auth');
+const { authMiddleware, adminOrDirecteur } = require('../middleware/auth');
 const { genererOuRecupererFactureDossier, syncStoredFactureById } = require('../services/factureService');
 const { isFactureSupprimee } = require('../utils/factureVisibility');
 
@@ -22,7 +22,7 @@ router.post('/generer/:dossierId', authMiddleware, (req, res) => {
   if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
 
   const isOwner = dossier.etudiant_id === req.user.id;
-  const isAdmin = req.user.role === 'admin';
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'directeur';
   const isStaffEtab =
     ['responsable', 'directeur', 'comptable', 'agent_admin', 'controleur_qualite'].includes(req.user.role) &&
     dossierDansEtablissementUtilisateur(dossier, req.user);
@@ -52,15 +52,17 @@ router.get('/dossier/:dossierId', authMiddleware, (req, res) => {
   if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
   const ok =
     req.user.role === 'admin' ||
+    req.user.role === 'directeur' ||
     dossier.etudiant_id === req.user.id ||
-    (['responsable', 'directeur', 'comptable', 'agent_admin', 'controleur_qualite'].includes(req.user.role) &&
+    (['responsable', 'comptable', 'agent_admin', 'controleur_qualite'].includes(req.user.role) &&
       dossierDansEtablissementUtilisateur(dossier, req.user));
   if (!ok) return res.status(403).json({ message: 'Accès refusé' });
   const facture = db.get('factures').find({ dossier_id: dossierId }).value();
   if (!facture) return res.status(404).json({ message: 'Aucune facture générée' });
   const isStaffView =
     req.user.role === 'admin' ||
-    (['responsable', 'directeur', 'comptable', 'agent_admin', 'controleur_qualite'].includes(req.user.role) &&
+    req.user.role === 'directeur' ||
+    (['responsable', 'comptable', 'agent_admin', 'controleur_qualite'].includes(req.user.role) &&
       dossierDansEtablissementUtilisateur(dossier, req.user));
   if (isFactureSupprimee(facture) && !isStaffView) {
     return res.status(404).json({ message: 'Aucune facture générée' });
@@ -73,10 +75,10 @@ router.get('/dossier/:dossierId', authMiddleware, (req, res) => {
 router.get('/:id', authMiddleware, (req, res) => {
   const facture = db.get('factures').find({ id: parseInt(req.params.id) }).value();
   if (!facture) return res.status(404).json({ message: 'Facture non trouvée' });
-  if (req.user.role !== 'admin' && facture.etudiant_id !== req.user.id) {
+  if (!['admin', 'directeur'].includes(req.user.role) && facture.etudiant_id !== req.user.id) {
     return res.status(403).json({ message: 'Accès refusé' });
   }
-  if (isFactureSupprimee(facture) && req.user.role !== 'admin' && facture.etudiant_id === req.user.id) {
+  if (isFactureSupprimee(facture) && !['admin', 'directeur'].includes(req.user.role) && facture.etudiant_id === req.user.id) {
     return res.status(404).json({ message: 'Facture non trouvée' });
   }
   const synced = syncStoredFactureById(facture.id);
@@ -84,7 +86,7 @@ router.get('/:id', authMiddleware, (req, res) => {
 });
 
 // GET /api/factures - Admin : toutes les factures
-router.get('/', authMiddleware, adminOnly, (req, res) => {
+router.get('/', authMiddleware, adminOrDirecteur, (req, res) => {
   const factures = (db.get('factures').value() || []).filter((f) => !isFactureSupprimee(f));
   res.json(factures);
 });

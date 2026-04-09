@@ -16,7 +16,13 @@ const NAV_LINKS = {
   responsable: [{ to: '/responsable', label: 'Mes dossiers' }],
   agent_admin: [{ to: '/agent-admin', label: 'Contrôle dossiers' }],
   comptable: [{ to: '/comptable', label: 'Finance & Comptabilité' }],
-  directeur: [{ to: '/directeur', label: 'Supervision' }],
+  directeur: [
+    { to: '/admin', label: 'Administration' },
+    { to: '/responsable', label: 'Pédagogie' },
+    { to: '/agent-admin', label: 'Contrôle admin' },
+    { to: '/comptable', label: 'Finance' },
+    { to: '/qualite', label: 'Qualité' },
+  ],
   controleur_qualite: [
     { to: '/qualite', label: 'Qualité & conformité' },
     { to: '/mon-etablissement', label: 'Mon établissement' },

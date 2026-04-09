@@ -56,7 +56,7 @@ export default function ForcePasswordChange() {
       user.role === 'admin'
         ? '/admin'
         : user.role === 'directeur'
-          ? '/directeur'
+          ? '/admin'
           : user.role === 'controleur_qualite'
             ? '/qualite'
             : ['responsable', 'agent_admin', 'comptable'].includes(user.role)
@@ -102,7 +102,7 @@ export default function ForcePasswordChange() {
         user.role === 'admin'
           ? '/admin'
           : user.role === 'directeur'
-            ? '/directeur'
+            ? '/admin'
             : user.role === 'controleur_qualite'
               ? '/qualite'
               : ['responsable', 'agent_admin', 'comptable'].includes(user.role)

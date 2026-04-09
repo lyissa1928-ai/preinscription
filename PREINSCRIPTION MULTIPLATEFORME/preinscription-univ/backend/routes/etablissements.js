@@ -8,7 +8,7 @@ const ExcelJS = require('exceljs');
 const db = require('../database/db');
 const { normalizeMatricule, normalizeTelephoneForUniqueness, telephoneTaken } = require('../utils/userIdentity');
 const { generateNextMatriculeForEtablissement } = require('../utils/matriculeGenerator');
-const { authMiddleware, adminOnly } = require('../middleware/auth');
+const { authMiddleware, adminOnly, adminOrDirecteur } = require('../middleware/auth');
 const { buildFacturesExportHtml } = require('../utils/factureExportHtml');
 const { publicAssetUrl } = require('../utils/publicAssetUrl');
 const { logAudit } = require('../utils/auditLog');
@@ -34,7 +34,7 @@ function formationAvecPrixRecalcule(formation) {
 
 /** Admin, ou responsable/directeur de l'établissement désigné dans :id ou :etabId */
 function etabPedagogieWrite(req, res, next) {
-  if (req.user.role === 'admin') return next();
+  if (req.user.role === 'admin' || req.user.role === 'directeur') return next();
   const raw = req.params.id ?? req.params.etabId;
   const etabId = parseInt(raw, 10);
   if (Number.isNaN(etabId)) {
@@ -48,7 +48,7 @@ function etabPedagogieWrite(req, res, next) {
 
 /** Liste / export / suppression factures : admin ou staff rattaché à l’établissement. */
 function etabFacturesAccess(req, res, next) {
-  if (req.user.role === 'admin') return next();
+  if (req.user.role === 'admin' || req.user.role === 'directeur') return next();
   const etabId = parseInt(req.params.id, 10);
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
@@ -287,9 +287,9 @@ router.get('/', (req, res) => {
     } catch { /* token invalide → traitement comme public */ }
   }
 
-  // Admin voit tous (y compris inactifs), les autres voient seulement actifs
+  // Admin et directeur : tous les établissements (y compris inactifs pour consultation) ; le reste : actifs seulement
   const rawEtabs =
-    userRole === 'admin'
+    userRole === 'admin' || userRole === 'directeur'
       ? db.get('etablissements').value()
       : db.get('etablissements').filter({ actif: true }).value();
   const etabs = Array.isArray(rawEtabs) ? rawEtabs : [];
@@ -344,8 +344,8 @@ function maybeUploadCreateFiles(req, res, next) {
   next();
 }
 
-// POST /api/etablissements — créer (admin) — JSON ou multipart/form-data (+ logo, cachet optionnels)
-router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
+// POST /api/etablissements — créer (admin ou directeur) — JSON ou multipart/form-data (+ logo, cachet optionnels)
+router.post('/', adminOrDirecteur, maybeUploadCreateFiles, async (req, res) => {
   const {
     nom, type, description, couleur_primaire, couleur_secondaire, adresse, telephone, email_contact, site_web,
     ninea, rc, arrete, compte_bancaire, banque, iban, swift, signataire_nom, signataire_fonction
@@ -395,7 +395,7 @@ router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
 });
 
 // POST /api/etablissements/:id/upload — upload logo/cachet séparé
-router.post('/:id/upload', adminOnly, upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'cachet', maxCount: 1 }]), async (req, res) => {
+router.post('/:id/upload', adminOrDirecteur, upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'cachet', maxCount: 1 }]), async (req, res) => {
   const id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
@@ -717,8 +717,9 @@ router.get('/:id', (req, res) => {
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
-  // Vérification accès : admin voit tout, responsable voit son etab
-  if (req.user.role !== 'admin' && req.user.etablissement_id !== id) {
+  // Admin et directeur : tous les établissements ; autres rôles : uniquement leur rattachement
+  const accesTousEtabs = req.user.role === 'admin' || req.user.role === 'directeur';
+  if (!accesTousEtabs && Number(req.user.etablissement_id) !== id) {
     return res.status(403).json({ message: 'Accès refusé.' });
   }
 
@@ -756,19 +757,20 @@ router.get('/:id', (req, res) => {
     ? db.get('utilisateurs').find({ id: etab.responsable_id }).pick(['id', 'prenom', 'nom', 'email', 'role']).value()
     : null;
 
+  const noUserScope = req.user.role === 'directeur';
   res.json({
     ...etab,
     logo_url: publicAssetUrl(req, etab.logo_url),
     cachet_url: publicAssetUrl(req, etab.cachet_url),
     filieres,
     formations,
-    membres,
-    responsable,
+    membres: noUserScope ? [] : membres,
+    responsable: noUserScope ? null : responsable,
   });
 });
 
 // PUT /api/etablissements/:id — modifier (JSON uniquement)
-router.put('/:id', adminOnly, (req, res) => {
+router.put('/:id', adminOrDirecteur, (req, res) => {
   const id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
@@ -787,7 +789,7 @@ router.put('/:id', adminOnly, (req, res) => {
 });
 
 // DELETE /api/etablissements/:id — désactiver
-router.delete('/:id', adminOnly, (req, res) => {
+router.delete('/:id', adminOrDirecteur, (req, res) => {
   const id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
@@ -795,7 +797,7 @@ router.delete('/:id', adminOnly, (req, res) => {
   res.json({ message: 'Établissement désactivé.' });
 });
 
-// PUT /api/etablissements/:id/responsable — désigner un responsable
+// PUT /api/etablissements/:id/responsable — désigner un responsable (comptes utilisateurs → admin uniquement)
 router.put('/:id/responsable', adminOnly, (req, res) => {
   const id = parseInt(req.params.id);
   const { utilisateur_id } = req.body;
@@ -1356,7 +1358,7 @@ router.post('/:etabId/formations/delete-batch', etabPedagogieWrite, (req, res) =
     return res.status(400).json({ message: 'Liste des ids vide.' });
   }
   const hardRequested = ['1', 'true', 'yes', 'oui'].includes(String(req.body?.hard || '').toLowerCase());
-  const hard = hardRequested && req.user.role === 'admin';
+  const hard = hardRequested && (req.user.role === 'admin' || req.user.role === 'directeur');
 
   const removed = [];
   const deactivated = [];
@@ -1419,8 +1421,8 @@ router.delete('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
     return res.json({ message: 'Formation désactivée (soft delete).' });
   }
 
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Suppression définitive réservée à l’administrateur.' });
+  if (req.user.role !== 'admin' && req.user.role !== 'directeur') {
+    return res.status(403).json({ message: 'Suppression définitive réservée à l’administrateur ou au directeur.' });
   }
 
   detachFormationReferences(id);
@@ -1433,7 +1435,7 @@ router.delete('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
 //  MEMBRES (utilisateurs rattachés à un établissement)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// GET /api/etablissements/:id/membres
+// GET /api/etablissements/:id/membres (admin uniquement)
 router.get('/:id/membres', adminOnly, (req, res) => {
   const etablissement_id = parseInt(req.params.id);
   const membres = db.get('utilisateurs')
@@ -1454,7 +1456,7 @@ router.get('/:id/membres', adminOnly, (req, res) => {
   res.json(membres);
 });
 
-// POST /api/etablissements/:id/membres — créer un compte membre
+// POST /api/etablissements/:id/membres — créer un compte membre (admin uniquement)
 router.post('/:id/membres', adminOnly, (req, res) => {
   const etablissement_id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id: etablissement_id }).value();
@@ -1531,7 +1533,7 @@ router.post('/:id/membres', adminOnly, (req, res) => {
   });
 });
 
-// PUT /api/etablissements/:etabId/membres/:id — modifier (identité, rôle, actif, mot de passe optionnel)
+// PUT /api/etablissements/:etabId/membres/:id — modifier (admin uniquement)
 router.put('/:etabId/membres/:id', adminOnly, (req, res) => {
   const etabId = parseInt(req.params.etabId, 10);
   const id = parseInt(req.params.id, 10);
@@ -1611,7 +1613,7 @@ router.put('/:etabId/membres/:id', adminOnly, (req, res) => {
   });
 });
 
-// DELETE /api/etablissements/:etabId/membres/:id — désactiver (soft)
+// DELETE /api/etablissements/:etabId/membres/:id — désactiver (soft) (admin uniquement)
 router.delete('/:etabId/membres/:id', adminOnly, (req, res) => {
   const etabId = parseInt(req.params.etabId, 10);
   const id = parseInt(req.params.id, 10);
@@ -1627,7 +1629,7 @@ router.delete('/:etabId/membres/:id', adminOnly, (req, res) => {
   res.json({ message: 'Compte désactivé.' });
 });
 
-// POST /api/etablissements/:etabId/membres/:id/supprimer-definitif — suppression base (admin)
+// POST /api/etablissements/:etabId/membres/:id/supprimer-definitif — suppression base (admin uniquement)
 router.post('/:etabId/membres/:id/supprimer-definitif', adminOnly, (req, res) => {
   const etabId = parseInt(req.params.etabId, 10);
   const id = parseInt(req.params.id, 10);

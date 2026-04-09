@@ -29,7 +29,7 @@ function docsMetaForDossier(dossier, documents, formation) {
 
 // Helper : filtrer les dossiers par établissement
 function filterDossiersByEtab(req, dossiers) {
-  const etabId = req.user.role !== 'admin' ? req.user.etablissement_id : null;
+  const etabId = req.user.role === 'admin' || req.user.role === 'directeur' ? null : req.user.etablissement_id;
   if (!etabId) return dossiers;
   const formationIds = (db.get('formations').value() || []).filter((f) => f.etablissement_id === etabId).map((f) => f.id);
   return dossiers.filter(d => {

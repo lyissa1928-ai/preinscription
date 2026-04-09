@@ -10,6 +10,7 @@ import {
   Panel,
   DashboardSpinner,
 } from '../components/dashboard/DashboardChrome'
+import { useAuth } from '../context/AuthContext'
 
 // ─── Icônes SVG inline ────────────────────────────────────────────────────────
 const Ico = ({ d, d2, cls = 'w-6 h-6' }) => (
@@ -41,6 +42,7 @@ const ICO = {
 }
 
 export default function AdminDashboard() {
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const conditionsAnchorRef = useRef(null)
   const [stats,       setStats]       = useState(null)
@@ -93,7 +95,7 @@ export default function AdminDashboard() {
   }, [page, filtreStatut, search])
 
   // ── Raccourcis de navigation ──────────────────────────────────────────────
-  const shortcuts = [
+  const shortcutsAll = [
     {
       label: 'Établissements',
       desc:  'Créer et gérer les établissements',
@@ -154,8 +156,10 @@ export default function AdminDashboard() {
       bg:    'bg-orange-50/80',
       text:  'text-orange-900',
       ring:  'group-hover:ring-orange-200/80',
+      adminOnly: true,
     },
   ]
+  const shortcuts = shortcutsAll.filter((s) => !s.adminOnly || user?.role === 'admin')
 
   const statItems = [
     { icon: ICO.dossiers, gradient: 'blue', label: 'Total dossiers', value: stats?.dossiers?.total },
@@ -167,9 +171,13 @@ export default function AdminDashboard() {
   return (
     <DashboardPage>
       <DashboardHero
-        eyebrow="Administration"
+        eyebrow={user?.role === 'directeur' ? 'Direction' : 'Administration'}
         title="Tableau de bord"
-        subtitle="Vue d’ensemble de la plateforme, indicateurs clés et accès rapide aux modules de gestion."
+        subtitle={
+          user?.role === 'directeur'
+            ? 'Vue d’ensemble : établissements, filières, formations et tarifs — sans gestion des comptes utilisateurs.'
+            : 'Vue d’ensemble de la plateforme, indicateurs clés et accès rapide aux modules de gestion.'
+        }
       />
 
       <div className="mb-3 flex items-center gap-3">

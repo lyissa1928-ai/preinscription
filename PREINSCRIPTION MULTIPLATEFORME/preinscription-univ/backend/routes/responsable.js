@@ -79,7 +79,7 @@ router.get('/demandes-proforma', authMiddleware, staffProformaDecision, (req, re
 
   let demandes = db.get('demandes_proforma').value();
   const formationIds = getEtabFormationIds(req) || [];
-  const etabId = req.user.role !== 'admin' ? req.user.etablissement_id : null;
+  const etabId = req.user.role === 'admin' || req.user.role === 'directeur' ? null : req.user.etablissement_id;
   if (etabId) {
     demandes = demandes.filter((d) => demandeAppartientAEtablissement(d, etabId, formationIds));
   }
@@ -144,7 +144,7 @@ router.use(authMiddleware, responsableOrAdmin);
 // ─── Helpers accès par établissement ─────────────────────────────────────────
 
 function getEtabFormationIds(req) {
-  const etabId = req.user.role !== 'admin' ? req.user.etablissement_id : null;
+  const etabId = req.user.role === 'admin' || req.user.role === 'directeur' ? null : req.user.etablissement_id;
   if (!etabId) return null;
   return (db.get('formations').value() || []).filter((f) => f.etablissement_id === etabId).map((f) => f.id);
 }
@@ -160,7 +160,7 @@ function dossierAppartientAEtablissement(dossier, etabId) {
 }
 
 function assertDossierPourResponsable(req, dossier) {
-  if (req.user.role === 'admin') return true;
+  if (req.user.role === 'admin' || req.user.role === 'directeur') return true;
   return dossierAppartientAEtablissement(dossier, req.user.etablissement_id);
 }
 
@@ -172,7 +172,7 @@ function demandeAppartientAEtablissement(demande, etabId, formationIds) {
 }
 
 function assertDemandePourResponsable(req, demande) {
-  if (req.user.role === 'admin') return true;
+  if (req.user.role === 'admin' || req.user.role === 'directeur') return true;
   const fIds = getEtabFormationIds(req) || [];
   return demandeAppartientAEtablissement(demande, req.user.etablissement_id, fIds);
 }
@@ -228,7 +228,7 @@ router.get('/dossiers', (req, res) => {
 
 router.get('/statistiques', (req, res) => {
   const formationIds = getEtabFormationIds(req);
-  const etabId = req.user.role !== 'admin' ? req.user.etablissement_id : null;
+  const etabId = req.user.role === 'admin' || req.user.role === 'directeur' ? null : req.user.etablissement_id;
 
   let dossiers = db.get('dossiers').value();
   if (formationIds !== null) {

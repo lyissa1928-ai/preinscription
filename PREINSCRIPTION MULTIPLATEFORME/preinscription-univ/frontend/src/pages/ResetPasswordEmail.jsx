@@ -46,7 +46,7 @@ export default function ResetPasswordEmail() {
         role === 'admin'
           ? '/admin'
           : role === 'directeur'
-            ? '/directeur'
+            ? '/admin'
             : role === 'controleur_qualite'
               ? '/qualite'
               : ['responsable', 'agent_admin', 'comptable'].includes(role)

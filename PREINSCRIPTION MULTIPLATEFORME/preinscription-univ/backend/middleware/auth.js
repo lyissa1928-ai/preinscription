@@ -52,13 +52,16 @@ const roleGuard = (...roles) => (req, res, next) => {
 
 // ─── Gardes prédéfinis ────────────────────────────────────────────────────────
 const adminOnly        = roleGuard('admin');
+/** Comme l’admin sur la structure pédagogique / établissements ; la gestion des comptes utilisateurs reste adminOnly. */
+const adminOrDirecteur = roleGuard('admin', 'directeur');
 const responsableOnly  = roleGuard('responsable');
 const agentAdminOnly   = roleGuard('agent_admin');
 const comptableOnly    = roleGuard('comptable');
 const directeurOnly    = roleGuard('directeur');
 const controleurQualiteOnly = roleGuard('controleur_qualite');
 
-const responsableOrAdmin = roleGuard('responsable', 'admin');
+/** Inclut le directeur (pouvoirs alignés sur l’admin hors création de comptes). */
+const responsableOrAdmin = roleGuard('responsable', 'admin', 'directeur');
 /** Validation demande facture proforma : pédagogique, finance, qualité, direction, admin établ. / plateforme */
 const staffProformaDecision = roleGuard(
   'admin',
@@ -77,17 +80,17 @@ const staffLettreAttestation = roleGuard(
   'directeur',
   'controleur_qualite'
 );
-const agentAdminOrAdmin  = roleGuard('agent_admin', 'admin');
-const comptableOrAdmin   = roleGuard('comptable', 'admin');
+const agentAdminOrAdmin  = roleGuard('agent_admin', 'admin', 'directeur');
+const comptableOrAdmin   = roleGuard('comptable', 'admin', 'directeur');
 const directeurOrAdmin   = roleGuard('directeur', 'admin');
-const controleurQualiteOrAdmin = roleGuard('controleur_qualite', 'admin');
+const controleurQualiteOrAdmin = roleGuard('controleur_qualite', 'admin', 'directeur');
 
 // Tout membre du staff (non étudiant)
 const staffOnly = roleGuard('admin', 'responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite');
 
 module.exports = {
   authMiddleware,
-  adminOnly, responsableOnly, agentAdminOnly, comptableOnly, directeurOnly, controleurQualiteOnly,
+  adminOnly, adminOrDirecteur, responsableOnly, agentAdminOnly, comptableOnly, directeurOnly, controleurQualiteOnly,
   responsableOrAdmin, staffProformaDecision, staffLettreAttestation, agentAdminOrAdmin, comptableOrAdmin, directeurOrAdmin,
   controleurQualiteOrAdmin,
   staffOnly

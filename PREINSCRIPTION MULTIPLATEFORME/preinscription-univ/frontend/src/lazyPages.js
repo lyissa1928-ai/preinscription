@@ -28,7 +28,6 @@ export const ResponsableDemandesProforma = lazy(() => import('./pages/responsabl
 export const AgentAdminDashboard = lazy(() => import('./pages/agent-admin/AgentAdminDashboard'))
 export const AgentAdminDossier = lazy(() => import('./pages/agent-admin/AgentAdminDossier'))
 export const ComptableDashboard = lazy(() => import('./pages/comptable/ComptableDashboard'))
-export const DirecteurDashboard = lazy(() => import('./pages/directeur/DirecteurDashboard'))
 export const QualiteDashboard = lazy(() => import('./pages/qualite/QualiteDashboard'))
 export const PublicFactureView = lazy(() => import('./pages/PublicFactureView'))
 export const PublicProformaPage = lazy(() => import('./pages/PublicProformaPage'))

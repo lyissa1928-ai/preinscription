@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
-const { authMiddleware, adminOnly } = require('../middleware/auth');
+const { authMiddleware, adminOrDirecteur } = require('../middleware/auth');
 const { evaluateSanteFiliereEligibility } = require('../utils/santeEligibility');
 
 /** Dossiers qui comptent pour l’occupation « indicative » des places catalogue. */
@@ -127,8 +127,8 @@ router.get('/:id', (req, res) => {
   res.json(out);
 });
 
-// POST /api/formations - Admin uniquement
-router.post('/', authMiddleware, adminOnly, (req, res) => {
+// POST /api/formations - Admin ou directeur
+router.post('/', authMiddleware, adminOrDirecteur, (req, res) => {
   const { titre, type, description, prix, frais_inscription, duree, ville, niveau_requis, places } = req.body;
   if (!titre || !type || !prix) return res.status(400).json({ message: 'Champs obligatoires manquants' });
   const id = db.nextId('formations');
