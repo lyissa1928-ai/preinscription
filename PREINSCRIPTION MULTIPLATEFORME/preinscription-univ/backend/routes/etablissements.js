@@ -757,15 +757,14 @@ router.get('/:id', (req, res) => {
     ? db.get('utilisateurs').find({ id: etab.responsable_id }).pick(['id', 'prenom', 'nom', 'email', 'role']).value()
     : null;
 
-  const noUserScope = req.user.role === 'directeur';
   res.json({
     ...etab,
     logo_url: publicAssetUrl(req, etab.logo_url),
     cachet_url: publicAssetUrl(req, etab.cachet_url),
     filieres,
     formations,
-    membres: noUserScope ? [] : membres,
-    responsable: noUserScope ? null : responsable,
+    membres,
+    responsable,
   });
 });
 
@@ -797,8 +796,8 @@ router.delete('/:id', adminOrDirecteur, (req, res) => {
   res.json({ message: 'Établissement désactivé.' });
 });
 
-// PUT /api/etablissements/:id/responsable — désigner un responsable (comptes utilisateurs → admin uniquement)
-router.put('/:id/responsable', adminOnly, (req, res) => {
+// PUT /api/etablissements/:id/responsable — désigner un responsable (admin ou directeur)
+router.put('/:id/responsable', adminOrDirecteur, (req, res) => {
   const id = parseInt(req.params.id);
   const { utilisateur_id } = req.body;
   const etab = db.get('etablissements').find({ id }).value();
@@ -1435,8 +1434,8 @@ router.delete('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
 //  MEMBRES (utilisateurs rattachés à un établissement)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// GET /api/etablissements/:id/membres (admin uniquement)
-router.get('/:id/membres', adminOnly, (req, res) => {
+// GET /api/etablissements/:id/membres (admin ou directeur)
+router.get('/:id/membres', adminOrDirecteur, (req, res) => {
   const etablissement_id = parseInt(req.params.id);
   const membres = db.get('utilisateurs')
     .filter((u) => u.etablissement_id === etablissement_id && isEtabStaffMember(u))
@@ -1533,8 +1532,8 @@ router.post('/:id/membres', adminOnly, (req, res) => {
   });
 });
 
-// PUT /api/etablissements/:etabId/membres/:id — modifier (admin uniquement)
-router.put('/:etabId/membres/:id', adminOnly, (req, res) => {
+// PUT /api/etablissements/:etabId/membres/:id — modifier (admin ou directeur)
+router.put('/:etabId/membres/:id', adminOrDirecteur, (req, res) => {
   const etabId = parseInt(req.params.etabId, 10);
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(etabId) || Number.isNaN(id)) {
@@ -1613,8 +1612,8 @@ router.put('/:etabId/membres/:id', adminOnly, (req, res) => {
   });
 });
 
-// DELETE /api/etablissements/:etabId/membres/:id — désactiver (soft) (admin uniquement)
-router.delete('/:etabId/membres/:id', adminOnly, (req, res) => {
+// DELETE /api/etablissements/:etabId/membres/:id — désactiver (soft) (admin ou directeur)
+router.delete('/:etabId/membres/:id', adminOrDirecteur, (req, res) => {
   const etabId = parseInt(req.params.etabId, 10);
   const id = parseInt(req.params.id, 10);
   const user = db.get('utilisateurs').find({ id }).value();

@@ -113,7 +113,7 @@ const MENUS = {
     { label: 'Factures dossiers', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
     { label: 'Finance', to: '/comptable', icon: ICONS.finance, exact: true },
   ],
-  /** Même périmètre que l’admin (hors utilisateurs) ; entrée principale = tableau de bord, pas « Mon établissement ». */
+  /** Même périmètre que l’admin, sauf création / suppression définitive de comptes. */
   directeur: [
     { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
     {
@@ -130,6 +130,7 @@ const MENUS = {
       isActive: (loc) => loc.pathname === '/admin' && new URLSearchParams(loc.search).get('tab') === 'conditions',
     },
     { label: 'Établissements', to: '/admin/etablissements', icon: ICONS.etablissements },
+    { label: 'Utilisateurs', to: '/admin/utilisateurs', icon: ICONS.users },
     { label: 'Demandes proforma', to: '/admin/proforma', icon: ICONS.demandesListe },
     { label: 'Factures par établissement', to: '/admin/factures-etablissement', icon: ICONS.finance },
     { label: 'Journal d’audit', to: '/admin/audit-logs', icon: ICONS.audit },

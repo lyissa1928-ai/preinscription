@@ -1754,6 +1754,9 @@ const EMPTY_EDIT_FORM = {
 }
 
 function TabMembres({ etabId, membres: init, responsable_id }) {
+  const { user } = useAuth()
+  const canCreateStaffAccount = user?.role === 'admin'
+  const canDeleteStaffPermanently = user?.role === 'admin'
   const [membres, setMembres] = useState(init || [])
   const [q, setQ] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -1922,14 +1925,16 @@ function TabMembres({ etabId, membres: init, responsable_id }) {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => { setShowForm(true); setForm(EMPTY_MEMBRE_FORM) }}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-900/40 transition hover:brightness-110 active:scale-[0.98]"
-          >
-            <FaPlus className="h-4 w-4" aria-hidden />
-            Ajouter un membre
-          </button>
+          {canCreateStaffAccount && (
+            <button
+              type="button"
+              onClick={() => { setShowForm(true); setForm(EMPTY_MEMBRE_FORM) }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-900/40 transition hover:brightness-110 active:scale-[0.98]"
+            >
+              <FaPlus className="h-4 w-4" aria-hidden />
+              Ajouter un membre
+            </button>
+          )}
         </div>
       </div>
 
@@ -2030,15 +2035,17 @@ function TabMembres({ etabId, membres: init, responsable_id }) {
                     Réactiver
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => { setPermanentFor(m); setConfirmEmail('') }}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-800"
-                  title="Suppression irréversible"
-                >
-                  <FaTrashAlt className="h-3.5 w-3.5" aria-hidden />
-                  Supprimer
-                </button>
+                {canDeleteStaffPermanently && (
+                  <button
+                    type="button"
+                    onClick={() => { setPermanentFor(m); setConfirmEmail('') }}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-800"
+                    title="Suppression irréversible"
+                  >
+                    <FaTrashAlt className="h-3.5 w-3.5" aria-hidden />
+                    Supprimer
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -2283,8 +2290,8 @@ const TABS_ALL = [
   { id: 'formations', label: 'Formations', Icon: FaGraduationCap },
   { id: 'acceptes', label: 'Acceptés', Icon: FaCheckCircle },
   { id: 'factures', label: 'Factures', Icon: FaFileInvoice },
-  { id: 'membres', label: 'Membres', Icon: FaUsers, adminOnly: true },
-  { id: 'responsable', label: 'Responsable', Icon: FaUserTie, adminOnly: true },
+  { id: 'membres', label: 'Membres', Icon: FaUsers },
+  { id: 'responsable', label: 'Responsable', Icon: FaUserTie },
 ]
 
 export default function AdminEtablissementDetail() {
@@ -2293,15 +2300,7 @@ export default function AdminEtablissementDetail() {
   const [etab, setEtab] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('identite')
-  const tabsVisible = useMemo(
-    () => TABS_ALL.filter((t) => !t.adminOnly || user?.role === 'admin'),
-    [user?.role],
-  )
-
-  useEffect(() => {
-    if (user?.role !== 'directeur') return
-    if (tab === 'membres' || tab === 'responsable') setTab('identite')
-  }, [user?.role, tab])
+  const tabsVisible = TABS_ALL
 
   const kpi = useMemo(() => {
     if (!etab) return { filieres: 0, formations: 0, membres: 0 }
@@ -2406,7 +2405,7 @@ export default function AdminEtablissementDetail() {
               {[
                 { label: 'Filières', value: kpi.filieres, Icon: FaBook },
                 { label: 'Formations', value: kpi.formations, Icon: FaGraduationCap },
-                ...(user?.role === 'admin' ? [{ label: 'Membres', value: kpi.membres, Icon: FaUsers }] : []),
+                ...(['admin', 'directeur'].includes(user?.role) ? [{ label: 'Membres', value: kpi.membres, Icon: FaUsers }] : []),
               ].map(({ label, value, Icon }) => (
                 <div
                   key={label}

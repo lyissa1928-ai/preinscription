@@ -18,6 +18,7 @@ const NAV_LINKS = {
   comptable: [{ to: '/comptable', label: 'Finance & Comptabilité' }],
   directeur: [
     { to: '/admin', label: 'Administration' },
+    { to: '/admin/utilisateurs', label: 'Utilisateurs' },
     { to: '/responsable', label: 'Pédagogie' },
     { to: '/agent-admin', label: 'Contrôle admin' },
     { to: '/comptable', label: 'Finance' },
