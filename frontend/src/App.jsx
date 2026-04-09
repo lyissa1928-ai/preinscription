@@ -178,7 +178,7 @@ function AppRoutes() {
         {/* Admin */}
         <Route path="/admin" element={<PrivateRoute roles={['admin', 'directeur']}><AdminDashboard /></PrivateRoute>} />
         <Route path="/admin/dossier/:id" element={<PrivateRoute roles={['admin', 'directeur']}><AdminDossier /></PrivateRoute>} />
-        <Route path="/admin/utilisateurs" element={<PrivateRoute roles={['admin']}><AdminUsers /></PrivateRoute>} />
+        <Route path="/admin/utilisateurs" element={<PrivateRoute roles={['admin', 'directeur']}><AdminUsers /></PrivateRoute>} />
         <Route path="/admin/etablissements" element={<PrivateRoute roles={['admin', 'directeur']}><AdminEtablissements /></PrivateRoute>} />
         <Route path="/admin/etablissements/:id" element={<PrivateRoute roles={['admin', 'directeur']}><AdminEtablissementDetail /></PrivateRoute>} />
         <Route path="/admin/proforma" element={<PrivateRoute roles={['admin', 'directeur']}><AdminProforma /></PrivateRoute>} />

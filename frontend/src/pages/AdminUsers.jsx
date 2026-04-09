@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const ROLES_STAFF = [
   { val: 'responsable', label: 'Responsable pédagogique' },
@@ -44,6 +45,8 @@ function normMat(m) {
 }
 
 export default function AdminUsers() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [users, setUsers] = useState([])
   const [etablissements, setEtablissements] = useState([])
   const [filtreRole, setFiltreRole] = useState('staff')
@@ -314,10 +317,17 @@ export default function AdminUsers() {
             <Link to="/admin" className="text-sm text-gray-400 hover:text-blue-700">← Administration</Link>
             <h1 className="text-3xl font-bold text-gray-800 mt-1">Gestion des utilisateurs</h1>
             <p className="text-gray-500 mt-0.5">{pagination.total} compte{pagination.total !== 1 ? 's' : ''} · {etablissements.length} établissement{etablissements.length !== 1 ? 's' : ''}</p>
+            {!isAdmin && (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2 max-w-xl">
+                En tant que directeur : vous pouvez consulter, modifier, désactiver ou réactiver des comptes. La <strong>création</strong> de comptes et la <strong>suppression définitive</strong> sont réservées à l’administrateur.
+              </p>
+            )}
           </div>
-          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
-            + Créer un compte staff
-          </button>
+          {isAdmin && (
+            <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+              + Créer un compte staff
+            </button>
+          )}
         </div>
 
         {/* Barre de filtres */}
@@ -376,10 +386,12 @@ export default function AdminUsers() {
                 className="text-xs font-bold px-3 py-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg transition-colors">
                 ✅ Réactiver tout
               </button>
-              <button onClick={() => { setBulkPhrase(''); setBulkAction('supprimer') }}
-                className="text-xs font-bold px-3 py-1.5 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg transition-colors">
-                🗑 Supprimer tout
-              </button>
+              {isAdmin && (
+                <button onClick={() => { setBulkPhrase(''); setBulkAction('supprimer') }}
+                  className="text-xs font-bold px-3 py-1.5 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg transition-colors">
+                  🗑 Supprimer tout
+                </button>
+              )}
             </div>
             <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-blue-500 hover:text-blue-700">
               Annuler
@@ -434,6 +446,7 @@ export default function AdminUsers() {
                     onToggleActif={handleToggleActif}
                     onDelete={confirmDelete}
                     onResetPassword={handleResetPassword}
+                    canDeletePermanently={isAdmin}
                   />
                 </div>
               )
@@ -452,6 +465,7 @@ export default function AdminUsers() {
               onToggleActif={handleToggleActif}
               onDelete={confirmDelete}
               onResetPassword={handleResetPassword}
+              canDeletePermanently={isAdmin}
             />
           </div>
         )}
@@ -748,7 +762,7 @@ export default function AdminUsers() {
 /* Sous-composants                                                            */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-function UserTable({ users, selected, allSelected, onToggleAll, onToggleOne, onEdit, onToggleActif, onDelete, onResetPassword }) {
+function UserTable({ users, selected, allSelected, onToggleAll, onToggleOne, onEdit, onToggleActif, onDelete, onResetPassword, canDeletePermanently = true }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -821,10 +835,12 @@ function UserTable({ users, selected, allSelected, onToggleAll, onToggleOne, onE
                         ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                     </button>
-                    <button onClick={() => onDelete(u)} title="Supprimer définitivement"
-                      className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
+                    {canDeletePermanently && (
+                      <button onClick={() => onDelete(u)} title="Supprimer définitivement"
+                        className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
                   </div>
                 )}
               </td>

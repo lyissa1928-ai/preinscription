@@ -149,17 +149,16 @@ export default function AdminDashboard() {
     },
     {
       label: 'Utilisateurs',
-      desc:  'Gérer les comptes étudiants et le personnel',
+      desc:  'Consulter et gérer les comptes (création et suppression définitive : administrateur uniquement)',
       to:    '/admin/utilisateurs',
       icon:  ICO.users,
       color: 'from-orange-500 to-rose-600',
       bg:    'bg-orange-50/80',
       text:  'text-orange-900',
       ring:  'group-hover:ring-orange-200/80',
-      adminOnly: true,
     },
   ]
-  const shortcuts = shortcutsAll.filter((s) => !s.adminOnly || user?.role === 'admin')
+  const shortcuts = shortcutsAll
 
   const statItems = [
     { icon: ICO.dossiers, gradient: 'blue', label: 'Total dossiers', value: stats?.dossiers?.total },
@@ -175,7 +174,7 @@ export default function AdminDashboard() {
         title="Tableau de bord"
         subtitle={
           user?.role === 'directeur'
-            ? 'Vue d’ensemble : établissements, filières, formations et tarifs — sans gestion des comptes utilisateurs.'
+            ? 'Vue d’ensemble comme l’administrateur : sauf création de comptes et suppression définitive des utilisateurs.'
             : 'Vue d’ensemble de la plateforme, indicateurs clés et accès rapide aux modules de gestion.'
         }
       />

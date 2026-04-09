@@ -20,8 +20,12 @@ const { proformaDemandeDecision } = require('../services/proformaDemandeDecision
 router.use(authMiddleware);
 router.use((req, res, next) => {
   const path = (req.path || '').split('?')[0];
-  // Gestion des comptes utilisateurs : réservée à l’administrateur (le directeur n’a aucune prérogative utilisateur).
-  if (path === '/utilisateurs' || path.startsWith('/utilisateurs/')) {
+  // Création de compte staff : admin uniquement.
+  if (req.method === 'POST' && path === '/utilisateurs') {
+    return adminOnly(req, res, next);
+  }
+  // Suppression définitive d’un compte : admin uniquement (le directeur peut désactiver / éditer / réinitialiser le MDP).
+  if (req.method === 'DELETE' && /\/utilisateurs\/\d+\/supprimer$/.test(path)) {
     return adminOnly(req, res, next);
   }
   return adminOrDirecteur(req, res, next);
@@ -464,6 +468,9 @@ router.post('/utilisateurs/bulk-action', adminSensitiveLimiter, (req, res) => {
   }
 
   if (action === 'supprimer') {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'La suppression définitive de comptes est réservée à l’administrateur.' });
+    }
     const expected = `SUPPRIMER ${ids.length} COMPTE${ids.length > 1 ? 'S' : ''}`;
     if (String(confirmation_bulk || '').trim().toUpperCase() !== expected) {
       return res.status(400).json({
