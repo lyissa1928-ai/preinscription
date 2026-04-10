@@ -21,8 +21,11 @@ const authMiddleware = (req, res, next) => {
     if (!dbUser || dbUser.actif === false) {
       return res.status(401).json({ message: 'Compte introuvable ou désactivé' });
     }
+    // Rôle et rattachement viennent toujours de la DB (migration rôle, changement côté admin, etc.) —
+    // le JWT peut être obsolète et provoquer des 403 alors que /api/auth/me affiche déjà le bon profil.
     req.user = {
       ...decoded,
+      role: dbUser.role,
       etablissement_id: dbUser.etablissement_id || null,
     };
 
