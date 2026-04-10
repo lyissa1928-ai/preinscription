@@ -26,7 +26,6 @@ const ROLE_LABELS = {
   responsable: 'Pédagogie',
   agent_admin: 'Services',
   comptable: 'Comptabilité',
-  directeur: 'Direction',
   controleur_qualite: 'Qualité',
 }
 

@@ -23,7 +23,7 @@ function normalizeForEditor(raw) {
 }
 
 /**
- * Plusieurs blocs de conditions d’admission (HTML riche) par établissement — responsable / directeur / admin.
+ * Plusieurs blocs de conditions d’admission (HTML riche) par établissement — responsable / admin.
  */
 export default function TabConditionsAdmissionEtab({ etabId, etabNom }) {
   const [conditions, setConditions] = useState([])

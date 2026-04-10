@@ -1,13 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
+
+/** Admins actifs, en excluant certains ids (ex. suppressions / désactivations en cours). */
+function activeAdminCountExcluding(excludeIds = []) {
+  const ex = new Set((excludeIds || []).map((x) => parseInt(String(x), 10)));
+  return (db.get('utilisateurs').value() || []).filter(
+    (u) => u && u.role === 'admin' && u.actif !== false && !ex.has(u.id),
+  ).length;
+}
 const bcrypt = require('bcryptjs');
-const { authMiddleware, adminOnly, adminOrDirecteur } = require('../middleware/auth');
+const { authMiddleware, adminOnly } = require('../middleware/auth');
 const {
   normalizeMatricule, isValidMatriculeFormat, matriculeTaken,
   normalizeTelephoneForUniqueness, telephoneTaken,
 } = require('../utils/userIdentity');
-const { generateNextMatriculeForEtablissement, generateNextMatriculeDirecteur } = require('../utils/matriculeGenerator');
+const { generateNextMatriculeForEtablissement, generateNextMatriculeGlobalAdmin } = require('../utils/matriculeGenerator');
 const { createBackup, DB_PATH, BACKUP_DIR } = require('../utils/dbBackup');
 const { logAudit } = require('../utils/auditLog');
 const { DOSSIER_STATUSES, canTransitionDossierStatus, requiresRejectionComment } = require('../utils/dossierWorkflow');
@@ -24,11 +32,11 @@ router.use((req, res, next) => {
   if (req.method === 'POST' && path === '/utilisateurs') {
     return adminOnly(req, res, next);
   }
-  // Suppression définitive d’un compte : admin uniquement (le directeur peut désactiver / éditer / réinitialiser le MDP).
+  // Suppression définitive d’un compte : réservée aux administrateurs (via routes sensibles).
   if (req.method === 'DELETE' && /\/utilisateurs\/\d+\/supprimer$/.test(path)) {
     return adminOnly(req, res, next);
   }
-  return adminOrDirecteur(req, res, next);
+  return adminOnly(req, res, next);
 });
 const adminSensitiveLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -397,7 +405,7 @@ router.post('/demandes-proforma/delete-batch', adminSensitiveLimiter, (req, res)
 router.get('/utilisateurs', (req, res) => {
   const { role = 'all', page, limit, search = '', etablissement_id = '' } = req.query;
   const dossiers = db.get('dossiers').value();
-  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite'];
+  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
 
   let utilisateurs = db.get('utilisateurs').value();
   if (role === 'etudiant') {
@@ -462,14 +470,13 @@ router.post('/utilisateurs/bulk-action', adminSensitiveLimiter, (req, res) => {
 
   const utilisateurs = db.get('utilisateurs').value();
   const targets = ids.map(id => utilisateurs.find(u => u.id === parseInt(id))).filter(Boolean);
-  const admins = targets.filter(u => u.role === 'admin');
-  if (admins.length > 0) {
-    return res.status(403).json({ message: 'Impossible d\'agir sur un compte administrateur.' });
-  }
+  const targetIds = targets.map((t) => t.id);
 
   if (action === 'supprimer') {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'La suppression définitive de comptes est réservée à l’administrateur.' });
+    if (activeAdminCountExcluding(targetIds) < 1) {
+      return res.status(403).json({
+        message: 'Impossible de supprimer : il doit rester au moins un administrateur actif sur la plateforme.',
+      });
     }
     const expected = `SUPPRIMER ${ids.length} COMPTE${ids.length > 1 ? 'S' : ''}`;
     if (String(confirmation_bulk || '').trim().toUpperCase() !== expected) {
@@ -479,6 +486,15 @@ router.post('/utilisateurs/bulk-action', adminSensitiveLimiter, (req, res) => {
     }
     ids.forEach(id => db.get('utilisateurs').remove({ id: parseInt(id) }).write());
     return res.json({ message: `${ids.length} compte(s) supprimé(s) définitivement.` });
+  }
+
+  if (action === 'desactiver') {
+    const wouldDisableAdmins = targets.filter((t) => t.role === 'admin' && t.actif !== false);
+    if (wouldDisableAdmins.length > 0 && activeAdminCountExcluding(wouldDisableAdmins.map((t) => t.id)) < 1) {
+      return res.status(403).json({
+        message: 'Impossible de désactiver : il doit rester au moins un administrateur actif.',
+      });
+    }
   }
 
   const update = action === 'desactiver'
@@ -494,12 +510,6 @@ router.post('/utilisateurs/:id/reinitialiser-mot-de-passe', adminSensitiveLimite
   const id = parseInt(req.params.id, 10);
   const target = db.get('utilisateurs').find({ id }).value();
   if (!target) return res.status(404).json({ message: 'Utilisateur introuvable.' });
-  if (target.role === 'admin') {
-    return res.status(403).json({
-      message: 'Impossible de réinitialiser le mot de passe d’un compte administrateur.',
-    });
-  }
-
   const plain = generateTempPassword(14);
   const hash = bcrypt.hashSync(plain, 10);
   db.get('utilisateurs').find({ id }).assign({
@@ -532,7 +542,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     prenom, nom, email, mot_de_passe, mot_de_passe_confirmation,
     role, etablissement_id, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_STAFF = ['responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite'];
+  const ROLES_STAFF = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
 
   if (!prenom || !nom || !email || !mot_de_passe || !role || !telephone) {
     return res.status(400).json({
@@ -546,10 +556,10 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     return res.status(400).json({ message: 'Rôle invalide.' });
   }
 
-  const isDirecteurGlobal = role === 'directeur';
+  const isAdminGlobal = role === 'admin';
   let etabIdForUser = null;
   let etab = null;
-  if (!isDirecteurGlobal) {
+  if (!isAdminGlobal) {
     if (!etablissement_id) {
       return res.status(400).json({ message: 'L\'établissement est obligatoire pour ce rôle staff.' });
     }
@@ -566,8 +576,8 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   if (mot_de_passe.length < 6) {
     return res.status(400).json({ message: 'Mot de passe trop court (min 6 caractères).' });
   }
-  const gen = isDirecteurGlobal
-    ? generateNextMatriculeDirecteur()
+  const gen = isAdminGlobal
+    ? generateNextMatriculeGlobalAdmin()
     : generateNextMatriculeForEtablissement(etabIdForUser);
   if (gen.error) return res.status(400).json({ message: gen.error });
   const matNorm = normalizeMatricule(gen.matricule);
@@ -599,7 +609,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     adresse: adresse ? String(adresse).trim() : '',
     mot_de_passe: hash,
     role,
-    etablissement_id: isDirecteurGlobal ? null : etabIdForUser,
+    etablissement_id: isAdminGlobal ? null : etabIdForUser,
     actif: true,
     must_change_password: true,
     login_attempts: 0,
@@ -623,15 +633,11 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
   const user = db.get('utilisateurs').find({ id }).value();
   if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
 
-  if (user.role === 'admin' && id === 1) {
-    return res.status(403).json({ message: 'Impossible de modifier le compte administrateur principal.' });
-  }
-
   const {
     nom, prenom, email, role, actif, etablissement_id, mot_de_passe,
     matricule, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_VALIDES = ['responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite', 'etudiant'];
+  const ROLES_VALIDES = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'etudiant'];
   const update = { updated_at: new Date().toISOString(), updated_by: req.user.id };
   let matriculeRegenerated = false;
 
@@ -660,33 +666,47 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
   }
   if (role !== undefined) {
     if (!ROLES_VALIDES.includes(role)) return res.status(400).json({ message: 'Rôle invalide.' });
-    update.role = role;
-    if (role === 'directeur') {
+    const nextRole = role;
+    if (user.role === 'admin' && nextRole !== 'admin') {
+      if (activeAdminCountExcluding([id]) < 1) {
+        return res.status(403).json({
+          message: 'Impossible de retirer le rôle administrateur : il doit rester au moins un autre administrateur actif.',
+        });
+      }
+    }
+    update.role = nextRole;
+    if (nextRole === 'admin') {
       update.etablissement_id = null;
-      const needDirMat =
-        user.role !== 'directeur' || user.etablissement_id != null;
-      if (needDirMat) {
-        const gen = generateNextMatriculeDirecteur();
+      const needGlobalMat = user.role !== 'admin' || user.etablissement_id != null;
+      if (needGlobalMat) {
+        const gen = generateNextMatriculeGlobalAdmin();
         if (gen.error) return res.status(400).json({ message: gen.error });
         update.matricule = normalizeMatricule(gen.matricule);
         matriculeRegenerated = true;
       }
     }
     if (
-      role !== undefined &&
-      role !== 'directeur' &&
-      ['responsable', 'agent_admin', 'comptable'].includes(role) &&
-      user.role === 'directeur' &&
+      nextRole !== 'admin' &&
+      ['responsable', 'agent_admin', 'comptable'].includes(nextRole) &&
+      user.role === 'admin' &&
       etablissement_id === undefined
     ) {
       return res.status(400).json({
-        message: 'Pour quitter le rôle directeur, indiquez l’établissement de rattachement.',
+        message: 'Pour quitter le rôle administrateur, indiquez l’établissement de rattachement.',
       });
     }
   }
   if (actif !== undefined) update.actif = !!actif;
   const effectiveRoleAfter = update.role !== undefined ? update.role : user.role;
-  if (etablissement_id !== undefined && effectiveRoleAfter !== 'directeur') {
+  const effectiveActifAfter = update.actif !== undefined ? update.actif : user.actif !== false;
+  if (
+    effectiveActifAfter === false &&
+    effectiveRoleAfter === 'admin' &&
+    activeAdminCountExcluding([id]) < 1
+  ) {
+    return res.status(403).json({ message: 'Impossible de désactiver le dernier administrateur actif.' });
+  }
+  if (etablissement_id !== undefined && effectiveRoleAfter !== 'admin') {
     if (etablissement_id) {
       const newEid = parseInt(etablissement_id, 10);
       const etab = db.get('etablissements').find({ id: newEid }).value();
@@ -707,9 +727,9 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
       update.etablissement_id = null;
     }
   }
-  if (etablissement_id !== undefined && effectiveRoleAfter === 'directeur' && etablissement_id) {
+  if (etablissement_id !== undefined && effectiveRoleAfter === 'admin' && etablissement_id) {
     return res.status(400).json({
-      message: 'Un directeur de supervision globale n\'est pas rattaché à un établissement.',
+      message: 'Un administrateur global n\'est pas rattaché à un établissement.',
     });
   }
   if (matricule !== undefined && !matriculeRegenerated) {
@@ -737,7 +757,9 @@ router.delete('/utilisateurs/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const user = db.get('utilisateurs').find({ id }).value();
   if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
-  if (user.role === 'admin') return res.status(403).json({ message: 'Impossible de désactiver un administrateur.' });
+  if (user.role === 'admin' && activeAdminCountExcluding([id]) < 1) {
+    return res.status(403).json({ message: 'Impossible de désactiver le dernier administrateur actif.' });
+  }
 
   db.get('utilisateurs').find({ id }).assign({ actif: false, deleted_at: new Date().toISOString() }).write();
   res.json({ message: 'Compte désactivé.' });
@@ -748,7 +770,9 @@ router.delete('/utilisateurs/:id/supprimer', adminSensitiveLimiter, (req, res) =
   const id = parseInt(req.params.id);
   const user = db.get('utilisateurs').find({ id }).value();
   if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
-  if (user.role === 'admin') return res.status(403).json({ message: 'Impossible de supprimer un administrateur.' });
+  if (user.role === 'admin' && activeAdminCountExcluding([id]) < 1) {
+    return res.status(403).json({ message: 'Impossible de supprimer le dernier administrateur actif.' });
+  }
 
   const confirmation_matricule = req.body?.confirmation_matricule ?? req.query?.confirmation_matricule;
   const confirmation_email = req.body?.confirmation_email ?? req.query?.confirmation_email;
@@ -784,7 +808,7 @@ router.get('/statistiques-globales', (req, res) => {
   const dossiers = db.get('dossiers').value();
   const utilisateurs = db.get('utilisateurs').value();
   const demandes = db.get('demandes_proforma').value();
-  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite'];
+  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
 
   const parRole = {};
   STAFF_ROLES.forEach(r => { parRole[r] = utilisateurs.filter(u => u.role === r).length; });

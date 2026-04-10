@@ -32,9 +32,7 @@ export default function VerifyEmail() {
         const dest =
           role === 'admin'
             ? '/admin'
-            : role === 'directeur'
-              ? '/admin'
-              : role === 'controleur_qualite'
+            : role === 'controleur_qualite'
                 ? '/qualite'
                 : ['responsable', 'agent_admin', 'comptable'].includes(role)
                   ? '/mon-etablissement'

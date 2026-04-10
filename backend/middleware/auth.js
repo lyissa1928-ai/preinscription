@@ -52,45 +52,38 @@ const roleGuard = (...roles) => (req, res, next) => {
 
 // ─── Gardes prédéfinis ────────────────────────────────────────────────────────
 const adminOnly        = roleGuard('admin');
-/** Comme l’admin sur la structure pédagogique / établissements ; la gestion des comptes utilisateurs reste adminOnly. */
-const adminOrDirecteur = roleGuard('admin', 'directeur');
+/** Alias historique : accès réservé aux administrateurs. */
+const adminOrDirecteur = adminOnly;
 const responsableOnly  = roleGuard('responsable');
 const agentAdminOnly   = roleGuard('agent_admin');
 const comptableOnly    = roleGuard('comptable');
-const directeurOnly    = roleGuard('directeur');
 const controleurQualiteOnly = roleGuard('controleur_qualite');
 
-/** Inclut le directeur (pouvoirs alignés sur l’admin hors création de comptes). */
-const responsableOrAdmin = roleGuard('responsable', 'admin', 'directeur');
-/** Validation demande facture proforma : pédagogique, finance, qualité, direction, admin établ. / plateforme */
+const responsableOrAdmin = roleGuard('responsable', 'admin');
 const staffProformaDecision = roleGuard(
   'admin',
   'responsable',
-  'directeur',
   'agent_admin',
   'comptable',
   'controleur_qualite'
 );
-/** Lecture lettre / attestation (même périmètre établissement que la facture dossier) */
 const staffLettreAttestation = roleGuard(
   'admin',
   'responsable',
   'agent_admin',
   'comptable',
-  'directeur',
   'controleur_qualite'
 );
-const agentAdminOrAdmin  = roleGuard('agent_admin', 'admin', 'directeur');
-const comptableOrAdmin   = roleGuard('comptable', 'admin', 'directeur');
-const directeurOrAdmin   = roleGuard('directeur', 'admin');
-const controleurQualiteOrAdmin = roleGuard('controleur_qualite', 'admin', 'directeur');
+const agentAdminOrAdmin  = roleGuard('agent_admin', 'admin');
+const comptableOrAdmin   = roleGuard('comptable', 'admin');
+const directeurOrAdmin   = adminOnly;
+const controleurQualiteOrAdmin = roleGuard('controleur_qualite', 'admin');
 
-// Tout membre du staff (non étudiant)
-const staffOnly = roleGuard('admin', 'responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite');
+const staffOnly = roleGuard('admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite');
 
 module.exports = {
   authMiddleware,
-  adminOnly, adminOrDirecteur, responsableOnly, agentAdminOnly, comptableOnly, directeurOnly, controleurQualiteOnly,
+  adminOnly, adminOrDirecteur, responsableOnly, agentAdminOnly, comptableOnly, controleurQualiteOnly,
   responsableOrAdmin, staffProformaDecision, staffLettreAttestation, agentAdminOrAdmin, comptableOrAdmin, directeurOrAdmin,
   controleurQualiteOrAdmin,
   staffOnly

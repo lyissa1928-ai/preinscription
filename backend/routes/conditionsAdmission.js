@@ -1,7 +1,7 @@
 /**
  * Conditions d’admission publiées par établissement : plusieurs blocs HTML par établissement.
- * Lecture publique ; écriture : responsable, directeur, admin.
- * Admin / directeur sans rattachement : préciser ?etablissement_id= sur /me (comme l’admin).
+ * Lecture publique ; écriture : responsable, admin.
+ * Admin sans rattachement : préciser ?etablissement_id= sur /me.
  */
 const express = require('express');
 const router = express.Router();
@@ -81,23 +81,8 @@ function resolveEtabId(req) {
       },
     };
   }
-  if (role === 'directeur') {
-    const q = parseInt(req.query.etablissement_id, 10);
-    if (Number.isFinite(q)) return { etablissement_id: q };
-    const fallback = req.user.etablissement_id;
-    if (fallback != null && Number.isFinite(Number(fallback))) {
-      return { etablissement_id: Number(fallback) };
-    }
-    return {
-      error: {
-        status: 400,
-        message:
-          'Indiquez l’établissement : paramètre ?etablissement_id= (comme pour l’administrateur) ou rattachez ce compte à un établissement.',
-      },
-    };
-  }
   if (role !== 'responsable') {
-    return { error: { status: 403, message: 'Accès réservé au responsable pédagogique ou au directeur.' } };
+    return { error: { status: 403, message: 'Accès réservé au responsable pédagogique ou à l’administrateur.' } };
   }
   const eid = req.user.etablissement_id;
   if (!eid) return { error: { status: 400, message: 'Aucun établissement associé au compte.' } };

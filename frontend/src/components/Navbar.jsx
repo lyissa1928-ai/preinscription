@@ -12,18 +12,11 @@ const NAV_LINKS = {
     { to: '/responsable', label: 'Pédagogie' },
     { to: '/agent-admin', label: 'Contrôle admin' },
     { to: '/comptable', label: 'Finance' },
+    { to: '/qualite', label: 'Qualité' },
   ],
   responsable: [{ to: '/responsable', label: 'Mes dossiers' }],
   agent_admin: [{ to: '/agent-admin', label: 'Contrôle dossiers' }],
   comptable: [{ to: '/comptable', label: 'Finance & Comptabilité' }],
-  directeur: [
-    { to: '/admin', label: 'Administration' },
-    { to: '/admin/utilisateurs', label: 'Utilisateurs' },
-    { to: '/responsable', label: 'Pédagogie' },
-    { to: '/agent-admin', label: 'Contrôle admin' },
-    { to: '/comptable', label: 'Finance' },
-    { to: '/qualite', label: 'Qualité' },
-  ],
   controleur_qualite: [
     { to: '/qualite', label: 'Qualité & conformité' },
     { to: '/mon-etablissement', label: 'Mon établissement' },
@@ -88,7 +81,6 @@ export default function Navbar() {
     responsable: 'bg-teal-600',
     agent_admin: 'bg-orange-500',
     comptable: 'bg-violet-600',
-    directeur: 'bg-blue-800',
     controleur_qualite: 'bg-cyan-700',
     etudiant: 'bg-blue-600',
   }
@@ -98,7 +90,6 @@ export default function Navbar() {
     responsable: 'Resp. Pédagogique',
     agent_admin: 'Agent Administratif',
     comptable: 'Comptable',
-    directeur: 'Directeur',
     controleur_qualite: 'Contrôleur qualité',
     etudiant: 'Étudiant',
   }

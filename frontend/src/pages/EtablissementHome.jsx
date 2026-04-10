@@ -16,7 +16,7 @@ const ROLE_LINKS = {
   responsable: { label: 'Traiter les dossiers',    path: '/responsable',  icon: '📋' },
   agent_admin:  { label: 'Contrôle administratif', path: '/agent-admin',   icon: '🗂️' },
   comptable:    { label: 'Finance & Facturation',   path: '/comptable',    icon: '💰' },
-  directeur:    { label: 'Administration',            path: '/admin',        icon: '👁️' },
+  admin:        { label: 'Administration',          path: '/admin',         icon: '👁️' },
   controleur_qualite: { label: 'Qualité & conformité', path: '/qualite', icon: '✅' },
 }
 
@@ -146,8 +146,8 @@ export default function EtablissementHome() {
     setSelectedFormationType(null)
   }, [filtreMode])
 
-  /** Directeur sans rattachement : ne pas afficher la page vide — tableau de bord unique. */
-  if (user?.role === 'directeur' && user?.etablissement_id == null) {
+  /** Administrateur global (sans rattachement) : tableau de bord unique. */
+  if (user?.role === 'admin' && user?.etablissement_id == null) {
     return <Navigate to="/admin" replace />
   }
 
@@ -299,7 +299,7 @@ export default function EtablissementHome() {
         </div>
       )}
 
-      {['responsable', 'directeur', 'comptable', 'agent_admin', 'controleur_qualite'].includes(user?.role) && (
+      {['responsable', 'comptable', 'agent_admin', 'controleur_qualite'].includes(user?.role) && (
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -349,7 +349,7 @@ export default function EtablissementHome() {
               </p>
             )}
           </div>
-          {(user?.role === 'responsable' || user?.role === 'directeur') && (
+          {user?.role === 'responsable' && (
             <Link to="/responsable/gestion-etablissement"
               className="text-sm font-bold px-4 py-2 rounded-xl border-2 transition-all hover:opacity-80 shrink-0 self-start"
               style={{ color: primary, borderColor: primary }}>
@@ -556,7 +556,7 @@ export default function EtablissementHome() {
       </div>
 
       {!isEtudiant && (() => {
-        const proformaRoles = ['responsable', 'admin', 'directeur', 'agent_admin', 'comptable', 'controleur_qualite']
+        const proformaRoles = ['responsable', 'admin', 'agent_admin', 'comptable', 'controleur_qualite']
         const showProforma = proformaRoles.includes(user?.role)
         const quick = [
           roleLink && { ...roleLink, desc: 'Gérer les dossiers de préinscription' },
@@ -569,7 +569,7 @@ export default function EtablissementHome() {
           user?.role === 'responsable' && { label: 'Valider des dossiers', path: '/responsable', icon: '✅', desc: 'Accepter ou refuser des candidatures' },
           user?.role === 'agent_admin' && { label: 'Vérifier les documents', path: '/agent-admin', icon: '📎', desc: 'Contrôle de complétude des dossiers' },
           user?.role === 'comptable' && { label: 'Finance', path: '/comptable', icon: '💰', desc: 'Gestion financière et facturation' },
-          user?.role === 'directeur' && { label: 'Administration', path: '/admin', icon: '👁️', desc: 'Vue globale de la plateforme' },
+          user?.role === 'admin' && { label: 'Administration', path: '/admin', icon: '👁️', desc: 'Vue globale de la plateforme' },
           user?.role === 'controleur_qualite' && { label: 'Qualité', path: '/qualite', icon: '✅', desc: 'Contrôle et conformité' },
         ].filter(Boolean)
         return (

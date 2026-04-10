@@ -170,13 +170,9 @@ export default function AdminDashboard() {
   return (
     <DashboardPage>
       <DashboardHero
-        eyebrow={user?.role === 'directeur' ? 'Direction' : 'Administration'}
+        eyebrow="Administration"
         title="Tableau de bord"
-        subtitle={
-          user?.role === 'directeur'
-            ? 'Vue d’ensemble comme l’administrateur : sauf création de comptes et suppression définitive des utilisateurs.'
-            : 'Vue d’ensemble de la plateforme, indicateurs clés et accès rapide aux modules de gestion.'
-        }
+        subtitle="Vue d’ensemble de la plateforme, indicateurs clés et accès rapide aux modules de gestion."
       />
 
       <div className="mb-3 flex items-center gap-3">

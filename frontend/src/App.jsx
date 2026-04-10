@@ -76,7 +76,6 @@ function AppRoutes() {
     if (!user) return '/'
     if (user.must_change_password) return '/changer-mot-de-passe-obligatoire'
     if (user.role === 'admin') return '/admin'
-    if (user.role === 'directeur') return '/admin'
     if (user.role === 'controleur_qualite') return '/qualite'
     if (['responsable', 'agent_admin', 'comptable'].includes(user.role)) return '/mon-etablissement'
     return '/dashboard'
@@ -115,11 +114,11 @@ function AppRoutes() {
         <Route path="/mes-acces" element={<PrivateRoute roles={['etudiant']}><MesAccesEtudiant /></PrivateRoute>} />
         <Route path="/preinscription" element={<PrivateRoute roles={['etudiant']}><Preinscription /></PrivateRoute>} />
         <Route path="/preinscription/:formationId" element={<PrivateRoute roles={['etudiant']}><Preinscription /></PrivateRoute>} />
-        <Route path="/facture/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'responsable', 'directeur', 'comptable', 'agent_admin', 'controleur_qualite']}><FactureView /></PrivateRoute>} />
+        <Route path="/facture/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'responsable', 'comptable', 'agent_admin', 'controleur_qualite']}><FactureView /></PrivateRoute>} />
 
         {/* Lettre */}
-        <Route path="/lettre/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite']}><LettrePreinscription /></PrivateRoute>} />
-        <Route path="/attestation/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite']}><AttestationPreinscription /></PrivateRoute>} />
+        <Route path="/lettre/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}><LettrePreinscription /></PrivateRoute>} />
+        <Route path="/attestation/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}><AttestationPreinscription /></PrivateRoute>} />
         <Route
           path="/lettre-demande/:demandeId"
           element={
@@ -132,61 +131,58 @@ function AppRoutes() {
 
         {/* Accueil établissement (staff + étudiants : catalogue sans tarifs pour les étudiants) */}
         <Route path="/mon-etablissement" element={
-          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite', 'etudiant']}>
+          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'etudiant']}>
             <EtablissementHome />
           </PrivateRoute>
         } />
         <Route path="/mon-etablissement/factures" element={
-          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable', 'directeur']}>
+          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable']}>
             <StaffFacturesEtab />
           </PrivateRoute>
         } />
         <Route path="/mon-etablissement/acceptes-par-formation" element={
-          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable', 'directeur']}>
+          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable']}>
             <StaffAcceptesParFormation />
           </PrivateRoute>
         } />
         <Route path="/mon-etablissement/documents-chat" element={
-          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite']}>
+          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable', 'controleur_qualite']}>
             <StaffChatDocuments />
           </PrivateRoute>
         } />
 
         {/* Responsable */}
-        <Route path="/responsable" element={<PrivateRoute roles={['responsable', 'admin', 'directeur']}><ResponsableDashboard /></PrivateRoute>} />
-        <Route path="/responsable/dossier/:id" element={<PrivateRoute roles={['responsable', 'admin', 'directeur']}><ResponsableDossier /></PrivateRoute>} />
+        <Route path="/responsable" element={<PrivateRoute roles={['responsable', 'admin']}><ResponsableDashboard /></PrivateRoute>} />
+        <Route path="/responsable/dossier/:id" element={<PrivateRoute roles={['responsable', 'admin']}><ResponsableDossier /></PrivateRoute>} />
         <Route path="/responsable/gestion-etablissement" element={
-          <PrivateRoute roles={['responsable', 'directeur']}>
+          <PrivateRoute roles={['responsable']}>
             <ResponsableGestionEtab />
           </PrivateRoute>
         } />
-        <Route path="/responsable/demandes-proforma" element={<PrivateRoute roles={['responsable', 'admin', 'directeur', 'agent_admin', 'comptable', 'controleur_qualite']}><ResponsableDemandesProforma /></PrivateRoute>} />
+        <Route path="/responsable/demandes-proforma" element={<PrivateRoute roles={['responsable', 'admin', 'agent_admin', 'comptable', 'controleur_qualite']}><ResponsableDemandesProforma /></PrivateRoute>} />
 
         {/* Agent admin */}
-        <Route path="/agent-admin" element={<PrivateRoute roles={['agent_admin', 'admin', 'directeur']}><AgentAdminDashboard /></PrivateRoute>} />
-        <Route path="/agent-admin/dossier/:id" element={<PrivateRoute roles={['agent_admin', 'admin', 'directeur']}><AgentAdminDossier /></PrivateRoute>} />
+        <Route path="/agent-admin" element={<PrivateRoute roles={['agent_admin', 'admin']}><AgentAdminDashboard /></PrivateRoute>} />
+        <Route path="/agent-admin/dossier/:id" element={<PrivateRoute roles={['agent_admin', 'admin']}><AgentAdminDossier /></PrivateRoute>} />
 
         {/* Comptable */}
-        <Route path="/comptable" element={<PrivateRoute roles={['comptable', 'admin', 'directeur']}><ComptableDashboard /></PrivateRoute>} />
-
-        {/* Directeur */}
-        <Route path="/directeur" element={<PrivateRoute roles={['directeur']}><Navigate to="/admin" replace /></PrivateRoute>} />
+        <Route path="/comptable" element={<PrivateRoute roles={['comptable', 'admin']}><ComptableDashboard /></PrivateRoute>} />
 
         {/* Contrôleur qualité */}
-        <Route path="/qualite" element={<PrivateRoute roles={['controleur_qualite', 'admin', 'directeur']}><QualiteDashboard /></PrivateRoute>} />
+        <Route path="/qualite" element={<PrivateRoute roles={['controleur_qualite', 'admin']}><QualiteDashboard /></PrivateRoute>} />
 
         {/* Admin */}
-        <Route path="/admin" element={<PrivateRoute roles={['admin', 'directeur']}><AdminDashboard /></PrivateRoute>} />
-        <Route path="/admin/dossier/:id" element={<PrivateRoute roles={['admin', 'directeur']}><AdminDossier /></PrivateRoute>} />
-        <Route path="/admin/utilisateurs" element={<PrivateRoute roles={['admin', 'directeur']}><AdminUsers /></PrivateRoute>} />
-        <Route path="/admin/etablissements" element={<PrivateRoute roles={['admin', 'directeur']}><AdminEtablissements /></PrivateRoute>} />
-        <Route path="/admin/etablissements/:id" element={<PrivateRoute roles={['admin', 'directeur']}><AdminEtablissementDetail /></PrivateRoute>} />
-        <Route path="/admin/proforma" element={<PrivateRoute roles={['admin', 'directeur']}><AdminProforma /></PrivateRoute>} />
-        <Route path="/admin/factures-etablissement" element={<PrivateRoute roles={['admin', 'directeur']}><AdminFacturesEtabPage /></PrivateRoute>} />
-        <Route path="/admin/audit-logs" element={<PrivateRoute roles={['admin', 'directeur']}><AdminAuditLogs /></PrivateRoute>} />
-        <Route path="/admin/security-events" element={<PrivateRoute roles={['admin', 'directeur']}><AdminSecurityEvents /></PrivateRoute>} />
-        <Route path="/admin/maintenance" element={<PrivateRoute roles={['admin', 'directeur']}><AdminMaintenance /></PrivateRoute>} />
-        <Route path="/admin/runtime-monitoring" element={<PrivateRoute roles={['admin', 'directeur']}><AdminRuntimeMonitoring /></PrivateRoute>} />
+        <Route path="/admin" element={<PrivateRoute roles={['admin']}><AdminDashboard /></PrivateRoute>} />
+        <Route path="/admin/dossier/:id" element={<PrivateRoute roles={['admin']}><AdminDossier /></PrivateRoute>} />
+        <Route path="/admin/utilisateurs" element={<PrivateRoute roles={['admin']}><AdminUsers /></PrivateRoute>} />
+        <Route path="/admin/etablissements" element={<PrivateRoute roles={['admin']}><AdminEtablissements /></PrivateRoute>} />
+        <Route path="/admin/etablissements/:id" element={<PrivateRoute roles={['admin']}><AdminEtablissementDetail /></PrivateRoute>} />
+        <Route path="/admin/proforma" element={<PrivateRoute roles={['admin']}><AdminProforma /></PrivateRoute>} />
+        <Route path="/admin/factures-etablissement" element={<PrivateRoute roles={['admin']}><AdminFacturesEtabPage /></PrivateRoute>} />
+        <Route path="/admin/audit-logs" element={<PrivateRoute roles={['admin']}><AdminAuditLogs /></PrivateRoute>} />
+        <Route path="/admin/security-events" element={<PrivateRoute roles={['admin']}><AdminSecurityEvents /></PrivateRoute>} />
+        <Route path="/admin/maintenance" element={<PrivateRoute roles={['admin']}><AdminMaintenance /></PrivateRoute>} />
+        <Route path="/admin/runtime-monitoring" element={<PrivateRoute roles={['admin']}><AdminRuntimeMonitoring /></PrivateRoute>} />
       </Route>
 
       {/* Chat : route dédiée (layout + index) pour éviter les soucis de matching sous layout sans path */}
@@ -194,7 +190,7 @@ function AppRoutes() {
         path="/chat"
         element={
           <PrivateRoute
-            roles={['etudiant', 'responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite']}
+            roles={['etudiant', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}
           >
             <AuthenticatedLayout />
           </PrivateRoute>

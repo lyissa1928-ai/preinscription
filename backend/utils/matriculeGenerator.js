@@ -51,10 +51,10 @@ function generateNextMatriculeForEtablissement(etablissementId) {
 }
 
 /**
- * Matricule pour un directeur sans rattachement établissement (supervision globale) : DIR + 3 chiffres.
+ * Matricule pour un administrateur sans rattachement établissement (vue globale) : DIR + 3 chiffres.
  * @returns {{ matricule?: string, error?: string }}
  */
-function generateNextMatriculeDirecteur() {
+function generateNextMatriculeGlobalAdmin() {
   const prefix = 'DIR';
   const re = new RegExp(`^${prefix}(\\d{3})$`, 'i');
   let max = 0;
@@ -64,13 +64,17 @@ function generateNextMatriculeDirecteur() {
   }
   const next = max + 1;
   if (next > 999) {
-    return { error: 'Nombre maximum de matricules atteint pour les comptes directeur (DIR999).' };
+    return { error: 'Nombre maximum de matricules atteint pour les comptes administrateur globaux (DIR999).' };
   }
   return { matricule: prefix + String(next).padStart(3, '0') };
 }
 
+/** @deprecated alias — utiliser generateNextMatriculeGlobalAdmin */
+const generateNextMatriculeDirecteur = generateNextMatriculeGlobalAdmin;
+
 module.exports = {
   threeLetterPrefixFromEtablissementNom,
   generateNextMatriculeForEtablissement,
+  generateNextMatriculeGlobalAdmin,
   generateNextMatriculeDirecteur,
 };
