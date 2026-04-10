@@ -3,7 +3,7 @@ import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
 
-const STAFF_ROLES = new Set(['responsable', 'agent_admin', 'comptable', 'directeur', 'controleur_qualite'])
+const STAFF_ROLES = new Set(['responsable', 'agent_admin', 'comptable', 'controleur_qualite'])
 
 export default function StaffChatDocuments() {
   const { user } = useAuth()

@@ -15,7 +15,7 @@ const {
 router.use(authMiddleware, controleurQualiteOrAdmin);
 
 function filterDossiersByEtab(req, dossiers) {
-  const etabId = req.user.role === 'admin' || req.user.role === 'directeur' ? null : req.user.etablissement_id;
+  const etabId = req.user.role === 'admin' ? null : req.user.etablissement_id;
   if (!etabId) return dossiers;
   const formationIds = (db.get('formations').value() || [])
     .filter((f) => f.etablissement_id === etabId)
@@ -80,7 +80,7 @@ router.get('/dashboard', (req, res) => {
     refuse: allDossiers.filter((x) => x.statut === 'refuse').length,
   };
 
-  const etabId = req.user.role === 'admin' || req.user.role === 'directeur' ? null : req.user.etablissement_id;
+  const etabId = req.user.role === 'admin' ? null : req.user.etablissement_id;
   const etab = etabId ? db.get('etablissements').find({ id: etabId }).value() : null;
 
   res.json({

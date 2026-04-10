@@ -78,7 +78,6 @@ export default function Login() {
       }
       const role = u.role
       let dest = role === 'admin' ? '/admin'
-        : role === 'directeur' ? '/admin'
         : role === 'controleur_qualite' ? '/qualite'
         : ['responsable', 'agent_admin', 'comptable'].includes(role) ? '/mon-etablissement'
         : '/dashboard'

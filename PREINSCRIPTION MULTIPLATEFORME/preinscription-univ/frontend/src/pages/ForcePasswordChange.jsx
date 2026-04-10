@@ -55,9 +55,7 @@ export default function ForcePasswordChange() {
     const dest =
       user.role === 'admin'
         ? '/admin'
-        : user.role === 'directeur'
-          ? '/admin'
-          : user.role === 'controleur_qualite'
+        : user.role === 'controleur_qualite'
             ? '/qualite'
             : ['responsable', 'agent_admin', 'comptable'].includes(user.role)
               ? '/mon-etablissement'
@@ -101,9 +99,7 @@ export default function ForcePasswordChange() {
       const dest =
         user.role === 'admin'
           ? '/admin'
-          : user.role === 'directeur'
-            ? '/admin'
-            : user.role === 'controleur_qualite'
+          : user.role === 'controleur_qualite'
               ? '/qualite'
               : ['responsable', 'agent_admin', 'comptable'].includes(user.role)
                 ? '/mon-etablissement'

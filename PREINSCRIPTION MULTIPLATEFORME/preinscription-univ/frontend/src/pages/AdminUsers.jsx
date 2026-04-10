@@ -5,10 +5,10 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const ROLES_STAFF = [
+  { val: 'admin', label: 'Administrateur (plateforme)' },
   { val: 'responsable', label: 'Responsable pédagogique' },
   { val: 'agent_admin', label: 'Agent administratif' },
   { val: 'comptable', label: 'Comptable / Finance' },
-  { val: 'directeur', label: 'Directeur' },
   { val: 'controleur_qualite', label: 'Contrôleur qualité' },
 ]
 
@@ -17,14 +17,13 @@ const ROLE_COLORS = {
   responsable: 'bg-teal-100 text-teal-700',
   agent_admin: 'bg-orange-100 text-orange-700',
   comptable:   'bg-purple-100 text-purple-700',
-  directeur:   'bg-blue-100 text-blue-700',
   controleur_qualite: 'bg-cyan-100 text-cyan-800',
   etudiant:    'bg-gray-100 text-gray-700'
 }
 const ROLE_LABELS = {
   admin: 'Administrateur', responsable: 'Resp. Pédagogique',
   agent_admin: 'Agent Administratif', comptable: 'Comptable',
-  directeur: 'Directeur', controleur_qualite: 'Contrôleur qualité', etudiant: 'Étudiant'
+  controleur_qualite: 'Contrôleur qualité', etudiant: 'Étudiant'
 }
 
 function RoleBadge({ role }) {
@@ -47,6 +46,7 @@ function normMat(m) {
 export default function AdminUsers() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
+  const isSelectableUser = (u) => !(u.role === 'admin' && u.id === user?.id)
   const [users, setUsers] = useState([])
   const [etablissements, setEtablissements] = useState([])
   const [filtreRole, setFiltreRole] = useState('staff')
@@ -130,15 +130,15 @@ export default function AdminUsers() {
     })
   }
   const toggleAll = () => {
-    const selectables = usersFiltres.filter(u => u.role !== 'admin').map(u => u.id)
+    const selectables = usersFiltres.filter(isSelectableUser).map(u => u.id)
     if (selectables.every(id => selected.has(id))) {
       setSelected(prev => { const next = new Set(prev); selectables.forEach(id => next.delete(id)); return next })
     } else {
       setSelected(prev => { const next = new Set(prev); selectables.forEach(id => next.add(id)); return next })
     }
   }
-  const allSelected = usersFiltres.filter(u => u.role !== 'admin').every(u => selected.has(u.id))
-    && usersFiltres.filter(u => u.role !== 'admin').length > 0
+  const allSelected = usersFiltres.filter(isSelectableUser).every(u => selected.has(u.id))
+    && usersFiltres.filter(isSelectableUser).length > 0
   const selectedIds = [...selected]
 
   /* ── Création ── */
@@ -148,7 +148,7 @@ export default function AdminUsers() {
       toast.error('Les mots de passe ne correspondent pas.')
       return
     }
-    if (createForm.role !== 'directeur' && !createForm.etablissement_id) {
+    if (createForm.role !== 'admin' && !createForm.etablissement_id) {
       toast.error('Sélectionnez un établissement pour ce rôle.')
       return
     }
@@ -156,7 +156,7 @@ export default function AdminUsers() {
     try {
       const { data } = await axios.post('/api/admin/utilisateurs', {
         ...createForm,
-        etablissement_id: createForm.role === 'directeur' ? null : createForm.etablissement_id,
+        etablissement_id: createForm.role === 'admin' ? null : createForm.etablissement_id,
       })
       const mat = data.utilisateur?.matricule
       toast.success(mat ? `Compte créé. Matricule : ${mat}` : 'Compte créé.')
@@ -180,7 +180,7 @@ export default function AdminUsers() {
   const handleEdit = async (e) => {
     e.preventDefault()
     if (
-      editForm.role !== 'directeur' &&
+      editForm.role !== 'admin' &&
       editForm.role !== 'etudiant' &&
       ['responsable', 'agent_admin', 'comptable'].includes(editForm.role) &&
       !editForm.etablissement_id
@@ -191,7 +191,7 @@ export default function AdminUsers() {
     setEditSaving(true)
     try {
       const payload = { ...editForm }
-      if (payload.role === 'directeur') payload.etablissement_id = null
+      if (payload.role === 'admin') payload.etablissement_id = null
       if (!payload.mot_de_passe) delete payload.mot_de_passe
       await axios.put(`/api/admin/utilisateurs/${editUser.id}`, payload)
       const etabChanged = String(editForm.etablissement_id || '') !== String(editUser.etablissement_id || '')
@@ -280,14 +280,14 @@ export default function AdminUsers() {
   const upCreate = (f) => (e) => {
     const v = e.target.value
     setCreateForm((p) => {
-      if (f === 'role' && v === 'directeur') return { ...p, role: v, etablissement_id: '' }
+      if (f === 'role' && v === 'admin') return { ...p, role: v, etablissement_id: '' }
       return { ...p, [f]: v }
     })
   }
   const upEdit = (f) => (e) => {
     const v = e.target.value
     setEditForm((p) => {
-      if (f === 'role' && v === 'directeur') return { ...p, role: v, etablissement_id: '' }
+      if (f === 'role' && v === 'admin') return { ...p, role: v, etablissement_id: '' }
       return { ...p, [f]: v }
     })
   }
@@ -317,11 +317,6 @@ export default function AdminUsers() {
             <Link to="/admin" className="text-sm text-gray-400 hover:text-blue-700">← Administration</Link>
             <h1 className="text-3xl font-bold text-gray-800 mt-1">Gestion des utilisateurs</h1>
             <p className="text-gray-500 mt-0.5">{pagination.total} compte{pagination.total !== 1 ? 's' : ''} · {etablissements.length} établissement{etablissements.length !== 1 ? 's' : ''}</p>
-            {!isAdmin && (
-              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2 max-w-xl">
-                En tant que directeur : vous pouvez consulter, modifier, désactiver ou réactiver des comptes. La <strong>création</strong> de comptes et la <strong>suppression définitive</strong> sont réservées à l’administrateur.
-              </p>
-            )}
           </div>
           {isAdmin && (
             <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
@@ -431,9 +426,10 @@ export default function AdminUsers() {
                   <UserTable
                     users={group.users}
                     selected={selected}
-                    allSelected={group.users.filter(u => u.role !== 'admin').every(u => selected.has(u.id)) && group.users.filter(u => u.role !== 'admin').length > 0}
+                    currentUserId={user?.id}
+                    allSelected={group.users.filter(isSelectableUser).every(u => selected.has(u.id)) && group.users.filter(isSelectableUser).length > 0}
                     onToggleAll={() => {
-                      const ids = group.users.filter(u => u.role !== 'admin').map(u => u.id)
+                      const ids = group.users.filter(isSelectableUser).map(u => u.id)
                       const allSel = ids.every(id => selected.has(id))
                       setSelected(prev => {
                         const next = new Set(prev)
@@ -458,6 +454,7 @@ export default function AdminUsers() {
             <UserTable
               users={usersFiltres}
               selected={selected}
+              currentUserId={user?.id}
               allSelected={allSelected}
               onToggleAll={toggleAll}
               onToggleOne={toggleOne}
@@ -500,9 +497,9 @@ export default function AdminUsers() {
               <Field label="Nom" required><input className="input-field" value={createForm.nom} onChange={upCreate('nom')} required /></Field>
             </div>
             <p className="text-xs text-gray-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-              {createForm.role === 'directeur' ? (
+              {createForm.role === 'admin' ? (
                 <>
-                  Le <strong>matricule</strong> sera du type <span className="font-mono">DIR001</span> (supervision globale, sans rattachement à un établissement).
+                  Le <strong>matricule</strong> sera du type <span className="font-mono">DIR001</span> (administrateur global, sans rattachement à un établissement).
                 </>
               ) : (
                 <>
@@ -530,11 +527,11 @@ export default function AdminUsers() {
                 {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
               </select>
             </Field>
-            {createForm.role === 'directeur' ? (
+            {createForm.role === 'admin' ? (
               <div className="rounded-xl border border-blue-100 bg-blue-50/90 px-3 py-3 text-sm text-blue-900">
-                <p className="font-semibold">Directeur — supervision globale</p>
+                <p className="font-semibold">Administrateur — plateforme</p>
                 <p className="text-xs text-blue-800/90 mt-1 leading-relaxed">
-                  Aucun établissement à choisir : ce compte a une vue sur <strong>toute l’activité</strong> (dossiers, statistiques) sur la plateforme, comme l’administrateur pour les données métier.
+                  Aucun établissement à choisir : accès global à la configuration, aux comptes et aux données métier. Vous pouvez créer d’autres administrateurs ; le dernier compte admin actif ne peut pas être supprimé ni retiré de son rôle.
                 </p>
               </div>
             ) : (
@@ -585,11 +582,11 @@ export default function AdminUsers() {
                 {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
               </select>
             </Field>
-            {editForm.role === 'directeur' ? (
+            {editForm.role === 'admin' ? (
               <div className="rounded-xl border border-blue-100 bg-blue-50/90 px-3 py-3 text-sm text-blue-900">
                 <p className="font-semibold">Rattachement établissement</p>
                 <p className="text-xs text-blue-800/90 mt-1">
-                  Compte directeur : <strong>aucun établissement</strong> (vue globale). Pour rattacher ce compte à une école, changez le rôle vers Responsable, Agent ou Comptable puis choisissez l’établissement.
+                  Compte administrateur global : <strong>aucun établissement</strong>. Pour rattacher ce compte à une école, changez le rôle vers Responsable, Agent ou Comptable puis choisissez l’établissement.
                 </p>
               </div>
             ) : (
@@ -762,7 +759,8 @@ export default function AdminUsers() {
 /* Sous-composants                                                            */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-function UserTable({ users, selected, allSelected, onToggleAll, onToggleOne, onEdit, onToggleActif, onDelete, onResetPassword, canDeletePermanently = true }) {
+function UserTable({ users, selected, currentUserId, allSelected, onToggleAll, onToggleOne, onEdit, onToggleActif, onDelete, onResetPassword, canDeletePermanently = true }) {
+  const rowSelectable = (u) => !(u.role === 'admin' && u.id === currentUserId)
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -785,7 +783,7 @@ function UserTable({ users, selected, allSelected, onToggleAll, onToggleOne, onE
           {users.map(u => (
             <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${u.actif === false ? 'opacity-55' : ''} ${selected.has(u.id) ? 'bg-blue-50' : ''}`}>
               <td className="py-3 px-3">
-                {u.role !== 'admin' && (
+                {rowSelectable(u) && (
                   <input type="checkbox" checked={selected.has(u.id)} onChange={() => onToggleOne(u.id)}
                     className="w-4 h-4 rounded accent-blue-700 cursor-pointer" />
                 )}
@@ -817,8 +815,7 @@ function UserTable({ users, selected, allSelected, onToggleAll, onToggleOne, onE
                 </span>
               </td>
               <td className="py-3 px-3">
-                {u.role !== 'admin' && (
-                  <div className="flex items-center justify-end gap-1.5">
+                <div className="flex items-center justify-end gap-1.5">
                     {onResetPassword && (
                       <button onClick={() => onResetPassword(u)} title="Réinitialiser le mot de passe"
                         className="p-1.5 rounded-lg text-violet-500 hover:bg-violet-50 hover:text-violet-700 transition-colors">
@@ -842,7 +839,6 @@ function UserTable({ users, selected, allSelected, onToggleAll, onToggleOne, onE
                       </button>
                     )}
                   </div>
-                )}
               </td>
             </tr>
           ))}

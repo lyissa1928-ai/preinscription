@@ -87,7 +87,6 @@ app.use('/api/admin', require('./routes/admin'));               // Administrateu
 app.use('/api/responsable', require('./routes/responsable'));   // Responsable pédagogique
 app.use('/api/agent-admin', require('./routes/agent_admin'));   // Agent administratif
 app.use('/api/comptable', require('./routes/comptable'));       // Comptable / Finance
-app.use('/api/directeur', require('./routes/directeur'));       // Directeur
 app.use('/api/qualite', require('./routes/qualite'));          // Contrôleur qualité
 app.use('/api/etablissements', require('./routes/etablissements'));
 app.use('/api/formations', require('./routes/formations'));

@@ -111,11 +111,10 @@ const ROLES_STAFF = [
   { val: 'agent_admin', label: 'Agent administratif' },
   { val: 'comptable', label: 'Comptable' },
   { val: 'controleur_qualite', label: 'Contrôleur qualité' },
-  { val: 'directeur', label: 'Directeur' },
 ]
 const ROLE_COLORS = {
   responsable: 'bg-teal-100 text-teal-700', agent_admin: 'bg-orange-100 text-orange-700',
-  comptable: 'bg-violet-100 text-violet-700', directeur: 'bg-blue-100 text-blue-700',
+  comptable: 'bg-violet-100 text-violet-700',
   controleur_qualite: 'bg-cyan-100 text-cyan-800',
 }
 
@@ -2405,7 +2404,7 @@ export default function AdminEtablissementDetail() {
               {[
                 { label: 'Filières', value: kpi.filieres, Icon: FaBook },
                 { label: 'Formations', value: kpi.formations, Icon: FaGraduationCap },
-                ...(['admin', 'directeur'].includes(user?.role) ? [{ label: 'Membres', value: kpi.membres, Icon: FaUsers }] : []),
+                ...(user?.role === 'admin' ? [{ label: 'Membres', value: kpi.membres, Icon: FaUsers }] : []),
               ].map(({ label, value, Icon }) => (
                 <div
                   key={label}
