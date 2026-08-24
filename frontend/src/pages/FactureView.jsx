@@ -1,334 +1,578 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { mediaUrl } from '../utils/mediaUrl'
+import CachetScolarite from '../components/CachetScolarite'
 
-const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n)
-const fmtDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+const fmt = (n) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0))
+const fmtDate = (d) => {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+}
+const typeLabel = (t) => (t === 'en_ligne' ? 'Formation en ligne (FAD)' : 'Formation en présentiel')
+
+function hexToRgb(hex) {
+  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '#1e40af')
+  return r ? [parseInt(r[1], 16), parseInt(r[2], 16), parseInt(r[3], 16)] : [30, 64, 175]
+}
+
+function fmtN(n) {
+  return Math.round(n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
+async function loadImgBase64(url) {
+  try {
+    const r = await fetch(url)
+    if (!r.ok) return null
+    const blob = await r.blob()
+    return new Promise((resolve) => {
+      const rd = new FileReader()
+      rd.onloadend = () => resolve(rd.result)
+      rd.onerror = () => resolve(null)
+      rd.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+/** Lignes : Mensualité unitaire + Total mensualités (mois × unitaire). */
+function buildDisplayRows(facture, fo = {}) {
+  const lignes = facture?.lignes || []
+  const moisFromLigne = Number(lignes.find((l) => Number(l.duree_mois) > 0)?.duree_mois) || 0
+  const mois = Number(fo.duree_mois) > 0 ? Number(fo.duree_mois) : moisFromLigne
+  const unitMen = Number(fo.mensualite) || 0
+  const rows = []
+  let mensualiteAjoutee = false
+
+  const pushMensualiteRows = (unit) => {
+    const u = Number(unit) || 0
+    if (u <= 0) return
+    rows.push({ designation: 'Mensualité', montant: u, isUnitMensualite: true })
+    if (mois > 0) {
+      rows.push({
+        designation: `Total mensualités (${mois} mois)`,
+        montant: mois * u,
+        isTotalMensualites: true,
+      })
+    }
+    mensualiteAjoutee = true
+  }
+
+  for (const l of lignes) {
+    const desc = String(l.description || l.designation || '').trim()
+    const kind = l.kind
+    if (kind === 'mensualite_unitaire' || /^mensualit/i.test(desc) || /^total mensualit/i.test(desc)) {
+      if (mensualiteAjoutee) continue
+      const unit = Number(l.montant_unitaire ?? fo.mensualite ?? l.prix_unitaire) || unitMen
+        || (mois > 0 && Number(l.total) > 0 ? Math.round(Number(l.total) / mois) : 0)
+      pushMensualiteRows(unit || unitMen)
+      continue
+    }
+    if (/inscription/i.test(desc)) {
+      rows.push({
+        designation: "Frais d'inscription",
+        montant: Number(l.total ?? l.montant) || Number(fo.frais_inscription) || 0,
+      })
+      continue
+    }
+    if (/^scolarit/i.test(desc)) {
+      if (!mensualiteAjoutee) {
+        const total = Number(l.total ?? l.montant) || 0
+        const unit = unitMen || (mois > 0 ? Math.round(total / mois) : 0)
+        pushMensualiteRows(unit)
+      }
+      continue
+    }
+    rows.push({ designation: desc || 'Frais', montant: Number(l.total ?? l.montant) || 0 })
+  }
+  if (!rows.some((r) => /inscription/i.test(r.designation)) && Number(fo.frais_inscription) > 0) {
+    rows.unshift({ designation: "Frais d'inscription", montant: Number(fo.frais_inscription) })
+  }
+  if (!mensualiteAjoutee && unitMen > 0) pushMensualiteRows(unitMen)
+
+  const rawSupp = facture?.lignes_supplementaires || []
+  const supplementaires = (Array.isArray(rawSupp) ? rawSupp : [])
+    .map((l) => ({
+      designation: String(l.designation || l.description || '').trim(),
+      montant: Number(l.montant || l.total) || 0,
+    }))
+    .filter((s) => s.designation && s.montant > 0)
+
+  for (const s of supplementaires) {
+    rows.push({ designation: s.designation, montant: s.montant, supplement: true })
+  }
+
+  const fromSnapshot = Number(facture?.montant_total_a_payer) || Number(facture?.montant_ttc) || 0
+  const recomputed = rows
+    .filter((r) => !r.isUnitMensualite)
+    .reduce((a, b) => a + (Number(b.montant) || 0), 0)
+
+  return { rows, totalAPayer: fromSnapshot > 0 ? fromSnapshot : recomputed, supplementaires }
+}
+
+/** Paiement uniquement — pas d’e-mail / tél / arrêté / banque (déjà en en-tête ou inutiles). */
+function CoordonneesPaiement({ eb, primary }) {
+  const lines = [
+    eb?.rc && { label: 'RC (Registre commercial)', value: String(eb.rc).trim() },
+    (eb?.compte_bancaire || eb?.iban) && {
+      label: 'Compte bancaire / IBAN',
+      value: eb.compte_bancaire || eb.iban,
+    },
+    eb?.swift && { label: 'Code SWIFT', value: eb.swift },
+  ].filter(Boolean)
+
+  if (!lines.length) return null
+
+  return (
+    <section className="px-8 pb-5">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+        Coordonnées de paiement
+      </p>
+      <div className="border border-slate-200 px-4 py-3 text-xs text-slate-700" style={{ borderLeftWidth: 3, borderLeftColor: primary }}>
+        <dl className="grid gap-2 sm:grid-cols-3">
+          {lines.map((l) => (
+            <div key={l.label}>
+              <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{l.label}</dt>
+              <dd className="mt-0.5 font-medium text-slate-800 break-words">{l.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  )
+}
+
+function headerContactLines(eb) {
+  return [
+    eb.adresse,
+    eb.telephone,
+    eb.email_contact,
+    eb.arrete && `Arrêté : ${String(eb.arrete).trim()}`,
+    eb.ninea && `NINEA : ${eb.ninea}`,
+  ].filter(Boolean)
+}
 
 export default function FactureView() {
   const { dossierId } = useParams()
   const [facture, setFacture] = useState(null)
+  const [etabLive, setEtabLive] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
-  const printRef = useRef()
+  const [pdfBusy, setPdfBusy] = useState(false)
 
   useEffect(() => {
-    // Essayer de charger la facture existante
     axios.get(`/api/factures/dossier/${dossierId}`)
       .then(({ data }) => setFacture(data))
       .catch(() => {
-        // Si pas de facture, la générer
         setGenerating(true)
         axios.post(`/api/factures/generer/${dossierId}`)
-          .then(({ data }) => { setFacture(data); toast.success('Facture générée avec succès !') })
-          .catch(err => toast.error(err.response?.data?.message || 'Erreur génération facture'))
+          .then(({ data }) => {
+            setFacture(data)
+            toast.success('Facture générée et enregistrée dans l’historique.')
+          })
+          .catch((err) => toast.error(err.response?.data?.message || 'Erreur génération facture'))
           .finally(() => setGenerating(false))
       })
       .finally(() => setLoading(false))
   }, [dossierId])
 
+  useEffect(() => {
+    const snap = facture?.etablissement_snapshot
+    if (!facture) return
+    const missing =
+      !snap?.adresse || !snap?.telephone || !snap?.email_contact || !snap?.arrete
+      || !snap?.rc || !(snap?.compte_bancaire || snap?.iban) || !snap?.swift
+    if (!missing) return
+    const tryIds = [facture?.etablissement_id, snap?.id, facture?.formation_snapshot?.etablissement_id].filter(Boolean)
+    const applyList = (data) => {
+      const list = Array.isArray(data) ? data : []
+      const found = tryIds.length
+        ? list.find((e) => tryIds.some((id) => Number(e.id) === Number(id)))
+        : list.find((e) => e.nom && snap?.nom && e.nom === snap.nom)
+      if (found) setEtabLive(found)
+    }
+    if (tryIds.length) {
+      axios.get(`/api/etablissements/${tryIds[0]}`)
+        .then(({ data }) => setEtabLive(data))
+        .catch(() => axios.get('/api/etablissements').then(({ data }) => applyList(data)).catch(() => {}))
+    } else {
+      axios.get('/api/etablissements').then(({ data }) => applyList(data)).catch(() => {})
+    }
+  }, [facture])
+
+  const mergeEtab = (snap = {}, live = null) => ({
+    ...snap,
+    email_contact: snap.email_contact || live?.email_contact || '',
+    telephone: snap.telephone || live?.telephone || '',
+    rc: snap.rc || live?.rc || '',
+    arrete: snap.arrete || live?.arrete || '',
+    compte_bancaire: snap.compte_bancaire || live?.compte_bancaire || live?.iban || '',
+    iban: snap.iban || live?.iban || '',
+    swift: snap.swift || live?.swift || '',
+    ninea: snap.ninea || live?.ninea || '',
+    adresse: snap.adresse || live?.adresse || '',
+    cachet_url: snap.cachet_url || live?.cachet_url || null,
+    logo_url: snap.logo_url || live?.logo_url || null,
+    nom: snap.nom || live?.nom || '',
+    couleur_primaire: snap.couleur_primaire || live?.couleur_primaire,
+    couleur_secondaire: snap.couleur_secondaire || live?.couleur_secondaire,
+  })
+
   const handlePrint = () => window.print()
 
-  if (loading || generating) return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-14 w-14 border-4 border-blue-700 border-t-transparent mx-auto mb-4"></div>
-        <p className="text-gray-600 font-medium">{generating ? 'Génération de votre facture...' : 'Chargement...'}</p>
-      </div>
-    </div>
-  )
+  const handleDownload = async () => {
+    if (!facture) return
+    setPdfBusy(true)
+    try {
+      const et = facture.etudiant_snapshot || {}
+      const fo = facture.formation_snapshot || {}
+      const eb = mergeEtab(facture.etablissement_snapshot || {}, etabLive)
+      const { rows, totalAPayer } = buildDisplayRows(facture, fo)
+      const P = hexToRgb(eb.couleur_primaire || '#1e40af')
+      const logoB64 = eb.logo_url ? await loadImgBase64(mediaUrl(eb.logo_url)) : null
+      const cachetB64 = eb.cachet_url ? await loadImgBase64(mediaUrl(eb.cachet_url)) : null
 
-  if (!facture) return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-gray-500 text-lg mb-4">Facture introuvable</p>
-        <Link to="/dashboard" className="btn-primary">Retour au tableau de bord</Link>
-      </div>
-    </div>
-  )
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const W = doc.internal.pageSize.getWidth()
+      const M = 16
 
-  const { etudiant_snapshot: et, formation_snapshot: fo, etablissement_snapshot: eb } = facture
-  const p1 = eb?.couleur_primaire || '#1e3a8a'
-  const p2 = eb?.couleur_secondaire || '#4338ca'
-  const headerGrad = { background: `linear-gradient(to right, ${p1}, ${p2})` }
-  const bandStyle = { background: `linear-gradient(to right, ${p1}, ${p2})` }
+      doc.setFillColor(...P)
+      doc.rect(0, 0, W, 2.5, 'F')
+
+      let y = 11
+      if (logoB64) {
+        try { doc.addImage(logoB64, 'AUTO', M, y, 16, 16) } catch { /* ignore */ }
+      }
+      const leftX = M + (logoB64 ? 20 : 0)
+      doc.setTextColor(...P)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.text(String(eb.nom || 'ÉTABLISSEMENT').toUpperCase(), leftX, y + 5)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7.5)
+      doc.setTextColor(70, 80, 90)
+      let iy = y + 10
+      headerContactLines(eb).forEach((line) => {
+        const wrapped = doc.splitTextToSize(String(line), 95)
+        wrapped.forEach((w) => {
+          doc.text(w, leftX, iy)
+          iy += 3.3
+        })
+      })
+
+      doc.setFillColor(...P)
+      doc.roundedRect(128, 11, W - 128 - M, 8, 1, 1, 'F')
+      doc.setTextColor(255, 255, 255)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.text('FACTURE PROFORMA', 128 + (W - 128 - M) / 2, 16.2, { align: 'center' })
+      doc.setTextColor(40, 50, 60)
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`N° ${facture.numero}`, 130, 24)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Date : ${fmtDate(facture.date_emission)}`, 130, 28.5)
+
+      y = Math.max(iy, 34) + 4
+      doc.setDrawColor(220, 225, 230)
+      doc.line(M, y, W - M, y)
+      y += 7
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7.5)
+      doc.setTextColor(...P)
+      doc.text('BÉNÉFICIAIRE', M, y)
+      y += 4.5
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.setTextColor(25, 35, 45)
+      doc.text(`${et.prenom || ''} ${(et.nom || '').toUpperCase()}`.trim() || '—', M, y)
+      y += 4
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(70, 80, 90)
+      ;[et.email, et.telephone && `Tél. ${et.telephone}`, et.nationalite && `Nationalité : ${et.nationalite}`]
+        .filter(Boolean)
+        .forEach((line) => {
+          doc.text(String(line), M, y)
+          y += 3.6
+        })
+
+      y += 3
+      doc.setDrawColor(...P)
+      doc.setFillColor(252, 252, 253)
+      doc.roundedRect(M, y, W - 2 * M, 18, 1.5, 1.5, 'FD')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7.5)
+      doc.setTextColor(...P)
+      doc.text('FORMATION', M + 3, y + 5)
+      doc.setTextColor(20, 30, 40)
+      doc.setFontSize(9)
+      doc.text(doc.splitTextToSize(fo.titre || '—', W - 2 * M - 8)[0], M + 3, y + 10)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7.5)
+      doc.setTextColor(70, 80, 90)
+      doc.text(
+        [fo.niveau && `Niveau : ${fo.niveau}`, typeLabel(fo.type), (fo.duree_formation || fo.duree) && `Durée : ${fo.duree_formation || fo.duree}`]
+          .filter(Boolean)
+          .join('  ·  '),
+        M + 3,
+        y + 15,
+      )
+      y += 24
+
+      autoTable(doc, {
+        startY: y,
+        margin: { left: M, right: M },
+        head: [['Désignation', 'Montant (FCFA)']],
+        body: rows.map((r) => [r.designation, fmtN(r.montant)]),
+        foot: [['Montant total à payer', `${fmtN(totalAPayer)} FCFA`]],
+        theme: 'grid',
+        headStyles: { fillColor: P, textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        footStyles: { fillColor: P, textColor: 255, fontStyle: 'bold', fontSize: 10 },
+        bodyStyles: { fontSize: 9, textColor: [40, 50, 60] },
+        columnStyles: { 1: { halign: 'right', cellWidth: 42 } },
+        didParseCell: (data) => {
+          const label = String(data.row?.raw?.[0] || '')
+          if (data.section === 'body' && /^Mensualité$/i.test(label)) {
+            data.cell.styles.textColor = [120, 130, 140]
+            data.cell.styles.fontSize = 8
+          }
+          if (data.section === 'body' && /^Total mensualités/i.test(label)) {
+            data.cell.styles.fontStyle = 'bold'
+          }
+        },
+      })
+
+      y = (doc.lastAutoTable?.finalY || y) + 8
+      const payLines = [
+        eb.rc && `RC : ${String(eb.rc).trim()}`,
+        (eb.compte_bancaire || eb.iban) && `Compte / IBAN : ${eb.compte_bancaire || eb.iban}`,
+        eb.swift && `SWIFT : ${eb.swift}`,
+      ].filter(Boolean)
+      if (payLines.length) {
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(8)
+        doc.setTextColor(...P)
+        doc.text('COORDONNÉES DE PAIEMENT', M, y)
+        y += 4
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(50, 60, 70)
+        doc.setFontSize(7.5)
+        payLines.forEach((line) => {
+          doc.text(String(line), M, y)
+          y += 3.5
+        })
+        y += 3
+      }
+
+      doc.setFontSize(7.5)
+      doc.setTextColor(120, 130, 140)
+      doc.text('Document non contractuel — Facture proforma émise à titre indicatif.', M, y)
+      y += 9
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(71, 85, 105)
+      doc.text('LA SCOLARITÉ', W - M - 15, y, { align: 'center' })
+      if (cachetB64) {
+        try { doc.addImage(cachetB64, 'AUTO', W - M - 30, y + 2, 28, 28) } catch { /* ignore */ }
+      }
+
+      doc.save(`${facture.numero || 'facture-proforma'}.pdf`)
+      toast.success('PDF téléchargé.')
+    } catch (e) {
+      console.error(e)
+      toast.error('Impossible de générer le PDF.')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
+  if (loading || generating) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-14 w-14 border-4 border-blue-700 border-t-transparent mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">{generating ? 'Génération de votre facture…' : 'Chargement…'}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!facture) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 text-lg mb-4">Facture introuvable</p>
+          <Link to="/dashboard" className="btn-primary">Retour</Link>
+        </div>
+      </div>
+    )
+  }
+
+  const et = facture.etudiant_snapshot || {}
+  const fo = facture.formation_snapshot || {}
+  const eb = mergeEtab(facture.etablissement_snapshot || {}, etabLive)
+  const primary = eb.couleur_primaire || '#1e40af'
+  const etabNom = eb.nom || 'Établissement'
+  const { rows, totalAPayer } = buildDisplayRows(facture, fo)
+  const prenom = (et.prenom || '').trim()
+  const nom = (et.nom || '').trim()
+  const contacts = headerContactLines(eb)
 
   return (
-    <div className="min-h-screen bg-gray-200 py-8 px-4">
-      {/* Barre d'actions (masquée à l'impression) */}
-      <div className="no-print max-w-4xl mx-auto mb-6 flex items-center justify-between">
-        <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium text-sm bg-white px-4 py-2 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
-          ← Retour au tableau de bord
+    <div className="lettre-print-scope min-h-screen bg-slate-200 py-8 px-4">
+      <div className="no-print mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3">
+        <Link
+          to={-1}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          ← Retour
         </Link>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">Facture N° <strong className="text-gray-800">{facture.numero}</strong></span>
+        <div className="flex flex-wrap gap-2">
           <button
-            onClick={handlePrint}
-            className="flex items-center gap-2 text-white font-semibold px-5 py-2.5 rounded-lg transition-opacity shadow-md hover:shadow-lg text-sm hover:opacity-90"
-            style={{ backgroundColor: p1 }}
+            type="button"
+            disabled={pdfBusy}
+            onClick={handleDownload}
+            className="rounded-lg border-2 px-5 py-2.5 text-sm font-bold transition hover:bg-white disabled:opacity-50"
+            style={{ color: primary, borderColor: primary }}
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-            Imprimer / Télécharger PDF
+            {pdfBusy ? 'Préparation…' : 'Télécharger'}
+          </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-md"
+            style={{ backgroundColor: primary }}
+          >
+            Imprimer
           </button>
         </div>
       </div>
 
-      {/* FACTURE */}
-      <div ref={printRef} className="print-page max-w-4xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden">
+      <article className="print-page mx-auto max-w-[210mm] overflow-hidden bg-white text-[13px] text-slate-800 shadow-xl">
+        <div className="h-1" style={{ background: primary }} />
 
-        <div className="text-white px-10 py-8" style={headerGrad}>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                {eb?.logo_url ? (
-                  <img src={eb.logo_url} alt="" className="w-12 h-12 object-contain rounded-xl bg-white/95 p-1" />
-                ) : (
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-sm font-bold">
-                    {(eb?.nom || 'U').slice(0, 2).toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <div className="text-xl font-bold">{eb?.nom || 'UniPréinscription'}</div>
-                  <div className="text-white/80 text-xs">
-                    {eb?.nom ? 'Facture proforma — préinscription' : 'Plateforme officielle de préinscription'}
-                  </div>
-                </div>
-              </div>
-              <div className="text-white/80 text-xs leading-relaxed">
-                {eb ? (
-                  <>
-                    {eb.adresse && <p>{eb.adresse}</p>}
-                    <p>
-                      {[eb.email_contact, eb.telephone].filter(Boolean).join(' · ') || '—'}
-                    </p>
-                    {(eb.ninea || eb.site_web) && (
-                      <p>
-                        {eb.ninea && <>NINEA : {eb.ninea}</>}
-                        {eb.ninea && eb.site_web && ' · '}
-                        {eb.site_web}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <p>Dakar, Sénégal</p>
-                    <p>contact@universite.sn · +221 33 000 00 00</p>
-                    <p>NINEA : 123456789 · RC : SN-DKR-2010-A-12345</p>
-                  </>
-                )}
-              </div>
+        <header className="flex items-start justify-between gap-6 px-8 pb-5 pt-6">
+          <div className="flex min-w-0 items-start gap-4">
+            <div
+              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden border border-slate-100"
+              style={{ background: eb.logo_url ? '#fff' : primary }}
+            >
+              {eb.logo_url ? (
+                <img src={mediaUrl(eb.logo_url)} alt="" className="h-full w-full object-contain p-1" />
+              ) : (
+                <span className="text-2xl font-black text-white">{etabNom.slice(0, 1)}</span>
+              )}
             </div>
-
-            <div className="text-right">
-              <div className="inline-block bg-yellow-400 text-gray-900 font-black text-xl px-6 py-2 rounded-xl tracking-wide mb-3">
-                FACTURE PROFORMA
-              </div>
-              <div className="space-y-1 text-sm">
-                <div className="text-white/80">N° <strong className="text-white font-mono text-base">{facture.numero}</strong></div>
-                <div className="text-white/80">Date d'émission : <strong className="text-white">{fmtDate(facture.date_emission)}</strong></div>
-                <div className="text-white/80">Valable jusqu'au : <strong className="text-white">{fmtDate(facture.date_echeance)}</strong></div>
+            <div className="min-w-0">
+              <h1 className="text-base font-black uppercase tracking-wide" style={{ color: primary }}>
+                {etabNom}
+              </h1>
+              <div className="mt-1.5 space-y-0.5 text-[11px] leading-snug text-slate-600">
+                {contacts.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Bandeau statut */}
-        <div className="bg-amber-50 border-b border-amber-100 px-10 py-3 flex items-center gap-2">
-          <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-          <p className="text-amber-700 text-sm font-medium">Document non contractuel — Cette facture proforma est émise à titre indicatif avant confirmation de votre inscription.</p>
-        </div>
-
-        <div className="px-10 py-8">
-          {/* Parties */}
-          <div className="grid grid-cols-2 gap-8 mb-8">
-            {/* Émetteur */}
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Émetteur</div>
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <div className="font-bold text-gray-900 text-base">{eb?.nom || 'UniPréinscription'}</div>
-                <div className="text-sm text-gray-600 mt-1 space-y-0.5">
-                  {eb ? (
-                    <>
-                      {eb.adresse && <p>{eb.adresse}</p>}
-                      {eb.telephone && <p>Tél : {eb.telephone}</p>}
-                      {eb.email_contact && <p>Email : {eb.email_contact}</p>}
-                      {eb.site_web && <p>{eb.site_web}</p>}
-                    </>
-                  ) : (
-                    <>
-                      <p>Université Nationale du Sénégal</p>
-                      <p>BP 5005, Dakar, Sénégal</p>
-                      <p>Tél : +221 33 000 00 00</p>
-                      <p>Email : contact@universite.sn</p>
-                    </>
-                  )}
-                </div>
-              </div>
+          <div className="shrink-0 text-right">
+            <div
+              className="inline-block px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-white"
+              style={{ background: primary }}
+            >
+              Facture proforma
             </div>
-
-            {/* Destinataire */}
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Destinataire</div>
-              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                <div className="font-bold text-gray-900 text-base">{et.prenom} {et.nom}</div>
-                <div className="text-sm text-gray-600 mt-1 space-y-0.5">
-                  <p>Nationalité : {et.nationalite}</p>
-                  <p>Tél : {et.telephone}</p>
-                  <p>Email : {et.email}</p>
-                  <p className="text-xs">{et.adresse}</p>
-                </div>
-              </div>
-            </div>
+            <p className="mt-2.5 font-mono text-sm font-bold" style={{ color: primary }}>{facture.numero}</p>
+            <p className="mt-1 text-[11px] text-slate-500">{fmtDate(facture.date_emission)}</p>
           </div>
+        </header>
 
-          {/* Objet */}
-          <div className="mb-6 p-4 rounded-xl border" style={{ backgroundColor: `${p1}12`, borderColor: `${p1}33` }}>
-            <div className="text-xs font-bold uppercase tracking-widest mb-1 opacity-70" style={{ color: p1 }}>Objet</div>
-            <p className="font-semibold text-gray-900">
-              Préinscription — {fo.titre} ({fo.type === 'en_ligne' ? 'Formation en ligne' : `Formation présentielle · ${fo.ville}`})
+        <div className="mx-8 border-t border-slate-200" />
+
+        <section className="grid gap-6 px-8 py-5 sm:grid-cols-2">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: primary }}>Bénéficiaire</p>
+            <p className="mt-1.5 text-[15px] font-bold text-slate-900">{prenom} {nom.toUpperCase()}</p>
+            {et.email && <p className="mt-1 text-sm text-slate-600">{et.email}</p>}
+            {et.telephone && <p className="text-sm text-slate-600">Tél. {et.telephone}</p>}
+            {et.nationalite && <p className="text-sm text-slate-600">Nationalité : {et.nationalite}</p>}
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: primary }}>Formation</p>
+            <p className="mt-1.5 font-bold text-slate-900">{fo.titre || '—'}</p>
+            <p className="mt-1.5 text-xs text-slate-600">
+              {[
+                fo.niveau && `Niveau : ${fo.niveau}`,
+                typeLabel(fo.type),
+                (fo.duree_formation || fo.duree) && `Durée : ${fo.duree_formation || fo.duree}`,
+              ].filter(Boolean).join(' · ')}
             </p>
-            <p className="text-sm mt-1 text-gray-600">Durée : {fo.duree} · Niveau requis : {fo.niveau_requis}</p>
           </div>
+        </section>
 
-          {/* Tableau des montants */}
-          <div className="mb-8">
-            <table className="w-full">
-              <thead>
-                <tr className="text-white" style={bandStyle}>
-                  <th className="text-left py-3.5 px-5 text-sm font-semibold rounded-tl-xl">Désignation</th>
-                  <th className="text-center py-3.5 px-4 text-sm font-semibold">Qté</th>
-                  <th className="text-right py-3.5 px-5 text-sm font-semibold rounded-tr-xl">Montant (FCFA)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {facture.lignes.map((ligne, i) => (
-                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="py-4 px-5">
-                      <div className="text-sm font-medium text-gray-800">{ligne.description}</div>
-                    </td>
-                    <td className="py-4 px-4 text-center text-sm text-gray-600">{ligne.quantite}</td>
-                    <td className="py-4 px-5 text-right text-sm font-semibold text-gray-800">{fmt(ligne.total)}</td>
-                  </tr>
-                ))}
-                {(facture.lignes_supplementaires || []).map((ligne, j) => (
-                  <tr key={`sup-${j}`} className="bg-amber-50/90">
-                    <td className="py-4 px-5">
-                      <div className="text-sm font-medium text-amber-900">{ligne.designation}</div>
-                      <div className="text-xs text-amber-800">Non inclus dans le sous-total HT (forfait annuel)</div>
-                    </td>
-                    <td className="py-4 px-4 text-center text-sm text-gray-600">1</td>
-                    <td className="py-4 px-5 text-right text-sm font-semibold text-amber-900">{fmt(ligne.montant)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Totaux */}
-            <div className="mt-0 border border-gray-100 rounded-b-xl overflow-hidden">
-              <div className="flex justify-end">
-                <div className="w-72">
-                  <div className="flex justify-between items-center px-5 py-3 bg-gray-50 border-t border-gray-100">
-                    <span className="text-sm text-gray-600">Sous-total HT</span>
-                    <span className="text-sm font-semibold text-gray-800">{fmt(facture.montant_ht)} FCFA</span>
-                  </div>
-                  <div className="flex justify-between items-center px-5 py-3 bg-gray-50 border-t border-gray-100">
-                    <span className="text-sm text-gray-600">TVA ({facture.tva_taux}%)</span>
-                    <span className="text-sm font-semibold text-gray-500">{facture.tva_taux === 0 ? 'Exonéré' : `${fmt(facture.montant_tva)} FCFA`}</span>
-                  </div>
-                  <div
-                    className="flex justify-between items-center px-5 py-4 text-white rounded-b-xl border-t border-gray-100"
-                    style={bandStyle}
+        <section className="px-8 pb-4">
+          <table className="w-full border-collapse overflow-hidden border border-slate-200">
+            <thead>
+              <tr style={{ background: primary }}>
+                <th className="px-4 py-2.5 text-left text-sm font-semibold text-white">Désignation</th>
+                <th className="w-40 px-4 py-2.5 text-right text-sm font-semibold text-white">Montant (FCFA)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={`${r.designation}-${i}`} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/80'}>
+                  <td
+                    className={`px-4 py-2.5 text-sm ${
+                      r.isTotalMensualites
+                        ? 'font-semibold text-slate-900'
+                        : r.isUnitMensualite
+                          ? 'text-slate-500'
+                          : 'font-medium text-slate-800'
+                    }`}
                   >
-                    <span className="font-bold text-base">TOTAL TTC</span>
-                    <span className="font-black text-xl">{fmt(facture.montant_ttc)} FCFA</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+                    {r.designation}
+                  </td>
+                  <td
+                    className={`px-4 py-2.5 text-right text-sm tabular-nums ${
+                      r.isTotalMensualites
+                        ? 'font-bold text-slate-900'
+                        : r.isUnitMensualite
+                          ? 'text-slate-500'
+                          : 'font-semibold text-slate-900'
+                    }`}
+                  >
+                    {fmt(r.montant)}
+                  </td>
+                </tr>
+              ))}
+              <tr style={{ background: primary }}>
+                <td className="px-4 py-3 text-sm font-bold text-white">Montant total à payer</td>
+                <td className="px-4 py-3 text-right text-base font-black tabular-nums text-white">
+                  {fmt(totalAPayer)} <span className="text-xs font-bold opacity-90">FCFA</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
 
-          {/* Montant en lettres */}
-          <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-8">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Arrêté à la somme de : </span>
-            <span className="text-sm font-semibold text-gray-800 ml-1">{fmt(facture.montant_ttc)} Francs CFA</span>
-          </div>
+        <CoordonneesPaiement eb={eb} primary={primary} />
 
-          {/* Conditions de paiement */}
-          <div className="grid grid-cols-2 gap-6 mb-8">
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Modalités de paiement</div>
-              <div className="space-y-2 text-sm text-gray-600">
-                <div className="flex items-start gap-2">
-                  <span className="font-bold mt-0.5" style={{ color: p1 }}>▸</span>
-                  <span>
-                    <strong>Virement bancaire :</strong>{' '}
-                    {eb?.compte_bancaire?.trim()
-                      ? eb.compte_bancaire
-                      : 'IBAN SN00 XXXX XXXX XXXX XXXX XXXX XXX'}
-                  </span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="font-bold mt-0.5" style={{ color: p1 }}>▸</span>
-                  <span>
-                    <strong>Mobile Money :</strong>{' '}
-                    {eb?.telephone ? `Coordonnées secrétariat : ${eb.telephone}` : 'Orange Money / Wave (+221 77 000 00 00)'}
-                  </span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="font-bold mt-0.5" style={{ color: p1 }}>▸</span>
-                  <span>
-                    <strong>Espèces :</strong>{' '}
-                    {eb?.nom ? `à la caisse de ${eb.nom} (selon consignes du secrétariat)` : "à la caisse de l'université (Lun-Ven 8h-16h)"}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Informations importantes</div>
-              <div className="space-y-2 text-sm text-gray-600">
-                <div className="flex items-start gap-2"><span className="text-amber-500 font-bold mt-0.5">▸</span><span>Cette facture est valable jusqu'au <strong>{fmtDate(facture.date_echeance)}</strong></span></div>
-                <div className="flex items-start gap-2"><span className="text-amber-500 font-bold mt-0.5">▸</span><span>Joindre le numéro de dossier lors du paiement</span></div>
-                <div className="flex items-start gap-2"><span className="text-amber-500 font-bold mt-0.5">▸</span><span>L'inscription est confirmée après réception du paiement</span></div>
-              </div>
-            </div>
+        <section className="flex items-end justify-between gap-6 px-8 pb-7 pt-1">
+          <div className="max-w-xs text-[10px] leading-relaxed text-slate-500">
+            <p>Document non contractuel — Facture proforma émise à titre indicatif.</p>
+            {facture.date_echeance && (
+              <p className="mt-1">Valable jusqu’au {fmtDate(facture.date_echeance)}.</p>
+            )}
           </div>
-
-          {/* Signature */}
-          <div className="flex justify-between items-end border-t border-gray-100 pt-6">
-            <div className="text-xs text-gray-400 max-w-xs">
-              <p>Ce document a été généré électroniquement et est valide sans signature manuscrite.</p>
-              <p className="mt-1">Référence dossier : <strong className="font-mono text-gray-600">{dossierId}</strong></p>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-400 mb-4">
-                {eb?.nom ? `Pour ${eb.nom}` : "Pour l'administration"}
-              </div>
-              <div className="w-44 min-h-[4.5rem] border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center p-2 mx-auto ml-auto">
-                {eb?.cachet_url ? (
-                  <img src={eb.cachet_url} alt="Cachet officiel" className="max-h-20 max-w-full object-contain" />
-                ) : (
-                  <div className="text-center py-2">
-                    <div className="text-xs text-gray-400">Cachet & Signature</div>
-                  </div>
-                )}
-              </div>
-              <div className="mt-2 text-xs text-gray-500 font-semibold">Le Directeur des Études</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Pied de page */}
-        <div className="bg-gray-900 text-gray-400 text-center py-4 px-10">
-          <p className="text-xs">
-            {eb?.nom ? eb.nom : 'UniPréinscription · Dakar, Sénégal'}
-            {eb?.email_contact || eb?.telephone
-              ? ` · ${[eb.email_contact, eb.telephone].filter(Boolean).join(' · ')}`
-              : ' · contact@universite.sn · Tél : +221 33 000 00 00'}
-          </p>
-          <p className="text-xs mt-1 text-gray-500">Document généré le {fmtDate(facture.created_at)} · Facture N° {facture.numero}</p>
-        </div>
-      </div>
+          <CachetScolarite cachetUrl={eb.cachet_url} />
+        </section>
+      </article>
     </div>
   )
 }

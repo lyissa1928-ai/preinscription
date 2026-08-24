@@ -349,7 +349,7 @@ export default function EtablissementHome() {
               </p>
             )}
           </div>
-          {user?.role === 'responsable' && (
+          {(user?.role === 'responsable' || user?.fonctions?.includes?.('responsable')) && (
             <Link to="/responsable/gestion-etablissement"
               className="text-sm font-bold px-4 py-2 rounded-xl border-2 transition-all hover:opacity-80 shrink-0 self-start"
               style={{ color: primary, borderColor: primary }}>
@@ -556,21 +556,45 @@ export default function EtablissementHome() {
       </div>
 
       {!isEtudiant && (() => {
-        const proformaRoles = ['responsable', 'admin', 'agent_admin', 'comptable', 'controleur_qualite']
-        const showProforma = proformaRoles.includes(user?.role)
+        const role = user?.role
         const quick = [
-          roleLink && { ...roleLink, desc: 'Gérer les dossiers de préinscription' },
-          showProforma && {
+          roleLink && { ...roleLink, desc: 'Tableau de bord de votre rôle' },
+          role === 'responsable' && {
+            label: 'Dossiers & acceptation',
+            path: '/responsable',
+            icon: '✅',
+            desc: 'Accepter ou refuser les préinscriptions',
+          },
+          ['responsable', 'comptable'].includes(role) && {
             label: 'Demandes proforma',
             path: '/responsable/demandes-proforma',
             icon: '🧾',
-            desc: "Demandes de facture proforma et validation",
+            desc: 'Demandes de facture proforma',
           },
-          user?.role === 'responsable' && { label: 'Valider des dossiers', path: '/responsable', icon: '✅', desc: 'Accepter ou refuser des candidatures' },
-          user?.role === 'agent_admin' && { label: 'Vérifier les documents', path: '/agent-admin', icon: '📎', desc: 'Contrôle de complétude des dossiers' },
-          user?.role === 'comptable' && { label: 'Finance', path: '/comptable', icon: '💰', desc: 'Gestion financière et facturation' },
-          user?.role === 'admin' && { label: 'Administration', path: '/admin', icon: '👁️', desc: 'Vue globale de la plateforme' },
-          user?.role === 'controleur_qualite' && { label: 'Qualité', path: '/qualite', icon: '✅', desc: 'Contrôle et conformité' },
+          ['responsable', 'agent_admin'].includes(role) && {
+            label: 'Guichet',
+            path: '/responsable/preinscription-guichet',
+            icon: '🧾',
+            desc: 'Saisie walk-in',
+          },
+          role === 'responsable' && {
+            label: 'Formations',
+            path: '/responsable/gestion-etablissement',
+            icon: '📚',
+            desc: 'Filières et formations',
+          },
+          {
+            label: 'Messages',
+            path: '/chat',
+            icon: '💬',
+            desc: 'Messagerie',
+          },
+          ['responsable', 'agent_admin', 'comptable'].includes(role) && {
+            label: 'Factures',
+            path: '/mon-etablissement/factures',
+            icon: '📄',
+            desc: 'Historique des factures',
+          },
         ].filter(Boolean)
         return (
           <div>

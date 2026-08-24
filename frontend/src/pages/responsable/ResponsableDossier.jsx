@@ -229,25 +229,27 @@ export default function ResponsableDossier() {
           Documents officiels
         </h3>
         <p className="mb-4 text-xs leading-relaxed text-emerald-800/90">
-          Préinscription acceptée : ouvrez la lettre ou l’attestation dans un nouvel onglet.
+          Préinscription acceptée : attestation (et lettre uniquement pour un candidat étranger en ligne).
         </p>
         <div className="flex flex-col gap-2.5">
-          <Link
-            to={`/lettre/${id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-900/15 transition hover:bg-emerald-700 hover:shadow-lg"
-          >
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-              />
-            </svg>
-            Lettre de préinscription
-          </Link>
+          {dossier?.source !== 'staff' && (
+            <Link
+              to={`/lettre/${id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-900/15 transition hover:bg-emerald-700 hover:shadow-lg"
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                />
+              </svg>
+              Lettre de préinscription
+            </Link>
+          )}
           <Link
             to={`/attestation/${id}`}
             target="_blank"

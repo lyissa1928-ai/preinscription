@@ -97,8 +97,10 @@ export default function ResponsableGestionEtab() {
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Gestion pédagogique</h1>
-              <p className="text-slate-500 text-sm truncate">{etab.nom} — filières et formations</p>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Filières & formations</h1>
+              <p className="text-slate-500 text-sm truncate">
+                {etab.nom} — modification limitée à votre établissement
+              </p>
             </div>
           </div>
         </header>

@@ -355,14 +355,14 @@ async function generatePDF(data) {
     y += 17
   }
 
-  // ── LA DIRECTION (cachet) ─────────────────────────────────────────────────
+  // ── LA SCOLARITÉ (cachet) ─────────────────────────────────────────────────
   if (cachetB64) {
     const cW = 30, cH = 30
     const cx = W - M - cW
     try {
-      doc.addImage(cachetB64, 'AUTO', cx, y, cW, cH)
-      doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 70, 90)
-      doc.text('La Direction', cx + cW / 2, y + cH + 4, { align: 'center' })
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(71, 85, 105)
+      doc.text('LA SCOLARITÉ', cx + cW / 2, y + 3, { align: 'center' })
+      doc.addImage(cachetB64, 'AUTO', cx, y + 5, cW, cH)
     } catch { /* pas de cachet */ }
   }
 
@@ -766,15 +766,15 @@ export default function PublicFactureView() {
           </div>
         </div>
 
-        {/* ── CACHET / LA DIRECTION ───────────────────────────────────────── */}
-        {etab.cachet_url && (
-          <div className="px-8 mb-6 flex justify-end">
-            <div className="text-center">
-              <img src={mediaUrl(etab.cachet_url)} alt="La Direction" className="w-28 h-28 object-contain opacity-90" />
-              <p className="text-xs text-gray-500 mt-1 font-semibold">La Direction</p>
-            </div>
+        {/* ── CACHET / LA SCOLARITÉ ───────────────────────────────────────── */}
+        <div className="px-8 mb-6 flex justify-end">
+          <div className="text-center">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">La scolarité</p>
+            {etab.cachet_url ? (
+              <img src={mediaUrl(etab.cachet_url)} alt="Cachet de la scolarité" className="mx-auto my-2 w-28 h-28 object-contain opacity-90" />
+            ) : null}
           </div>
-        )}
+        </div>
 
         {/* ── CTA ──────────────────────────────────────────────────────────── */}
         <div className="px-8 mb-8">

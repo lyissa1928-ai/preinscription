@@ -97,7 +97,6 @@ function getFraisSupplementairesEffectifs(formation) {
  * Détail des lignes pour facture / proforma (forfait annuel uniquement dans montant_ht).
  */
 function buildLignesForfaitAnnuel(formation) {
-  const titre = formation?.titre || 'Formation';
   const fi = parseInt(formation?.frais_inscription, 10) || 0;
   const men = parseInt(formation?.mensualite, 10) || 0;
   const mois = getDureeMoisEffectif(formation);
@@ -106,21 +105,24 @@ function buildLignesForfaitAnnuel(formation) {
 
   const lignes = [];
   if (fi > 0) {
-    lignes.push({ designation: `Frais d'inscription — ${titre}`, montant: fi });
+    lignes.push({ designation: "Frais d'inscription", montant: fi });
   }
   if (mois > 0 && men > 0) {
     lignes.push({
-      designation: `Mensualités (${mois} mois × ${men.toLocaleString('fr-FR')} FCFA) — ${titre}`,
-      montant: partMensualites,
+      designation: 'Mensualité',
+      montant: men,
+      kind: 'mensualite_unitaire',
+      duree_mois: mois,
+      total_mensualites: partMensualites,
     });
   } else if (partMensualites > 0) {
     lignes.push({
-      designation: `Mensualités — ${titre}`,
+      designation: 'Scolarité',
       montant: partMensualites,
     });
   }
   if (lignes.length === 0) {
-    lignes.push({ designation: `Forfait annuel — ${titre}`, montant: montant_ht });
+    lignes.push({ designation: 'Forfait formation', montant: montant_ht });
   }
 
   const supp = getFraisSupplementairesEffectifs(formation);

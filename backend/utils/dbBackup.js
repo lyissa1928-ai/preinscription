@@ -1,8 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const { runWithDbLockSync } = require('./dbWriteQueue');
 
 const DB_PATH = path.join(__dirname, '..', 'database', 'preinscription.json');
 const BACKUP_DIR = path.join(__dirname, '..', 'database', 'backups');
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+const UPLOADS_BACKUP_DIR = path.join(BACKUP_DIR, 'uploads');
 
 function ensureBackupDir() {
   if (!fs.existsSync(BACKUP_DIR)) {
@@ -25,7 +28,9 @@ function createBackup(label = 'manual') {
   ensureBackupDir();
   const fileName = `preinscription-${label}-${stamp()}.json`;
   const backupPath = path.join(BACKUP_DIR, fileName);
-  fs.copyFileSync(DB_PATH, backupPath);
+  runWithDbLockSync(DB_PATH, () => {
+    fs.copyFileSync(DB_PATH, backupPath);
+  });
   return backupPath;
 }
 
@@ -44,10 +49,72 @@ function pruneBackups(maxFiles = 50) {
   return { kept: Math.min(all.length, maxFiles), removed: toDelete.length };
 }
 
+function copyDirRecursive(src, dest) {
+  if (!fs.existsSync(src)) return;
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const s = path.join(src, entry.name);
+    const d = path.join(dest, entry.name);
+    if (entry.isDirectory()) copyDirRecursive(s, d);
+    else fs.copyFileSync(s, d);
+  }
+}
+
+function createUploadsBackup(label = 'manual') {
+  ensureBackupDir();
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(UPLOADS_BACKUP_DIR)) {
+    fs.mkdirSync(UPLOADS_BACKUP_DIR, { recursive: true });
+  }
+  const dirName = `uploads-${label}-${stamp()}`;
+  const backupPath = path.join(UPLOADS_BACKUP_DIR, dirName);
+  copyDirRecursive(UPLOADS_DIR, backupPath);
+  return backupPath;
+}
+
+function pruneUploadsBackups(maxDirs = 20) {
+  ensureBackupDir();
+  if (!fs.existsSync(UPLOADS_BACKUP_DIR)) return { kept: 0, removed: 0 };
+  const all = fs.readdirSync(UPLOADS_BACKUP_DIR, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && e.name.startsWith('uploads-'))
+    .map((e) => {
+      const p = path.join(UPLOADS_BACKUP_DIR, e.name);
+      return { name: e.name, path: p, stat: fs.statSync(p) };
+    })
+    .sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
+
+  const toDelete = all.slice(maxDirs);
+  toDelete.forEach((f) => {
+    try {
+      fs.rmSync(f.path, { recursive: true, force: true });
+    } catch (_) {}
+  });
+  return { kept: Math.min(all.length, maxDirs), removed: toDelete.length };
+}
+
+function runFullBackup(label = 'scheduled') {
+  const dbPath = createBackup(label);
+  const uploadsPath = createUploadsBackup(label);
+  const dbPrune = pruneBackups(
+    parseInt(process.env.BACKUP_MAX_FILES || '80', 10) || 80
+  );
+  const uploadsPrune = pruneUploadsBackups(
+    parseInt(process.env.BACKUP_UPLOADS_MAX_DIRS || '20', 10) || 20
+  );
+  return { dbPath, uploadsPath, dbPrune, uploadsPrune };
+}
+
 module.exports = {
   DB_PATH,
   BACKUP_DIR,
+  UPLOADS_DIR,
+  UPLOADS_BACKUP_DIR,
   createBackup,
+  createUploadsBackup,
   pruneBackups,
+  pruneUploadsBackups,
+  runFullBackup,
 };
 

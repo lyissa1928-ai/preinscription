@@ -2,10 +2,13 @@ const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const fs = require('fs');
 const { createBackup, pruneBackups } = require('../utils/dbBackup');
+const { installWriteLockOnAdapter, runWithDbLockSync } = require('../utils/dbWriteQueue');
 
 const DB_PATH = path.join(__dirname, 'preinscription.json');
 const adapter = new FileSync(DB_PATH);
+installWriteLockOnAdapter(adapter, DB_PATH);
 let db;
 try {
   db = low(adapter);
@@ -56,6 +59,8 @@ db.defaults({
   audit_logs: [],
   security_events: [],
   conditions_admission: [],
+  chatbot_logs: [],
+  chatbot_config: [],
   _nextId: {
     etablissements: 1,
     filieres: 1,
@@ -69,6 +74,7 @@ db.defaults({
     audit_logs: 1,
     security_events: 1,
     conditions_admission: 1,
+    chatbot_logs: 1,
   },
 }).write();
 
@@ -79,24 +85,46 @@ db.defaults({
 // Admin
 const adminExist = db.get('utilisateurs').find({ role: 'admin' }).value();
 if (!adminExist) {
-  const hash = bcrypt.hashSync('Admin123!', 10);
+  // Mot de passe : ADMIN_BOOTSTRAP_PASSWORD si fourni, sinon généré aléatoirement.
+  // On force le changement à la première connexion et on ne journalise jamais le
+  // mot de passe (écrit dans .credentials_dev.txt, ignoré par git, pour le dev).
+  const crypto = require('crypto');
+  const provided = String(process.env.ADMIN_BOOTSTRAP_PASSWORD || '').trim();
+  const plain = provided || `Adm-${crypto.randomBytes(9).toString('base64url')}!`;
+  const hash = bcrypt.hashSync(plain, 10);
+  const email = process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@universite.sn';
   const id = db.get('_nextId.utilisateurs').value();
   db.get('utilisateurs').push({
     id, nom: 'Admin', prenom: 'Système',
-    email: 'admin@universite.sn',
+    email,
     mot_de_passe: hash, role: 'admin',
     matricule: `ADM-${String(id).padStart(6, '0')}`,
     date_naissance: null,
     telephone: '',
     adresse: '',
-    must_change_password: false,
+    must_change_password: true,
     login_attempts: 0,
     is_locked: false,
     lock_until: null,
     created_at: new Date().toISOString()
   }).write();
   db.set('_nextId.utilisateurs', id + 1).write();
-  console.log('✅ Admin : admin@universite.sn / Admin123!');
+
+  if (provided) {
+    console.log(`✅ Admin initial créé (${email}). Mot de passe : celui de ADMIN_BOOTSTRAP_PASSWORD. Changement requis à la 1re connexion.`);
+  } else {
+    try {
+      const credPath = path.join(__dirname, '..', '.credentials_dev.txt');
+      fs.writeFileSync(
+        credPath,
+        `Admin initial UniPortail\nEmail : ${email}\nMot de passe (temporaire) : ${plain}\nChangement obligatoire à la première connexion.\nGénéré le ${new Date().toISOString()}\n`,
+        'utf8'
+      );
+      console.log(`✅ Admin initial créé (${email}). Mot de passe temporaire écrit dans backend/.credentials_dev.txt (changement requis à la 1re connexion).`);
+    } catch {
+      console.log(`✅ Admin initial créé (${email}). Définissez ADMIN_BOOTSTRAP_PASSWORD pour choisir le mot de passe (changement requis à la 1re connexion).`);
+    }
+  }
 }
 
 // Note : les comptes staff (responsable, agent_admin, comptable, etc.)
@@ -130,6 +158,7 @@ try {
   'audit_logs',
   'security_events',
   'conditions_admission',
+  'chatbot_logs',
 ].forEach((col) => {
   const v = db.get(`_nextId.${col}`).value();
   if (!v || typeof v !== 'number') {
@@ -144,12 +173,13 @@ try {
   }
 });
 
-// Helper ID auto-incrémenté
-db.nextId = (collection) => {
-  const id = db.get(`_nextId.${collection}`).value() || 1;
-  db.set(`_nextId.${collection}`, id + 1).write();
-  return id;
-};
+// Helper ID auto-incrémenté (sérialisé — évite doublons d’id entre requêtes concurrentes)
+db.nextId = (collection) =>
+  runWithDbLockSync(DB_PATH, () => {
+    const id = db.get(`_nextId.${collection}`).value() || 1;
+    db.set(`_nextId.${collection}`, id + 1).write();
+    return id;
+  });
 
 // ─── Migration : matricule / flags pour comptes existants (rétrocompatibilité) ─
 (() => {

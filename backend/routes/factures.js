@@ -4,13 +4,15 @@ const db = require('../database/db');
 const { authMiddleware, adminOnly } = require('../middleware/auth');
 const { genererOuRecupererFactureDossier, syncStoredFactureById } = require('../services/factureService');
 const { isFactureSupprimee } = require('../utils/factureVisibility');
+const { parsePagination, wantsPagination, paginateArray } = require('../utils/pagination');
 
 function dossierDansEtablissementUtilisateur(dossier, user) {
   if (!user.etablissement_id) return false;
-  if (dossier.etablissement_id && dossier.etablissement_id === user.etablissement_id) return true;
+  const eid = Number(user.etablissement_id);
+  if (dossier.etablissement_id != null && Number(dossier.etablissement_id) === eid) return true;
   if (dossier.formation_id) {
     const f = db.get('formations').find({ id: dossier.formation_id }).value();
-    return f && f.etablissement_id === user.etablissement_id;
+    return f && Number(f.etablissement_id) === eid;
   }
   return false;
 }
@@ -86,6 +88,11 @@ router.get('/:id', authMiddleware, (req, res) => {
 // GET /api/factures - Admin : toutes les factures
 router.get('/', authMiddleware, adminOnly, (req, res) => {
   const factures = (db.get('factures').value() || []).filter((f) => !isFactureSupprimee(f));
+  if (wantsPagination(req.query)) {
+    const { page, limit } = parsePagination(req.query, { page: 1, limit: 50 });
+    const { items, pagination } = paginateArray(factures, page, limit);
+    return res.json({ factures: items, pagination });
+  }
   res.json(factures);
 });
 

@@ -69,7 +69,7 @@ export default function Login() {
     setLoading(true)
     try {
       const { data } = await axios.post('/api/auth/connexion', form)
-      login(data.token, data.utilisateur)
+      login(data.token, data.utilisateur, data.refresh_token)
       const u = data.utilisateur
       toast.success(`Bienvenue, ${u.prenom || u.nom} !`)
       if (u.must_change_password) {

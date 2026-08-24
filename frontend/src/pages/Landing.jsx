@@ -14,6 +14,16 @@ import {
   FaChevronDown,
 } from 'react-icons/fa'
 import Navbar from '../components/Navbar'
+import { useAuth } from '../context/AuthContext'
+
+const DASHBOARD_BY_ROLE = {
+  admin: '/admin',
+  responsable: '/responsable',
+  agent_admin: '/agent-admin',
+  comptable: '/comptable',
+  controleur_qualite: '/qualite',
+  etudiant: '/dashboard',
+}
 
 const STATS = [
   { value: '12 000+', label: 'Étudiants accompagnés', icon: '🎓' },
@@ -132,6 +142,8 @@ function AnimatedStat({ value, label, icon, delay = 0 }) {
 export default function Landing() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const dashboardPath = user ? (DASHBOARD_BY_ROLE[user.role] || '/accueil') : null
   const [etablissements, setEtablissements] = useState([])
   const [etablissementsLoaded, setEtablissementsLoaded] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
@@ -353,32 +365,77 @@ export default function Landing() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-stretch gap-3">
-                    <Link
-                      to="/inscription"
-                      className="group inline-flex justify-center items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-7 py-3.5 text-sm sm:text-base font-black text-slate-900 shadow-lg shadow-orange-500/25 transition-all hover:shadow-orange-400/35 hover:-translate-y-0.5"
-                    >
-                      Créer un compte
-                      <FaArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                    </Link>
-                    <Link
-                      to="/connexion"
-                      className="inline-flex justify-center items-center rounded-2xl border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/10"
-                    >
-                      Connexion
-                    </Link>
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                    Sans compte : consultation des{' '}
-                    <Link to="/etablissements" className="font-semibold text-white/90 hover:text-white underline decoration-white/30 underline-offset-2">
-                      établissements
-                    </Link>
-                    {' '}et des conditions d’admission (lecture). La préinscription et la demande de facture proforma se font après{' '}
-                    <Link to="/inscription" className="font-semibold text-amber-200/95 hover:text-white underline decoration-amber-400/40 underline-offset-2">
-                      création de compte
-                    </Link>
-                    .
-                  </p>
+                  {user ? (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-stretch gap-3">
+                        <Link
+                          to={dashboardPath}
+                          className="group inline-flex justify-center items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-7 py-3.5 text-sm sm:text-base font-black text-slate-900 shadow-lg shadow-orange-500/25 transition-all hover:shadow-orange-400/35 hover:-translate-y-0.5"
+                        >
+                          Tableau de bord
+                          <FaArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                        </Link>
+                        {['responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(user.role) && (
+                          <>
+                            <Link
+                              to="/responsable/gestion-etablissement"
+                              className="inline-flex justify-center items-center rounded-2xl border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/10"
+                            >
+                              Formations
+                            </Link>
+                            <Link
+                              to="/responsable"
+                              className="inline-flex justify-center items-center rounded-2xl border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/10"
+                            >
+                              Préinscriptions
+                            </Link>
+                          </>
+                        )}
+                        {user.role === 'etudiant' && (
+                          <Link
+                            to="/preinscription"
+                            className="inline-flex justify-center items-center rounded-2xl border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/10"
+                          >
+                            Préinscription
+                          </Link>
+                        )}
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                        Connecté en tant que <span className="text-white font-semibold">{user.prenom} {user.nom}</span>
+                        {' — '}
+                        accédez à votre espace pour traiter les dossiers et les formations.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-stretch gap-3">
+                        <Link
+                          to="/inscription"
+                          className="group inline-flex justify-center items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-7 py-3.5 text-sm sm:text-base font-black text-slate-900 shadow-lg shadow-orange-500/25 transition-all hover:shadow-orange-400/35 hover:-translate-y-0.5"
+                        >
+                          Créer un compte
+                          <FaArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                        </Link>
+                        <Link
+                          to="/connexion"
+                          className="inline-flex justify-center items-center rounded-2xl border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/10"
+                        >
+                          Connexion
+                        </Link>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                        Sans compte : consultation des{' '}
+                        <Link to="/etablissements" className="font-semibold text-white/90 hover:text-white underline decoration-white/30 underline-offset-2">
+                          établissements
+                        </Link>
+                        {' '}et des conditions d’admission (lecture). La préinscription et la demande de facture proforma se font après{' '}
+                        <Link to="/inscription" className="font-semibold text-amber-200/95 hover:text-white underline decoration-amber-400/40 underline-offset-2">
+                          création de compte
+                        </Link>
+                        .
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -756,21 +813,47 @@ export default function Landing() {
                       Tous les établissements
                     </Link>
                   </li>
-                  <li>
-                    <Link to="/inscription" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
-                      Créer un compte
-                    </Link>
-                  </li>
-                  <li>
-                    <Link to="/connexion" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
-                      Connexion
-                    </Link>
-                  </li>
-                  <li>
-                    <Link to="/demande-proforma" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
-                      Facture proforma (compte requis)
-                    </Link>
-                  </li>
+                  {user ? (
+                    <>
+                      <li>
+                        <Link to={dashboardPath} className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
+                          Tableau de bord
+                        </Link>
+                      </li>
+                      {['responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(user.role) && (
+                        <>
+                          <li>
+                            <Link to="/responsable" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
+                              Préinscriptions
+                            </Link>
+                          </li>
+                          <li>
+                            <Link to="/responsable/gestion-etablissement" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
+                              Formations
+                            </Link>
+                          </li>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <li>
+                        <Link to="/inscription" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
+                          Créer un compte
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/connexion" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
+                          Connexion
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/demande-proforma" className="inline-block border-b border-transparent py-0.5 text-slate-400 transition-colors hover:border-slate-600 hover:text-white">
+                          Facture proforma (compte requis)
+                        </Link>
+                      </li>
+                    </>
+                  )}
                 </ul>
               </nav>
             </div>

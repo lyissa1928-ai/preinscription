@@ -290,14 +290,14 @@ export default function Register() {
         toast.error('Réponse serveur inattendue.')
         return
       }
-      login(data.token, data.utilisateur)
-      try {
-        sessionStorage.setItem('signup_creds_once', JSON.stringify({ p: form.mot_de_passe, t: Date.now() }))
-      } catch {
-        /* ignore */
-      }
+      login(data.token, data.utilisateur, data.refresh_token)
       toast.success('Compte créé — notez vos identifiants sur l’écran suivant.')
-      navigate('/bienvenue-compte', { replace: true, state: { next: nextAfterSignup } })
+      // Mot de passe transmis via l'état de navigation (mémoire uniquement),
+      // jamais via sessionStorage : perdu au refresh, invisible pour une XSS ultérieure.
+      navigate('/bienvenue-compte', {
+        replace: true,
+        state: { next: nextAfterSignup, passwordOnce: form.mot_de_passe },
+      })
     } catch (err) {
       recaptchaRef.current?.reset()
       setRecaptchaToken('')

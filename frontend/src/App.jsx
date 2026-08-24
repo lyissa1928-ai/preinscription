@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { userMatchesRoles } from './utils/roles'
 import AuthenticatedLayout from './layouts/AuthenticatedLayout'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
@@ -14,6 +15,7 @@ import {
   AttestationPreinscription,
   AttestationDemandePreinscription,
   AdminDashboard,
+  AdminDossiers,
   AdminDossier,
   AdminUsers,
   AdminEtablissements,
@@ -21,6 +23,7 @@ import {
   AdminProforma,
   AdminFacturesEtabPage,
   AdminAuditLogs,
+  AdminChatbotStats,
   AdminSecurityEvents,
   AdminMaintenance,
   AdminRuntimeMonitoring,
@@ -29,6 +32,7 @@ import {
   ResponsableDossier,
   ResponsableGestionEtab,
   ResponsableDemandesProforma,
+  StaffPreinscriptionGuichet,
   AgentAdminDashboard,
   AgentAdminDossier,
   ComptableDashboard,
@@ -50,6 +54,7 @@ import {
   ResetPasswordEmail,
 } from './lazyPages'
 import RedirectLettreDemandeDeprecated from './pages/RedirectLettreDemandeDeprecated'
+import ChatbotWidget from './components/ChatbotWidget'
 
 function PrivateRoute({ children, roles }) {
   const { user, loading } = useAuth()
@@ -65,7 +70,8 @@ function PrivateRoute({ children, roles }) {
     </div>
   )
   if (!user) return <Navigate to="/connexion" />
-  if (roles && !roles.includes(user.role)) return <Navigate to="/" />
+  // Rôle principal OU fonction supplémentaire (ex. responsable d'établissement désigné)
+  if (roles && !userMatchesRoles(user, roles)) return <Navigate to="/" />
   return children
 }
 
@@ -77,7 +83,9 @@ function AppRoutes() {
     if (user.must_change_password) return '/changer-mot-de-passe-obligatoire'
     if (user.role === 'admin') return '/admin'
     if (user.role === 'controleur_qualite') return '/qualite'
-    if (['responsable', 'agent_admin', 'comptable'].includes(user.role)) return '/mon-etablissement'
+    if (user.role === 'responsable') return '/responsable'
+    if (user.role === 'agent_admin') return '/agent-admin'
+    if (user.role === 'comptable') return '/comptable'
     return '/dashboard'
   }
 
@@ -85,11 +93,15 @@ function AppRoutes() {
     <Routes>
       {/* ─── Public / Redirection selon rôle ────────────── */}
       <Route path="/" element={
-        user && ['responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(user.role)
-          ? <Navigate to="/mon-etablissement" />
+        user
+          ? <Navigate to={homeRedirect()} replace />
           : <Landing />
       } />
-      <Route path="/accueil" element={<Landing />} />
+      <Route path="/accueil" element={
+        user && ['responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'admin'].includes(user.role)
+          ? <Navigate to={homeRedirect()} replace />
+          : <Landing />
+      } />
       <Route path="/guide-conditions-admission" element={<GuideConditionsAdmission />} />
       <Route path="/guide-conditions-admission/:slug" element={<GuideConditionsAdmission />} />
       <Route path="/formations" element={<Navigate to="/" replace />} />
@@ -136,7 +148,7 @@ function AppRoutes() {
           </PrivateRoute>
         } />
         <Route path="/mon-etablissement/factures" element={
-          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable']}>
+          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable', 'controleur_qualite']}>
             <StaffFacturesEtab />
           </PrivateRoute>
         } />
@@ -151,7 +163,7 @@ function AppRoutes() {
           </PrivateRoute>
         } />
 
-        {/* Responsable */}
+        {/* Responsable — acceptation pédagogique */}
         <Route path="/responsable" element={<PrivateRoute roles={['responsable', 'admin']}><ResponsableDashboard /></PrivateRoute>} />
         <Route path="/responsable/dossier/:id" element={<PrivateRoute roles={['responsable', 'admin']}><ResponsableDossier /></PrivateRoute>} />
         <Route path="/responsable/gestion-etablissement" element={
@@ -159,7 +171,8 @@ function AppRoutes() {
             <ResponsableGestionEtab />
           </PrivateRoute>
         } />
-        <Route path="/responsable/demandes-proforma" element={<PrivateRoute roles={['responsable', 'admin', 'agent_admin', 'comptable', 'controleur_qualite']}><ResponsableDemandesProforma /></PrivateRoute>} />
+        <Route path="/responsable/demandes-proforma" element={<PrivateRoute roles={['responsable', 'admin', 'comptable']}><ResponsableDemandesProforma /></PrivateRoute>} />
+        <Route path="/responsable/preinscription-guichet" element={<PrivateRoute roles={['responsable', 'admin', 'agent_admin']}><StaffPreinscriptionGuichet /></PrivateRoute>} />
 
         {/* Agent admin */}
         <Route path="/agent-admin" element={<PrivateRoute roles={['agent_admin', 'admin']}><AgentAdminDashboard /></PrivateRoute>} />
@@ -173,6 +186,7 @@ function AppRoutes() {
 
         {/* Admin */}
         <Route path="/admin" element={<PrivateRoute roles={['admin']}><AdminDashboard /></PrivateRoute>} />
+        <Route path="/admin/dossiers" element={<PrivateRoute roles={['admin']}><AdminDossiers /></PrivateRoute>} />
         <Route path="/admin/dossier/:id" element={<PrivateRoute roles={['admin']}><AdminDossier /></PrivateRoute>} />
         <Route path="/admin/utilisateurs" element={<PrivateRoute roles={['admin']}><AdminUsers /></PrivateRoute>} />
         <Route path="/admin/etablissements" element={<PrivateRoute roles={['admin']}><AdminEtablissements /></PrivateRoute>} />
@@ -180,6 +194,7 @@ function AppRoutes() {
         <Route path="/admin/proforma" element={<PrivateRoute roles={['admin']}><AdminProforma /></PrivateRoute>} />
         <Route path="/admin/factures-etablissement" element={<PrivateRoute roles={['admin']}><AdminFacturesEtabPage /></PrivateRoute>} />
         <Route path="/admin/audit-logs" element={<PrivateRoute roles={['admin']}><AdminAuditLogs /></PrivateRoute>} />
+        <Route path="/admin/chatbot" element={<PrivateRoute roles={['admin']}><AdminChatbotStats /></PrivateRoute>} />
         <Route path="/admin/security-events" element={<PrivateRoute roles={['admin']}><AdminSecurityEvents /></PrivateRoute>} />
         <Route path="/admin/maintenance" element={<PrivateRoute roles={['admin']}><AdminMaintenance /></PrivateRoute>} />
         <Route path="/admin/runtime-monitoring" element={<PrivateRoute roles={['admin']}><AdminRuntimeMonitoring /></PrivateRoute>} />
@@ -224,6 +239,7 @@ export default function App() {
       <Suspense fallback={<PageLoadingFallback />}>
         <AppRoutes />
       </Suspense>
+      <ChatbotWidget />
     </AuthProvider>
   )
 }

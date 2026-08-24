@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import { mediaUrl } from '../utils/mediaUrl'
+import { actsAsResponsable } from '../utils/roles'
+import { getUserBrandColor, normalizeBrandColor } from '../utils/etabTheme'
 
 const BRAND_IMAGE = new URL('../../img/image-multisite.jpg', import.meta.url).href
 
@@ -47,10 +49,9 @@ const ICONS = {
   chevron:     <Icon d="M9 5l7 7-7 7" />,
 }
 
-/* ─── Menus par rôle ─────────────────────────────────────────────── */
+/* ─── Menus par rôle — une entrée par action, périmètre strict ─ */
 const MENUS = {
   admin: [
-    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
     {
       label: 'Tableau de bord',
       to: '/admin',
@@ -58,77 +59,63 @@ const MENUS = {
       exact: true,
       isActive: (loc) => loc.pathname === '/admin' && new URLSearchParams(loc.search).get('tab') !== 'conditions',
     },
+    { label: 'Dossiers', to: '/admin/dossiers', icon: ICONS.dossiers },
+    { label: 'Demandes proforma', to: '/admin/proforma', icon: ICONS.demandesListe },
+    { label: 'Établissements', to: '/admin/etablissements', icon: ICONS.etablissements },
+    { label: 'Utilisateurs', to: '/admin/utilisateurs', icon: ICONS.users },
+    { label: 'Factures', to: '/admin/factures-etablissement', icon: ICONS.finance },
     {
       label: 'Conditions d’admission',
       to: '/admin?tab=conditions',
       icon: ICONS.conditions,
       isActive: (loc) => loc.pathname === '/admin' && new URLSearchParams(loc.search).get('tab') === 'conditions',
     },
-    { label: 'Établissements', to: '/admin/etablissements', icon: ICONS.etablissements },
-    { label: 'Demandes proforma', to: '/admin/proforma', icon: ICONS.demandesListe },
-    { label: 'Factures par établissement', to: '/admin/factures-etablissement', icon: ICONS.finance },
-    { label: 'Utilisateurs', to: '/admin/utilisateurs', icon: ICONS.users },
     { label: 'Journal d’audit', to: '/admin/audit-logs', icon: ICONS.audit },
-    { label: 'Événements sécurité', to: '/admin/security-events', icon: ICONS.shield },
+    { label: 'Sécurité', to: '/admin/security-events', icon: ICONS.shield },
     { label: 'Maintenance', to: '/admin/maintenance', icon: ICONS.settings },
-    { label: 'Monitoring runtime', to: '/admin/runtime-monitoring', icon: ICONS.pulse },
-    { label: 'Pédagogie', to: '/responsable', icon: ICONS.pedago },
-    { label: 'Adm. dossiers', to: '/agent-admin', icon: ICONS.controle },
-    { label: 'Finance', to: '/comptable', icon: ICONS.finance },
-    { label: 'Qualité', to: '/qualite', icon: ICONS.controle },
   ],
   responsable: [
-    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
-    { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
-    { label: 'Messages', to: '/chat', icon: ICONS.chat },
-    { label: 'Documents chat', to: '/mon-etablissement/documents-chat', icon: ICONS.docsChat },
+    { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     {
-      label: 'Dossiers & suivi',
+      label: 'Tableau de bord',
       to: '/responsable',
-      icon: ICONS.dossiers,
+      icon: ICONS.dashboard,
       exact: true,
-      isActive: (loc) => loc.pathname === '/responsable' && new URLSearchParams(loc.search).get('tab') !== 'conditions',
+      isActive: (loc) =>
+        loc.pathname === '/responsable'
+        && new URLSearchParams(loc.search).get('tab') !== 'conditions',
     },
     { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
-    {
-      label: 'Conditions d’admission',
-      to: '/responsable?tab=conditions',
-      icon: ICONS.conditions,
-      isActive: (loc) => loc.pathname === '/responsable' && new URLSearchParams(loc.search).get('tab') === 'conditions',
-    },
+    { label: 'Guichet', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
+    { label: 'Formations', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
+    { label: 'Messages', to: '/chat', icon: ICONS.chat },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
   ],
   agent_admin: [
-    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
-    { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Tableau de bord', to: '/agent-admin', icon: ICONS.dashboard, exact: true },
+    { label: 'Guichet', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
-    { label: 'Documents chat', to: '/mon-etablissement/documents-chat', icon: ICONS.docsChat },
-    { label: 'Dossiers & contrôle', to: '/agent-admin', icon: ICONS.controle, exact: true },
-    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
   ],
   comptable: [
-    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
-    { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
-    { label: 'Messages', to: '/chat', icon: ICONS.chat },
-    { label: 'Documents chat', to: '/mon-etablissement/documents-chat', icon: ICONS.docsChat },
+    { label: 'Tableau de bord', to: '/comptable', icon: ICONS.dashboard, exact: true },
     { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
-    { label: 'Factures dossiers', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
-    { label: 'Finance', to: '/comptable', icon: ICONS.finance, exact: true },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
+    { label: 'Messages', to: '/chat', icon: ICONS.chat },
+    { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
   ],
   controleur_qualite: [
-    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
-    { label: 'Mon Établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Tableau de bord', to: '/qualite', icon: ICONS.dashboard, exact: true },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
-    { label: 'Documents chat', to: '/mon-etablissement/documents-chat', icon: ICONS.docsChat },
-    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
-    { label: 'Qualité & conformité', to: '/qualite', icon: ICONS.controle, exact: true },
+    { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
   ],
   etudiant: [
-    { label: 'Accueil', to: '/accueil', icon: ICONS.accueil, exact: true },
-    { label: 'Mon espace', to: '/dashboard', icon: ICONS.dashboard },
-    { label: 'Filières & formations', to: '/mon-etablissement', icon: ICONS.formations },
+    { label: 'Tableau de bord', to: '/dashboard', icon: ICONS.dashboard },
+    { label: 'Préinscription', to: '/preinscription', icon: ICONS.preinscription },
+    { label: 'Demande proforma', to: '/demande-proforma', icon: ICONS.demandesListe },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mes identifiants', to: '/mes-acces', icon: ICONS.identifiants },
-    { label: 'Préinscription', to: '/preinscription', icon: ICONS.preinscription },
   ],
 }
 
@@ -187,11 +174,29 @@ export default function Sidebar() {
 
   if (!user) return null
 
-  const menu = MENUS[user.role] || []
-  const cfg = ROLE_CONFIG[user.role] || { label: user.role, color: 'from-gray-700 to-gray-900', badge: 'bg-gray-500' }
+  // Menu du rôle principal, complété par les entrées « responsable » si
+  // l'utilisateur est désigné responsable d'établissement (fonction supplémentaire).
+  let menu = MENUS[user.role] || []
+  const responsableDesigne = user.role !== 'responsable' && user.role !== 'admin' && actsAsResponsable(user)
+  if (responsableDesigne) {
+    const existing = new Set(menu.map((i) => (typeof i.to === 'string' ? i.to : '')))
+    menu = [...menu, ...MENUS.responsable.filter((i) => !existing.has(i.to))]
+  }
+  const baseCfg = ROLE_CONFIG[user.role] || { label: user.role, color: 'from-gray-700 to-gray-900', badge: 'bg-gray-500' }
+  const cfg = responsableDesigne ? { ...baseCfg, label: `${baseCfg.label} · Resp. étab.` } : baseCfg
   const initials = `${user.prenom?.[0] || '?'}${user.nom?.[0] || ''}`
   const homePath = '/accueil'
   const etabLogoSrc = user?.etablissement_logo ? mediaUrl(user.etablissement_logo) : null
+  // Couleur établissement (prioritaire) — sinon dégradé du rôle.
+  const brandHex = getUserBrandColor(user)
+  const brand = brandHex ? normalizeBrandColor(brandHex) : null
+  const sidebarStyle = brand
+    ? { background: `linear-gradient(180deg, ${brand.primary} 0%, ${brand.secondary} 100%)` }
+    : undefined
+  const badgeStyle = brand ? { backgroundColor: brand.secondary } : undefined
+  const topbarStyle = brand
+    ? { background: `linear-gradient(90deg, ${brand.primary}, ${brand.secondary})` }
+    : undefined
 
   const handleLogout = () => {
     logout()
@@ -200,7 +205,10 @@ export default function Sidebar() {
   }
 
   const SidebarContent = ({ isMobile = false }) => (
-    <div className={`flex flex-col h-full bg-gradient-to-b ${cfg.color} text-white`}>
+    <div
+      className={`flex flex-col h-full text-white ${brand ? '' : `bg-gradient-to-b ${cfg.color}`}`}
+      style={sidebarStyle}
+    >
 
       {/* ── Logo + toggle ─────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 h-16 flex-shrink-0 border-b border-white/10">
@@ -242,7 +250,10 @@ export default function Sidebar() {
       <div className={`px-3 py-4 border-b border-white/10 flex-shrink-0 ${collapsed && !isMobile ? 'flex justify-center' : ''}`}>
         {(!collapsed || isMobile) ? (
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full ${cfg.badge} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${brand ? '' : cfg.badge}`}
+              style={badgeStyle}
+            >
               {initials}
             </div>
             <div className="min-w-0">
@@ -251,7 +262,11 @@ export default function Sidebar() {
             </div>
           </div>
         ) : (
-          <div className={`w-9 h-9 rounded-full ${cfg.badge} flex items-center justify-center text-white font-bold text-xs`} title={`${user.prenom} ${user.nom}`}>
+          <div
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs ${brand ? '' : cfg.badge}`}
+            style={badgeStyle}
+            title={`${user.prenom} ${user.nom}`}
+          >
             {initials}
           </div>
         )}
@@ -286,12 +301,15 @@ export default function Sidebar() {
   return (
     <>
       {/* ── Sidebar desktop ───────────────────────────────────── */}
-      <aside className={`hidden md:flex flex-col flex-shrink-0 h-screen sticky top-0 transition-all duration-200 ${collapsed ? 'w-16' : 'w-60'}`}>
+      <aside data-no-print className={`hidden md:flex flex-col flex-shrink-0 h-screen sticky top-0 transition-all duration-200 ${collapsed ? 'w-16' : 'w-60'}`}>
         <SidebarContent />
       </aside>
 
       {/* ── Topbar mobile ─────────────────────────────────────── */}
-      <div className={`md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-gradient-to-r ${cfg.color} flex items-center px-4 gap-3 shadow-lg`}>
+      <div
+        className={`md:hidden fixed top-0 left-0 right-0 z-40 h-14 flex items-center px-4 gap-3 shadow-lg ${brand ? '' : `bg-gradient-to-r ${cfg.color}`}`}
+        style={topbarStyle}
+      >
         <button onClick={() => setMobileOpen(true)} className="text-white p-1">
           {ICONS.menu}
         </button>
@@ -302,7 +320,10 @@ export default function Sidebar() {
           <span className="font-bold text-sm text-white">UniPortail</span>
         </Link>
         <div className="ml-auto flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-full ${cfg.badge} flex items-center justify-center text-white font-bold text-xs`}>
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs ${brand ? '' : cfg.badge}`}
+            style={badgeStyle}
+          >
             {initials}
           </div>
         </div>
@@ -315,7 +336,7 @@ export default function Sidebar() {
             className="md:hidden fixed inset-0 z-50 bg-black/50"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="md:hidden fixed top-0 left-0 z-50 h-full w-72 flex flex-col shadow-2xl">
+          <aside data-no-print className="md:hidden fixed top-0 left-0 z-50 h-full w-72 flex flex-col shadow-2xl">
             <SidebarContent isMobile />
           </aside>
         </>

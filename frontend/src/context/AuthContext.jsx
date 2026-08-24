@@ -1,36 +1,84 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
+import {
+  getAccessToken,
+  getRefreshToken,
+  getStoredUserJson,
+  setSession,
+  clearSession,
+} from '../lib/tokenStorage'
+import { SESSION_EXPIRED_EVENT } from '../lib/setupAuthInterceptors'
+import { applyEtabTheme, clearEtabTheme, getUserBrandColor } from '../utils/etabTheme'
 
 const AuthContext = createContext(null)
+
+/** Chemins publics : ne pas rediriger vers /connexion si la session expire ici. */
+const PUBLIC_PATH_PREFIXES = [
+  '/connexion',
+  '/inscription',
+  '/accueil',
+  '/etablissement',
+  '/facture-publique',
+  '/demande-proforma',
+  '/guide-conditions-admission',
+  '/mot-de-passe-oublie',
+  '/reinitialiser-mot-de-passe',
+  '/verifier-email',
+]
+
+function isPublicPath(pathname) {
+  if (pathname === '/') return true
+  return PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p))
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // Session déclarée expirée par l'intercepteur (refresh échoué) : purge l'état
+  // React et renvoie vers la connexion si on est sur une page protégée.
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    const savedUser = localStorage.getItem('user')
+    const handleExpiry = () => {
+      setUser(null)
+      clearEtabTheme()
+      if (typeof window !== 'undefined' && !isPublicPath(window.location.pathname)) {
+        const next = encodeURIComponent(window.location.pathname + window.location.search)
+        window.location.assign(`/connexion?next=${next}`)
+      }
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleExpiry)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpiry)
+  }, [])
+
+  // Identité visuelle : couleur de l'établissement de l'utilisateur connecté.
+  useEffect(() => {
+    const color = getUserBrandColor(user)
+    const secondary = user?.etablissement?.couleur_secondaire || null
+    if (color) applyEtabTheme(color, secondary)
+    else clearEtabTheme()
+  }, [user])
+
+  useEffect(() => {
+    const token = getAccessToken()
+    const savedUser = getStoredUserJson()
     if (token && savedUser) {
       let parsed
       try {
         parsed = JSON.parse(savedUser)
       } catch {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
+        clearSession()
         delete axios.defaults.headers.common['Authorization']
         setLoading(false)
         return
       }
       if (!parsed || typeof parsed !== 'object') {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
+        clearSession()
         delete axios.defaults.headers.common['Authorization']
         setLoading(false)
         return
       }
       setUser(parsed)
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-      // Rafraîchir depuis la DB — garantit etablissement_id et autres champs à jour
       axios
         .get('/api/auth/me', { timeout: 20000 })
         .then(({ data }) => {
@@ -40,18 +88,16 @@ export function AuthProvider({ children }) {
           }
           try {
             const fresh = { ...parsed, ...data }
-            localStorage.setItem('user', JSON.stringify(fresh))
+            setSession({ user: fresh })
             setUser(fresh)
           } catch {
-            /* JSON ou fusion impossible — garder la session locale */
             setUser(parsed)
           }
         })
         .catch((err) => {
           const st = err.response?.status
           if (st === 401 || st === 403) {
-            localStorage.removeItem('token')
-            localStorage.removeItem('user')
+            clearSession()
             delete axios.defaults.headers.common['Authorization']
             setUser(null)
           }
@@ -62,35 +108,39 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const login = (token, userData) => {
-    localStorage.setItem('token', token)
-    localStorage.setItem('user', JSON.stringify(userData))
+  const login = (token, userData, refreshToken) => {
+    setSession({
+      accessToken: token,
+      refreshToken: refreshToken ?? getRefreshToken(),
+      user: userData,
+    })
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
     setUser(userData)
   }
 
   const logout = async () => {
-    const token = localStorage.getItem('token')
+    const token = getAccessToken()
+    const refresh = getRefreshToken()
     try {
       if (token) {
         await axios.post(
           '/api/auth/deconnexion',
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
+          refresh ? { refresh_token: refresh } : {},
+          { headers: { Authorization: `Bearer ${token}` } },
         )
       }
     } catch {
-      /* ignore — déconnexion locale même si l’API échoue */
+      /* ignore */
     }
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    clearSession()
     delete axios.defaults.headers.common['Authorization']
+    clearEtabTheme()
     setUser(null)
   }
 
   const refreshUser = async () => {
     const { data } = await axios.get('/api/auth/me')
-    localStorage.setItem('user', JSON.stringify(data))
+    setSession({ user: data })
     setUser(data)
     return data
   }

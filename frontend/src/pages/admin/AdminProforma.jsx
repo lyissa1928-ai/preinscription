@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+﻿import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { mediaUrl } from '../../utils/mediaUrl'
 import { DashboardPage, DashboardHero, DashboardSpinner } from '../../components/dashboard/DashboardChrome'
+import CreerProformaModal from '../../components/CreerProformaModal'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0))
 const fmtDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -368,6 +369,7 @@ export default function AdminProforma() {
   const [refuseMotif, setRefuseMotif] = useState('')
   const [refuseSaving, setRefuseSaving] = useState(false)
   const [revokeConfirm, setRevokeConfirm] = useState(null)
+  const [creerOpen, setCreerOpen] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -600,19 +602,26 @@ export default function AdminProforma() {
         title="Demandes proforma"
         subtitle="File des demandes : pièces sur chaque ligne, puis validation. Le candidat reçoit la facture proforma et l’attestation une fois accepté. Vous pouvez retirer la facture pour remettre en attente."
         actions={
-          <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 via-white to-indigo-50/50 px-6 py-4 text-right shadow-lg shadow-violet-500/10 ring-1 ring-white/60">
-            <p className="text-4xl font-black tabular-nums text-transparent bg-gradient-to-r from-violet-700 to-indigo-700 bg-clip-text">
-              {demandes.length}
-            </p>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total demandes</p>
-            {pendingCount > 0 && (
-              <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900 ring-1 ring-amber-200/80">
-                {pendingCount} à traiter
+          <div className="flex flex-col items-end gap-3">
+            <button type="button" className="btn-primary text-sm" onClick={() => setCreerOpen(true)}>
+              Nouvelle facture proforma
+            </button>
+            <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 via-white to-indigo-50/50 px-6 py-4 text-right shadow-lg shadow-violet-500/10 ring-1 ring-white/60">
+              <p className="text-4xl font-black tabular-nums text-transparent bg-gradient-to-r from-violet-700 to-indigo-700 bg-clip-text">
+                {demandes.length}
               </p>
-            )}
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total demandes</p>
+              {pendingCount > 0 && (
+                <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900 ring-1 ring-amber-200/80">
+                  {pendingCount} à traiter
+                </p>
+              )}
+            </div>
           </div>
         }
       />
+
+      <CreerProformaModal open={creerOpen} onClose={() => setCreerOpen(false)} onCreated={load} />
 
       {pendingCount > 0 && (
         <div className="animate-fade-in mb-6 rounded-2xl border border-amber-200/90 bg-gradient-to-r from-amber-50 to-orange-50/50 px-4 py-3.5 text-sm text-amber-950 shadow-md shadow-amber-500/5">

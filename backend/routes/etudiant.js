@@ -27,7 +27,9 @@ const {
 const { processAndPersistDossierFile } = require('../utils/secureDossierUpload');
 const { buildAttestationPayloadForDossier, buildAttestationPayloadForDemandeProforma } = require('../utils/buildAttestationPayload');
 const { publicAssetUrl } = require('../utils/publicAssetUrl');
-const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
+const { canIssueOfficialDocs } = require('../utils/canIssueOfficialDocs');
+const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
+const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
 const { genererOuRecupererFactureDossier } = require('../services/factureService');
 const { getDureeMoisEffectif } = require('../utils/formationTarifs');
 
@@ -317,6 +319,10 @@ router.post(
     dernier_diplome, etablissement_origine, mention: mention || null,
     annee_obtention: parseInt(annee_obtention),
     ...(passeportTrim ? { numero_passeport: passeportTrim } : {}),
+    prenom: etudiantRow.prenom || null,
+    nom: etudiantRow.nom || null,
+    email: etudiantRow.email || null,
+    etablissement_id: formation.etablissement_id,
     statut: 'en_attente', commentaire_admin: null,
     created_at: now, updated_at: now
   };
@@ -714,32 +720,37 @@ router.get('/lettre/:dossierId', authMiddleware, (req, res) => {
   if (Number(dossier.etudiant_id) !== Number(req.user.id)) {
     return res.status(403).json({ message: 'Accès refusé' });
   }
-  if (!isDossierAcceptePourLettre(dossier.statut)) {
-    return res.status(403).json({ message: 'La préinscription doit être acceptée pour afficher la lettre.' });
+  if (!canIssueLettrePreinscription(dossier)) {
+    return res.status(403).json({
+      message:
+        'La lettre de préinscription est réservée aux candidats étrangers acceptés ayant déposé une demande en ligne.',
+    });
   }
 
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
+  const identite = resolveCandidatIdentite(dossier, u);
   const formation = dossier.formation_id
     ? db.get('formations').find({ id: dossier.formation_id }).value()
     : null;
   const documents = db.get('documents').filter({ dossier_id: id }).value();
   const photoDoc = primaryPhotoDocumentFromList(documents);
   const etablissement =
-    snapshotFromFormation(formation) || snapshotFromEtablissementId(u.etablissement_id);
+    snapshotFromFormation(formation) || snapshotFromEtablissementId(dossier.etablissement_id || u.etablissement_id);
 
   const y = new Date().getFullYear();
   const lettre_extensions = {
     reference_lettre: `LPI-${y}-${String(dossier.id).padStart(5, '0')}`,
     numero_dossier: dossier.numero_dossier,
     date_soumission: dossier.created_at,
-    matricule_candidat: u.matricule || null,
-    numero_passeport: dossier.numero_passeport || null,
+    matricule_candidat: identite.matricule || null,
+    numero_passeport: identite.numero_passeport || null,
+    nationalite: identite.nationalite || null,
   };
 
   res.json({
     type: 'dossier',
     dossier,
-    etudiant: { nom: u.nom, prenom: u.prenom, email: u.email },
+    etudiant: { nom: identite.nom, prenom: identite.prenom, email: identite.email },
     formation,
     etablissement,
     photo_url: photoDoc ? `/uploads/${photoDoc.chemin}` : null,

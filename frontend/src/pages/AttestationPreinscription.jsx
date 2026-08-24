@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
+import CachetScolarite from '../components/CachetScolarite'
 
 const fmtDate = (d) => {
   if (d == null || d === '') return '—'
@@ -62,13 +63,13 @@ export default function AttestationPreinscription() {
     )
   }
 
-  if (error) {
+  if (error || !data?.dossier) {
     return (
       <div className="min-h-screen bg-slate-200 flex items-center justify-center">
         <div className="card max-w-md w-full text-center">
           <div className="text-5xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Attestation indisponible</h2>
-          <p className="text-gray-500 mb-6">{error}</p>
+          <p className="text-gray-500 mb-6">{error || 'Données incomplètes.'}</p>
           <Link to="/dashboard" className="btn-primary">
             Retour au tableau de bord
           </Link>
@@ -95,11 +96,10 @@ export default function AttestationPreinscription() {
   const bandStyle = { background: `linear-gradient(to right, ${primary}, ${secondary})` }
   const logoSrc = mediaUrl(etab?.logo_url)
   const photoSrc = mediaUrl(rawPhoto)
-  const cachetSrc = mediaUrl(etab?.cachet_url)
   const refAtt = ext.reference_attestation || `ATT-${new Date().getFullYear()}-${String(dossier.id).padStart(5, '0')}`
 
-  const prenomT = (etudiant.prenom || '').trim()
-  const nomT = (etudiant.nom || '').trim()
+  const prenomT = (etudiant?.prenom || dossier?.prenom || '').trim()
+  const nomT = (etudiant?.nom || dossier?.nom || '').trim()
   const nomComplet = [prenomT, nomT].filter(Boolean).join(' ') || '—'
   const nDossier = candidat?.numero_dossier || dossier.numero_dossier
 
@@ -250,19 +250,7 @@ export default function AttestationPreinscription() {
           </div>
 
           <div className="flex flex-col items-center pt-6 pb-2">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-3">Cachet de la direction</p>
-            {cachetSrc ? (
-              <img src={cachetSrc} alt="Cachet" className="max-h-36 mx-auto object-contain" />
-            ) : (
-              <div
-                className="mx-auto w-40 h-28 rounded-xl border-2 border-dashed flex items-center justify-center text-gray-400 text-xs px-2"
-                style={{ borderColor: `${primary}44` }}
-              >
-                Cachet
-              </div>
-            )}
-            <p className="text-sm font-bold text-gray-900 mt-6">{etab?.signataire_nom || 'Le Responsable pédagogique'}</p>
-            <p className="text-xs text-gray-500">{etab?.signataire_fonction || 'Pour la direction'}</p>
+            <CachetScolarite cachetUrl={etab?.cachet_url} />
             <p className="text-xs text-gray-400 mt-3">Fait à {etab?.nom || '…'}, le {fmtDate(new Date())}</p>
           </div>
 

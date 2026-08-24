@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+﻿import { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import {
@@ -140,6 +140,20 @@ export default function QualiteDashboard() {
                   {etabNom} — suivez la complétude des pièces, identifiez les dossiers à risque et priorisez les contrôles avant la validation pédagogique.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
+                  <Link
+                    to="/mon-etablissement"
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
+                  >
+                    Mon établissement
+                    <FaChevronRight className="h-3 w-3 opacity-70" aria-hidden />
+                  </Link>
+                  <Link
+                    to="/chat"
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
+                  >
+                    Messages
+                    <FaChevronRight className="h-3 w-3 opacity-70" aria-hidden />
+                  </Link>
                   <button
                     type="button"
                     onClick={() => {
@@ -150,15 +164,8 @@ export default function QualiteDashboard() {
                     className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
                   >
                     <FaSync className="h-3.5 w-3.5" aria-hidden />
-                    Actualiser les indicateurs
+                    Actualiser
                   </button>
-                  <Link
-                    to="/mon-etablissement"
-                    className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-900 shadow-lg shadow-black/20 transition hover:bg-cyan-50"
-                  >
-                    Catalogue établissement
-                    <FaChevronRight className="h-3 w-3 opacity-70" aria-hidden />
-                  </Link>
                 </div>
               </div>
               {user && (

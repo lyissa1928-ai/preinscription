@@ -8,6 +8,7 @@ node_modules/
 .env.*.local
 backend/.env
 frontend/.env
+backend/.credentials_dev.txt
 
 # Builds frontend
 frontend/dist/
@@ -16,6 +17,8 @@ frontend/dist/
 # Fichiers uploadés et sauvegardes auto (données locales)
 backend/uploads/
 backend/database/backups/
+backend/database/auth-sessions.json
+backend/database/chat.json
 
 # Note : backend/database/preinscription.json est VERSIONNÉ (jeu démo : établissements, filières, formations).
 # Ne pas l’ajouter ici — sinon les clones GitHub n’auraient plus de données.

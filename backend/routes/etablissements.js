@@ -17,7 +17,8 @@ const { optionalClamScanFile } = require('../utils/optionalClamScan');
 const { computePrixAnnuel, normalizeFraisSupplementaires } = require('../utils/formationTarifs');
 const { syncStoredFactureById } = require('../services/factureService');
 const { isFactureSupprimee } = require('../utils/factureVisibility');
-const { JWT_SECRET } = require('../utils/jwtHelpers');
+const { stripEtabSensitiveFields } = require('../utils/etablissementSanitize');
+const { actsAsResponsable } = require('../utils/userFonctions');
 
 function parseDureeMoisInput(v) {
   if (v === undefined || v === null || v === '') return 0;
@@ -32,7 +33,10 @@ function formationAvecPrixRecalcule(formation) {
   return { ...formation, prix: computePrixAnnuel(formation) };
 }
 
-/** Admin, ou responsable de l'établissement désigné dans :id ou :etabId */
+/**
+ * Admin, ou responsable (rôle / fonction désignée) de l’établissement :id / :etabId.
+ * Journalisé (audit) pour l’administrateur.
+ */
 function etabPedagogieWrite(req, res, next) {
   if (req.user.role === 'admin') return next();
   const raw = req.params.id ?? req.params.etabId;
@@ -40,10 +44,15 @@ function etabPedagogieWrite(req, res, next) {
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
   }
-  if (req.user.role === 'responsable' && req.user.etablissement_id === etabId) {
+  if (Number(req.user.etablissement_id) !== etabId) {
+    return res.status(403).json({ message: 'Vous ne pouvez modifier que les formations de votre établissement.' });
+  }
+  if (actsAsResponsable(req.user)) {
     return next();
   }
-  return res.status(403).json({ message: 'Accès réservé à l\'administrateur ou au responsable de cet établissement.' });
+  return res.status(403).json({
+    message: 'Accès réservé à l’administrateur ou au responsable pédagogique de cet établissement.',
+  });
 }
 
 /** Liste / export / suppression factures : admin ou staff rattaché à l’établissement. */
@@ -53,8 +62,11 @@ function etabFacturesAccess(req, res, next) {
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
   }
-  const roles = ['responsable', 'comptable', 'agent_admin'];
-  if (roles.includes(req.user.role) && Number(req.user.etablissement_id) === etabId) {
+  const roles = ['responsable', 'comptable', 'agent_admin', 'controleur_qualite'];
+  if (
+    (roles.includes(req.user.role) || actsAsResponsable(req.user)) &&
+    Number(req.user.etablissement_id) === etabId
+  ) {
     return next();
   }
   return res.status(403).json({ message: 'Accès refusé.' });
@@ -275,16 +287,22 @@ function isEtabStaffMember(u) {
 
 // GET /api/etablissements — liste publique ou enrichie selon le rôle
 router.get('/', (req, res) => {
-  const isAuth = req.headers.authorization?.startsWith('Bearer ');
+  let isAuth = req.headers.authorization?.startsWith('Bearer ');
 
-  // Déterminer le rôle si authentifié
+  // Déterminer le rôle si authentifié (vérif complète : signature + révocation jti)
   let userRole = null;
   if (isAuth) {
     try {
-      const jwtLib = require('jsonwebtoken');
+      const { verifyAccessToken } = require('../utils/jwtHelpers');
+      const { isTokenRevoked } = require('../utils/tokenRevocation');
       const token = req.headers.authorization.split(' ')[1];
-      userRole = jwtLib.verify(token, JWT_SECRET).role;
-    } catch { /* token invalide → traitement comme public */ }
+      const decoded = verifyAccessToken(token);
+      if (decoded.jti && isTokenRevoked(decoded.jti)) {
+        isAuth = false; // session révoquée → traitement comme public
+      } else {
+        userRole = decoded.role;
+      }
+    } catch { isAuth = false; /* token invalide → traitement comme public */ }
   }
 
   // Admin : tous les établissements (y compris inactifs pour consultation) ; le reste : actifs seulement
@@ -311,14 +329,17 @@ router.get('/', (req, res) => {
         couleur_secondaire: e.couleur_secondaire || null,
       };
     }
-    // Données complètes avec compteurs pour les authentifiés
+    // Données avec compteurs pour les authentifiés.
+    // Champs bancaires réservés à l'admin plateforme (les factures passent
+    // par leurs propres endpoints scopés).
     const nb_filieres  = db.get('filieres').filter({ etablissement_id: e.id }).value().length;
     const nb_formations = db.get('formations').filter({ etablissement_id: e.id }).value().length;
     const nb_membres   = db.get('utilisateurs')
       .filter((u) => u.etablissement_id === e.id && isEtabStaffMember(u))
       .value().length;
+    const base = userRole === 'admin' ? { ...e } : stripEtabSensitiveFields(e);
     return {
-      ...e,
+      ...base,
       logo_url: publicAssetUrl(req, e.logo_url),
       cachet_url: publicAssetUrl(req, e.cachet_url),
       nb_filieres,
@@ -503,6 +524,14 @@ router.get('/:id/acceptes-par-formation/export-xlsx', etabFacturesAccess, async 
     return res.status(400).json({ message: 'Aucune formation trouvée pour cette filière avec ce filtre.' });
   }
 
+  const { EXPORT_LIMITS, capArray } = require('../utils/exportLimits');
+  if (formations.length > EXPORT_LIMITS.maxExcelFormations) {
+    return res.status(400).json({
+      message: `Export limité à ${EXPORT_LIMITS.maxExcelFormations} formations par fichier. Affinez le filtre.`,
+      code: 'EXPORT_TOO_LARGE',
+    });
+  }
+
   const dossiers = db.get('dossiers').value() || [];
   const utilisateurs = db.get('utilisateurs').value() || [];
   const wb = new ExcelJS.Workbook();
@@ -565,7 +594,7 @@ router.get('/:id/acceptes-par-formation/export-xlsx', etabFacturesAccess, async 
       });
     }
 
-    const rows = dossiers
+    let rows = dossiers
       .filter((d) => d.statut === 'accepte' && Number(d.formation_id) === Number(fo.id))
       .map((d) => {
         const u = utilisateurs.find((x) => x.id === d.etudiant_id) || {};
@@ -579,6 +608,12 @@ router.get('/:id/acceptes-par-formation/export-xlsx', etabFacturesAccess, async 
         };
       })
       .sort((a, b) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`, 'fr'));
+
+    const capped = capArray(rows, EXPORT_LIMITS.maxExcelRowsPerSheet, 'Lignes');
+    rows = capped.items;
+    if (capped.truncated && idx === 0) {
+      sheet.getCell('B3').value = `${sheet.getCell('B3').value || ''} — export tronqué (${EXPORT_LIMITS.maxExcelRowsPerSheet} max/feuille)`;
+    }
 
     if (rows.length === 0) {
       sheet.addRow({
@@ -619,6 +654,13 @@ router.get('/:id/factures/export', etabFacturesAccess, (req, res) => {
   const idSet = idsParam
     ? new Set(idsParam.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !Number.isNaN(n)))
     : null;
+  const { EXPORT_LIMITS, capArray } = require('../utils/exportLimits');
+  if (idSet && idSet.size > EXPORT_LIMITS.maxFactureIdsParam) {
+    return res.status(400).json({
+      message: `Sélection limitée à ${EXPORT_LIMITS.maxFactureIdsParam} factures par export.`,
+      code: 'EXPORT_TOO_MANY_IDS',
+    });
+  }
   const all = db.get('factures').value();
   let subset = all.filter((f) => factureBelongsToEtablissement(f, etabId) && !isFactureSupprimee(f));
   if (idSet && idSet.size > 0) {
@@ -627,6 +669,8 @@ router.get('/:id/factures/export', etabFacturesAccess, (req, res) => {
   if (subset.length === 0) {
     return res.status(400).json({ message: 'Aucune facture à exporter pour cette sélection.' });
   }
+  const cappedFactures = capArray(subset, EXPORT_LIMITS.maxFacturesHtmlExport, 'Factures');
+  subset = cappedFactures.items;
   subset.sort((a, b) => String(a.numero || '').localeCompare(String(b.numero || '')));
   const syncedSubset = subset.map((f) => syncStoredFactureById(f.id) || f);
   const html = buildFacturesExportHtml(syncedSubset, etabId);
@@ -674,7 +718,7 @@ router.post('/:id/factures/delete-batch', etabFacturesAccess, (req, res) => {
   });
 });
 
-// GET /api/etablissements/:id/factures?page=1&limit=10 — liste paginée (10 max. par page)
+// GET /api/etablissements/:id/factures?page=1&limit=10&q=&statut=&formation=&date_from=&date_to=
 router.get('/:id/factures', etabFacturesAccess, (req, res) => {
   const etabId = parseInt(req.params.id, 10);
   const etab = db.get('etablissements').find({ id: etabId }).value();
@@ -682,10 +726,51 @@ router.get('/:id/factures', etabFacturesAccess, (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limitRaw = parseInt(req.query.limit, 10);
   const limit = Math.min(FACTURES_PAGE_MAX, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : FACTURES_PAGE_MAX));
+  const q = String(req.query.q || '').trim().toLowerCase();
+  const statut = String(req.query.statut || '').trim().toLowerCase();
+  const formationQ = String(req.query.formation || '').trim().toLowerCase();
+  const dateFrom = req.query.date_from ? new Date(req.query.date_from) : null;
+  const dateTo = req.query.date_to ? new Date(req.query.date_to) : null;
+  if (dateTo && !Number.isNaN(dateTo.getTime())) dateTo.setHours(23, 59, 59, 999);
+
   const all = db.get('factures').value();
-  const factures = all
+  let factures = all
     .filter((f) => factureBelongsToEtablissement(f, etabId) && !isFactureSupprimee(f))
     .sort((a, b) => new Date(b.date_emission || 0) - new Date(a.date_emission || 0));
+
+  if (statut) {
+    factures = factures.filter((f) => String(f.statut || '').toLowerCase() === statut);
+  }
+  if (formationQ) {
+    factures = factures.filter((f) =>
+      String(f.formation_snapshot?.titre || '').toLowerCase().includes(formationQ),
+    );
+  }
+  if (q) {
+    factures = factures.filter((f) => {
+      const et = f.etudiant_snapshot || {};
+      const blob = [
+        f.numero,
+        et.prenom,
+        et.nom,
+        et.email,
+        et.telephone,
+        f.dossier_id,
+        f.formation_snapshot?.titre,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return blob.includes(q);
+    });
+  }
+  if (dateFrom && !Number.isNaN(dateFrom.getTime())) {
+    factures = factures.filter((f) => new Date(f.date_emission || 0) >= dateFrom);
+  }
+  if (dateTo && !Number.isNaN(dateTo.getTime())) {
+    factures = factures.filter((f) => new Date(f.date_emission || 0) <= dateTo);
+  }
+
   const total = factures.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const safePage = Math.min(page, totalPages);
@@ -701,6 +786,8 @@ router.get('/:id/factures', etabFacturesAccess, (req, res) => {
     statut: f.statut,
     etudiant_snapshot: f.etudiant_snapshot,
     formation_snapshot: f.formation_snapshot,
+    etablissement_id: etabId,
+    etablissement_nom: etab.nom,
   }));
   return res.json({
     items,
@@ -757,13 +844,17 @@ router.get('/:id', (req, res) => {
     ? db.get('utilisateurs').find({ id: etab.responsable_id }).pick(['id', 'prenom', 'nom', 'email', 'role']).value()
     : null;
 
+  // Étudiant : pas de coordonnées bancaires ni d'annuaire du staff (PII).
+  const isEtudiant = req.user.role === 'etudiant';
+  const base = isEtudiant ? stripEtabSensitiveFields(etab) : { ...etab };
+
   res.json({
-    ...etab,
+    ...base,
     logo_url: publicAssetUrl(req, etab.logo_url),
     cachet_url: publicAssetUrl(req, etab.cachet_url),
     filieres,
     formations,
-    membres,
+    membres: isEtudiant ? [] : membres,
     responsable,
   });
 });
@@ -796,22 +887,57 @@ router.delete('/:id', adminOnly, (req, res) => {
   res.json({ message: 'Établissement désactivé.' });
 });
 
-// PUT /api/etablissements/:id/responsable — désigner un responsable (admin)
+// PUT /api/etablissements/:id/responsable — désigner un responsable (admin).
+// La fonction « responsable d'établissement » est une responsabilité supplémentaire :
+// tout membre STAFF actif de l'établissement peut être désigné, quel que soit son
+// rôle principal (comptable, agent admin, contrôleur qualité, responsable).
+// Le désigné obtient les droits « responsable » via req.user.fonctions (voir
+// utils/userFonctions.js) sans perdre son rôle d'origine.
 router.put('/:id/responsable', adminOnly, (req, res) => {
   const id = parseInt(req.params.id);
   const { utilisateur_id } = req.body;
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
+  let designe = null;
   if (utilisateur_id) {
-    const user = db.get('utilisateurs').find({ id: parseInt(utilisateur_id) }).value();
+    const uid = parseInt(utilisateur_id, 10);
+    const user = db.get('utilisateurs').find({ id: uid }).value();
     if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
-    // Relier l'utilisateur à l'établissement
-    db.get('utilisateurs').find({ id: parseInt(utilisateur_id) }).assign({ etablissement_id: id }).write();
+    if (user.actif === false) {
+      return res.status(400).json({ message: 'Ce compte est désactivé : réactivez-le avant de le désigner responsable.' });
+    }
+    // Contraintes métier justifiées (pas de restriction par rôle staff) :
+    // - un compte étudiant est un compte candidat, il ne peut pas piloter l'établissement ;
+    // - un administrateur global possède déjà tous les droits et n'est rattaché à aucun établissement.
+    if (user.role === 'etudiant') {
+      return res.status(400).json({ message: 'Un compte étudiant ne peut pas être désigné responsable d\'établissement.' });
+    }
+    if (user.role === 'admin') {
+      return res.status(400).json({ message: 'Un administrateur global dispose déjà de tous les droits : désignez un membre du staff de l\'établissement.' });
+    }
+    if (Number(user.etablissement_id) !== id) {
+      return res.status(400).json({
+        message: 'L\'utilisateur doit d\'abord être membre de cet établissement (onglet Membres ou gestion des utilisateurs).',
+      });
+    }
+    // Hygiène des données : retirer toute désignation obsolète de ce compte sur un autre établissement.
+    (db.get('etablissements').value() || []).forEach((e) => {
+      if (e.id !== id && Number(e.responsable_id) === uid) {
+        db.get('etablissements').find({ id: e.id }).assign({ responsable_id: null }).write();
+      }
+    });
+    designe = { id: uid, role: user.role };
   }
 
-  db.get('etablissements').find({ id }).assign({ responsable_id: utilisateur_id ? parseInt(utilisateur_id) : null }).write();
-  res.json({ message: 'Responsable mis à jour.' });
+  const previous = etab.responsable_id ?? null;
+  db.get('etablissements').find({ id }).assign({ responsable_id: designe ? designe.id : null }).write();
+  logAudit(req, designe ? 'etablissement_responsable_designe' : 'etablissement_responsable_retire', 'etablissement', id, {
+    ancien_responsable_id: previous,
+    nouveau_responsable_id: designe ? designe.id : null,
+    role_principal_designe: designe ? designe.role : null,
+  });
+  res.json({ message: designe ? 'Responsable désigné.' : 'Responsable retiré.' });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -989,6 +1115,9 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     filiere_id: formation.filiere_id,
     titre: formation.titre,
     type: formation.type,
+    actor_role: req.user.role,
+    actor_id: req.user.id,
+    visible_admin: true,
   });
   res.status(201).json(formation);
 });
@@ -1173,7 +1302,13 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
   saved = formationAvecPrixRecalcule(saved);
   db.get('formations').find({ id }).assign({ prix: saved.prix }).write();
   saved = db.get('formations').find({ id }).value();
-  logAudit(req, 'update', 'formation', id, { etablissement_id: etabId, updates });
+  logAudit(req, 'update', 'formation', id, {
+    etablissement_id: etabId,
+    updates,
+    actor_role: req.user.role,
+    actor_id: req.user.id,
+    visible_admin: true,
+  });
   res.json(saved);
 });
 
@@ -1416,7 +1551,13 @@ router.delete('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
 
   if (!hard) {
     db.get('formations').find({ id }).assign({ actif: false, deleted_at: new Date().toISOString() }).write();
-    logAudit(req, 'deactivate', 'formation', id, { etablissement_id: etabId, source: 'single' });
+    logAudit(req, 'deactivate', 'formation', id, {
+      etablissement_id: etabId,
+      source: 'single',
+      actor_role: req.user.role,
+      actor_id: req.user.id,
+      visible_admin: true,
+    });
     return res.json({ message: 'Formation désactivée (soft delete).' });
   }
 
@@ -1426,7 +1567,13 @@ router.delete('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
 
   detachFormationReferences(id);
   db.get('formations').remove({ id }).write();
-  logAudit(req, 'delete_hard', 'formation', id, { etablissement_id: etabId, source: 'single' });
+  logAudit(req, 'delete_hard', 'formation', id, {
+    etablissement_id: etabId,
+    source: 'single',
+    actor_role: req.user.role,
+    actor_id: req.user.id,
+    visible_admin: true,
+  });
   return res.json({ message: 'Formation supprimée définitivement.' });
 });
 

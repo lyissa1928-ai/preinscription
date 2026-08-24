@@ -2,10 +2,10 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const db = require('../database/db');
 const { authMiddleware } = require('../middleware/auth');
 const { normalizeMatricule, normalizeTelephoneForUniqueness, telephoneTaken } = require('../utils/userIdentity');
+const { getFonctions } = require('../utils/userFonctions');
 const { generateNextMatriculeForEtablissement } = require('../utils/matriculeGenerator');
 const { publicAssetUrl } = require('../utils/publicAssetUrl');
 const { rateLimit, getClientIp } = require('../utils/rateLimit');
@@ -18,8 +18,16 @@ const {
   recaptchaSecret,
   inscriptionCaptchaEnforced,
 } = require('../utils/antiBot');
-const { JWT_SECRET, signPayload } = require('../utils/jwtHelpers');
+const { verifyAccessToken } = require('../utils/jwtHelpers');
 const { revokeToken, isTokenRevoked } = require('../utils/tokenRevocation');
+const { issueAuthSession } = require('../utils/authSession');
+const { signAccessToken, accessExpiresInSeconds } = require('../utils/jwtHelpers');
+const {
+  validateRefreshToken,
+  rotateRefreshToken,
+  revokeRefreshToken,
+  revokeAllRefreshTokensForUser,
+} = require('../database/authSessionStore');
 const { isLoginLocked, recordLoginFailure, clearLoginLockout } = require('../utils/loginLockout');
 const {
   refreshAccountLockState,
@@ -93,6 +101,42 @@ const resendVerifyLimiter = rateLimit({
   keyGenerator: (req) =>
     `resend-verify:${getClientIp(req)}:${String(req.body?.email || '').trim().toLowerCase()}`,
 });
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: 'Trop de demandes de renouvellement de session.',
+  keyGenerator: (req) => `refresh:${getClientIp(req)}`,
+});
+const resetEmailApplyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Trop de tentatives. Réessayez plus tard.',
+  keyGenerator: (req) => `reset-email-apply:${getClientIp(req)}`,
+});
+const verifyEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: 'Trop de tentatives. Réessayez plus tard.',
+  keyGenerator: (req) => `verify-email:${getClientIp(req)}`,
+});
+
+function buildAuthTokensResponse(user, req) {
+  const session = issueAuthSession({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    nom: user.nom,
+    prenom: user.prenom,
+    etablissement_id: user.etablissement_id || null,
+  });
+  return {
+    token: session.token,
+    refresh_token: session.refresh_token,
+    expires_in: session.expires_in,
+    token_type: session.token_type,
+    utilisateur: buildPublicUserPayload(user, req),
+  };
+}
 
 /** Données établissement non sensibles pour le contexte utilisateur connecté */
 function buildPublicEtablissementPayload(etab, req) {
@@ -121,6 +165,9 @@ function buildPublicUserPayload(user, req) {
     prenom: user.prenom,
     email: user.email,
     role: user.role,
+    // Fonctions supplémentaires (ex. responsable d'établissement désigné) —
+    // le frontend s'en sert pour ouvrir les zones correspondantes.
+    fonctions: getFonctions(user),
     matricule: user.matricule || null,
     etablissement_id: user.etablissement_id || null,
     etablissement_nom: etab?.nom || null,
@@ -328,17 +375,9 @@ router.post('/inscription', inscriptionLimiter, async (req, res) => {
     });
   }
 
-  const { token } = signPayload({
-    id,
-    email: emailNorm,
-    role: 'etudiant',
-    nom: user.nom,
-    prenom: user.prenom,
-  });
   res.status(201).json({
     message: 'Compte créé avec succès',
-    token,
-    utilisateur: buildPublicUserPayload(user, req),
+    ...buildAuthTokensResponse(user, req),
   });
 });
 
@@ -404,7 +443,35 @@ router.post('/connexion', loginLimiter, (req, res) => {
   clearLoginLockout(req, emailNorm);
   clearAccountLockOnSuccess(user.id);
 
-  const { token } = signPayload({
+  res.json({
+    message: 'Connexion réussie',
+    ...buildAuthTokensResponse(user, req),
+  });
+});
+
+// POST /api/auth/refresh — renouvellement access token (refresh token rotatif)
+router.post('/refresh', refreshLimiter, (req, res) => {
+  const raw = String(req.body?.refresh_token || '').trim();
+  if (!raw) {
+    return res.status(400).json({ message: 'refresh_token requis.' });
+  }
+  const row = validateRefreshToken(raw);
+  if (!row) {
+    logSecurityEvent(req, 'auth_refresh_invalid', {}, 'warning');
+    return res.status(401).json({ message: 'Session expirée. Reconnectez-vous.', code: 'REFRESH_INVALID' });
+  }
+  const user = db.get('utilisateurs').find({ id: row.user_id }).value();
+  if (!user || user.actif === false) {
+    revokeRefreshToken(raw);
+    return res.status(401).json({ message: 'Compte introuvable ou désactivé.' });
+  }
+  if (!isLoginEmailVerified(user)) {
+    return res.status(403).json({
+      code: 'EMAIL_NOT_VERIFIED',
+      message: 'Adresse e-mail non confirmée.',
+    });
+  }
+  const { token } = signAccessToken({
     id: user.id,
     email: user.email,
     role: user.role,
@@ -412,9 +479,13 @@ router.post('/connexion', loginLimiter, (req, res) => {
     prenom: user.prenom,
     etablissement_id: user.etablissement_id || null,
   });
+  const { refreshToken } = rotateRefreshToken(raw, user.id);
   res.json({
-    message: 'Connexion réussie',
+    message: 'Session renouvelée',
     token,
+    refresh_token: refreshToken,
+    expires_in: accessExpiresInSeconds(),
+    token_type: 'Bearer',
     utilisateur: buildPublicUserPayload(user, req),
   });
 });
@@ -425,12 +496,14 @@ router.post('/deconnexion', authMiddleware, (req, res) => {
   const token = authHeader && authHeader.split(' ')[1];
   if (token) {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = verifyAccessToken(token);
       if (decoded.jti && decoded.exp) {
         revokeToken(decoded.jti, decoded.exp * 1000);
       }
     } catch { /* ignore */ }
   }
+  const refreshRaw = String(req.body?.refresh_token || '').trim();
+  if (refreshRaw) revokeRefreshToken(refreshRaw);
   res.json({ message: 'Déconnexion enregistrée.' });
 });
 
@@ -450,8 +523,11 @@ router.post('/changer-mot-de-passe-obligatoire', authMiddleware, (req, res) => {
   if (nouveau_mot_de_passe !== confirmation) {
     return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
   }
-  if (nouveau_mot_de_passe.length < 6) {
-    return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères.' });
+  {
+    const vp = validatePasswordPolicy(nouveau_mot_de_passe);
+    if (!vp.ok) {
+      return res.status(400).json({ message: vp.message, code: 'PASSWORD_POLICY' });
+    }
   }
   if (nouveau_mot_de_passe === ancien_mot_de_passe) {
     return res.status(400).json({ message: 'Le nouveau mot de passe doit être différent de l’ancien.' });
@@ -482,18 +558,10 @@ router.post('/changer-mot-de-passe-obligatoire', authMiddleware, (req, res) => {
   clearAccountLockOnSuccess(user.id);
 
   const updated = db.get('utilisateurs').find({ id: user.id }).value();
-  const { token } = signPayload({
-    id: updated.id,
-    email: updated.email,
-    role: updated.role,
-    nom: updated.nom,
-    prenom: updated.prenom,
-    etablissement_id: updated.etablissement_id || null,
-  });
+  revokeAllRefreshTokensForUser(updated.id);
   res.json({
     message: 'Mot de passe mis à jour. Vous pouvez continuer.',
-    token,
-    utilisateur: buildPublicUserPayload(updated, req),
+    ...buildAuthTokensResponse(updated, req),
   });
 });
 
@@ -504,7 +572,7 @@ router.get('/me', (req, res) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = verifyAccessToken(token);
     if (decoded.jti && isTokenRevoked(decoded.jti)) {
       return res.status(401).json({ message: 'Session révoquée. Reconnectez-vous.' });
     }
@@ -518,45 +586,227 @@ router.get('/me', (req, res) => {
   }
 });
 
-// POST /api/auth/reinitialiser-mot-de-passe-matricule — public, étudiants uniquement
-router.post('/reinitialiser-mot-de-passe-matricule', resetPwdLimiter, (req, res) => {
-  const { matricule, nouveau_mot_de_passe, confirmation } = req.body;
-  if (!matricule || !nouveau_mot_de_passe || !confirmation) {
-    return res.status(400).json({ message: 'Matricule, nouveau mot de passe et confirmation requis.' });
-  }
-  if (nouveau_mot_de_passe !== confirmation) {
-    return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
-  }
-  if (nouveau_mot_de_passe.length < 6) {
-    return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères.' });
-  }
+// POST /api/auth/reinitialiser-mot-de-passe-matricule — public, étudiants uniquement.
+// Durci : ne change plus le mot de passe directement (la seule connaissance du
+// matricule permettait la prise de compte). Envoie un lien de réinitialisation
+// à l'adresse e-mail associée au compte (même flux que mot-de-passe-oublie-email).
+router.post('/reinitialiser-mot-de-passe-matricule', resetPwdLimiter, async (req, res) => {
+  const generic = {
+    message:
+      'Si un compte étudiant existe avec ce matricule, un e-mail de réinitialisation vient d’être envoyé à l’adresse associée au compte.',
+  };
 
-  const m = normalizeMatricule(matricule);
+  const m = normalizeMatricule(req.body?.matricule);
   if (!m || m.length < 4) {
     return res.status(400).json({ message: 'Matricule invalide.' });
+  }
+  if (!passwordResetEmailEnabled()) {
+    return res.status(503).json({
+      code: 'EMAIL_RESET_DISABLED',
+      message:
+        'La réinitialisation en ligne est momentanément indisponible. Contactez la scolarité de votre établissement.',
+    });
   }
 
   const user = (db.get('utilisateurs').value() || []).find(
     (u) => normalizeMatricule(u.matricule) === m
   );
-  if (!user || user.role !== 'etudiant') {
+  if (!user || user.role !== 'etudiant' || user.actif === false || !user.email) {
     logSecurityEvent(req, 'auth_reset_matricule_not_found', { matricule: m }, 'warning');
-    return res.status(404).json({ message: 'Aucun compte étudiant trouvé avec ce matricule.' });
+    return res.json(generic);
   }
-  if (user.actif === false) {
-    logSecurityEvent(req, 'auth_reset_matricule_disabled_account', { user_id: user.id, matricule: m }, 'warning');
-    return res.status(403).json({ message: 'Ce compte a été désactivé.' });
+
+  const tok = newSecureToken();
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    password_reset_token: tok,
+    password_reset_expires: Date.now() + 60 * 60 * 1000,
+    updated_at: new Date().toISOString(),
+  }).write();
+
+  const url = `${publicAppUrl()}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(tok)}`;
+  await sendMail({
+    to: user.email,
+    subject: 'Réinitialisation de votre mot de passe — UniPortail',
+    text:
+      `Bonjour ${user.prenom},\n\n` +
+      `Une réinitialisation de mot de passe a été demandée avec votre matricule (${user.matricule}).\n` +
+      `Pour choisir un nouveau mot de passe, ouvrez ce lien (valide 1 h) :\n${url}\n\n` +
+      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.`,
+    html:
+      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
+      `<p>Une réinitialisation de mot de passe a été demandée avec votre matricule (${escapeHtml(user.matricule)}).</p>` +
+      `<p><a href="${url}">Choisir un nouveau mot de passe</a> (lien valide 1 h)</p>` +
+      `<p style="font-size:12px;color:#64748b;">Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>`,
+  });
+
+  logSecurityEvent(req, 'auth_reset_matricule_email_sent', { user_id: user.id }, 'info');
+  res.json(generic);
+});
+
+// POST /api/auth/verifier-email — lien reçu par e-mail
+router.post('/verifier-email', verifyEmailLimiter, async (req, res) => {
+  const token = String(req.body?.token || '').trim();
+  if (!token) return res.status(400).json({ message: 'Lien invalide (token manquant).' });
+
+  const user = (db.get('utilisateurs').value() || []).find((u) => u.email_verify_token === token);
+  if (!user) {
+    return res.status(400).json({ message: 'Lien invalide ou déjà utilisé.' });
+  }
+  if (user.email_verify_expires && Date.now() > user.email_verify_expires) {
+    return res.status(400).json({
+      code: 'VERIFY_EXPIRED',
+      message: 'Ce lien a expiré. Demandez un nouvel e-mail de confirmation depuis la page de connexion.',
+    });
+  }
+
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    email_verified_at: new Date().toISOString(),
+    email_verify_token: null,
+    email_verify_expires: null,
+    updated_at: new Date().toISOString(),
+  }).write();
+
+  const updated = db.get('utilisateurs').find({ id: user.id }).value();
+  clearAccountLockOnSuccess(user.id);
+  res.json({
+    message: 'Adresse e-mail confirmée. Vous êtes connecté.',
+    ...buildAuthTokensResponse(updated, req),
+  });
+});
+
+// POST /api/auth/renvoyer-email-verification
+router.post('/renvoyer-email-verification', resendVerifyLimiter, async (req, res) => {
+  const emailNorm = normalizeEmail(String(req.body?.email || ''));
+  if (!emailNorm) {
+    return res.status(400).json({ message: 'Adresse e-mail requise.' });
+  }
+  const user = db.get('utilisateurs').find({ email: emailNorm }).value();
+  if (!user || user.role !== 'etudiant') {
+    return res.json({
+      message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
+    });
+  }
+  if (user.email_verified_at || !user.email_verify_token) {
+    return res.json({
+      message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
+    });
+  }
+
+  const tok = newSecureToken();
+  const exp = Date.now() + 48 * 60 * 60 * 1000;
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    email_verify_token: tok,
+    email_verify_expires: exp,
+    updated_at: new Date().toISOString(),
+  }).write();
+
+  const url = `${publicAppUrl()}/verifier-email?token=${encodeURIComponent(tok)}`;
+  await sendMail({
+    to: emailNorm,
+    subject: 'Confirmez votre adresse e-mail — UniPortail',
+    text:
+      `Bonjour ${user.prenom},\n\nPour activer votre compte :\n${url}\n\nLe lien expire dans 48 heures.`,
+    html:
+      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
+      `<p><a href="${url}">Confirmer mon e-mail</a></p>` +
+      `<p style="font-size:12px;color:#64748b;">Expire dans 48 h.</p>`,
+  });
+
+  res.json({
+    message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
+  });
+});
+
+// POST /api/auth/mot-de-passe-oublie-email — envoi lien (étudiants)
+router.post('/mot-de-passe-oublie-email', forgotEmailLimiter, async (req, res) => {
+  const emailNorm = normalizeEmail(String(req.body?.email || ''));
+  const generic = {
+    message:
+      'Si un compte étudiant existe avec cette adresse, un e-mail de réinitialisation vient d’être envoyé.',
+  };
+  if (!passwordResetEmailEnabled() || !emailNorm) {
+    return res.json(generic);
+  }
+
+  const user = db.get('utilisateurs').find({ email: emailNorm }).value();
+  if (!user || user.role !== 'etudiant' || user.actif === false) {
+    return res.json(generic);
+  }
+
+  const tok = newSecureToken();
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    password_reset_token: tok,
+    password_reset_expires: Date.now() + 60 * 60 * 1000,
+    updated_at: new Date().toISOString(),
+  }).write();
+
+  const url = `${publicAppUrl()}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(tok)}`;
+  await sendMail({
+    to: emailNorm,
+    subject: 'Réinitialisation de votre mot de passe — UniPortail',
+    text:
+      `Bonjour ${user.prenom},\n\n` +
+      `Pour choisir un nouveau mot de passe, ouvrez ce lien (valide 1 h) :\n${url}\n\n` +
+      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.`,
+    html:
+      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
+      `<p><a href="${url}">Choisir un nouveau mot de passe</a> (lien valide 1 h)</p>` +
+      `<p style="font-size:12px;color:#64748b;">Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>`,
+  });
+
+  res.json(generic);
+});
+
+// POST /api/auth/reinitialiser-mot-de-passe-email
+router.post('/reinitialiser-mot-de-passe-email', resetEmailApplyLimiter, (req, res) => {
+  const token = String(req.body?.token || '').trim();
+  const { nouveau_mot_de_passe, confirmation } = req.body;
+  if (!token || !nouveau_mot_de_passe || !confirmation) {
+    return res.status(400).json({ message: 'Token, nouveau mot de passe et confirmation requis.' });
+  }
+  if (nouveau_mot_de_passe !== confirmation) {
+    return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
+  }
+  const vp = validatePasswordPolicy(nouveau_mot_de_passe);
+  if (!vp.ok) {
+    return res.status(400).json({ message: vp.message, code: 'PASSWORD_POLICY' });
+  }
+
+  const user = (db.get('utilisateurs').value() || []).find((u) => u.password_reset_token === token);
+  if (!user || user.role !== 'etudiant') {
+    logSecurityEvent(req, 'auth_reset_email_bad_token', {}, 'warning');
+    return res.status(400).json({ message: 'Lien invalide ou expiré.' });
+  }
+  if (!user.password_reset_expires || Date.now() > user.password_reset_expires) {
+    return res.status(400).json({ message: 'Lien expiré. Demandez une nouvelle réinitialisation.' });
   }
 
   const hash = bcrypt.hashSync(nouveau_mot_de_passe, 10);
   db.get('utilisateurs').find({ id: user.id }).assign({
     mot_de_passe: hash,
+    password_reset_token: null,
+    password_reset_expires: null,
     must_change_password: false,
     password_changed_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).write();
 
-  res.json({ message: 'Mot de passe mis à jour. Vous pouvez vous connecter avec votre adresse email.' });
+  const updated = db.get('utilisateurs').find({ id: user.id }).value();
+  clearAccountLockOnSuccess(user.id);
+  revokeAllRefreshTokensForUser(updated.id);
+  res.json({
+    message: 'Mot de passe mis à jour. Vous êtes connecté.',
+    ...buildAuthTokensResponse(updated, req),
+  });
+});
+
+// GET /api/auth/options-public — pour le front (affichage liens)
+router.get('/options-public', (req, res) => {
+  res.json({
+    email_verification_enabled: emailVerificationEnabled(),
+    password_reset_email_enabled: passwordResetEmailEnabled(),
+    smtp_configured: isSmtpConfigured(),
+  });
 });
 
 // POST /api/auth/verifier-email — lien reçu par e-mail

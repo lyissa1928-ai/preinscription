@@ -17,16 +17,34 @@ export function TabFacturesEtab({ etabId }) {
   const [selected, setSelected] = useState(() => new Set())
   const [busy, setBusy] = useState(false)
   const selectAllRef = useRef(null)
+  const [filters, setFilters] = useState({
+    q: '',
+    statut: '',
+    formation: '',
+    date_from: '',
+    date_to: '',
+  })
+  const [applied, setApplied] = useState(filters)
 
   useEffect(() => {
     setPage(1)
-  }, [etabId])
+  }, [etabId, applied])
 
   const load = useCallback(() => {
     if (!etabId) return
     setLoading(true)
     axios
-      .get(`/api/etablissements/${etabId}/factures`, { params: { page, limit: PAGE_SIZE } })
+      .get(`/api/etablissements/${etabId}/factures`, {
+        params: {
+          page,
+          limit: PAGE_SIZE,
+          q: applied.q || undefined,
+          statut: applied.statut || undefined,
+          formation: applied.formation || undefined,
+          date_from: applied.date_from || undefined,
+          date_to: applied.date_to || undefined,
+        },
+      })
       .then(({ data }) => {
         const items = Array.isArray(data.items) ? data.items : []
         setList(items)
@@ -36,7 +54,7 @@ export function TabFacturesEtab({ etabId }) {
       })
       .catch(() => toast.error('Impossible de charger les factures.'))
       .finally(() => setLoading(false))
-  }, [etabId, page])
+  }, [etabId, page, applied])
 
   useEffect(() => {
     load()
@@ -46,6 +64,18 @@ export function TabFacturesEtab({ etabId }) {
   useEffect(() => {
     setSelected(new Set())
   }, [page])
+
+  const applyFilters = () => {
+    setApplied({ ...filters })
+    setPage(1)
+  }
+
+  const resetFilters = () => {
+    const empty = { q: '', statut: '', formation: '', date_from: '', date_to: '' }
+    setFilters(empty)
+    setApplied(empty)
+    setPage(1)
+  }
 
   const pageIds = list.map((f) => f.id)
   const allSelected = list.length > 0 && pageIds.every((id) => selected.has(id))
@@ -277,6 +307,66 @@ export function TabFacturesEtab({ etabId }) {
         Le fichier regroupe les factures pour impression ou enregistrement PDF depuis le navigateur. Les logos en ligne ne s’affichent pas hors serveur : les données textuelles restent complètes.
       </p>
 
+      <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="lg:col-span-2">
+          <label className="mb-1 block text-xs font-semibold text-slate-500">Étudiant / N° / e-mail</label>
+          <input
+            className="input-field text-sm"
+            value={filters.q}
+            onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
+            placeholder="Rechercher…"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-500">Formation</label>
+          <input
+            className="input-field text-sm"
+            value={filters.formation}
+            onChange={(e) => setFilters((f) => ({ ...f, formation: e.target.value }))}
+            placeholder="Intitulé…"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-500">Statut</label>
+          <select
+            className="input-field text-sm"
+            value={filters.statut}
+            onChange={(e) => setFilters((f) => ({ ...f, statut: e.target.value }))}
+          >
+            <option value="">Tous</option>
+            <option value="emise">Émise</option>
+            <option value="payee">Payée</option>
+            <option value="annulee">Annulée</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-500">Du</label>
+          <input
+            type="date"
+            className="input-field text-sm"
+            value={filters.date_from}
+            onChange={(e) => setFilters((f) => ({ ...f, date_from: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-500">Au</label>
+          <input
+            type="date"
+            className="input-field text-sm"
+            value={filters.date_to}
+            onChange={(e) => setFilters((f) => ({ ...f, date_to: e.target.value }))}
+          />
+        </div>
+        <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-6">
+          <button type="button" className="btn-primary text-sm" onClick={applyFilters}>
+            Filtrer
+          </button>
+          <button type="button" className="btn-secondary text-sm" onClick={resetFilters}>
+            Réinitialiser
+          </button>
+        </div>
+      </div>
+
       {total === 0 && !loading ? (
         <div className="rounded-xl border border-dashed border-gray-200 py-14 text-center text-gray-400">
           Aucune facture enregistrée pour cet établissement.
@@ -302,6 +392,7 @@ export function TabFacturesEtab({ etabId }) {
                   <th className="p-3">Bénéficiaire</th>
                   <th className="p-3">Formation</th>
                   <th className="p-3 text-right">Montant TTC</th>
+                  <th className="p-3">Statut</th>
                   <th className="p-3">Dossier</th>
                   <th className="w-28 p-3">Action</th>
                 </tr>
@@ -332,6 +423,11 @@ export function TabFacturesEtab({ etabId }) {
                         {fo.titre || '—'}
                       </td>
                       <td className="p-3 text-right font-semibold tabular-nums">{fmt(f.montant_ttc)} FCFA</td>
+                      <td className="p-3">
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                          {f.statut || '—'}
+                        </span>
+                      </td>
                       <td className="p-3 font-mono text-xs text-gray-500">#{f.dossier_id}</td>
                       <td className="p-3">
                         <Link to={`/facture/${f.dossier_id}`} className="text-xs font-semibold text-blue-600 hover:underline">

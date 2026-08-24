@@ -8,6 +8,7 @@ const {
   getDocumentChecklistDefinition,
   computeMissingDocumentTypes,
 } = require('../utils/preinscriptionDocumentRules');
+const { filterDossiersForUser, assertDossierForUser } = require('../utils/staffScope');
 
 router.use(authMiddleware, agentAdminOrAdmin);
 
@@ -27,21 +28,9 @@ function docsMetaForDossier(dossier, documents, formation) {
   return { docs_requis, docs_manquants, document_rule_profile: profile };
 }
 
-// Helper : filtrer les dossiers par établissement
-function filterDossiersByEtab(req, dossiers) {
-  const etabId = req.user.role === 'admin' ? null : req.user.etablissement_id;
-  if (!etabId) return dossiers;
-  const formationIds = (db.get('formations').value() || []).filter((f) => f.etablissement_id === etabId).map((f) => f.id);
-  return dossiers.filter(d => {
-    if (d.etablissement_id) return d.etablissement_id === etabId;
-    if (d.formation_id) return formationIds.includes(d.formation_id);
-    return false;
-  });
-}
-
 // ─── GET /api/agent-admin/dashboard ──────────────────────────────────────────
 router.get('/dashboard', (req, res) => {
-  const dossiers = filterDossiersByEtab(req, db.get('dossiers').value() || []);
+  const dossiers = filterDossiersForUser(req.user, db.get('dossiers').value() || []);
   const docs = db.get('documents').value() || [];
   const formations = db.get('formations').value() || [];
 
@@ -86,7 +75,7 @@ router.get('/dossiers', (req, res) => {
   const utilisateurs = db.get('utilisateurs').value() || [];
   const formations = db.get('formations').value() || [];
 
-  let dossiers = filterDossiersByEtab(req, db.get('dossiers').value() || []).map((d) => {
+  let dossiers = filterDossiersForUser(req.user, db.get('dossiers').value() || []).map((d) => {
     const u = utilisateurs.find((x) => x.id === d.etudiant_id) || {};
     const dDocs = docs.filter((doc) => doc.dossier_id === d.id);
     const docsIds = dDocs.map((doc) => doc.type_document);
@@ -119,6 +108,9 @@ router.get('/dossiers/:id', (req, res) => {
   const dossier = db.get('dossiers').find({ id }).value();
   if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
 
+  const access = assertDossierForUser(req.user, dossier);
+  if (!access.ok) return res.status(access.status).json({ message: access.message });
+
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
   const documents = db.get('documents').filter({ dossier_id: id }).value();
   const formation = db.get('formations').find({ id: dossier.formation_id }).value();
@@ -145,6 +137,9 @@ router.put('/dossiers/:id/completude', (req, res) => {
   const id = parseInt(req.params.id);
   const dossier = db.get('dossiers').find({ id }).value();
   if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
+
+  const access = assertDossierForUser(req.user, dossier);
+  if (!access.ok) return res.status(access.status).json({ message: access.message });
 
   db.get('dossiers').find({ id }).assign({
     statut_admin,

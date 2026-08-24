@@ -1,6 +1,7 @@
 const db = require('../database/db');
 const { snapshotFromFormation, snapshotFromEtablissementId } = require('./etablissementSnapshot');
-const { isDossierAcceptePourLettre } = require('./dossierLettreEligible');
+const { canIssueOfficialDocs } = require('./canIssueOfficialDocs');
+const { resolveCandidatIdentite } = require('./candidatIdentite');
 const { primaryPhotoDocumentFromList } = require('./preinscriptionDocumentRules');
 
 /**
@@ -13,16 +14,17 @@ function buildAttestationPayloadForDossier(dossierId) {
 
   const dossier = db.get('dossiers').find({ id }).value();
   if (!dossier) return { error: { status: 404, message: 'Dossier non trouvé' } };
-  if (!isDossierAcceptePourLettre(dossier.statut)) {
+  if (!canIssueOfficialDocs(dossier)) {
     return {
       error: {
         status: 403,
-        message: 'L’attestation de préinscription n’est disponible que pour une candidature acceptée.',
+        message: 'L’attestation n’est pas encore disponible pour cette préinscription.',
       },
     };
   }
 
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
+  const identite = resolveCandidatIdentite(dossier, u);
   const formation = dossier.formation_id
     ? db.get('formations').find({ id: dossier.formation_id }).value()
     : null;
@@ -36,7 +38,7 @@ function buildAttestationPayloadForDossier(dossierId) {
   const documents = db.get('documents').filter({ dossier_id: id }).value();
   const photoDoc = primaryPhotoDocumentFromList(documents);
   const etablissement =
-    snapshotFromFormation(formation) || snapshotFromEtablissementId(u.etablissement_id);
+    snapshotFromFormation(formation) || snapshotFromEtablissementId(dossier.etablissement_id || u.etablissement_id);
 
   const y = new Date().getFullYear();
   const reference_attestation = `ATT-${y}-${String(dossier.id).padStart(5, '0')}`;
@@ -46,14 +48,18 @@ function buildAttestationPayloadForDossier(dossierId) {
     type: 'attestation',
     dossier,
     etudiant: {
-      nom: u.nom,
-      prenom: u.prenom,
-      email: u.email,
+      nom: identite.nom,
+      prenom: identite.prenom,
+      email: identite.email,
     },
     candidat: {
-      date_naissance: dossier.date_naissance || null,
-      nationalite: dossier.nationalite || null,
+      date_naissance: identite.date_naissance,
+      lieu_naissance: identite.lieu_naissance,
+      nationalite: identite.nationalite,
+      pays_residence: identite.pays_residence,
       numero_dossier: dossier.numero_dossier,
+      numero_passeport: identite.numero_passeport,
+      sexe: identite.sexe,
     },
     formation,
     filiere_libelle,

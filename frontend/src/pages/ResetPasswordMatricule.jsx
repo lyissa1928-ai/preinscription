@@ -1,60 +1,33 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { FaGraduationCap, FaEye, FaEyeSlash, FaInfoCircle } from 'react-icons/fa'
+import { FaGraduationCap, FaInfoCircle, FaEnvelopeOpenText } from 'react-icons/fa'
 import AuthCinematicBackground from '../components/AuthCinematicBackground'
-import PasswordStrengthMeter from '../components/PasswordStrengthMeter'
-
-const MIN_LEN = 6
 
 export default function ResetPasswordMatricule() {
-  const [form, setForm] = useState({ matricule: '', nouveau_mot_de_passe: '', confirmation: '' })
+  const [matricule, setMatricule] = useState('')
   const [loading, setLoading] = useState(false)
-  const [show1, setShow1] = useState(false)
-  const [show2, setShow2] = useState(false)
+  const [sent, setSent] = useState(false)
   const [serverError, setServerError] = useState('')
-  const [fieldErrors, setFieldErrors] = useState({})
-  const navigate = useNavigate()
-
-  const clearFieldError = (key) => {
-    setFieldErrors((prev) => {
-      const next = { ...prev }
-      delete next[key]
-      return next
-    })
-    setServerError('')
-  }
-
-  const validate = () => {
-    const err = {}
-    const m = form.matricule.trim()
-    if (!m) err.matricule = 'Indiquez votre matricule.'
-    const pw = form.nouveau_mot_de_passe
-    if (pw.length < MIN_LEN) err.nouveau_mot_de_passe = `Au moins ${MIN_LEN} caractères.`
-    if (form.confirmation !== pw) err.confirmation = 'Les deux mots de passe ne correspondent pas.'
-    setFieldErrors(err)
-    return Object.keys(err).length === 0
-  }
+  const [fieldError, setFieldError] = useState('')
 
   const submit = async (e) => {
     e.preventDefault()
     setServerError('')
-    if (!validate()) {
-      toast.error('Vérifiez les champs en surbrillance.')
+    const m = matricule.trim()
+    if (!m) {
+      setFieldError('Indiquez votre matricule.')
+      toast.error('Indiquez votre matricule.')
       return
     }
+    setFieldError('')
     setLoading(true)
     try {
-      await axios.post('/api/auth/reinitialiser-mot-de-passe-matricule', {
-        matricule: form.matricule.trim(),
-        nouveau_mot_de_passe: form.nouveau_mot_de_passe,
-        confirmation: form.confirmation,
-      })
-      toast.success('Mot de passe mis à jour. Connectez-vous avec votre email.')
-      navigate('/connexion')
+      await axios.post('/api/auth/reinitialiser-mot-de-passe-matricule', { matricule: m })
+      setSent(true)
     } catch (err) {
-      const msg = err.response?.data?.message || 'Impossible de réinitialiser le mot de passe.'
+      const msg = err.response?.data?.message || 'Impossible d’envoyer l’e-mail de réinitialisation.'
       setServerError(msg)
       toast.error(msg)
     } finally {
@@ -72,149 +45,119 @@ export default function ResetPasswordMatricule() {
             <FaGraduationCap className="text-amber-200 text-3xl" aria-hidden />
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight [text-shadow:0_2px_12px_rgba(0,0,0,0.45)]">
-            Nouveau mot de passe
+            Mot de passe oublié
           </h1>
           <p className="text-blue-100/95 text-sm mt-2 max-w-sm mx-auto [text-shadow:0_1px_6px_rgba(0,0,0,0.4)]">
-            À l’aide de votre matricule étudiant
+            Indiquez votre matricule : un lien de réinitialisation sera envoyé à l’adresse
+            e-mail associée à votre compte.
           </p>
         </div>
 
         <div className="rounded-3xl border border-white/90 bg-white/95 backdrop-blur-xl p-6 md:p-8 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
-          {serverError && (
-            <div
-              role="alert"
-              className="mb-5 flex gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
-            >
-              <FaInfoCircle className="mt-0.5 shrink-0 text-red-600" aria-hidden />
-              <p>{serverError}</p>
-            </div>
-          )}
-
-          <form onSubmit={submit} className="space-y-5" noValidate>
-            <div>
-              <label htmlFor="rpm-matricule" className="label-field">
-                Matricule
-              </label>
-              <input
-                id="rpm-matricule"
-                className={`input-field font-mono uppercase ${fieldErrors.matricule ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
-                placeholder="Ex. ABC001"
-                value={form.matricule}
-                onChange={(e) => {
-                  setForm({ ...form, matricule: e.target.value })
-                  clearFieldError('matricule')
-                }}
-                autoComplete="username"
-                aria-invalid={Boolean(fieldErrors.matricule)}
-                aria-describedby={fieldErrors.matricule ? 'err-matricule' : undefined}
-              />
-              {fieldErrors.matricule && (
-                <p id="err-matricule" className="mt-1.5 text-xs font-medium text-red-600">
-                  {fieldErrors.matricule}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="rpm-pw" className="label-field">
-                Nouveau mot de passe
-              </label>
-              <div className="relative">
-                <input
-                  id="rpm-pw"
-                  type={show1 ? 'text' : 'password'}
-                  className={`input-field pr-10 ${fieldErrors.nouveau_mot_de_passe ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
-                  value={form.nouveau_mot_de_passe}
-                  onChange={(e) => {
-                    setForm({ ...form, nouveau_mot_de_passe: e.target.value })
-                    clearFieldError('nouveau_mot_de_passe')
-                  }}
-                  minLength={MIN_LEN}
-                  autoComplete="new-password"
-                  aria-invalid={Boolean(fieldErrors.nouveau_mot_de_passe)}
-                  aria-describedby="rpm-pw-hint err-nouveau"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => setShow1(!show1)}
-                  aria-label={show1 ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
-                >
-                  {show1 ? <FaEyeSlash /> : <FaEye />}
-                </button>
+          {sent ? (
+            <div className="text-center space-y-4">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200">
+                <FaEnvelopeOpenText className="text-emerald-600 text-2xl" aria-hidden />
               </div>
-              <p id="rpm-pw-hint" className="mt-1.5 text-xs text-slate-500">
-                Minimum {MIN_LEN} caractères — idéalement majuscules, chiffres et un symbole.
+              <h2 className="text-lg font-bold text-slate-800">Vérifiez votre boîte mail</h2>
+              <p className="text-sm text-slate-600">
+                Si un compte étudiant existe avec ce matricule, un e-mail de réinitialisation
+                vient d’être envoyé à l’adresse associée au compte. Le lien est valable 1 heure.
               </p>
-              <PasswordStrengthMeter password={form.nouveau_mot_de_passe} className="mt-2" />
-              {fieldErrors.nouveau_mot_de_passe && (
-                <p id="err-nouveau" className="mt-1.5 text-xs font-medium text-red-600">
-                  {fieldErrors.nouveau_mot_de_passe}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="rpm-confirm" className="label-field">
-                Confirmer le mot de passe
-              </label>
-              <div className="relative">
-                <input
-                  id="rpm-confirm"
-                  type={show2 ? 'text' : 'password'}
-                  className={`input-field pr-10 ${fieldErrors.confirmation ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
-                  value={form.confirmation}
-                  onChange={(e) => {
-                    setForm({ ...form, confirmation: e.target.value })
-                    clearFieldError('confirmation')
-                  }}
-                  minLength={MIN_LEN}
-                  autoComplete="new-password"
-                  aria-invalid={Boolean(fieldErrors.confirmation)}
-                  aria-describedby={fieldErrors.confirmation ? 'err-confirm' : undefined}
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => setShow2(!show2)}
-                  aria-label={show2 ? 'Masquer la confirmation' : 'Afficher la confirmation'}
+              <p className="text-xs text-slate-500">
+                Pensez à vérifier le dossier spam. Vous n’avez plus accès à cette adresse ?{' '}
+                <a
+                  href="mailto:lyissa15@gmail.com?subject=UniPr%C3%A9inscription%20%E2%80%94%20Acc%C3%A8s%20au%20compte"
+                  className="font-medium text-blue-600 hover:underline"
                 >
-                  {show2 ? <FaEyeSlash /> : <FaEye />}
-                </button>
-              </div>
-              {fieldErrors.confirmation && (
-                <p id="err-confirm" className="mt-1.5 text-xs font-medium text-red-600">
-                  {fieldErrors.confirmation}
-                </p>
-              )}
+                  Écrire au support
+                </a>
+              </p>
+              <Link to="/connexion" className="btn-primary inline-flex h-11 items-center px-6">
+                Retour à la connexion
+              </Link>
             </div>
-
-            <button type="submit" disabled={loading} className="btn-primary w-full h-12 text-base shadow-lg shadow-blue-500/20">
-              {loading ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Enregistrement…
-                </span>
-              ) : (
-                'Enregistrer le nouveau mot de passe'
+          ) : (
+            <>
+              {serverError && (
+                <div
+                  role="alert"
+                  className="mb-5 flex gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
+                >
+                  <FaInfoCircle className="mt-0.5 shrink-0 text-red-600" aria-hidden />
+                  <p>{serverError}</p>
+                </div>
               )}
-            </button>
-          </form>
 
-          <p className="mt-6 text-center text-sm text-slate-600">
-            <Link to="/connexion" className="font-semibold text-blue-600 hover:underline">
-              Retour à la connexion
-            </Link>
-          </p>
-          <p className="mt-3 text-center text-xs text-slate-500">
-            Matricule oublié ?{' '}
-            <a
-              href="mailto:lyissa15@gmail.com?subject=UniPr%C3%A9inscription%20%E2%80%94%20R%C3%A9cup%C3%A9ration%20de%20matricule"
-              className="font-medium text-blue-600 hover:underline"
-            >
-              Écrire au support
-            </a>
-          </p>
+              <form onSubmit={submit} className="space-y-5" noValidate>
+                <div>
+                  <label htmlFor="rpm-matricule" className="label-field">
+                    Matricule
+                  </label>
+                  <input
+                    id="rpm-matricule"
+                    className={`input-field font-mono uppercase ${fieldError ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
+                    placeholder="Ex. ABC001"
+                    value={matricule}
+                    onChange={(e) => {
+                      setMatricule(e.target.value)
+                      setFieldError('')
+                      setServerError('')
+                    }}
+                    autoComplete="username"
+                    aria-invalid={Boolean(fieldError)}
+                    aria-describedby={fieldError ? 'err-matricule' : 'rpm-hint'}
+                  />
+                  {fieldError ? (
+                    <p id="err-matricule" className="mt-1.5 text-xs font-medium text-red-600">
+                      {fieldError}
+                    </p>
+                  ) : (
+                    <p id="rpm-hint" className="mt-1.5 text-xs text-slate-500">
+                      Pour votre sécurité, le mot de passe ne peut être changé que via le lien
+                      envoyé par e-mail.
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn-primary w-full h-12 text-base shadow-lg shadow-blue-500/20"
+                >
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Envoi…
+                    </span>
+                  ) : (
+                    'Recevoir le lien de réinitialisation'
+                  )}
+                </button>
+              </form>
+
+              <p className="mt-6 text-center text-sm text-slate-600">
+                Vous connaissez votre adresse e-mail ?{' '}
+                <Link to="/mot-de-passe-oublie-email" className="font-semibold text-blue-600 hover:underline">
+                  Réinitialiser par e-mail
+                </Link>
+              </p>
+              <p className="mt-3 text-center text-sm text-slate-600">
+                <Link to="/connexion" className="font-semibold text-blue-600 hover:underline">
+                  Retour à la connexion
+                </Link>
+              </p>
+              <p className="mt-3 text-center text-xs text-slate-500">
+                Matricule oublié ?{' '}
+                <a
+                  href="mailto:lyissa15@gmail.com?subject=UniPr%C3%A9inscription%20%E2%80%94%20R%C3%A9cup%C3%A9ration%20de%20matricule"
+                  className="font-medium text-blue-600 hover:underline"
+                >
+                  Écrire au support
+                </a>
+              </p>
+            </>
+          )}
         </div>
 
         <p className="mt-6 text-center">

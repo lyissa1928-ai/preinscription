@@ -2117,7 +2117,8 @@ function TabMembres({ etabId, membres: init, responsable_id }) {
                 <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   <FaExclamationTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" aria-hidden />
                   <p>
-                    Cette personne est le <strong>responsable désigné</strong>. Si vous changez son rôle, vérifiez l’onglet « Responsable » pour désigner un autre responsable pédagogique.
+                    Cette personne est le <strong>responsable désigné</strong> de l&apos;établissement. Elle conserve cette fonction
+                    même si vous changez son rôle principal ; pour la lui retirer, passez par l&apos;onglet « Responsable ».
                   </p>
                 </div>
               )}
@@ -2222,7 +2223,10 @@ function TabResponsable({ etabId, responsable: initResp, membres }) {
   const [selectedId, setSelectedId] = useState(initResp?.id ? String(initResp.id) : '')
   const [saving, setSaving] = useState(false)
 
-  const eligibles = membres.filter(m => m.role === 'responsable' && m.actif !== false)
+  // Tout membre STAFF actif peut être désigné responsable, quel que soit son rôle
+  // principal : la fonction « responsable d'établissement » est une responsabilité
+  // supplémentaire (le désigné garde son rôle et gagne les droits responsable).
+  const eligibles = membres.filter(m => m.actif !== false && m.role !== 'etudiant')
 
   const handleSave = async () => {
     setSaving(true)
@@ -2257,9 +2261,14 @@ function TabResponsable({ etabId, responsable: initResp, membres }) {
 
       <div>
         <p className="font-semibold text-gray-800 mb-3">Désigner un responsable</p>
+        <p className="text-xs text-gray-500 mb-3">
+          Tout membre <strong>staff actif</strong> de l&apos;établissement peut être désigné, quel que soit son rôle
+          (comptable, agent administratif, contrôleur qualité…). Il conserve son rôle actuel et obtient en plus
+          les droits de responsable d&apos;établissement.
+        </p>
         {eligibles.length === 0 ? (
           <div className="p-4 bg-amber-50 rounded-xl text-sm text-amber-700">
-            ⚠ Créez d&apos;abord un membre avec le rôle <strong>Responsable pédagogique</strong>.
+            ⚠ Ajoutez d&apos;abord un membre staff à cet établissement (onglet <strong>Membres</strong>).
           </div>
         ) : (
           <>

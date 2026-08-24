@@ -1,6 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
+const { rateLimit, getClientIp } = require('../utils/rateLimit');
+
+const publicProformaLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: 'Trop de consultations. Réessayez plus tard.',
+  keyGenerator: (req) => `public_proforma:${getClientIp(req)}:${req.params.reference || ''}`,
+});
 const { publicAssetUrl } = require('../utils/publicAssetUrl');
 const { mergeFactureProformaFromFormation, getDureeMoisEffectif } = require('../utils/formationTarifs');
 const { isFactureProformaConsultablePublique } = require('../utils/proformaDemandeHelpers');
@@ -35,7 +43,7 @@ function buildSnapshot(etab, req) {
 }
 
 // GET /api/public/facture-proforma/:reference
-router.get('/facture-proforma/:reference', (req, res) => {
+router.get('/facture-proforma/:reference', publicProformaLimiter, (req, res) => {
   const demande = db.get('demandes_proforma').find({ reference: req.params.reference }).value();
   if (!demande) return res.status(404).json({ message: 'Facture proforma introuvable.' });
   if (!isFactureProformaConsultablePublique(demande)) {

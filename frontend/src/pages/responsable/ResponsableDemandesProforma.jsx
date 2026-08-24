@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { mediaUrl } from '../../utils/mediaUrl'
 import { useAuth } from '../../context/AuthContext'
+import { actsAsResponsable } from '../../utils/roles'
 import { chatWithStudentUrl } from '../../utils/chatWithStudentUrl'
+import CreerProformaModal from '../../components/CreerProformaModal'
 
 const fmt = n => new Intl.NumberFormat('fr-FR').format(n || 0)
 
@@ -16,23 +18,30 @@ function justifUrl(rel) {
 
 export default function ResponsableDemandesProforma() {
   const { user } = useAuth()
+  // Chat avec le candidat : rôle responsable OU fonction « responsable d'établissement » désignée
   const canChatterEtudiant =
-    user?.role === 'responsable' && user?.etablissement_id != null
+    actsAsResponsable(user) && user?.etablissement_id != null
   const [demandes, setDemandes] = useState([])
+  const [pagination, setPagination] = useState({})
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [motifRefus, setMotifRefus] = useState('')
   const [saving, setSaving] = useState(false)
+  const [creerOpen, setCreerOpen] = useState(false)
 
-  const load = () => {
+  const load = (p = page) => {
     setLoading(true)
-    axios.get('/api/responsable/demandes-proforma?limit=200')
-      .then(({ data }) => setDemandes(data.demandes || []))
+    axios.get(`/api/responsable/demandes-proforma?page=${p}&limit=15`)
+      .then(({ data }) => {
+        setDemandes(data.demandes || [])
+        setPagination(data.pagination || {})
+      })
       .catch(() => toast.error('Chargement impossible'))
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(page) }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const marquerVue = (id) => {
     axios.put(`/api/responsable/demandes-proforma/${id}/statut`, { statut: 'vue' })
@@ -79,8 +88,15 @@ export default function ResponsableDemandesProforma() {
             l’attestation de préinscription qu’après votre <strong>acceptation</strong> (ou celle d’un administrateur).
           </p>
         </div>
-        <Link to="/responsable" className="btn-secondary text-sm">Dossiers complets →</Link>
+        <div className="flex items-center gap-2">
+          <button type="button" className="btn-primary text-sm" onClick={() => setCreerOpen(true)}>
+            Nouvelle facture proforma
+          </button>
+          <Link to="/responsable" className="btn-secondary text-sm">Dossiers complets →</Link>
+        </div>
       </div>
+
+      <CreerProformaModal open={creerOpen} onClose={() => setCreerOpen(false)} onCreated={() => load(1)} />
 
       {loading ? (
         <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent" /></div>
@@ -176,6 +192,21 @@ export default function ResponsableDemandesProforma() {
               </div>
             </div>
           ))}
+
+          {pagination.totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
+              <p className="text-sm text-slate-500">{pagination.total} demande(s)</p>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page === 1} className="btn-secondary py-1.5 px-3 text-xs disabled:opacity-40">
+                  ← Préc.
+                </button>
+                <span className="text-sm text-slate-500">Page {page}/{pagination.totalPages}</span>
+                <button type="button" onClick={() => setPage((p) => p + 1)} disabled={page === pagination.totalPages} className="btn-secondary py-1.5 px-3 text-xs disabled:opacity-40">
+                  Suiv. →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

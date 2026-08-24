@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
 const { authMiddleware } = require('../middleware/auth');
+const { actsAsResponsable } = require('../utils/userFonctions');
 
 const MAX_LEN = 300000;
 
@@ -81,7 +82,7 @@ function resolveEtabId(req) {
       },
     };
   }
-  if (role !== 'responsable') {
+  if (!actsAsResponsable(req.user)) {
     return { error: { status: 403, message: 'Accès réservé au responsable pédagogique ou à l’administrateur.' } };
   }
   const eid = req.user.etablissement_id;

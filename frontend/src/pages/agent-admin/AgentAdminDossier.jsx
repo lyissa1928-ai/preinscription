@@ -4,6 +4,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import StatutBadge from '../../components/StatutBadge'
 import { DOC_FIELD_LABELS } from '../../utils/preinscriptionDocumentRules'
+import { mediaUrl } from '../../utils/mediaUrl'
 
 const DOCS_LABELS = {
   ...DOC_FIELD_LABELS,
@@ -128,7 +129,7 @@ export default function AgentAdminDossier() {
                         {!doc && <p className="text-xs text-red-500">Document manquant</p>}
                       </div>
                       {doc && (
-                        <a href={`/uploads/${doc.chemin}`} target="_blank" rel="noreferrer"
+                        <a href={mediaUrl(`/uploads/${doc.chemin}`)} target="_blank" rel="noreferrer"
                           className="text-xs text-blue-600 hover:underline flex-shrink-0">Voir</a>
                       )}
                     </div>

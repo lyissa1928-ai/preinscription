@@ -1,8 +1,9 @@
 /**
- * Messagerie (même établissement) :
- * - Étudiants : uniquement avec les responsables pédagogiques (role responsable).
- * - Staff (responsable, agent_admin, comptable, controleur_qualite) : entre eux ;
- *   seul le responsable peut échanger avec les étudiants.
+ * Messagerie — uniquement entre comptes de la plateforme, même établissement :
+ * - Étudiants ↔ personnel / responsables / agents du même établissement
+ * - Staff ↔ staff du même établissement
+ * - Étudiants entre eux : interdit (sauf éventuelle autorisation admin future)
+ * - Jamais d’échange libre vers un autre établissement
  * Les comptes admin sans établissement ne participent pas au chat.
  */
 
@@ -15,6 +16,11 @@ const STAFF_ROLES = new Set([
 
 function isStaffRole(role) {
   return STAFF_ROLES.has(role)
+}
+
+/** Rôle `responsable` ou fonction désignée (si l'appelant a enrichi l'utilisateur). */
+function actsAsResponsable(u) {
+  return u?.role === 'responsable' || (u?.fonctions || []).includes('responsable')
 }
 
 function sameEtab(a, b) {
@@ -36,15 +42,16 @@ function canChatWith(a, b) {
   // Étudiants entre eux : interdit
   if (ar === 'etudiant' && br === 'etudiant') return false
 
-  // Étudiant ↔ uniquement responsable pédagogique
-  if (ar === 'etudiant') return br === 'responsable'
-  if (br === 'etudiant') return ar === 'responsable'
+  // Étudiant ↔ tout le personnel du même établissement
+  if (ar === 'etudiant') return isStaffRole(br)
+  if (br === 'etudiant') return isStaffRole(ar)
 
-  // Autres cas staff ↔ staff
+  // Staff ↔ staff (même établissement)
   if (isStaffRole(ar) && isStaffRole(br)) return true
 
   return false
 }
+
 
 function conversationKey(etablissementId, userIdA, userIdB) {
   const u1 = Number(userIdA)

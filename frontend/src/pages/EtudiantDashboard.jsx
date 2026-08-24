@@ -7,8 +7,8 @@ import { mediaUrl } from '../utils/mediaUrl'
 import StatutBadge from '../components/StatutBadge'
 import PreinscriptionConditionsBlock from '../components/PreinscriptionConditionsBlock'
 import { DashboardPage, DashboardHero, Panel, DashboardSpinner } from '../components/dashboard/DashboardChrome'
-import { isDossierAcceptePourDocuments } from '../utils/dossierStatut'
-import { primaryPhotoDocumentFromList } from '../utils/preinscriptionDocumentRules'
+import { isDossierAcceptePourDocuments, canShowLettrePreinscription } from '../utils/dossierStatut'
+import { primaryPhotoDocumentFromList, inferIsForeignerFromNationalite } from '../utils/preinscriptionDocumentRules'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n)
 const fmtDate = (d) =>
@@ -160,15 +160,15 @@ function ModalDetail({ open, onClose, type, payload }) {
           )}
           {isDossierAcceptePourDocuments(dossier.statut) && (
             <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-              <Link to={`/lettre/${dossier.id}`} className="text-xs font-bold bg-emerald-600 text-white px-3 py-2 rounded-lg" onClick={onClose}>
-                Lettre
+              <Link to={`/facture/${dossier.id}`} className="text-xs font-bold border border-blue-300 text-blue-700 px-3 py-2 rounded-lg" onClick={onClose}>
+                Facture
               </Link>
               <Link to={`/attestation/${dossier.id}`} className="text-xs font-bold bg-indigo-600 text-white px-3 py-2 rounded-lg" onClick={onClose}>
                 Attestation
               </Link>
-              {facture?.numero && (
-                <Link to={`/facture/${dossier.id}`} className="text-xs font-bold border border-blue-300 text-blue-700 px-3 py-2 rounded-lg" onClick={onClose}>
-                  Facture {fmt(facture.montant_ttc)} FCFA
+              {canShowLettrePreinscription(dossier, inferIsForeignerFromNationalite) && (
+                <Link to={`/lettre/${dossier.id}`} className="text-xs font-bold bg-emerald-600 text-white px-3 py-2 rounded-lg" onClick={onClose}>
+                  Lettre
                 </Link>
               )}
             </div>
@@ -331,15 +331,18 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
               <div>
                 <h3 className="flex items-center gap-2 font-bold text-emerald-900">📜 Documents officiels disponibles</h3>
                 <p className="mt-1 text-sm text-emerald-800/90">
-                  Cette préinscription est acceptée : lettre et attestation pour ce dossier.
+                  Candidature acceptée : facture proforma et attestation disponibles
+                  {canShowLettrePreinscription(dossier, inferIsForeignerFromNationalite)
+                    ? ' ; lettre de préinscription (candidat étranger).'
+                    : '.'}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row flex-wrap gap-2 shrink-0">
                 <Link
-                  to={`/lettre/${dossier.id}`}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:from-emerald-700 hover:to-teal-700 hover:shadow-lg"
+                  to={`/facture/${dossier.id}`}
+                  className="flex items-center justify-center gap-2 rounded-xl border-2 border-blue-600 bg-white px-5 py-2.5 text-sm font-bold text-blue-700 shadow-sm transition-all hover:bg-blue-50"
                 >
-                  📄 Lettre de préinscription
+                  🧾 Facture proforma
                 </Link>
                 <Link
                   to={`/attestation/${dossier.id}`}
@@ -347,6 +350,14 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
                 >
                   🏅 Attestation de préinscription
                 </Link>
+                {canShowLettrePreinscription(dossier, inferIsForeignerFromNationalite) && (
+                  <Link
+                    to={`/lettre/${dossier.id}`}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:from-emerald-700 hover:to-teal-700 hover:shadow-lg"
+                  >
+                    📄 Lettre de préinscription
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -368,15 +379,21 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
               </div>
               <Link to={`/facture/${dossier.id}`} className="btn-primary mt-auto flex w-full items-center justify-center gap-2 text-center text-sm shadow-lg shadow-blue-600/20">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                Voir & Imprimer la facture
+                Voir, imprimer ou PDF
               </Link>
             </div>
-          ) : (
+          ) : isDossierAcceptePourDocuments(dossier.statut) ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
               <p className="text-gray-400 text-sm mb-4">Aucune facture générée</p>
               <Link to={`/facture/${dossier.id}`} className="btn-outline text-sm w-full text-center">
                 Générer ma facture proforma
               </Link>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
+              <p className="text-sm text-slate-500">
+                Disponible après acceptation de votre candidature (y compris pour les candidats étrangers).
+              </p>
             </div>
           )}
         </div>
@@ -462,6 +479,12 @@ export default function EtudiantDashboard() {
         actions={
           !loading ? (
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+              <Link to="/chat" className="btn-outline inline-flex min-h-[44px] items-center justify-center gap-2">
+                Messages
+              </Link>
+              <Link to="/mes-acces" className="btn-outline inline-flex min-h-[44px] items-center justify-center gap-2">
+                Mes identifiants
+              </Link>
               <Link
                 to="/demande-proforma"
                 className="btn-outline inline-flex min-h-[44px] items-center justify-center gap-2 border-violet-200 text-violet-800 hover:bg-violet-50"

@@ -7,23 +7,35 @@ const BRAND_IMAGE = new URL('../../img/image-multisite.jpg', import.meta.url).hr
 
 const NAV_LINKS = {
   admin: [
-    { to: '/admin', label: 'Dossiers' },
+    { to: '/admin', label: 'Tableau de bord' },
+    { to: '/admin/etablissements', label: 'Établissements' },
     { to: '/admin/utilisateurs', label: 'Utilisateurs' },
-    { to: '/responsable', label: 'Pédagogie' },
-    { to: '/agent-admin', label: 'Contrôle admin' },
-    { to: '/comptable', label: 'Finance' },
-    { to: '/qualite', label: 'Qualité' },
   ],
-  responsable: [{ to: '/responsable', label: 'Mes dossiers' }],
-  agent_admin: [{ to: '/agent-admin', label: 'Contrôle dossiers' }],
-  comptable: [{ to: '/comptable', label: 'Finance & Comptabilité' }],
+  responsable: [
+    { to: '/responsable', label: 'Tableau de bord' },
+    { to: '/responsable/demandes-proforma', label: 'Proforma' },
+    { to: '/chat', label: 'Messages' },
+  ],
+  agent_admin: [
+    { to: '/agent-admin', label: 'Tableau de bord' },
+    { to: '/responsable/preinscription-guichet', label: 'Guichet' },
+    { to: '/chat', label: 'Messages' },
+  ],
+  comptable: [
+    { to: '/comptable', label: 'Tableau de bord' },
+    { to: '/responsable/demandes-proforma', label: 'Proforma' },
+    { to: '/mon-etablissement/factures', label: 'Factures' },
+  ],
   controleur_qualite: [
-    { to: '/qualite', label: 'Qualité & conformité' },
-    { to: '/mon-etablissement', label: 'Mon établissement' },
+    { to: '/qualite', label: 'Tableau de bord' },
+    { to: '/chat', label: 'Messages' },
+    { to: '/mon-etablissement', label: 'Établissement' },
   ],
   etudiant: [
+    { to: '/dashboard', label: 'Tableau de bord' },
     { to: '/preinscription', label: 'Préinscription' },
-    { to: '/dashboard', label: 'Mon espace' },
+    { to: '/demande-proforma', label: 'Proforma' },
+    { to: '/chat', label: 'Messages' },
   ],
   public: [],
 }
@@ -119,15 +131,9 @@ export default function Navbar() {
             </div>
           )}
 
-          {/* Desktop — connectés : guide + liens rôle */}
+          {/* Desktop — connectés : Accueil + Tableau de bord */}
           {user && (
             <div className="hidden flex-1 items-center justify-center gap-0.5 md:flex lg:gap-1">
-              <Link
-                to={user ? '/preinscription?guide=1' : '/?guide=1'}
-                className={navLinkClass(String(location.search || '').includes('guide=1'))}
-              >
-                Guide d&apos;utilisation
-              </Link>
               {links.map((link) => (
                 <Link key={link.to} to={link.to} className={navLinkClass(isActive(link.to))}>
                   {link.label}

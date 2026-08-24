@@ -386,7 +386,7 @@
       "created_at": "2026-03-24T16:46:13.502Z",
       "created_by": 1,
       "password_changed_at": "2026-03-24T16:46:57.425Z",
-      "updated_at": "2026-04-06T01:24:35.546Z",
+      "updated_at": "2026-08-11T23:18:12.462Z",
       "login_attempts": 0,
       "is_locked": false,
       "lock_until": null,
@@ -401,14 +401,18 @@
       "date_naissance": null,
       "telephone": "78994040404",
       "adresse": "LOUGA",
-      "mot_de_passe": "$2a$10$gYnIrLoHdeRpY7PzJDuew.0LV5hc.v2bA4GPfxKMRs12EjeP8cOQ6",
+      "mot_de_passe": "$2a$10$X3XCO74uehv8Rhplq7MHruU1crckGeWkcAOK/MFOT/2sEjFw9BAkq",
       "role": "etudiant",
       "etablissement_id": 1,
       "must_change_password": false,
       "created_at": "2026-03-24T16:54:18.460Z",
       "login_attempts": 0,
       "is_locked": false,
-      "lock_until": null
+      "lock_until": null,
+      "password_reset_at": "2026-05-18T16:19:25.830Z",
+      "updated_at": "2026-05-18T16:19:30.377Z",
+      "updated_by": 1,
+      "password_changed_at": "2026-05-18T16:19:30.377Z"
     },
     {
       "id": 4,
@@ -497,14 +501,16 @@
       "date_naissance": null,
       "telephone": "77777494",
       "adresse": "KM",
-      "mot_de_passe": "$2a$10$exbrqOlF49mX796QY21WwuKrblCJOe9xwsrEq632nOwP5ha8H9B/2",
+      "mot_de_passe": "$2a$10$dHjjoN/7Alx.J21dyfpZYe5bh9/KPeUEWBqEMWXfhi.RyboekE3BG",
       "role": "etudiant",
       "etablissement_id": 1,
       "must_change_password": false,
       "created_at": "2026-03-26T07:33:38.217Z",
-      "login_attempts": 0,
+      "login_attempts": 1,
       "is_locked": false,
-      "lock_until": null
+      "lock_until": null,
+      "updated_at": "2026-05-09T12:10:41.953Z",
+      "updated_by": 1
     },
     {
       "id": 9,
@@ -553,18 +559,20 @@
       "date_naissance": null,
       "telephone": "78000000",
       "adresse": "",
-      "mot_de_passe": "$2a$10$pb/h3z4ZtcvAdLPpniJO1uUz8SjZWMKUKF06dnYmfAtgHKAzWzykS",
+      "mot_de_passe": "$2a$10$NDyVpNaIdISo5vh2Nryvm.ipwdWbKt3NZYa7fajU1MUYX6qau7gAi",
       "role": "responsable",
       "etablissement_id": 1,
       "actif": true,
       "must_change_password": false,
       "created_at": "2026-03-26T16:46:29.501Z",
       "created_by": 1,
-      "password_changed_at": "2026-03-26T16:47:09.670Z",
-      "updated_at": "2026-04-06T01:24:56.078Z",
+      "password_changed_at": "2026-05-18T16:19:27.991Z",
+      "updated_at": "2026-08-12T12:53:44.279Z",
       "login_attempts": 0,
       "is_locked": false,
-      "lock_until": null
+      "lock_until": null,
+      "password_reset_at": "2026-05-18T16:19:25.561Z",
+      "updated_by": 1
     },
     {
       "id": 13,
@@ -806,15 +814,19 @@
       "date_naissance": "1990-11-11",
       "telephone": "775465767",
       "adresse": "",
-      "mot_de_passe": "$2a$10$/vaeHTTFNY/ZqDa7EsOhF.TNCM9HUFvmWQeAaFeEKGNACNE.7g6Su",
+      "mot_de_passe": "$2a$10$IIm8Xh8zjqQymDFTmRtiS.KQpcmSviD2TkQ5Z/VISVm5gZ4045JD2",
       "role": "agent_admin",
       "etablissement_id": 2,
       "actif": true,
-      "must_change_password": true,
+      "must_change_password": false,
       "login_attempts": 0,
       "is_locked": false,
       "lock_until": null,
-      "created_at": "2026-04-07T16:11:19.811Z"
+      "created_at": "2026-04-07T16:11:19.811Z",
+      "password_reset_at": "2026-05-18T16:19:25.957Z",
+      "updated_at": "2026-05-18T16:19:29.694Z",
+      "updated_by": 1,
+      "password_changed_at": "2026-05-18T16:19:29.694Z"
     },
     {
       "id": 26,
@@ -825,7 +837,7 @@
       "date_naissance": "2000-11-11",
       "telephone": "4256374758675",
       "adresse": "",
-      "mot_de_passe": "$2a$10$p0kr6gPZsQ0Z5/S2/qBTPOeL/yI7RZafAf9N5Ut4iYtZqyvaXXWAG",
+      "mot_de_passe": "$2a$10$bRWY.7Xv71aStpwLc6NeVu1US9L72Jkpwzhf4TMWLgEMp1eiU/9Q2",
       "role": "controleur_qualite",
       "etablissement_id": 2,
       "actif": true,
@@ -834,8 +846,10 @@
       "is_locked": false,
       "lock_until": null,
       "created_at": "2026-04-07T16:12:12.903Z",
-      "updated_at": "2026-04-07T16:12:59.187Z",
-      "password_changed_at": "2026-04-07T16:12:59.187Z"
+      "updated_at": "2026-05-18T16:19:30.031Z",
+      "password_changed_at": "2026-05-18T16:19:30.031Z",
+      "password_reset_at": "2026-05-18T16:19:25.721Z",
+      "updated_by": 1
     },
     {
       "id": 27,
@@ -855,6 +869,51 @@
       "lock_until": null,
       "created_at": "2026-04-09T11:22:27.043Z",
       "email_verified_at": "2026-04-09T11:22:27.043Z",
+      "email_verify_token": null,
+      "email_verify_expires": null
+    },
+    {
+      "id": 28,
+      "prenom": "Verify",
+      "nom": "Comptable",
+      "email": "comptable.verify@universite.sn",
+      "matricule": "ESE021",
+      "date_naissance": null,
+      "telephone": "770000001",
+      "adresse": "",
+      "mot_de_passe": "$2a$10$Uv01Fbxkw0DfTgtE0rsy5u9oMKFGXw0y3Y2d.JBIde8S00oU6tFJS",
+      "role": "comptable",
+      "etablissement_id": 1,
+      "actif": true,
+      "must_change_password": false,
+      "login_attempts": 0,
+      "is_locked": false,
+      "lock_until": null,
+      "created_at": "2026-05-18T16:18:09.912Z",
+      "created_by": 1,
+      "password_reset_at": "2026-05-18T16:19:26.110Z",
+      "updated_at": "2026-05-18T16:19:27.005Z",
+      "updated_by": 1,
+      "password_changed_at": "2026-05-18T16:19:27.005Z"
+    },
+    {
+      "id": 29,
+      "nom": "LY",
+      "prenom": "FATIMA",
+      "email": "issa.ly@ucad.edu.sn",
+      "matricule": "ESE022",
+      "date_naissance": null,
+      "telephone": "+221709017205",
+      "adresse": "Université Cheikh Anta DIOP de DAKAR",
+      "mot_de_passe": "$2a$10$wd3xiSaZ.5AJGkfWeLQpyecVziXNptmpchqHEaW5k5dutvtChBGJu",
+      "role": "etudiant",
+      "etablissement_id": 1,
+      "must_change_password": false,
+      "login_attempts": 0,
+      "is_locked": false,
+      "lock_until": null,
+      "created_at": "2026-06-01T13:37:49.063Z",
+      "email_verified_at": "2026-06-01T13:37:49.063Z",
       "email_verify_token": null,
       "email_verify_expires": null
     }
@@ -881,7 +940,7 @@
       "statut": "accepte",
       "commentaire_admin": null,
       "created_at": "2026-03-24T16:56:16.991Z",
-      "updated_at": "2026-03-25T10:01:53.719Z",
+      "updated_at": "2026-05-18T16:19:30.591Z",
       "traite_par": 2,
       "traite_le": "2026-03-24T17:00:54.305Z",
       "lettre_generee": true,
@@ -890,7 +949,11 @@
       "remarque_admin": null,
       "verifie_par": 1,
       "verifie_par_nom": "Système Admin",
-      "verifie_le": "2026-03-25T10:01:53.719Z"
+      "verifie_le": "2026-03-25T10:01:53.719Z",
+      "validation_financiere": "en_attente",
+      "commentaire_financier": null,
+      "valide_par_comptable": 28,
+      "valide_financier_le": "2026-05-18T16:19:30.591Z"
     },
     {
       "id": 2,
@@ -1107,6 +1170,312 @@
       "traite_le": "2026-04-04T11:50:41.817Z",
       "lettre_generee": true,
       "date_acceptation": "2026-04-04T11:50:41.817Z"
+    },
+    {
+      "id": 9,
+      "etudiant_id": null,
+      "numero_dossier": "PREINSC-2026-53691",
+      "formation_id": 4,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "Diplôme de Technicien Génie Civil - Bâtiment",
+      "niveau": "BFEM/BEP",
+      "formation_niveau_cible": "BT",
+      "document_rule_profile": "generic",
+      "annee_academique": "2025-2026",
+      "prenom": "Moussa",
+      "nom": "Ba",
+      "email": "moussa.guichet.1787156328856@test.sn",
+      "sexe": "M",
+      "date_naissance": "2001-05-05",
+      "lieu_naissance": "Saint-Louis",
+      "nationalite": "Sénégalaise",
+      "pays_residence": null,
+      "telephone": "7756328856",
+      "adresse": "Dakar",
+      "type_piece": null,
+      "numero_piece": null,
+      "numero_passeport": null,
+      "dernier_diplome": "Baccalauréat",
+      "etablissement_origine": "Lycée",
+      "mention": null,
+      "annee_obtention": 2021,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 1,
+      "commentaire_admin": "Préinscription guichet — documents générables immédiatement.",
+      "date_acceptation": "2026-08-19T16:18:48.857Z",
+      "lettre_generee": true,
+      "created_at": "2026-08-19T16:18:48.857Z",
+      "updated_at": "2026-08-19T16:18:48.857Z"
+    },
+    {
+      "id": 10,
+      "etudiant_id": null,
+      "numero_dossier": "PREINSC-2026-80051",
+      "formation_id": 4,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "Diplôme de Technicien Génie Civil - Bâtiment",
+      "niveau": "BFEM/BEP",
+      "formation_niveau_cible": "BT",
+      "document_rule_profile": "generic",
+      "annee_academique": "2025-2026",
+      "prenom": "Fatou",
+      "nom": "Ndiaye",
+      "email": "",
+      "sexe": null,
+      "date_naissance": "1999-02-02",
+      "lieu_naissance": "Thiès",
+      "nationalite": "Sénégalaise",
+      "pays_residence": null,
+      "telephone": "7656328908",
+      "adresse": "Thiès",
+      "type_piece": null,
+      "numero_piece": null,
+      "numero_passeport": null,
+      "dernier_diplome": "Baccalauréat",
+      "etablissement_origine": "Lycée",
+      "mention": null,
+      "annee_obtention": 2019,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 1,
+      "commentaire_admin": "Préinscription guichet — documents générables immédiatement.",
+      "date_acceptation": "2026-08-19T16:18:48.908Z",
+      "lettre_generee": true,
+      "created_at": "2026-08-19T16:18:48.908Z",
+      "updated_at": "2026-08-19T16:18:48.908Z"
+    },
+    {
+      "id": 11,
+      "etudiant_id": 18,
+      "numero_dossier": "PREINSC-2026-16871",
+      "formation_id": 45,
+      "etablissement_id": 1,
+      "type_formation": "en_ligne",
+      "filiere": "Licence 3 Électromécanique et Systèmes Automatisés",
+      "niveau": "Bac+2",
+      "formation_niveau_cible": "Licence 3",
+      "document_rule_profile": "l3",
+      "annee_academique": "2025-2026",
+      "prenom": "dcqs",
+      "nom": "cdcs",
+      "email": "abdoulayecheikhou.ly@ucad.edu.sn",
+      "sexe": "M",
+      "date_naissance": "2026-08-13",
+      "lieu_naissance": "dcs",
+      "nationalite": "DDXZ",
+      "pays_residence": "Sénégal",
+      "telephone": "89877877878987",
+      "adresse": "DSZCM%ZEDM%",
+      "type_piece": "CNI",
+      "numero_piece": "30020020",
+      "numero_passeport": "30020020",
+      "dernier_diplome": "Master",
+      "etablissement_origine": "KEDLLDLDL",
+      "mention": "Assez Bien",
+      "annee_obtention": 2014,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 11,
+      "commentaire_admin": "Préinscription guichet — documents générables immédiatement.",
+      "date_acceptation": "2026-08-21T11:02:38.386Z",
+      "lettre_generee": true,
+      "created_at": "2026-08-19T16:22:33.213Z",
+      "updated_at": "2026-08-21T11:02:38.386Z",
+      "traite_par": 11,
+      "traite_le": "2026-08-21T11:02:38.386Z"
+    },
+    {
+      "id": 12,
+      "etudiant_id": 18,
+      "numero_dossier": "PREINSC-2026-40709",
+      "formation_id": 11,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "Licence 3 Electromécanique et Systèmes Automatisés",
+      "niveau": "Bac+2",
+      "formation_niveau_cible": "Licence 3",
+      "document_rule_profile": "l3",
+      "annee_academique": "2025-2026",
+      "prenom": "YFFL",
+      "nom": "HGHGHG",
+      "email": "abdoulayecheikhou.ly@ucad.edu.sn",
+      "sexe": "F",
+      "date_naissance": "1990-11-11",
+      "lieu_naissance": "DZA",
+      "nationalite": "SENEGAL",
+      "pays_residence": "Sénégal",
+      "telephone": "77738939",
+      "adresse": "CEDEDE",
+      "type_piece": "CNI",
+      "numero_piece": "18282982109",
+      "numero_passeport": "18282982109",
+      "dernier_diplome": "Master",
+      "etablissement_origine": "DZDEDCE",
+      "mention": "Bien",
+      "annee_obtention": 2014,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 11,
+      "commentaire_admin": "Préinscription guichet — documents générables immédiatement.",
+      "date_acceptation": "2026-08-19T18:08:41.987Z",
+      "lettre_generee": true,
+      "created_at": "2026-08-19T18:08:41.987Z",
+      "updated_at": "2026-08-19T18:08:41.987Z"
+    },
+    {
+      "id": 13,
+      "etudiant_id": 18,
+      "numero_dossier": "PREINSC-2026-63166",
+      "formation_id": 5,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "BTS / L1,L2 Génie Civil et Construction",
+      "niveau": "Bac S/BT",
+      "formation_niveau_cible": "BTS/L1-L2",
+      "document_rule_profile": "generic",
+      "annee_academique": "2025-2026",
+      "prenom": "ali",
+      "nom": "lo",
+      "email": "abdoulayecheikhou.ly@ucad.edu.sn",
+      "sexe": "F",
+      "date_naissance": "2000-08-12",
+      "lieu_naissance": "DAKAR",
+      "nationalite": "SENEGALAISE",
+      "pays_residence": "Sénégal",
+      "telephone": "77738939",
+      "adresse": "KEUR NDIAYE LO",
+      "type_piece": "CNI",
+      "numero_piece": "18282982109",
+      "numero_passeport": "18282982109",
+      "dernier_diplome": "Licence",
+      "etablissement_origine": "DZDEDCE",
+      "mention": "Assez Bien",
+      "annee_obtention": 2014,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 11,
+      "commentaire_admin": "Préinscription guichet — documents générables immédiatement.",
+      "date_acceptation": "2026-08-21T12:08:53.337Z",
+      "lettre_generee": true,
+      "created_at": "2026-08-21T12:08:53.337Z",
+      "updated_at": "2026-08-21T12:08:53.337Z"
+    },
+    {
+      "id": 14,
+      "etudiant_id": 18,
+      "numero_dossier": "PREINSC-2026-57895",
+      "formation_id": 16,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "Licence 3 Electrotechnique",
+      "niveau": "Bac+2",
+      "formation_niveau_cible": "Licence 3",
+      "document_rule_profile": "l3",
+      "annee_academique": "2025-2026",
+      "prenom": "dffev",
+      "nom": "cdfceda",
+      "email": "abdoulayecheikhou.ly@ucad.edu.sn",
+      "sexe": "F",
+      "date_naissance": "2000-11-11",
+      "lieu_naissance": "DEEFDD",
+      "nationalite": "DFFGGH",
+      "pays_residence": "DFDFD",
+      "telephone": "777654444",
+      "adresse": "BGRHRTEH",
+      "type_piece": "CNI",
+      "numero_piece": "18282982109",
+      "numero_passeport": "18282982109",
+      "dernier_diplome": "Licence",
+      "etablissement_origine": "DZDEDCE",
+      "mention": "Assez Bien",
+      "annee_obtention": 2015,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 11,
+      "commentaire_admin": "Préinscription guichet — documents générables immédiatement.",
+      "date_acceptation": "2026-08-21T12:50:45.132Z",
+      "lettre_generee": true,
+      "created_at": "2026-08-21T12:50:45.132Z",
+      "updated_at": "2026-08-21T12:50:45.132Z"
+    },
+    {
+      "id": 15,
+      "etudiant_id": null,
+      "numero_dossier": "PREINSC-2026-69157",
+      "formation_id": 4,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "Diplôme de Technicien Génie Civil - Bâtiment",
+      "niveau": "BFEM/BEP",
+      "formation_niveau_cible": "BT",
+      "document_rule_profile": "generic",
+      "annee_academique": "2025-2026",
+      "prenom": "Moussa",
+      "nom": "Ba",
+      "email": "moussa.guichet.1787320279821@test.sn",
+      "sexe": "M",
+      "date_naissance": "2001-05-05",
+      "lieu_naissance": "Saint-Louis",
+      "nationalite": "Sénégalaise",
+      "pays_residence": null,
+      "telephone": "7720279821",
+      "adresse": "Dakar",
+      "type_piece": null,
+      "numero_piece": null,
+      "numero_passeport": null,
+      "dernier_diplome": "Baccalauréat",
+      "etablissement_origine": "Lycée",
+      "mention": null,
+      "annee_obtention": 2021,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 1,
+      "commentaire_admin": "Préinscription guichet — documents générables immédiatement.",
+      "date_acceptation": "2026-08-21T13:51:19.821Z",
+      "lettre_generee": true,
+      "created_at": "2026-08-21T13:51:19.821Z",
+      "updated_at": "2026-08-21T13:51:19.821Z"
+    },
+    {
+      "id": 16,
+      "etudiant_id": null,
+      "numero_dossier": "PREINSC-2026-93138",
+      "formation_id": 4,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "Diplôme de Technicien Génie Civil - Bâtiment",
+      "niveau": "BFEM/BEP",
+      "formation_niveau_cible": "BT",
+      "document_rule_profile": "generic",
+      "annee_academique": "2025-2026",
+      "prenom": "Fatou",
+      "nom": "Ndiaye",
+      "email": "",
+      "sexe": null,
+      "date_naissance": "1999-02-02",
+      "lieu_naissance": "Thiès",
+      "nationalite": "Sénégalaise",
+      "pays_residence": null,
+      "telephone": "7620279838",
+      "adresse": "Thiès",
+      "type_piece": null,
+      "numero_piece": null,
+      "numero_passeport": null,
+      "dernier_diplome": "Baccalauréat",
+      "etablissement_origine": "Lycée",
+      "mention": null,
+      "annee_obtention": 2019,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 1,
+      "commentaire_admin": "Préinscription guichet — documents générables immédiatement.",
+      "date_acceptation": "2026-08-21T13:51:19.838Z",
+      "lettre_generee": true,
+      "created_at": "2026-08-21T13:51:19.838Z",
+      "updated_at": "2026-08-21T13:51:19.838Z"
     }
   ],
   "documents": [
@@ -1393,7 +1762,8 @@
           "designation": "Abonnement Bibliotheque + Pack EPI",
           "montant": 30000
         }
-      ]
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 5,
@@ -1533,7 +1903,15 @@
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:30:29.725Z"
+      "created_at": "2026-03-24T16:30:29.725Z",
+      "duree_mois": 0,
+      "frais_supplementaires": [
+        {
+          "designation": "BIBLIOTHQUE ET EPI",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 12,
@@ -3376,21 +3754,885 @@
       "created_at": "2026-04-01T12:00:00.000Z"
     }
   ],
-  "factures": [],
-  "demandes_proforma": [],
+  "factures": [
+    {
+      "id": 9,
+      "numero": "FP-2026-39287",
+      "dossier_id": 4,
+      "etudiant_id": 8,
+      "formation_id": 21,
+      "date_emission": "2026-05-09T12:29:05.889Z",
+      "date_echeance": "2026-06-08T12:29:05.889Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription — Master 2 Énergies Renouvelables",
+          "quantite": 1,
+          "prix_unitaire": 180000,
+          "total": 180000
+        },
+        {
+          "description": "Mensualités (12 mois × 120 000 FCFA) — Master 2 Énergies Renouvelables",
+          "quantite": 1,
+          "prix_unitaire": 1440000,
+          "total": 1440000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Autres frais (legacy)",
+          "montant": 45000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 45000,
+      "montant_ht": 1620000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 1620000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "FATIMA",
+        "prenom": "LY",
+        "email": "fatima1.ly@universite.sn",
+        "telephone": "7789094940",
+        "adresse": "KM",
+        "nationalite": "SENEGALAISE"
+      },
+      "formation_snapshot": {
+        "titre": "Master 2 Énergies Renouvelables",
+        "type": "presentiel",
+        "duree": "1 an",
+        "duree_mois": 12,
+        "ville": "Dakar",
+        "niveau_requis": "Bac+4",
+        "mensualite": 120000,
+        "frais_inscription": 180000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-05-09T12:29:05.889Z"
+    },
+    {
+      "id": 10,
+      "numero": "FP-2026-53356",
+      "dossier_id": 9,
+      "etudiant_id": null,
+      "formation_id": 4,
+      "date_emission": "2026-08-19T16:18:48.903Z",
+      "date_echeance": "2026-09-18T16:18:48.903Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription — Diplôme de Technicien Génie Civil - Bâtiment",
+          "quantite": 1,
+          "prix_unitaire": 160000,
+          "total": 160000
+        },
+        {
+          "description": "Mensualités (9 mois × 40 000 FCFA) — Diplôme de Technicien Génie Civil - Bâtiment",
+          "quantite": 1,
+          "prix_unitaire": 360000,
+          "total": 360000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Abonnement Bibliotheque + Pack EPI",
+          "montant": 30000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 30000,
+      "montant_ht": 520000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 520000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "Ba",
+        "prenom": "Moussa",
+        "email": "moussa.guichet.1787156328856@test.sn",
+        "telephone": "7756328856",
+        "adresse": "Dakar",
+        "nationalite": "Sénégalaise"
+      },
+      "formation_snapshot": {
+        "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+        "type": "presentiel",
+        "duree": "3 ans",
+        "duree_mois": 9,
+        "ville": "Dakar",
+        "niveau_requis": "BFEM/BEP",
+        "mensualite": 40000,
+        "frais_inscription": 160000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-08-19T16:18:48.903Z"
+    },
+    {
+      "id": 11,
+      "numero": "FP-2026-65830",
+      "dossier_id": 10,
+      "etudiant_id": null,
+      "formation_id": 4,
+      "date_emission": "2026-08-19T16:18:48.922Z",
+      "date_echeance": "2026-09-18T16:18:48.922Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription — Diplôme de Technicien Génie Civil - Bâtiment",
+          "quantite": 1,
+          "prix_unitaire": 160000,
+          "total": 160000
+        },
+        {
+          "description": "Mensualités (9 mois × 40 000 FCFA) — Diplôme de Technicien Génie Civil - Bâtiment",
+          "quantite": 1,
+          "prix_unitaire": 360000,
+          "total": 360000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Abonnement Bibliotheque + Pack EPI",
+          "montant": 30000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 30000,
+      "montant_ht": 520000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 520000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "Ndiaye",
+        "prenom": "Fatou",
+        "email": "",
+        "telephone": "7656328908",
+        "adresse": "Thiès",
+        "nationalite": "Sénégalaise"
+      },
+      "formation_snapshot": {
+        "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+        "type": "presentiel",
+        "duree": "3 ans",
+        "duree_mois": 9,
+        "ville": "Dakar",
+        "niveau_requis": "BFEM/BEP",
+        "mensualite": 40000,
+        "frais_inscription": 160000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-08-19T16:18:48.922Z"
+    },
+    {
+      "id": 12,
+      "numero": "FP-2026-54372",
+      "dossier_id": 11,
+      "etudiant_id": 18,
+      "formation_id": 45,
+      "date_emission": "2026-08-19T16:22:33.226Z",
+      "date_echeance": "2026-09-18T16:22:33.226Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription — Licence 3 Électromécanique et Systèmes Automatisés",
+          "quantite": 1,
+          "prix_unitaire": 215000,
+          "total": 215000
+        },
+        {
+          "description": "Mensualités (11 mois × 110 000 FCFA) — Licence 3 Électromécanique et Systèmes Automatisés",
+          "quantite": 1,
+          "prix_unitaire": 1210000,
+          "total": 1210000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Autres frais (legacy)",
+          "montant": 20000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 20000,
+      "montant_ht": 1425000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 1425000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "cdcs",
+        "prenom": "dcqs",
+        "email": "abdoulayecheikhou.ly@ucad.edu.sn",
+        "telephone": "89877877878987",
+        "adresse": "DSZCM%ZEDM%",
+        "nationalite": "DDXZ"
+      },
+      "formation_snapshot": {
+        "titre": "Licence 3 Électromécanique et Systèmes Automatisés",
+        "type": "en_ligne",
+        "duree": "11 mois",
+        "duree_mois": 11,
+        "ville": null,
+        "niveau_requis": "Bac+2",
+        "mensualite": 110000,
+        "frais_inscription": 215000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-08-19T16:22:33.226Z"
+    },
+    {
+      "id": 13,
+      "numero": "FP-2026-63081",
+      "dossier_id": 12,
+      "etudiant_id": 18,
+      "formation_id": 11,
+      "date_emission": "2026-08-19T18:08:41.998Z",
+      "date_echeance": "2026-09-18T18:08:41.998Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription — Licence 3 Electromécanique et Systèmes Automatisés",
+          "quantite": 1,
+          "prix_unitaire": 200000,
+          "total": 200000
+        },
+        {
+          "description": "Mensualités (12 mois × 85 000 FCFA) — Licence 3 Electromécanique et Systèmes Automatisés",
+          "quantite": 1,
+          "prix_unitaire": 1020000,
+          "total": 1020000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Autres frais (legacy)",
+          "montant": 45000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 45000,
+      "montant_ht": 1220000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 1220000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "HGHGHG",
+        "prenom": "YFFL",
+        "email": "abdoulayecheikhou.ly@ucad.edu.sn",
+        "telephone": "77738939",
+        "adresse": "CEDEDE",
+        "nationalite": "SENEGAL"
+      },
+      "formation_snapshot": {
+        "titre": "Licence 3 Electromécanique et Systèmes Automatisés",
+        "type": "presentiel",
+        "duree": "1 an",
+        "duree_mois": 12,
+        "ville": "Dakar",
+        "niveau_requis": "Bac+2",
+        "mensualite": 85000,
+        "frais_inscription": 200000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-08-19T18:08:41.999Z"
+    },
+    {
+      "id": 14,
+      "numero": "FP-2026-47077",
+      "dossier_id": 13,
+      "etudiant_id": 18,
+      "formation_id": 5,
+      "date_emission": "2026-08-21T12:08:53.349Z",
+      "date_echeance": "2026-09-20T12:08:53.349Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 200000,
+          "total": 200000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 60000,
+          "total": 1440000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 24,
+          "montant_unitaire": 60000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Autres frais (legacy)",
+          "montant": 45000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 45000,
+      "montant_ht": 1640000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 1640000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "lo",
+        "prenom": "ali",
+        "email": "abdoulayecheikhou.ly@ucad.edu.sn",
+        "telephone": "77738939",
+        "adresse": "KEUR NDIAYE LO",
+        "nationalite": "SENEGALAISE"
+      },
+      "formation_snapshot": {
+        "titre": "BTS / L1,L2 Génie Civil et Construction",
+        "type": "presentiel",
+        "niveau": "BTS/L1-L2",
+        "niveau_requis": "Bac S/BT",
+        "duree": "2 ans",
+        "duree_mois": 24,
+        "duree_formation": "24 mois",
+        "duree_cycle": null,
+        "ville": "Dakar",
+        "mensualite": 60000,
+        "frais_inscription": 200000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-08-21T12:08:53.349Z",
+      "montant_total_a_payer": 1685000
+    },
+    {
+      "id": 15,
+      "numero": "FP-2026-62700",
+      "dossier_id": 14,
+      "etudiant_id": 18,
+      "formation_id": 16,
+      "date_emission": "2026-08-21T12:50:45.141Z",
+      "date_echeance": "2026-09-20T12:50:45.141Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 200000,
+          "total": 200000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 85000,
+          "total": 1020000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 12,
+          "montant_unitaire": 85000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Autres frais (legacy)",
+          "montant": 45000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 45000,
+      "montant_ht": 1220000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 1220000,
+      "montant_total_a_payer": 1265000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "cdfceda",
+        "prenom": "dffev",
+        "email": "abdoulayecheikhou.ly@ucad.edu.sn",
+        "telephone": "777654444",
+        "adresse": "BGRHRTEH",
+        "nationalite": "DFFGGH"
+      },
+      "formation_snapshot": {
+        "titre": "Licence 3 Electrotechnique",
+        "type": "presentiel",
+        "niveau": "Licence 3",
+        "niveau_requis": "Bac+2",
+        "duree": "1 an",
+        "duree_mois": 12,
+        "duree_formation": "12 mois",
+        "duree_cycle": null,
+        "ville": "Dakar",
+        "mensualite": 85000,
+        "frais_inscription": 200000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-08-21T12:50:45.141Z"
+    },
+    {
+      "id": 16,
+      "numero": "FP-2026-17616",
+      "dossier_id": 15,
+      "etudiant_id": null,
+      "formation_id": 4,
+      "date_emission": "2026-08-21T13:51:19.834Z",
+      "date_echeance": "2026-09-20T13:51:19.834Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 160000,
+          "total": 160000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 40000,
+          "total": 360000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 9,
+          "montant_unitaire": 40000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Abonnement Bibliotheque + Pack EPI",
+          "montant": 30000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 30000,
+      "montant_ht": 520000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 520000,
+      "montant_total_a_payer": 550000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "Ba",
+        "prenom": "Moussa",
+        "email": "moussa.guichet.1787320279821@test.sn",
+        "telephone": "7720279821",
+        "adresse": "Dakar",
+        "nationalite": "Sénégalaise"
+      },
+      "formation_snapshot": {
+        "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+        "type": "presentiel",
+        "niveau": "BT",
+        "niveau_requis": "BFEM/BEP",
+        "duree": "3 ans",
+        "duree_mois": 9,
+        "duree_formation": "9 mois",
+        "duree_cycle": null,
+        "ville": "Dakar",
+        "mensualite": 40000,
+        "frais_inscription": 160000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-08-21T13:51:19.835Z"
+    },
+    {
+      "id": 17,
+      "numero": "FP-2026-30093",
+      "dossier_id": 16,
+      "etudiant_id": null,
+      "formation_id": 4,
+      "date_emission": "2026-08-21T13:51:19.848Z",
+      "date_echeance": "2026-09-20T13:51:19.848Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 160000,
+          "total": 160000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 40000,
+          "total": 360000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 9,
+          "montant_unitaire": 40000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Abonnement Bibliotheque + Pack EPI",
+          "montant": 30000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 30000,
+      "montant_ht": 520000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 520000,
+      "montant_total_a_payer": 550000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "Ndiaye",
+        "prenom": "Fatou",
+        "email": "",
+        "telephone": "7620279838",
+        "adresse": "Thiès",
+        "nationalite": "Sénégalaise"
+      },
+      "formation_snapshot": {
+        "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+        "type": "presentiel",
+        "niveau": "BT",
+        "niveau_requis": "BFEM/BEP",
+        "duree": "3 ans",
+        "duree_mois": 9,
+        "duree_formation": "9 mois",
+        "duree_cycle": null,
+        "ville": "Dakar",
+        "mensualite": 40000,
+        "frais_inscription": 160000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-08-21T13:51:19.848Z"
+    }
+  ],
+  "demandes_proforma": [
+    {
+      "id": 14,
+      "reference": "DEM-2026-00014",
+      "etudiant_id": null,
+      "prenom": "Awa",
+      "nom": "Diop",
+      "email": "",
+      "telephone": "778889900",
+      "niveau": null,
+      "type_formation": "presentiel",
+      "formation_id": 4,
+      "etablissement_id": 1,
+      "formation_titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+      "formation_description": "Formation technique en génie civil et bâtiment.",
+      "formation_ville": "Dakar",
+      "formation_niveau_requis": "BFEM/BEP",
+      "formation_mensualite": 40000,
+      "formation_duree_mois": 9,
+      "details": null,
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "justificatifs": null,
+      "statut": "acceptee",
+      "facture": {
+        "numero": "FACT-PUB-2026-00014",
+        "lignes": [
+          {
+            "designation": "Frais d'inscription — Diplôme de Technicien Génie Civil - Bâtiment",
+            "montant": 160000
+          },
+          {
+            "designation": "Mensualités (9 mois × 40 000 FCFA) — Diplôme de Technicien Génie Civil - Bâtiment",
+            "montant": 360000
+          }
+        ],
+        "lignes_frais_supplementaires": [
+          {
+            "designation": "Abonnement Bibliotheque + Pack EPI",
+            "montant": 30000,
+            "hors_forfait_annuel": true
+          }
+        ],
+        "montant_supplementaires_hors_forfait": 30000,
+        "montant_ht": 520000,
+        "tva": 0,
+        "montant_ttc": 520000,
+        "remise": 0,
+        "validite_jusqu_au": "2026-09-11T13:54:49.963Z"
+      },
+      "source": "staff",
+      "creee_par": 1,
+      "created_at": "2026-08-12T13:54:49.918Z",
+      "acceptee_le": "2026-08-12T13:54:49.918Z",
+      "acceptee_par": 1
+    },
+    {
+      "id": 16,
+      "reference": "DEM-2026-00016",
+      "etudiant_id": null,
+      "prenom": "azmam",
+      "nom": "xazelkal",
+      "email": "kjkz@dhzk.com",
+      "telephone": "663788829",
+      "niveau": null,
+      "type_formation": "presentiel",
+      "formation_id": 13,
+      "etablissement_id": 1,
+      "formation_titre": "Master 2 Electromécanique et Systèmes Automatisés",
+      "formation_description": "Formation d’ingénieur en électromécanique et systèmes automatisés.",
+      "formation_ville": "Dakar",
+      "formation_niveau_requis": "Bac+4",
+      "formation_mensualite": 120000,
+      "formation_duree_mois": 12,
+      "details": null,
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "justificatifs": null,
+      "statut": "acceptee",
+      "facture": {
+        "numero": "FACT-PUB-2026-00016",
+        "lignes": [
+          {
+            "designation": "Frais d'inscription — Master 2 Electromécanique et Systèmes Automatisés",
+            "montant": 180000
+          },
+          {
+            "designation": "Mensualités (12 mois × 120 000 FCFA) — Master 2 Electromécanique et Systèmes Automatisés",
+            "montant": 1440000
+          }
+        ],
+        "lignes_frais_supplementaires": [
+          {
+            "designation": "Autres frais (legacy)",
+            "montant": 45000,
+            "hors_forfait_annuel": true
+          }
+        ],
+        "montant_supplementaires_hors_forfait": 45000,
+        "montant_ht": 1620000,
+        "tva": 0,
+        "montant_ttc": 1620000,
+        "remise": 0,
+        "validite_jusqu_au": "2026-09-11T14:58:21.985Z"
+      },
+      "source": "staff",
+      "creee_par": 11,
+      "created_at": "2026-08-12T14:58:21.984Z",
+      "acceptee_le": "2026-08-12T14:58:21.984Z",
+      "acceptee_par": 11
+    }
+  ],
   "_nextId": {
     "etablissements": 4,
     "filieres": 25,
     "formations": 122,
-    "utilisateurs": 28,
-    "dossiers": 9,
+    "utilisateurs": 31,
+    "dossiers": 17,
     "documents": 33,
-    "factures": 9,
-    "demandes_proforma": 13,
-    "audit_logs": 19,
-    "notifications": 8,
-    "security_events": 19,
-    "conditions_admission": 3
+    "factures": 18,
+    "demandes_proforma": 17,
+    "audit_logs": 51,
+    "notifications": 10,
+    "security_events": 49,
+    "conditions_admission": 3,
+    "chatbot_logs": 65
   },
   "audit_logs": [
     {
@@ -3711,116 +4953,678 @@
         "motif_rejet": null
       },
       "created_at": "2026-03-27T23:31:15.201Z"
+    },
+    {
+      "id": 19,
+      "action": "update",
+      "entity": "formation",
+      "entity_id": 4,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "PUT",
+      "path": "/api/etablissements/1/formations/4",
+      "ip": "::1",
+      "details": {
+        "etablissement_id": 1,
+        "updates": {
+          "filiere_id": 1,
+          "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+          "type": "presentiel",
+          "niveau": "BT",
+          "niveau_requis": "BFEM/BEP",
+          "duree": "3 ans",
+          "description": "Formation technique en génie civil et bâtiment.",
+          "ville": "Dakar",
+          "places": 0,
+          "frais_inscription": 160000,
+          "mensualite": 40000,
+          "frais_soutenance": 0,
+          "autres_frais": 30000,
+          "duree_mois": 9,
+          "frais_supplementaires": [
+            {
+              "designation": "Abonnement Bibliotheque + Pack EPI",
+              "montant": 30000
+            }
+          ],
+          "nombre_photos_preinscription": 1
+        }
+      },
+      "created_at": "2026-05-09T12:23:50.407Z"
+    },
+    {
+      "id": 20,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 11,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/11/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "responsable",
+        "target_email": "adama.diop@esebat.com"
+      },
+      "created_at": "2026-05-18T16:17:39.226Z"
+    },
+    {
+      "id": 21,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 11,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/11/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "responsable",
+        "target_email": "adama.diop@esebat.com"
+      },
+      "created_at": "2026-05-18T16:17:58.309Z"
+    },
+    {
+      "id": 22,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 11,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/11/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "responsable",
+        "target_email": "adama.diop@esebat.com"
+      },
+      "created_at": "2026-05-18T16:18:08.718Z"
+    },
+    {
+      "id": 23,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 26,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/26/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "controleur_qualite",
+        "target_email": "salif.sene@universite.sn"
+      },
+      "created_at": "2026-05-18T16:18:08.896Z"
+    },
+    {
+      "id": 24,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 3,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/3/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "etudiant",
+        "target_email": "ali.seck@test.com"
+      },
+      "created_at": "2026-05-18T16:18:09.132Z"
+    },
+    {
+      "id": 25,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 25,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/25/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "agent_admin",
+        "target_email": "efosante@universite.sn"
+      },
+      "created_at": "2026-05-18T16:18:09.356Z"
+    },
+    {
+      "id": 26,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 11,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/11/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "responsable",
+        "target_email": "adama.diop@esebat.com"
+      },
+      "created_at": "2026-05-18T16:18:43.209Z"
+    },
+    {
+      "id": 27,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 26,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/26/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "controleur_qualite",
+        "target_email": "salif.sene@universite.sn"
+      },
+      "created_at": "2026-05-18T16:18:43.400Z"
+    },
+    {
+      "id": 28,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 3,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/3/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "etudiant",
+        "target_email": "ali.seck@test.com"
+      },
+      "created_at": "2026-05-18T16:18:43.531Z"
+    },
+    {
+      "id": 29,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 25,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/25/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "agent_admin",
+        "target_email": "efosante@universite.sn"
+      },
+      "created_at": "2026-05-18T16:18:43.626Z"
+    },
+    {
+      "id": 30,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 28,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/28/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "comptable",
+        "target_email": "comptable.verify@universite.sn"
+      },
+      "created_at": "2026-05-18T16:18:43.727Z"
+    },
+    {
+      "id": 31,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 11,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/11/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "responsable",
+        "target_email": "adama.diop@esebat.com"
+      },
+      "created_at": "2026-05-18T16:19:25.569Z"
+    },
+    {
+      "id": 32,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 26,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/26/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "controleur_qualite",
+        "target_email": "salif.sene@universite.sn"
+      },
+      "created_at": "2026-05-18T16:19:25.727Z"
+    },
+    {
+      "id": 33,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 3,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/3/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "etudiant",
+        "target_email": "ali.seck@test.com"
+      },
+      "created_at": "2026-05-18T16:19:25.835Z"
+    },
+    {
+      "id": 34,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 25,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/25/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "agent_admin",
+        "target_email": "efosante@universite.sn"
+      },
+      "created_at": "2026-05-18T16:19:25.961Z"
+    },
+    {
+      "id": 35,
+      "action": "admin_password_reset",
+      "entity": "utilisateur",
+      "entity_id": 28,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/28/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_role": "comptable",
+        "target_email": "comptable.verify@universite.sn"
+      },
+      "created_at": "2026-05-18T16:19:26.118Z"
+    },
+    {
+      "id": 36,
+      "action": "etablissement_responsable_designe",
+      "entity": "etablissement",
+      "entity_id": 1,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "PUT",
+      "path": "/api/etablissements/1/responsable",
+      "ip": "::1",
+      "details": {
+        "ancien_responsable_id": null,
+        "nouveau_responsable_id": 30,
+        "role_principal_designe": "comptable"
+      },
+      "created_at": "2026-08-11T23:12:49.299Z"
+    },
+    {
+      "id": 37,
+      "action": "etablissement_responsable_retire",
+      "entity": "etablissement",
+      "entity_id": 1,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "PUT",
+      "path": "/api/etablissements/1/responsable",
+      "ip": "::1",
+      "details": {
+        "ancien_responsable_id": 30,
+        "nouveau_responsable_id": null,
+        "role_principal_designe": null
+      },
+      "created_at": "2026-08-11T23:12:50.001Z"
+    },
+    {
+      "id": 38,
+      "action": "etablissement_responsable_retire",
+      "entity": "etablissement",
+      "entity_id": 1,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "PUT",
+      "path": "/api/etablissements/1/responsable",
+      "ip": "::1",
+      "details": {
+        "ancien_responsable_id": null,
+        "nouveau_responsable_id": null,
+        "role_principal_designe": null
+      },
+      "created_at": "2026-08-11T23:18:02.637Z"
+    },
+    {
+      "id": 39,
+      "action": "create",
+      "entity": "demande_proforma",
+      "entity_id": 13,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/responsable/demandes-proforma/creer",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00013",
+        "etudiant_id": 13,
+        "formation_id": 10,
+        "source": "staff"
+      },
+      "created_at": "2026-08-12T13:09:54.417Z"
+    },
+    {
+      "id": 40,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 13,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00013"
+      },
+      "created_at": "2026-08-12T13:09:54.511Z"
+    },
+    {
+      "id": 41,
+      "action": "create",
+      "entity": "demande_proforma",
+      "entity_id": 14,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/responsable/demandes-proforma/creer",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00014",
+        "etudiant_id": null,
+        "formation_id": 4,
+        "source": "staff",
+        "mode": "saisie_libre"
+      },
+      "created_at": "2026-08-12T13:54:49.972Z"
+    },
+    {
+      "id": 42,
+      "action": "create",
+      "entity": "demande_proforma",
+      "entity_id": 15,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/responsable/demandes-proforma/creer",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00015",
+        "etudiant_id": null,
+        "formation_id": 10,
+        "source": "staff",
+        "mode": "saisie_libre"
+      },
+      "created_at": "2026-08-12T13:57:56.956Z"
+    },
+    {
+      "id": 43,
+      "action": "demande_proforma_hard_delete",
+      "entity": "demande_proforma",
+      "entity_id": 15,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "POST",
+      "path": "/api/admin/demandes-proforma/delete-batch",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00015"
+      },
+      "created_at": "2026-08-12T13:57:56.993Z"
+    },
+    {
+      "id": 44,
+      "action": "create",
+      "entity": "demande_proforma",
+      "entity_id": 16,
+      "user_id": 11,
+      "user_role": "responsable",
+      "etablissement_id": 1,
+      "method": "POST",
+      "path": "/api/responsable/demandes-proforma/creer",
+      "ip": "::1",
+      "details": {
+        "reference": "DEM-2026-00016",
+        "etudiant_id": null,
+        "formation_id": 13,
+        "source": "staff",
+        "mode": "saisie_libre"
+      },
+      "created_at": "2026-08-12T14:58:21.993Z"
+    },
+    {
+      "id": 45,
+      "action": "create",
+      "entity": "dossier",
+      "entity_id": 11,
+      "user_id": 11,
+      "user_role": "responsable",
+      "etablissement_id": 1,
+      "method": "POST",
+      "path": "/api/responsable/dossiers/guichet",
+      "ip": "::1",
+      "details": {
+        "numero_dossier": "PREINSC-2026-16871",
+        "source": "staff_guichet",
+        "reused": false,
+        "facture_id": 12
+      },
+      "created_at": "2026-08-19T16:22:33.232Z"
+    },
+    {
+      "id": 46,
+      "action": "create",
+      "entity": "dossier",
+      "entity_id": 12,
+      "user_id": 11,
+      "user_role": "responsable",
+      "etablissement_id": 1,
+      "method": "POST",
+      "path": "/api/responsable/dossiers/guichet",
+      "ip": "::1",
+      "details": {
+        "numero_dossier": "PREINSC-2026-40709",
+        "source": "staff_guichet",
+        "reused": false,
+        "facture_id": 13
+      },
+      "created_at": "2026-08-19T18:08:42.005Z"
+    },
+    {
+      "id": 47,
+      "action": "update_status",
+      "entity": "dossier",
+      "entity_id": 11,
+      "user_id": 11,
+      "user_role": "responsable",
+      "etablissement_id": 1,
+      "method": "PUT",
+      "path": "/api/responsable/dossiers/11/statut",
+      "ip": "::1",
+      "details": {
+        "from": "en_attente",
+        "to": "en_attente",
+        "motif_rejet": null
+      },
+      "created_at": "2026-08-21T11:02:38.397Z"
+    },
+    {
+      "id": 48,
+      "action": "create",
+      "entity": "dossier",
+      "entity_id": 13,
+      "user_id": 11,
+      "user_role": "responsable",
+      "etablissement_id": 1,
+      "method": "POST",
+      "path": "/api/responsable/dossiers/guichet",
+      "ip": "::1",
+      "details": {
+        "numero_dossier": "PREINSC-2026-63166",
+        "source": "staff_guichet",
+        "reused": false,
+        "facture_id": 14
+      },
+      "created_at": "2026-08-21T12:08:53.356Z"
+    },
+    {
+      "id": 49,
+      "action": "create",
+      "entity": "dossier",
+      "entity_id": 14,
+      "user_id": 11,
+      "user_role": "responsable",
+      "etablissement_id": 1,
+      "method": "POST",
+      "path": "/api/responsable/dossiers/guichet",
+      "ip": "::1",
+      "details": {
+        "numero_dossier": "PREINSC-2026-57895",
+        "source": "staff_guichet",
+        "reused": false,
+        "facture_id": 15
+      },
+      "created_at": "2026-08-21T12:50:45.148Z"
+    },
+    {
+      "id": 50,
+      "action": "update",
+      "entity": "formation",
+      "entity_id": 11,
+      "user_id": 1,
+      "user_role": "admin",
+      "etablissement_id": null,
+      "method": "PUT",
+      "path": "/api/etablissements/1/formations/11",
+      "ip": "::1",
+      "details": {
+        "etablissement_id": 1,
+        "updates": {
+          "filiere_id": 4,
+          "titre": "Licence 3 Electromécanique et Systèmes Automatisés",
+          "type": "presentiel",
+          "niveau": "Licence 3",
+          "niveau_requis": "Bac+2",
+          "duree": "1 an",
+          "description": "Spécialisation en électromécanique et systèmes automatisés.",
+          "ville": "Dakar",
+          "places": 0,
+          "frais_inscription": 200000,
+          "mensualite": 85000,
+          "frais_soutenance": 0,
+          "autres_frais": 45000,
+          "duree_mois": 0,
+          "frais_supplementaires": [
+            {
+              "designation": "BIBLIOTHQUE ET EPI",
+              "montant": 45000
+            }
+          ],
+          "nombre_photos_preinscription": 1
+        }
+      },
+      "created_at": "2026-08-21T13:01:04.606Z"
     }
   ],
   "notifications": [
     {
-      "id": 1,
-      "user_id": 10,
-      "type": "dossier_statut",
-      "title": "Décision sur votre dossier",
-      "message": "Le dossier PREINSC-2026-79306 est maintenant: en attente.",
-      "link": "/dashboard",
-      "meta": {
-        "dossier_id": 6,
-        "numero_dossier": "PREINSC-2026-79306",
-        "statut": "en_attente"
-      },
-      "read_at": "2026-03-27T23:32:27.136Z",
-      "created_at": "2026-03-27T23:31:15.194Z"
-    },
-    {
-      "id": 2,
-      "user_id": 10,
-      "type": "dossier_statut",
-      "title": "Décision sur votre dossier",
-      "message": "Le dossier PREINSC-2026-79306 est maintenant: accepté.",
-      "link": "/dashboard",
-      "meta": {
-        "dossier_id": 6,
-        "numero_dossier": "PREINSC-2026-79306",
-        "statut": "accepte"
-      },
-      "read_at": null,
-      "created_at": "2026-03-28T06:00:59.961Z"
-    },
-    {
-      "id": 3,
-      "user_id": 14,
-      "type": "dossier_statut",
-      "title": "Décision sur votre dossier",
-      "message": "Le dossier PREINSC-2026-68842 est maintenant: accepté.",
-      "link": "/dashboard",
-      "meta": {
-        "dossier_id": 7,
-        "numero_dossier": "PREINSC-2026-68842",
-        "statut": "accepte"
-      },
-      "read_at": null,
-      "created_at": "2026-03-28T07:26:26.488Z"
-    },
-    {
-      "id": 4,
-      "user_id": 22,
-      "type": "dossier_statut",
-      "title": "Décision sur votre dossier",
-      "message": "Le dossier PREINSC-2026-98654 est maintenant: accepté.",
-      "link": "/dashboard",
-      "meta": {
-        "dossier_id": 8,
-        "numero_dossier": "PREINSC-2026-98654",
-        "statut": "accepte"
-      },
-      "read_at": null,
-      "created_at": "2026-04-04T11:50:41.831Z"
-    },
-    {
-      "id": 5,
-      "user_id": 24,
+      "id": 8,
+      "user_id": 13,
       "type": "demande_proforma",
-      "title": "Demande de facture proforma acceptée",
-      "message": "Votre demande DEM-2026-00012 a été acceptée. Vous pouvez télécharger la facture proforma, la lettre et l’attestation depuis votre espace.",
+      "title": "Facture proforma disponible",
+      "message": "Une facture proforma (DEM-2026-00013) a été établie pour vous par l’établissement. Retrouvez-la sur votre espace.",
       "link": "/dashboard",
       "meta": {
-        "demande_id": 12,
-        "reference": "DEM-2026-00012",
+        "demande_id": 13,
+        "reference": "DEM-2026-00013",
         "statut": "acceptee"
       },
       "read_at": null,
-      "created_at": "2026-04-06T22:23:52.719Z"
+      "created_at": "2026-08-12T13:09:54.406Z"
     },
     {
-      "id": 6,
-      "user_id": 24,
-      "type": "demande_proforma",
-      "title": "Demande de facture proforma",
-      "message": "Votre demande DEM-2026-00012 a été remise en attente. La facture proforma n'est plus disponible tant qu'elle n'est pas à nouveau validée.",
+      "id": 9,
+      "user_id": 18,
+      "type": "dossier_statut",
+      "title": "Décision sur votre dossier",
+      "message": "Le dossier PREINSC-2026-16871 est maintenant: accepté.",
       "link": "/dashboard",
       "meta": {
-        "demande_id": 12,
-        "reference": "DEM-2026-00012",
-        "statut": "en_attente"
+        "dossier_id": 11,
+        "numero_dossier": "PREINSC-2026-16871",
+        "statut": "accepte"
       },
       "read_at": null,
-      "created_at": "2026-04-07T14:48:34.745Z"
-    },
-    {
-      "id": 7,
-      "user_id": 24,
-      "type": "demande_proforma",
-      "title": "Demande de facture proforma acceptée",
-      "message": "Votre demande DEM-2026-00012 a été acceptée. Vous pouvez télécharger la facture proforma et l’attestation de préinscription depuis votre espace.",
-      "link": "/dashboard",
-      "meta": {
-        "demande_id": 12,
-        "reference": "DEM-2026-00012",
-        "statut": "acceptee"
-      },
-      "read_at": null,
-      "created_at": "2026-04-07T14:48:53.136Z"
+      "created_at": "2026-08-21T11:02:38.391Z"
     }
   ],
   "security_events": [
+    {
+      "id": 20,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "admin@universite.sn"
+      },
+      "created_at": "2026-05-08T22:52:16.991Z"
+    },
+    {
+      "id": 19,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "issa.ly@ucad.edu.sn"
+      },
+      "created_at": "2026-05-08T22:51:49.895Z"
+    },
     {
       "id": 18,
       "type": "auth_login_failed",
@@ -4075,6 +5879,419 @@
         "email": "x@test.com"
       },
       "created_at": "2026-03-27T14:31:44.664Z"
+    },
+    {
+      "id": 21,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "adama.diop@esebat.com"
+      },
+      "created_at": "2026-05-18T16:14:21.677Z"
+    },
+    {
+      "id": 22,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "efosante@universite.sn"
+      },
+      "created_at": "2026-05-18T16:14:24.736Z"
+    },
+    {
+      "id": 23,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "salif.sene@universite.sn"
+      },
+      "created_at": "2026-05-18T16:14:26.191Z"
+    },
+    {
+      "id": 24,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "ali.seck@test.com"
+      },
+      "created_at": "2026-05-18T16:14:27.511Z"
+    },
+    {
+      "id": 25,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "comptable.verify@universite.sn"
+      },
+      "created_at": "2026-05-18T16:14:28.765Z"
+    },
+    {
+      "id": 26,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "adama.diop@esebat.com"
+      },
+      "created_at": "2026-05-18T16:16:38.653Z"
+    },
+    {
+      "id": 27,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/11/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 11,
+        "target_role": "responsable"
+      },
+      "created_at": "2026-05-18T16:17:58.314Z"
+    },
+    {
+      "id": 28,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/11/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 11,
+        "target_role": "responsable"
+      },
+      "created_at": "2026-05-18T16:18:08.724Z"
+    },
+    {
+      "id": 29,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/26/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 26,
+        "target_role": "controleur_qualite"
+      },
+      "created_at": "2026-05-18T16:18:08.914Z"
+    },
+    {
+      "id": 30,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/3/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 3,
+        "target_role": "etudiant"
+      },
+      "created_at": "2026-05-18T16:18:09.139Z"
+    },
+    {
+      "id": 31,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/25/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 25,
+        "target_role": "agent_admin"
+      },
+      "created_at": "2026-05-18T16:18:09.368Z"
+    },
+    {
+      "id": 32,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/11/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 11,
+        "target_role": "responsable"
+      },
+      "created_at": "2026-05-18T16:18:43.216Z"
+    },
+    {
+      "id": 33,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/26/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 26,
+        "target_role": "controleur_qualite"
+      },
+      "created_at": "2026-05-18T16:18:43.405Z"
+    },
+    {
+      "id": 34,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/3/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 3,
+        "target_role": "etudiant"
+      },
+      "created_at": "2026-05-18T16:18:43.536Z"
+    },
+    {
+      "id": 35,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/25/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 25,
+        "target_role": "agent_admin"
+      },
+      "created_at": "2026-05-18T16:18:43.629Z"
+    },
+    {
+      "id": 36,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/28/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 28,
+        "target_role": "comptable"
+      },
+      "created_at": "2026-05-18T16:18:43.732Z"
+    },
+    {
+      "id": 37,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "comptable.verify@universite.sn"
+      },
+      "created_at": "2026-05-18T16:18:43.863Z"
+    },
+    {
+      "id": 38,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/11/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 11,
+        "target_role": "responsable"
+      },
+      "created_at": "2026-05-18T16:19:25.576Z"
+    },
+    {
+      "id": 39,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/26/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 26,
+        "target_role": "controleur_qualite"
+      },
+      "created_at": "2026-05-18T16:19:25.732Z"
+    },
+    {
+      "id": 40,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/3/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 3,
+        "target_role": "etudiant"
+      },
+      "created_at": "2026-05-18T16:19:25.839Z"
+    },
+    {
+      "id": 41,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/25/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 25,
+        "target_role": "agent_admin"
+      },
+      "created_at": "2026-05-18T16:19:25.965Z"
+    },
+    {
+      "id": 42,
+      "type": "admin_password_reset",
+      "severity": "warning",
+      "user_id": 1,
+      "user_role": "admin",
+      "method": "POST",
+      "path": "/api/admin/utilisateurs/28/reinitialiser-mot-de-passe",
+      "ip": "::1",
+      "details": {
+        "target_user_id": 28,
+        "target_role": "comptable"
+      },
+      "created_at": "2026-05-18T16:19:26.127Z"
+    },
+    {
+      "id": 43,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "comptable.verify@universite.sn"
+      },
+      "created_at": "2026-05-18T16:19:26.334Z"
+    },
+    {
+      "id": 44,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "fatima1.ly@universite.sn"
+      },
+      "created_at": "2026-05-18T16:20:18.999Z"
+    },
+    {
+      "id": 45,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "lyisaa1928@gmail.com"
+      },
+      "created_at": "2026-05-23T15:54:02.396Z"
+    },
+    {
+      "id": 46,
+      "type": "auth_refresh_invalid",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/refresh",
+      "ip": "::1",
+      "details": {},
+      "created_at": "2026-06-01T14:03:09.947Z"
+    },
+    {
+      "id": 47,
+      "type": "rate_limit_block",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "GET",
+      "path": "/api/formations",
+      "ip": "::1",
+      "details": {
+        "key": "global:::1",
+        "max": 300,
+        "window_ms": 60000,
+        "retry_after_sec": 56,
+        "backend": "memory"
+      },
+      "created_at": "2026-08-11T21:13:40.403Z"
+    },
+    {
+      "id": 48,
+      "type": "rate_limit_block",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "GET",
+      "path": "/api/formations",
+      "ip": "::1",
+      "details": {
+        "key": "global:::1",
+        "max": 300,
+        "window_ms": 60000,
+        "retry_after_sec": 51,
+        "backend": "memory"
+      },
+      "created_at": "2026-08-11T23:14:01.611Z"
     }
   ],
   "conditions_admission": [
@@ -4093,6 +6310,1170 @@
       "updated_at": "2026-04-07T14:29:04.929Z",
       "updated_by_user_id": 1,
       "ordre": 1
+    }
+  ],
+  "chatbot_logs": [
+    {
+      "id": 1,
+      "created_at": "2026-08-12T15:42:32.544Z",
+      "session_id": "anon-1786549352473-xqxtoq",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles formations en informatique ?",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82,
+        94
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 2,
+      "created_at": "2026-08-12T15:42:32.571Z",
+      "session_id": "anon-1786549352473-xqxtoq",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Et les debouches ?",
+      "intent": "careers",
+      "formation_ids": [
+        80
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 3,
+      "created_at": "2026-08-12T15:43:09.241Z",
+      "session_id": "anon-1786549389198-jl72o6",
+      "etablissement_id": null,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "bjr",
+      "intent": "unknown",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 4,
+      "created_at": "2026-08-12T15:43:27.268Z",
+      "session_id": "anon-1786549407229-gf2hlf",
+      "etablissement_id": 1,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Génie civil",
+      "intent": "list_formations",
+      "formation_ids": [
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 5,
+      "created_at": "2026-08-12T15:43:44.927Z",
+      "session_id": "anon-1786549407229-gf2hlf",
+      "etablissement_id": 1,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "bonjour",
+      "intent": "greeting",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 6,
+      "created_at": "2026-08-12T15:43:53.444Z",
+      "session_id": "test-info-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles sont vos formations en informatique ?",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 7,
+      "created_at": "2026-08-12T15:43:53.461Z",
+      "session_id": "test-astro-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Avez-vous une licence en astronautique ?",
+      "intent": "unknown",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 8,
+      "created_at": "2026-08-12T15:43:53.478Z",
+      "session_id": "test-off-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelle est la capitale du Japon ?",
+      "intent": "off_topic",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": true,
+      "ip_hash": null
+    },
+    {
+      "id": 9,
+      "created_at": "2026-08-12T15:43:53.496Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je cherche une formation en informatique",
+      "intent": "recommend",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 10,
+      "created_at": "2026-08-12T15:43:53.520Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Et combien de temps dure cette formation ?",
+      "intent": "fees",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 11,
+      "created_at": "2026-08-12T15:43:53.540Z",
+      "session_id": "test-cyber-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je veux faire de la cybersécurité. Quelle formation ?",
+      "intent": "recommend",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 12,
+      "created_at": "2026-08-12T15:43:53.559Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "formations informatique",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 13,
+      "created_at": "2026-08-12T15:43:53.582Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quels sont les débouchés de cette formation ?",
+      "intent": "careers",
+      "formation_ids": [
+        80
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 14,
+      "created_at": "2026-08-12T16:12:07.613Z",
+      "session_id": "anon-1786551127539-hgzv62",
+      "etablissement_id": 1,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "BJR",
+      "intent": "unknown",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 15,
+      "created_at": "2026-08-12T16:12:45.095Z",
+      "session_id": "anon-1786551165016-5phvbp",
+      "etablissement_id": null,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "BJR",
+      "intent": "unknown",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 16,
+      "created_at": "2026-08-12T16:13:35.512Z",
+      "session_id": "test-info-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles sont vos formations en informatique ?",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 17,
+      "created_at": "2026-08-12T16:13:35.559Z",
+      "session_id": "test-astro-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Avez-vous une licence en astronautique ?",
+      "intent": "unknown",
+      "formation_ids": [
+        92,
+        102,
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 18,
+      "created_at": "2026-08-12T16:13:35.590Z",
+      "session_id": "test-off-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelle est la capitale du Japon ?",
+      "intent": "off_topic",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": true,
+      "ip_hash": null
+    },
+    {
+      "id": 19,
+      "created_at": "2026-08-12T16:13:35.626Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je cherche une formation en informatique",
+      "intent": "recommend",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 20,
+      "created_at": "2026-08-12T16:13:35.681Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Et combien de temps dure cette formation ?",
+      "intent": "fees",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 21,
+      "created_at": "2026-08-12T16:13:35.720Z",
+      "session_id": "test-cyber-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je veux faire de la cybersécurité. Quelle formation ?",
+      "intent": "recommend",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 22,
+      "created_at": "2026-08-12T16:13:35.752Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "formations informatique",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 23,
+      "created_at": "2026-08-12T16:13:35.783Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quels sont les débouchés de cette formation ?",
+      "intent": "careers",
+      "formation_ids": [
+        80
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 24,
+      "created_at": "2026-08-12T16:14:01.575Z",
+      "session_id": "test-info-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles sont vos formations en informatique ?",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 25,
+      "created_at": "2026-08-12T16:14:01.608Z",
+      "session_id": "test-astro-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Avez-vous une licence en astronautique ?",
+      "intent": "unknown",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 26,
+      "created_at": "2026-08-12T16:14:01.638Z",
+      "session_id": "test-off-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelle est la capitale du Japon ?",
+      "intent": "off_topic",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": true,
+      "ip_hash": null
+    },
+    {
+      "id": 27,
+      "created_at": "2026-08-12T16:14:01.672Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je cherche une formation en informatique",
+      "intent": "recommend",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 28,
+      "created_at": "2026-08-12T16:14:01.695Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Et combien de temps dure cette formation ?",
+      "intent": "fees",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 29,
+      "created_at": "2026-08-12T16:14:01.737Z",
+      "session_id": "test-cyber-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je veux faire de la cybersécurité. Quelle formation ?",
+      "intent": "recommend",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 30,
+      "created_at": "2026-08-12T16:14:01.765Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "formations informatique",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 31,
+      "created_at": "2026-08-12T16:14:01.791Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quels sont les débouchés de cette formation ?",
+      "intent": "careers",
+      "formation_ids": [
+        80
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 32,
+      "created_at": "2026-08-12T16:14:15.412Z",
+      "session_id": "test-info-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles sont vos formations en informatique ?",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 33,
+      "created_at": "2026-08-12T16:14:15.438Z",
+      "session_id": "test-astro-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Avez-vous une licence en astronautique ?",
+      "intent": "unknown",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 34,
+      "created_at": "2026-08-12T16:14:15.465Z",
+      "session_id": "test-off-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelle est la capitale du Japon ?",
+      "intent": "off_topic",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": true,
+      "ip_hash": null
+    },
+    {
+      "id": 35,
+      "created_at": "2026-08-12T16:14:15.495Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je cherche une formation en informatique",
+      "intent": "recommend",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 36,
+      "created_at": "2026-08-12T16:14:15.556Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Et combien de temps dure cette formation ?",
+      "intent": "fees",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 37,
+      "created_at": "2026-08-12T16:14:15.576Z",
+      "session_id": "test-cyber-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je veux faire de la cybersécurité. Quelle formation ?",
+      "intent": "recommend",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 38,
+      "created_at": "2026-08-12T16:14:15.601Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "formations informatique",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 39,
+      "created_at": "2026-08-12T16:14:15.620Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quels sont les débouchés de cette formation ?",
+      "intent": "careers",
+      "formation_ids": [
+        80
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 40,
+      "created_at": "2026-08-12T16:14:29.020Z",
+      "session_id": "x",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles formations proposez-vous ?",
+      "intent": "list_formations",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 41,
+      "created_at": "2026-08-12T16:14:50.562Z",
+      "session_id": "test-info-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles sont vos formations en informatique ?",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 42,
+      "created_at": "2026-08-12T16:14:50.601Z",
+      "session_id": "test-astro-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Avez-vous une licence en astronautique ?",
+      "intent": "list_formations",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 43,
+      "created_at": "2026-08-12T16:14:50.630Z",
+      "session_id": "test-off-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelle est la capitale du Japon ?",
+      "intent": "off_topic",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": true,
+      "ip_hash": null
+    },
+    {
+      "id": 44,
+      "created_at": "2026-08-12T16:14:50.667Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je cherche une formation en informatique",
+      "intent": "recommend",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 45,
+      "created_at": "2026-08-12T16:14:50.701Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Et combien de temps dure cette formation ?",
+      "intent": "fees",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 46,
+      "created_at": "2026-08-12T16:14:50.731Z",
+      "session_id": "test-cyber-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je veux faire de la cybersécurité. Quelle formation ?",
+      "intent": "recommend",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 47,
+      "created_at": "2026-08-12T16:14:50.753Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "formations informatique",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 48,
+      "created_at": "2026-08-12T16:14:50.775Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quels sont les débouchés de cette formation ?",
+      "intent": "careers",
+      "formation_ids": [
+        80
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 49,
+      "created_at": "2026-08-19T13:08:22.785Z",
+      "session_id": "test-info-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles sont vos formations en informatique ?",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 50,
+      "created_at": "2026-08-19T13:08:22.811Z",
+      "session_id": "test-astro-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Avez-vous une licence en astronautique ?",
+      "intent": "list_formations",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 51,
+      "created_at": "2026-08-19T13:08:22.853Z",
+      "session_id": "test-off-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelle est la capitale du Japon ?",
+      "intent": "off_topic",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": true,
+      "ip_hash": null
+    },
+    {
+      "id": 52,
+      "created_at": "2026-08-19T13:08:22.887Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je cherche une formation en informatique",
+      "intent": "recommend",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 53,
+      "created_at": "2026-08-19T13:08:22.914Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Et combien de temps dure cette formation ?",
+      "intent": "fees",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 54,
+      "created_at": "2026-08-19T13:08:22.931Z",
+      "session_id": "test-cyber-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je veux faire de la cybersécurité. Quelle formation ?",
+      "intent": "recommend",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 55,
+      "created_at": "2026-08-19T13:08:22.953Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "formations informatique",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 56,
+      "created_at": "2026-08-19T13:08:22.976Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quels sont les débouchés de cette formation ?",
+      "intent": "careers",
+      "formation_ids": [
+        80
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 57,
+      "created_at": "2026-08-19T17:11:24.305Z",
+      "session_id": "anon-1787159484269-8ibvm3",
+      "etablissement_id": 1,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je cherche une formation",
+      "intent": "recommend",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 58,
+      "created_at": "2026-08-19T17:11:28.285Z",
+      "session_id": "anon-1787159484269-8ibvm3",
+      "etablissement_id": 1,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Voir les formations",
+      "intent": "list_formations",
+      "formation_ids": [
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 59,
+      "created_at": "2026-08-19T17:11:44.103Z",
+      "session_id": "anon-1787159484269-8ibvm3",
+      "etablissement_id": 1,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Facture proforma",
+      "intent": "proforma",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 60,
+      "created_at": "2026-08-21T18:51:02.571Z",
+      "session_id": "anon-1787338262541-ncanvh",
+      "etablissement_id": 1,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles formations proposez-vous ?",
+      "intent": "list_formations",
+      "formation_ids": [
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 61,
+      "created_at": "2026-08-22T16:52:59.635Z",
+      "session_id": "anon-1787417579607-vu5jrw",
+      "etablissement_id": 3,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Comment m’inscrire ?",
+      "intent": "inscription",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 62,
+      "created_at": "2026-08-22T17:01:49.065Z",
+      "session_id": "anon-1787418109052-bb7cu9",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles formations proposez-vous ?",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82,
+        86,
+        87
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 63,
+      "created_at": "2026-08-22T17:02:16.097Z",
+      "session_id": "anon-1787418109052-bb7cu9",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "La première m’intéresse",
+      "intent": "select_ordinal",
+      "formation_ids": [
+        80
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 64,
+      "created_at": "2026-08-22T17:02:22.877Z",
+      "session_id": "anon-1787418109052-bb7cu9",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Tarifs",
+      "intent": "fees",
+      "formation_ids": [
+        80
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    }
+  ],
+  "chatbot_config": [
+    {
+      "id": "global",
+      "etablissement_id": null,
+      "enabled": true,
+      "assistant_name": "Accueil scolarité",
+      "welcome_message": "Bonjour et bienvenue. Je suis l’accueil virtuel de la scolarité. Comment puis-je vous aider aujourd’hui ?",
+      "expose_staff_contacts": false,
+      "contacts": {
+        "scolarite": {
+          "label": "Scolarité / Accueil",
+          "nom": "",
+          "email": "",
+          "telephone": ""
+        },
+        "pedagogie": {
+          "label": "Responsable pédagogique",
+          "nom": "",
+          "email": "",
+          "telephone": ""
+        },
+        "finance": {
+          "label": "Service financier",
+          "nom": "",
+          "email": "",
+          "telephone": ""
+        },
+        "etablissement": {
+          "label": "Responsable d’établissement",
+          "nom": "",
+          "email": "",
+          "telephone": ""
+        }
+      },
+      "service_routing": [
+        {
+          "key": "formation",
+          "service": "pedagogie",
+          "label": "Responsable pédagogique"
+        },
+        {
+          "key": "etablissement",
+          "service": "etablissement",
+          "label": "Responsable d’établissement"
+        },
+        {
+          "key": "inscription",
+          "service": "scolarite",
+          "label": "Scolarité"
+        },
+        {
+          "key": "proforma",
+          "service": "scolarite",
+          "label": "Accueil / facturation"
+        },
+        {
+          "key": "paiement",
+          "service": "finance",
+          "label": "Service financier"
+        },
+        {
+          "key": "administratif",
+          "service": "scolarite",
+          "label": "Scolarité"
+        },
+        {
+          "key": "pedagogie",
+          "service": "pedagogie",
+          "label": "Responsable pédagogique"
+        }
+      ],
+      "suggestions": [
+        {
+          "id": "trouver",
+          "label": "Trouver une formation",
+          "message": "Je cherche une formation"
+        },
+        {
+          "id": "catalogue",
+          "label": "Voir les formations",
+          "message": "Quelles formations proposez-vous ?"
+        },
+        {
+          "id": "admission",
+          "label": "Conditions d’admission",
+          "message": "Quelles sont les conditions d’admission ?"
+        },
+        {
+          "id": "debouches",
+          "label": "Débouchés",
+          "message": "Quels sont les débouchés professionnels ?"
+        },
+        {
+          "id": "proforma",
+          "label": "Facture proforma",
+          "message": "Je voudrais une facture proforma"
+        },
+        {
+          "id": "responsable",
+          "label": "Contacter un responsable",
+          "message": "Je souhaite contacter un responsable"
+        },
+        {
+          "id": "etab",
+          "label": "Informations établissement",
+          "message": "Informations sur l’établissement"
+        },
+        {
+          "id": "inscription",
+          "label": "Inscription",
+          "message": "Comment m’inscrire ?"
+        }
+      ],
+      "faqs": [],
+      "updated_at": null
     }
   ]
 }

@@ -30,12 +30,12 @@ export default defineConfig(({ mode }) => {
   server: {
     /** IPv4 explicite : évite les écarts localhost IPv4 vs ::1 (page blanche / mauvaise appli). */
     host: '127.0.0.1',
-    port: 5173,
-    /** Si le port est pris, échouer au lieu de passer silencieusement à 5174. */
-    strictPort: true,
+    port: Number(v.VITE_DEV_SERVER_PORT) || 5173,
+    /** Si le port est pris (ex. double `npm run dev`), passer à 5174 — CORS backend inclut 5173–5174. */
+    strictPort: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: v.VITE_PROXY_API_TARGET || 'http://localhost:5000',
         changeOrigin: true
       },
       '/uploads': {

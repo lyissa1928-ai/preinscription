@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { chatWithStudentUrl } from '../../utils/chatWithStudentUrl'
 import TabConditionsAdmissionEtab from '../../components/TabConditionsAdmissionEtab'
 import StatutBadge from '../../components/StatutBadge'
+import CreerProformaModal from '../../components/CreerProformaModal'
 import {
   DashboardPage,
   DashboardHero,
@@ -14,10 +15,9 @@ import {
 } from '../../components/dashboard/DashboardChrome'
 
 const ONGLETS = [
-  { key: 'fad',        label: '🌐 FAD (En ligne)',    type: 'fad' },
-  { key: 'presentiel', label: '🏫 Présentiel',        type: 'presentiel' },
-  { key: 'demandes',   label: '🧾 Demandes proforma', type: null },
-  { key: 'conditions', label: '📋 Conditions d’admission', type: null },
+  { key: 'fad',        label: 'FAD (En ligne)',    type: 'fad' },
+  { key: 'presentiel', label: 'Présentiel',        type: 'presentiel' },
+  { key: 'conditions', label: 'Conditions d’admission', type: null },
 ]
 
 export default function ResponsableDashboard() {
@@ -28,12 +28,17 @@ export default function ResponsableDashboard() {
   )
   const [stats, setStats]           = useState(null)
   const [dossiers, setDossiers]     = useState([])
-  const [demandes, setDemandes]     = useState([])
   const [pagination, setPagination] = useState({})
   const [search, setSearch]         = useState('')
   const [filtreStatut, setFiltreStatut] = useState('')
   const [page, setPage]             = useState(1)
   const [loading, setLoading]       = useState(true)
+  const [creerOpen, setCreerOpen]   = useState(false)
+
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t === 'conditions') setOnglet('conditions')
+  }, [searchParams])
 
   useEffect(() => {
     const t = searchParams.get('tab')
@@ -47,7 +52,7 @@ export default function ResponsableDashboard() {
 
   // Dossiers FAD / Présentiel
   useEffect(() => {
-    if (onglet === 'demandes' || onglet === 'conditions') return
+    if (onglet === 'conditions') return
     setLoading(true)
     const params = new URLSearchParams({ page, limit: 12, type: onglet })
     if (filtreStatut) params.append('statut', filtreStatut)
@@ -57,16 +62,6 @@ export default function ResponsableDashboard() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [onglet, page, filtreStatut, search])
-
-  // Demandes proforma
-  useEffect(() => {
-    if (onglet !== 'demandes') return
-    setLoading(true)
-    axios.get('/api/responsable/demandes-proforma')
-      .then(({ data }) => setDemandes(data.demandes))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [onglet])
 
   const handleOnglet = (key) => {
     setOnglet(key)
@@ -80,11 +75,8 @@ export default function ResponsableDashboard() {
     }
   }
 
-  const marquerVue = (id) => {
-    axios.put(`/api/responsable/demandes-proforma/${id}/statut`, { statut: 'vue' }).then(() => {
-      setDemandes(prev => prev.map(d => d.id === id ? { ...d, statut: 'vue' } : d))
-    }).catch(() => {})
-  }
+  const canChatterEtudiant =
+    user?.role === 'responsable' && user?.etablissement_id != null
 
   const canChatterEtudiant =
     user?.role === 'responsable' && user?.etablissement_id != null
@@ -94,21 +86,34 @@ export default function ResponsableDashboard() {
       <DashboardHero
         eyebrow="Pédagogie"
         title="Espace responsable"
-        subtitle="Dossiers FAD / présentiel, demandes proforma, et publication des conditions d’admission visibles par les candidats."
+        subtitle="Dossiers FAD / présentiel et conditions d’admission. Les demandes proforma sont sur leur page dédiée."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link to="/responsable/demandes-proforma" className="btn-secondary text-sm">Demandes proforma</Link>
+            <Link to="/responsable/preinscription-guichet" className="btn-secondary text-sm">Guichet</Link>
+            <Link to="/responsable/gestion-etablissement" className="btn-secondary text-sm">Formations</Link>
+            <button type="button" onClick={() => setCreerOpen(true)} className="btn-primary text-sm">
+              Nouvelle facture proforma
+            </button>
+          </div>
+        }
       />
+      <CreerProformaModal open={creerOpen} onClose={() => setCreerOpen(false)} />
 
       {stats && (
         <div className="mb-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatTile icon={<span className="text-2xl">🌐</span>} gradient="emerald" label="Dossiers FAD" value={stats.fad.total} sub={`${stats.fad.en_attente} en attente`} />
           <StatTile icon={<span className="text-2xl">🏫</span>} gradient="blue" label="Dossiers présentiel" value={stats.presentiel.total} sub={`${stats.presentiel.en_attente} en attente`} />
           <StatTile icon={<span className="text-2xl">✅</span>} gradient="cyan" label="Acceptés (total)" value={(stats.fad.acceptes || 0) + (stats.presentiel.acceptes || 0)} />
-          <StatTile
-            icon={<span className="text-2xl">🧾</span>}
-            gradient="amber"
-            label="Demandes proforma"
-            value={stats.demandes_proforma}
-            sub={stats.nouvelles_demandes > 0 ? `${stats.nouvelles_demandes} nouvelle(s)` : null}
-          />
+          <Link to="/responsable/demandes-proforma" className="block">
+            <StatTile
+              icon={<span className="text-2xl">🧾</span>}
+              gradient="amber"
+              label="Demandes proforma"
+              value={stats.demandes_proforma}
+              sub={stats.nouvelles_demandes > 0 ? `${stats.nouvelles_demandes} nouvelle(s)` : null}
+            />
+          </Link>
         </div>
       )}
 
@@ -125,9 +130,6 @@ export default function ResponsableDashboard() {
             }`}
           >
             {o.label}
-            {o.key === 'demandes' && stats?.nouvelles_demandes > 0 && (
-              <span className="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-xs text-white shadow-sm">{stats.nouvelles_demandes}</span>
-            )}
           </button>
         ))}
       </div>
@@ -260,89 +262,6 @@ export default function ResponsableDashboard() {
               <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 Aucun établissement n’est rattaché à votre compte. Contactez l’administrateur.
               </p>
-            )}
-          </Panel>
-        )}
-
-        {onglet === 'demandes' && (
-          <Panel
-            title="Demandes de facture proforma"
-            meta={
-              stats?.nouvelles_demandes > 0 ? (
-                <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-bold text-red-700">{stats.nouvelles_demandes} nouvelle(s)</span>
-              ) : null
-            }
-            bodyClassName="p-6"
-          >
-            <p className="mb-5 text-sm text-slate-500">Déposées par les candidats (compte + justificatifs) ; validation pédagogique requise.</p>
-
-            {loading ? (
-              <DashboardSpinner />
-            ) : demandes.length === 0 ? (
-              <div className="py-12 text-center text-slate-400">
-                <div className="mb-3 text-4xl">🧾</div>
-                <p>Aucune demande pour le moment</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {demandes.map((d) => (
-                  <div
-                    key={d.id}
-                    role={d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'button' : undefined}
-                    tabIndex={d.statut === 'nouvelle' || d.statut === 'en_attente' ? 0 : undefined}
-                    className={`rounded-2xl border p-4 transition-all ${
-                      d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'border-amber-300/80 bg-gradient-to-br from-amber-50 to-orange-50/50 shadow-md shadow-amber-100/50' : 'border-slate-100 bg-white shadow-sm'
-                    } ${d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'cursor-pointer hover:border-amber-400' : ''}`}
-                    onClick={() => (d.statut === 'nouvelle' || d.statut === 'en_attente') && marquerVue(d.id)}
-                    onKeyDown={(e) => {
-                      if ((d.statut === 'nouvelle' || d.statut === 'en_attente') && (e.key === 'Enter' || e.key === ' ')) {
-                        e.preventDefault()
-                        marquerVue(d.id)
-                      }
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <span className="font-bold text-gray-900">{d.prenom} {d.nom}</span>
-                          {canChatterEtudiant && d.etudiant_id != null && Number(d.etudiant_id) > 0 && (
-                            <Link
-                              to={chatWithStudentUrl(d.etudiant_id, d.prenom, d.nom)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center rounded-lg border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-800 shadow-sm hover:bg-emerald-50"
-                            >
-                              💬 Chatter
-                            </Link>
-                          )}
-                          {(d.statut === 'nouvelle' || d.statut === 'en_attente') && (
-                            <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">NOUVEAU</span>
-                          )}
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${d.type_formation === 'en_ligne' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {d.type_formation === 'en_ligne' ? '🌐 FAD' : '🏫 Présentiel'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-700 font-medium">{d.formation_titre}</p>
-                        <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
-                          <span>📧 {d.email}</span>
-                          <span>📞 {d.telephone}</span>
-                          <span>📅 {new Date(d.created_at).toLocaleDateString('fr-FR')}</span>
-                        </div>
-                        {d.details && <p className="text-xs text-gray-500 mt-2 italic bg-white rounded-lg p-2 border border-gray-100">"{d.details}"</p>}
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="font-mono text-xs text-gray-400">{d.reference}</div>
-                        <span className={`inline-block mt-1 text-xs px-2 py-1 rounded-full font-semibold ${
-                          d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'bg-amber-100 text-amber-700'
-                          : d.statut === 'vue' ? 'bg-blue-100 text-blue-700'
-                          : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {d.statut === 'en_attente' ? 'En attente' : d.statut === 'nouvelle' ? 'Nouvelle' : d.statut === 'vue' ? 'Vue' : 'Traitée'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
             )}
           </Panel>
         )}
