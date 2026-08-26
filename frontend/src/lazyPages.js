@@ -47,5 +47,6 @@ export const ResetPasswordMatricule = lazy(() => import('./pages/ResetPasswordMa
 export const ResetPasswordStaff = lazy(() => import('./pages/ResetPasswordStaff'))
 export const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
 export const ForgotPasswordEmail = lazy(() => import('./pages/ForgotPasswordEmail'))
+export const MotDePasseOublie = lazy(() => import('./pages/MotDePasseOublie'))
 export const ResetPasswordEmail = lazy(() => import('./pages/ResetPasswordEmail'))
 export const ProfilPage = lazy(() => import('./pages/ProfilPage'))

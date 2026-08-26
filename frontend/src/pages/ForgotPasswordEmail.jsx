@@ -69,8 +69,8 @@ export default function ForgotPasswordEmail() {
             </form>
           )}
           <div className="mt-6 text-center text-sm space-y-2">
-            <Link to="/mot-de-passe-oublie-matricule" className="text-blue-600 hover:underline block">
-              Réinitialiser avec mon matricule à la place
+            <Link to="/mot-de-passe-oublie" className="text-blue-600 hover:underline block">
+              Choisir une autre méthode
             </Link>
             <Link to="/connexion" className="text-slate-600 hover:underline block">
               ← Retour connexion

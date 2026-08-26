@@ -138,8 +138,8 @@ export default function ResetPasswordMatricule() {
 
               <p className="mt-6 text-center text-sm text-slate-600">
                 Vous connaissez votre adresse e-mail ?{' '}
-                <Link to="/mot-de-passe-oublie-email" className="font-semibold text-blue-600 hover:underline">
-                  Réinitialiser par e-mail
+                <Link to="/mot-de-passe-oublie" className="font-semibold text-blue-600 hover:underline">
+                  Choisir une autre méthode
                 </Link>
               </p>
               <p className="mt-3 text-center text-sm text-slate-600">

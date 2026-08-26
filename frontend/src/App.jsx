@@ -52,6 +52,7 @@ import {
   ResetPasswordStaff,
   VerifyEmail,
   ForgotPasswordEmail,
+  MotDePasseOublie,
   ResetPasswordEmail,
   ProfilPage,
 } from './lazyPages'
@@ -114,6 +115,7 @@ function AppRoutes() {
       <Route path="/connexion" element={user ? <Navigate to={homeRedirect()} /> : <Login />} />
       <Route path="/register" element={<Navigate to="/inscription" replace />} />
       <Route path="/inscription" element={user ? <Navigate to={homeRedirect()} /> : <Register />} />
+      <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie />} />
       <Route path="/mot-de-passe-oublie-matricule" element={<ResetPasswordMatricule />} />
       <Route path="/mot-de-passe-oublie-personnel" element={<ResetPasswordStaff />} />
       <Route path="/verifier-email" element={<VerifyEmail />} />

@@ -35,10 +35,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState('')
-  const [authOptions, setAuthOptions] = useState({
-    password_reset_email: false,
-    email_verification: false,
-  })
+  const [authOptions, setAuthOptions] = useState({ email_verification: false })
   const [resendLoading, setResendLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -56,7 +53,6 @@ export default function Login() {
       .get('/api/auth/options-public')
       .then(({ data }) =>
         setAuthOptions({
-          password_reset_email: Boolean(data?.password_reset_email_enabled),
           email_verification: Boolean(data?.email_verification_enabled),
         }),
       )
@@ -217,22 +213,9 @@ export default function Login() {
                   <span className="text-gray-500"> (vérification anti-bot requise)</span>
                 )}
               </p>
-              <p className="text-sm text-gray-600">
-                Mot de passe oublié ?{' '}
-                {authOptions.password_reset_email && (
-                  <>
-                    <Link to="/mot-de-passe-oublie-email" className="text-blue-600 hover:underline font-medium">
-                      Par e-mail
-                    </Link>
-                    <span className="text-gray-400"> · </span>
-                  </>
-                )}
-                <Link to="/mot-de-passe-oublie-matricule" className="text-blue-600 hover:underline font-medium">
-                  Étudiant
-                </Link>
-                <span className="text-gray-400"> · </span>
-                <Link to="/mot-de-passe-oublie-personnel" className="text-blue-600 hover:underline font-medium">
-                  Personnel
+              <p className="text-sm">
+                <Link to="/mot-de-passe-oublie" className="text-blue-600 hover:underline font-medium">
+                  Mot de passe oublié ?
                 </Link>
               </p>
               {authOptions.email_verification && form.email.trim() && (
@@ -257,22 +240,6 @@ export default function Login() {
                   >
                     {resendLoading ? 'Envoi…' : 'Renvoyer l’e-mail de confirmation'}
                   </button>
-                </p>
-              )}
-              {!import.meta.env.DEV && (
-                <p className="text-xs text-gray-500">
-                  Matricule oublié ? Contactez la scolarité de votre établissement.
-                </p>
-              )}
-              {import.meta.env.DEV && (
-                <p className="text-xs text-gray-500">
-                  Matricule oublié ?{' '}
-                  <a
-                    href="mailto:lyissa15@gmail.com?subject=UniPr%C3%A9inscription%20%E2%80%94%20R%C3%A9cup%C3%A9ration%20de%20matricule"
-                    className="text-blue-600 hover:underline"
-                  >
-                    Support dev
-                  </a>
                 </p>
               )}
             </div>

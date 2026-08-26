@@ -13,12 +13,24 @@ Objectif : déployer la dernière version synchronisée avec GitHub sans casser 
 
 ### reCAPTCHA Enterprise (production)
 
-Dans `backend/.env` : `RECAPTCHA_ENTERPRISE_PROJECT_ID`, `RECAPTCHA_ENTERPRISE_API_KEY`, `RECAPTCHA_ENTERPRISE_SITE_KEY` (voir `backend/.env.example`). La clé API doit avoir l’API **reCAPTCHA Enterprise** activée dans Google Cloud. La **clé site** doit être la même que `VITE_RECAPTCHA_SITE_KEY` utilisée au `npm run build`. Vous pouvez laisser vide `RECAPTCHA_SECRET_KEY` si tout passe par Enterprise.
+Dans `backend/.env` : `RECAPTCHA_ENTERPRISE_PROJECT_ID`, `RECAPTCHA_ENTERPRISE_API_KEY`, `RECAPTCHA_ENTERPRISE_SITE_KEY` (voir `backend/.env.example`). La clé API doit avoir l'API **reCAPTCHA Enterprise** activée dans Google Cloud. La **clé site** doit être la même que `VITE_RECAPTCHA_SITE_KEY` utilisée au `npm run build`. Vous pouvez laisser vide `RECAPTCHA_SECRET_KEY` si tout passe par Enterprise.
 
 ## Déploiement (depuis le dépôt cloné sur le serveur)
 
+**Recommandé en production** — script qui sauvegarde, protège la base, pull, build et redémarre :
+
 ```bash
-cd /chemin/vers/uniportail   # adapter : ex. home/.../uniportail
+cd /var/www/uniportail
+bash deploy/proteger-donnees-prod.sh    # une seule fois
+bash deploy/mise-a-jour-prod.sh         # à chaque mise à jour
+```
+
+Le script compare le nombre d'utilisateurs, factures, dossiers avant/après le `git pull`. Si la base a été écrasée par le dépôt Git, elle est **restaurée automatiquement** depuis la sauvegarde.
+
+### Déploiement manuel (alternative)
+
+```bash
+cd /chemin/vers/uniportail   # adapter : ex. /var/www/uniportail
 git fetch origin
 git status
 git pull origin main
@@ -36,7 +48,7 @@ Construire le frontend :
 npm run build
 ```
 
-Redémarrer l’API Node (PM2) :
+Redémarrer l'API Node (PM2) :
 
 ```bash
 cd backend
@@ -54,12 +66,21 @@ sudo nginx -t && sudo systemctl reload nginx
 
 - `curl -sI https://VOTRE-DOMAINE-TEST/` — HTTP 200
 - `curl -s https://VOTRE-DOMAINE-TEST/api/health` — JSON `status: OK`
-- Page d’accueil + connexion + préinscription (parcours rapide)
+- Page d'accueil + connexion + préinscription (parcours rapide)
 
 ## Fichiers à ne jamais écraser depuis Git sur la prod/test
 
+- `backend/database/preinscription.json` — **utilisateurs, factures, dossiers** (versionné pour la démo dev, mais **données réelles en prod**)
+- `backend/uploads/` — pièces jointes (hors Git)
 - `backend/.env` (secrets, JWT, CORS, clés reCAPTCHA)
-- `frontend/.env` en local ; en prod le build est fait **avec** `VITE_*` au moment du `npm run build` (ou variables d’environnement CI injectées au build)
+- `frontend/.env.production` — variables `VITE_*` au build
+- `frontend/public/config-site.js` — URL API en prod si modifiée sans rebuild
+
+**Une fois sur le serveur** : `bash deploy/proteger-donnees-prod.sh` marque ces fichiers en `skip-worktree` pour que `git pull` ne les remplace plus.
+
+**À chaque mise à jour** : `bash deploy/mise-a-jour-prod.sh` (sauvegarde + vérif compteurs + build + PM2).
+
+**URL correcte** : `https://esebat-digitalservices.com/uniportail/connexion` — **pas** `/connexion` à la racine (ancienne app). Voir `deploy/apache-esebat-redirections.conf.example`.
 
 ## Rollback rapide
 

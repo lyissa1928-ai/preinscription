@@ -98,7 +98,7 @@ export default function ResetPasswordStaff() {
         <p className="mt-4 text-center text-sm text-white/90">
           <Link to="/connexion" className="font-semibold underline">Retour connexion</Link>
           {' · '}
-          <Link to="/mot-de-passe-oublie-matricule" className="font-semibold underline">Étudiants (matricule)</Link>
+          <Link to="/mot-de-passe-oublie" className="font-semibold underline">Autre méthode</Link>
         </p>
       </div>
     </div>
