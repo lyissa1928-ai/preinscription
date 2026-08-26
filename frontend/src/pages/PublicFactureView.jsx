@@ -4,6 +4,7 @@ import axios from 'axios'
 import { jsPDF } from 'jspdf'
 import { mediaUrl } from '../utils/mediaUrl'
 import autoTable from 'jspdf-autotable'
+import { titreTypeDocument } from '../utils/factureTypeDocument'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt     = (n) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0))
@@ -148,12 +149,12 @@ async function generatePDF(data) {
   if (etabRC)     { doc.setFont('helvetica', 'bold'); doc.text(`RC : ${etabRC}`, txX, iy); iy += 4; doc.setFont('helvetica', 'normal') }
   if (etabArrete) { doc.setFont('helvetica', 'bold'); doc.text(`Arrêté : ${etabArrete}`, txX, iy); doc.setFont('helvetica', 'normal') }
 
-  // ── BLOC FACTURE PROFORMA (droite) ────────────────────────────────────────
+  // ── BLOC TYPE FACTURE (droite) ───────────────────────────────────────────
   const bx = 128, bw = W - bx - M
   const headerTopY = 7
   doc.setFillColor(...P); doc.roundedRect(bx, headerTopY, bw, 9, 2, 2, 'F')
   doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont('helvetica', 'bold')
-  doc.text('FACTURE PROFORMA', bx + bw / 2, headerTopY + 6, { align: 'center' })
+  doc.text(titreTypeDocument(facture?.type_document), bx + bw / 2, headerTopY + 6, { align: 'center' })
 
   doc.setFontSize(7.5); doc.setTextColor(50, 60, 80)
   const meta = [
@@ -549,7 +550,7 @@ export default function PublicFactureView() {
             <div className="text-right flex-shrink-0">
               <div className="inline-block text-white font-black text-sm px-5 py-2.5 rounded-xl mb-3"
                 style={{ background: primary }}>
-                FACTURE PROFORMA
+                {titreTypeDocument(facture?.type_document)}
               </div>
               <div className="text-xs text-gray-500 space-y-1">
                 <p><span className="font-semibold text-gray-700">N° :</span>{' '}

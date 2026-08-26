@@ -2,9 +2,9 @@
  * Présentation premium partagée des tableaux de bord (UI uniquement).
  */
 
-export function DashboardPage({ children, maxWidthClass = 'max-w-7xl' }) {
+export function DashboardPage({ children, maxWidthClass = 'max-w-7xl', className = '' }) {
   return (
-    <main className={`relative ${maxWidthClass} mx-auto w-full min-h-[calc(100vh-5rem)] px-4 py-10`}>
+    <main className={`relative ${maxWidthClass} mx-auto w-full min-h-[calc(100vh-5rem)] px-4 py-10 ${className}`}>
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
         <div className="absolute -top-32 left-1/2 h-[28rem] w-[min(100%,64rem)] -translate-x-1/2 rounded-[100%] bg-gradient-to-b from-blue-400/25 via-indigo-400/12 to-transparent blur-3xl" />
         <div className="absolute top-48 -right-20 h-72 w-72 animate-pulse-glow rounded-full bg-cyan-400/18 blur-3xl" />

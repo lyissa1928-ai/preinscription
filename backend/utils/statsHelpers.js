@@ -68,8 +68,40 @@ function statsParEtablissement(dossiers, etablissements, formations) {
   return Object.values(byEtab).sort((a, b) => b.total - a.total);
 }
 
+/**
+ * Classement des formations les plus demandées (demandes proforma).
+ * @returns {{ formation_id: number|null, titre: string, type_formation: string|null, total: number, acceptees: number, en_attente: number }[]}
+ */
+function topFormationsDemandees(demandes, limit = 8) {
+  const map = new Map();
+  (demandes || []).forEach((d) => {
+    const fid = d.formation_id != null ? Number(d.formation_id) : null;
+    const key = fid != null && !Number.isNaN(fid) ? `id:${fid}` : `t:${String(d.formation_titre || 'Sans formation').trim()}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        formation_id: fid,
+        titre: d.formation_titre || 'Sans formation',
+        type_formation: d.type_formation || null,
+        total: 0,
+        acceptees: 0,
+        en_attente: 0,
+      });
+    }
+    const row = map.get(key);
+    row.total += 1;
+    if (d.statut === 'acceptee') row.acceptees += 1;
+    else if (d.statut !== 'refusee') row.en_attente += 1;
+    if (!row.titre && d.formation_titre) row.titre = d.formation_titre;
+    if (!row.type_formation && d.type_formation) row.type_formation = d.type_formation;
+  });
+  return [...map.values()]
+    .sort((a, b) => b.total - a.total || String(a.titre).localeCompare(String(b.titre), 'fr'))
+    .slice(0, Math.max(1, limit));
+}
+
 module.exports = {
   countDossiersByStatut,
   dossiersRecents,
   statsParEtablissement,
+  topFormationsDemandees,
 };

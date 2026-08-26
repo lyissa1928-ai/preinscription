@@ -222,7 +222,10 @@ export default function Login() {
                   </Link>
                 )}
                 <Link to="/mot-de-passe-oublie-matricule" className="text-blue-600 hover:underline font-medium">
-                  Mot de passe oublié (matricule)
+                  Mot de passe oublié — Étudiant (matricule)
+                </Link>
+                <Link to="/mot-de-passe-oublie-personnel" className="text-blue-600 hover:underline font-medium">
+                  Mot de passe oublié — Personnel (matricule + téléphone)
                 </Link>
               </p>
               {authOptions.email_verification && form.email.trim() && (

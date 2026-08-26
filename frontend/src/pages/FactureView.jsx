@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
+import { titreTypeDocument, isFactureDefinitive } from '../utils/factureTypeDocument'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0))
 const fmtDate = (d) => {
@@ -269,7 +270,7 @@ export default function FactureView() {
       doc.setTextColor(255, 255, 255)
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(9)
-      doc.text('FACTURE PROFORMA', 128 + (W - 128 - M) / 2, 16.2, { align: 'center' })
+      doc.text(titreTypeDocument(facture.type_document), 128 + (W - 128 - M) / 2, 16.2, { align: 'center' })
       doc.setTextColor(40, 50, 60)
       doc.setFontSize(8)
       doc.setFont('helvetica', 'bold')
@@ -372,7 +373,13 @@ export default function FactureView() {
 
       doc.setFontSize(7.5)
       doc.setTextColor(120, 130, 140)
-      doc.text('Document non contractuel — Facture proforma émise à titre indicatif.', M, y)
+      doc.text(
+        isFactureDefinitive(facture.type_document)
+          ? 'Facture définitive — document à conserver.'
+          : 'Document non contractuel — Facture proforma émise à titre indicatif.',
+        M,
+        y,
+      )
       y += 9
 
       doc.setFont('helvetica', 'bold')
@@ -383,7 +390,7 @@ export default function FactureView() {
         try { doc.addImage(cachetB64, 'AUTO', W - M - 30, y + 2, 28, 28) } catch { /* ignore */ }
       }
 
-      doc.save(`${facture.numero || 'facture-proforma'}.pdf`)
+      doc.save(`${facture.numero || 'facture'}.pdf`)
       toast.success('PDF téléchargé.')
     } catch (e) {
       console.error(e)
@@ -486,7 +493,7 @@ export default function FactureView() {
               className="inline-block px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-white"
               style={{ background: primary }}
             >
-              Facture proforma
+              {titreTypeDocument(facture.type_document, { uppercase: false })}
             </div>
             <p className="mt-2.5 font-mono text-sm font-bold" style={{ color: primary }}>{facture.numero}</p>
             <p className="mt-1 text-[11px] text-slate-500">{fmtDate(facture.date_emission)}</p>
@@ -565,7 +572,11 @@ export default function FactureView() {
 
         <section className="flex items-end justify-between gap-6 px-8 pb-7 pt-1">
           <div className="max-w-xs text-[10px] leading-relaxed text-slate-500">
-            <p>Document non contractuel — Facture proforma émise à titre indicatif.</p>
+            <p>
+              {isFactureDefinitive(facture.type_document)
+                ? 'Facture définitive — document à conserver.'
+                : 'Document non contractuel — Facture proforma émise à titre indicatif.'}
+            </p>
             {facture.date_echeance && (
               <p className="mt-1">Valable jusqu’au {fmtDate(facture.date_echeance)}.</p>
             )}

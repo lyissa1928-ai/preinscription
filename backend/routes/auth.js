@@ -992,4 +992,128 @@ router.get('/options-public', (req, res) => {
   });
 });
 
+function phonesMatch(a, b) {
+  const na = normalizeTelephoneForUniqueness(a);
+  const nb = normalizeTelephoneForUniqueness(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const sa = na.slice(-9);
+  const sb = nb.slice(-9);
+  return sa.length >= 8 && sa === sb;
+}
+
+// POST /api/auth/reinitialiser-mot-de-passe-staff — public, personnel (hors étudiants)
+// Matricule + téléphone → mot de passe temporaire (changement obligatoire à la connexion).
+router.post('/reinitialiser-mot-de-passe-staff', resetPwdLimiter, (req, res) => {
+  const { generateTempPassword } = require('../utils/accountLock');
+  const m = normalizeMatricule(req.body?.matricule);
+  const tel = String(req.body?.telephone || '').trim();
+  if (!m || m.length < 4) {
+    return res.status(400).json({ message: 'Matricule invalide.' });
+  }
+  if (!tel || normalizeTelephoneForUniqueness(tel).length < 8) {
+    return res.status(400).json({ message: 'Numéro de téléphone invalide.' });
+  }
+
+  const user = (db.get('utilisateurs').value() || []).find(
+    (u) => normalizeMatricule(u.matricule) === m,
+  );
+  const failGeneric = () => {
+    logSecurityEvent(req, 'auth_reset_staff_failed', { matricule: m }, 'warning');
+    return res.status(400).json({
+      message: 'Matricule ou téléphone incorrect, ou compte non éligible.',
+    });
+  };
+
+  if (!user || user.role === 'etudiant' || user.actif === false) return failGeneric();
+  if (!phonesMatch(user.telephone, tel)) return failGeneric();
+
+  const plain = generateTempPassword(12);
+  const hash = bcrypt.hashSync(plain, 10);
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    mot_de_passe: hash,
+    must_change_password: true,
+    password_reset_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).write();
+
+  logSecurityEvent(req, 'auth_reset_staff_ok', { user_id: user.id, role: user.role }, 'warning');
+  return res.json({
+    message:
+      'Mot de passe temporaire généré. Connectez-vous puis changez-le immédiatement. Conservez-le en lieu sûr.',
+    mot_de_passe_temporaire: plain,
+    email: user.email,
+  });
+});
+
+// PUT /api/auth/profil — infos personnelles (tous rôles authentifiés)
+router.put('/profil', authMiddleware, (req, res) => {
+  const user = db.get('utilisateurs').find({ id: req.user.id }).value();
+  if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+
+  const prenom = trimStr(req.body?.prenom);
+  const nom = trimStr(req.body?.nom);
+  const telephone = trimStr(req.body?.telephone);
+  const adresse = trimStr(req.body?.adresse);
+  const date_naissance = req.body?.date_naissance != null ? String(req.body.date_naissance).trim() || null : undefined;
+
+  if (!prenom || !nom) {
+    return res.status(400).json({ message: 'Prénom et nom sont obligatoires.' });
+  }
+  if (telephone && normalizeTelephoneForUniqueness(telephone).length < 8) {
+    return res.status(400).json({ message: 'Téléphone invalide.' });
+  }
+  if (telephone && telephoneTaken(normalizeTelephoneForUniqueness(telephone), user.id)) {
+    return res.status(409).json({ message: 'Ce numéro de téléphone est déjà utilisé.' });
+  }
+
+  const patch = {
+    prenom,
+    nom,
+    telephone: telephone || '',
+    adresse: adresse || '',
+    updated_at: new Date().toISOString(),
+  };
+  if (date_naissance !== undefined) patch.date_naissance = date_naissance;
+
+  db.get('utilisateurs').find({ id: user.id }).assign(patch).write();
+  const updated = db.get('utilisateurs').find({ id: user.id }).value();
+  return res.json({
+    message: 'Profil mis à jour.',
+    utilisateur: buildMeResponse(updated, req),
+  });
+});
+
+// PUT /api/auth/mot-de-passe — changer le mot de passe (connecté)
+router.put('/mot-de-passe', authMiddleware, (req, res) => {
+  const ancien = String(req.body?.ancien_mot_de_passe || '');
+  const nouveau = String(req.body?.nouveau_mot_de_passe || '');
+  const confirmation = String(req.body?.confirmation || '');
+  if (!ancien || !nouveau || !confirmation) {
+    return res.status(400).json({ message: 'Ancien mot de passe, nouveau et confirmation requis.' });
+  }
+  if (nouveau !== confirmation) {
+    return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
+  }
+  const vp = validatePasswordPolicy(nouveau);
+  if (!vp.ok) return res.status(400).json({ message: vp.message, code: 'PASSWORD_POLICY' });
+
+  const user = db.get('utilisateurs').find({ id: req.user.id }).value();
+  if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+  if (!bcrypt.compareSync(ancien, user.mot_de_passe)) {
+    return res.status(400).json({ message: 'Mot de passe actuel incorrect.' });
+  }
+  if (nouveau === ancien) {
+    return res.status(400).json({ message: 'Le nouveau mot de passe doit être différent.' });
+  }
+
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    mot_de_passe: bcrypt.hashSync(nouveau, 10),
+    must_change_password: false,
+    updated_at: new Date().toISOString(),
+  }).write();
+  revokeAllRefreshTokensForUser(user.id);
+  return res.json({ message: 'Mot de passe mis à jour. Reconnectez-vous sur les autres appareils si besoin.' });
+});
+
 module.exports = router;

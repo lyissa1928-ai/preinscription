@@ -73,6 +73,7 @@ const MENUS = {
     { label: 'Journal d’audit', to: '/admin/audit-logs', icon: ICONS.audit },
     { label: 'Sécurité', to: '/admin/security-events', icon: ICONS.shield },
     { label: 'Maintenance', to: '/admin/maintenance', icon: ICONS.settings },
+    { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   responsable: [
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
@@ -85,11 +86,12 @@ const MENUS = {
         loc.pathname === '/responsable'
         && new URLSearchParams(loc.search).get('tab') !== 'conditions',
     },
-    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Préinscriptions à traiter', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
     { label: 'Guichet', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Formations', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
+    { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   agent_admin: [
     { label: 'Tableau de bord', to: '/agent-admin', icon: ICONS.dashboard, exact: true },
@@ -97,24 +99,28 @@ const MENUS = {
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
+    { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   comptable: [
     { label: 'Tableau de bord', to: '/comptable', icon: ICONS.dashboard, exact: true },
-    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Préinscriptions à traiter', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
     { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   controleur_qualite: [
     { label: 'Tableau de bord', to: '/qualite', icon: ICONS.dashboard, exact: true },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   etudiant: [
     { label: 'Tableau de bord', to: '/dashboard', icon: ICONS.dashboard },
     { label: 'Préinscription', to: '/preinscription', icon: ICONS.preinscription },
     { label: 'Demande proforma', to: '/demande-proforma', icon: ICONS.demandesListe },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
+    { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
     { label: 'Mes identifiants', to: '/mes-acces', icon: ICONS.identifiants },
   ],
 }

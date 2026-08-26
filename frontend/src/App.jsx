@@ -49,9 +49,11 @@ import {
   ChatPage,
   StaffChatDocuments,
   ResetPasswordMatricule,
+  ResetPasswordStaff,
   VerifyEmail,
   ForgotPasswordEmail,
   ResetPasswordEmail,
+  ProfilPage,
 } from './lazyPages'
 import RedirectLettreDemandeDeprecated from './pages/RedirectLettreDemandeDeprecated'
 import ChatbotWidget from './components/ChatbotWidget'
@@ -113,6 +115,7 @@ function AppRoutes() {
       <Route path="/register" element={<Navigate to="/inscription" replace />} />
       <Route path="/inscription" element={user ? <Navigate to={homeRedirect()} /> : <Register />} />
       <Route path="/mot-de-passe-oublie-matricule" element={<ResetPasswordMatricule />} />
+      <Route path="/mot-de-passe-oublie-personnel" element={<ResetPasswordStaff />} />
       <Route path="/verifier-email" element={<VerifyEmail />} />
       <Route path="/mot-de-passe-oublie-email" element={<ForgotPasswordEmail />} />
       <Route path="/reinitialiser-mot-de-passe-email" element={<ResetPasswordEmail />} />
@@ -120,6 +123,7 @@ function AppRoutes() {
 
       {/* ─── Pages avec sidebar (layout authentifié) ─────── */}
       <Route element={<AuthenticatedLayout />}>
+        <Route path="/profil" element={<PrivateRoute><ProfilPage /></PrivateRoute>} />
         {/* Étudiant */}
         <Route path="/dashboard" element={<PrivateRoute roles={['etudiant']}><EtudiantDashboard /></PrivateRoute>} />
         <Route path="/bienvenue-compte" element={<PrivateRoute roles={['etudiant']}><BienvenueCompte /></PrivateRoute>} />

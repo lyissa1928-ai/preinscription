@@ -359,6 +359,7 @@ router.get('/dossiers', (req, res) => {
 });
 
 router.get('/statistiques', (req, res) => {
+  const { topFormationsDemandees } = require('../utils/statsHelpers');
   const formationIds = getEtabFormationIds(req);
   const etabId = req.user.role === 'admin' ? null : req.user.etablissement_id;
 
@@ -384,6 +385,63 @@ router.get('/statistiques', (req, res) => {
   });
 
   const global = counts(dossiers);
+
+  const demandesSorted = [...demandes].sort(
+    (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+  );
+  const demandes_recentes = demandesSorted.slice(0, 6).map((d) => ({
+    id: d.id,
+    reference: d.reference,
+    prenom: d.prenom,
+    nom: d.nom,
+    email: d.email,
+    telephone: d.telephone,
+    formation_titre: d.formation_titre,
+    type_formation: d.type_formation,
+    statut: d.statut,
+    montant_ttc: d.facture?.montant_ttc ?? null,
+    created_at: d.created_at,
+  }));
+
+  const { isFactureSupprimee } = require('../utils/factureVisibility');
+  let factures = db.get('factures').value() || [];
+  if (etabId) {
+    const formById = _formationsMap();
+    factures = factures.filter((f) => {
+      if (isFactureSupprimee(f)) return false;
+      if (f.formation_id) {
+        const fo = formById.get(f.formation_id) || formById.get(Number(f.formation_id));
+        if (fo && Number(fo.etablissement_id) === Number(etabId)) return true;
+      }
+      if (f.dossier_id) {
+        const dos = db.get('dossiers').find({ id: f.dossier_id }).value();
+        if (dos && dossierAppartientAEtablissement(dos, etabId)) return true;
+      }
+      if (f.etablissement_snapshot?.id != null && Number(f.etablissement_snapshot.id) === Number(etabId)) {
+        return true;
+      }
+      return false;
+    });
+  } else {
+    factures = factures.filter((f) => !isFactureSupprimee(f));
+  }
+  factures.sort((a, b) => new Date(b.date_emission || 0) - new Date(a.date_emission || 0));
+  const factures_recentes = factures.slice(0, 6).map((f) => {
+    const et = f.etudiant_snapshot || {};
+    return {
+      id: f.id,
+      numero: f.numero,
+      prenom: et.prenom,
+      nom: et.nom,
+      formation_titre: f.formation_snapshot?.titre || null,
+      montant_ttc: f.montant_ttc,
+      statut: f.statut,
+      date_emission: f.date_emission,
+      dossier_id: f.dossier_id || null,
+    };
+  });
+  const montant_total = factures.reduce((s, f) => s + (Number(f.montant_ttc) || 0), 0);
+
   res.json({
     fad: counts(fad),
     presentiel: counts(presentiel),
@@ -392,7 +450,11 @@ router.get('/statistiques', (req, res) => {
       ? Math.round((global.acceptes / (global.acceptes + global.refuses)) * 1000) / 10
       : null,
     demandes_proforma: demandes.length,
-    nouvelles_demandes: demandes.filter(d => d.statut === 'nouvelle' || d.statut === 'en_attente').length
+    nouvelles_demandes: demandes.filter(d => d.statut === 'nouvelle' || d.statut === 'en_attente').length,
+    formations_plus_demandees: topFormationsDemandees(demandes, 8),
+    demandes_recentes,
+    factures: { total: factures.length, montant_total },
+    factures_recentes,
   });
 });
 

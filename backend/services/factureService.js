@@ -78,7 +78,13 @@ function syncStoredFactureById(factureId) {
   return { ...facture, ...synced };
 }
 
-function genererOuRecupererFactureDossier(dossierId) {
+function normalizeTypeDocument(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (v === 'definitive' || v === 'définitive' || v === 'def') return 'definitive';
+  return 'proforma';
+}
+
+function genererOuRecupererFactureDossier(dossierId, options = {}) {
   const id = parseInt(dossierId, 10);
   const dossierRow = db.get('dossiers').find({ id }).value();
   if (!dossierRow) return null;
@@ -87,6 +93,10 @@ function genererOuRecupererFactureDossier(dossierId) {
   if (!formation) return null;
 
   const etabSnap = snapshotFromFormation(formation);
+  const typeDocOpt =
+    options.type_document != null || options.nature != null
+      ? normalizeTypeDocument(options.type_document || options.nature)
+      : null;
 
   const existing = db.get('factures').find({ dossier_id: id }).value();
   if (existing) {
@@ -108,10 +118,13 @@ function genererOuRecupererFactureDossier(dossierId) {
         }).write();
       }
     }
+    if (typeDocOpt && existing.type_document !== typeDocOpt) {
+      db.get('factures').find({ id: existing.id }).assign({ type_document: typeDocOpt }).write();
+    }
     const current = db.get('factures').find({ id: existing.id }).value();
     const synced = syncFactureMontantsFromFormation(current, formation);
     db.get('factures').find({ id: existing.id }).assign(synced).write();
-    return { ...current, ...synced };
+    return { ...current, ...synced, type_document: current.type_document || typeDocOpt || 'proforma' };
   }
 
   const etudiant = dossierRow.etudiant_id
@@ -134,6 +147,7 @@ function genererOuRecupererFactureDossier(dossierId) {
     dossier_id: id,
     etudiant_id: dossierRow.etudiant_id,
     formation_id: formation.id,
+    type_document: typeDocOpt || 'proforma',
     date_emission: new Date().toISOString(),
     date_echeance: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     lignes: mapLignesFacture(tarif),
@@ -165,6 +179,7 @@ function genererOuRecupererFactureDossier(dossierId) {
 module.exports = {
   genererOuRecupererFactureDossier,
   genererNumeroFacture,
+  normalizeTypeDocument,
   syncFactureMontantsFromFormation,
   syncStoredFactureById,
   buildFormationSnapshot,

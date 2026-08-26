@@ -496,6 +496,124 @@ router.get('/:id/acceptes-par-formation', etabFacturesAccess, (req, res) => {
   });
 });
 
+// GET /api/etablissements/:id/acceptes-par-classe/export-xlsx?niveau=L1&type=presentiel
+router.get('/:id/acceptes-par-classe/export-xlsx', etabFacturesAccess, async (req, res) => {
+  const etabId = parseInt(req.params.id, 10);
+  if (Number.isNaN(etabId)) {
+    return res.status(400).json({ message: 'Identifiant établissement invalide.' });
+  }
+  const etab = db.get('etablissements').find({ id: etabId }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+
+  const niveauQ = String(req.query.niveau || '').trim();
+  const typeFilterRaw = normalizeFormationType(req.query.type || '');
+  const typeFilter = ['presentiel', 'en_ligne'].includes(typeFilterRaw) ? typeFilterRaw : '';
+  if (!niveauQ) {
+    return res.status(400).json({ message: 'Paramètre niveau requis (ex. L1, M2, BST).' });
+  }
+
+  const { EXPORT_LIMITS, capArray } = require('../utils/exportLimits');
+  const formations = (db.get('formations').value() || []).filter((f) => {
+    if (Number(f.etablissement_id) !== etabId) return false;
+    if (String(f.niveau || '').trim().toLowerCase() !== niveauQ.toLowerCase()) return false;
+    if (typeFilter && String(f.type) !== typeFilter) return false;
+    return true;
+  });
+  if (formations.length === 0) {
+    return res.status(400).json({ message: 'Aucune formation pour ce niveau / type.' });
+  }
+
+  const formIds = new Set(formations.map((f) => Number(f.id)));
+  const utilisateurs = db.get('utilisateurs').value() || [];
+  let rows = (db.get('dossiers').value() || [])
+    .filter((d) => d.statut === 'accepte' && formIds.has(Number(d.formation_id)))
+    .map((d) => {
+      const u = utilisateurs.find((x) => x.id === d.etudiant_id) || {};
+      const fo = formations.find((f) => Number(f.id) === Number(d.formation_id)) || {};
+      return {
+        prenom: u.prenom || '',
+        nom: u.nom || '',
+        email: u.email || '',
+        telephone: u.telephone || '',
+        formation: fo.titre || '',
+        numero_dossier: d.numero_dossier || '',
+        date_acceptation: d.date_acceptation || d.updated_at || '',
+      };
+    })
+    .sort((a, b) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`, 'fr'));
+
+  const capped = capArray(rows, EXPORT_LIMITS.maxExcelRowsPerSheet, 'Lignes');
+  rows = capped.items;
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'UniPortail';
+  wb.created = new Date();
+  const primary = hexToArgb(etab.couleur_primaire, 'FFE5742A');
+  const logoImageId = await prepareExcelLogoImageId(wb, etab.logo_url);
+  const typeLabel = typeFilter === 'en_ligne' ? 'FAD / Distance' : typeFilter === 'presentiel' ? 'Présentiel' : 'Tous types';
+
+  const sheet = wb.addWorksheet(safeSheetName(`${niveauQ}-${typeFilter || 'tous'}`, 'Classe'));
+  sheet.views = [{ state: 'frozen', ySplit: 5 }];
+  sheet.getRow(1).height = 48;
+  ;[14, 16, 16, 28, 16, 40, 18, 16].forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
+
+  sheet.mergeCells('B1:H1');
+  sheet.getCell('B1').value = etab.nom || 'Établissement';
+  sheet.getCell('B1').font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+  sheet.getCell('B1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: primary } };
+  sheet.getCell('B1').alignment = { vertical: 'middle' };
+
+  sheet.mergeCells('B2:H2');
+  sheet.getCell('B2').value = `Classe : ${niveauQ} — ${typeLabel}`;
+  sheet.getCell('B2').font = { bold: true, size: 11, color: { argb: 'FF1F2937' } };
+
+  sheet.mergeCells('B3:H3');
+  sheet.getCell('B3').value = [
+    etab.adresse,
+    etab.telephone && `Tél. ${etab.telephone}`,
+    (etab.email_contact || etab.email) && `E-mail ${etab.email_contact || etab.email}`,
+  ].filter(Boolean).join('  ·  ');
+  sheet.getCell('B3').font = { size: 9, color: { argb: 'FF6B7280' } };
+
+  sheet.mergeCells('B4:H4');
+  sheet.getCell('B4').value = `Préinscriptions acceptées — ${new Date().toLocaleDateString('fr-FR')}${capped.truncated ? ` (${capped.message})` : ''}`;
+  sheet.getCell('B4').font = { italic: true, size: 9, color: { argb: 'FF6B7280' } };
+
+  if (logoImageId) {
+    sheet.addImage(logoImageId, { tl: { col: 0, row: 0 }, ext: { width: 56, height: 56 } });
+  }
+
+  ;['Prénom', 'Nom', 'Email', 'Téléphone', 'Formation', 'N° dossier', 'Date acceptation'].forEach((h, i) => {
+    const cell = sheet.getCell(5, i + 1);
+    cell.value = h;
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: primary } };
+  });
+
+  if (rows.length === 0) {
+    sheet.getCell(6, 1).value = 'Aucun étudiant accepté pour cette classe';
+  } else {
+    rows.forEach((r, idx) => {
+      const row = 6 + idx;
+      sheet.getCell(row, 1).value = r.prenom;
+      sheet.getCell(row, 2).value = r.nom;
+      sheet.getCell(row, 3).value = r.email;
+      sheet.getCell(row, 4).value = r.telephone;
+      sheet.getCell(row, 5).value = r.formation;
+      sheet.getCell(row, 6).value = r.numero_dossier;
+      sheet.getCell(row, 7).value = r.date_acceptation
+        ? new Date(r.date_acceptation).toLocaleDateString('fr-FR')
+        : '';
+    });
+  }
+
+  const slugNiv = String(niveauQ).replace(/\s+/g, '-').toLowerCase();
+  res.setHeader('Content-Disposition', `attachment; filename="classe-${slugNiv}-${typeFilter || 'tous'}.xlsx"`);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  await wb.xlsx.write(res);
+  return res.end();
+});
+
 // GET /api/etablissements/:id/acceptes-par-formation/export-xlsx?filiere_id=12
 // Export d'une filière : une feuille par formation.
 router.get('/:id/acceptes-par-formation/export-xlsx', etabFacturesAccess, async (req, res) => {
@@ -637,6 +755,162 @@ router.get('/:id/acceptes-par-formation/export-xlsx', etabFacturesAccess, async 
   res.setHeader(
     'Content-Disposition',
     `attachment; filename="acceptes-${String(filiere.nom || 'filiere').replace(/\s+/g, '-').toLowerCase()}${typeFilter ? `-${typeFilter}` : ''}.xlsx"`
+  );
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  await wb.xlsx.write(res);
+  return res.end();
+});
+
+// GET /api/etablissements/:id/rapport-etablissement/export-xlsx
+// Une seule feuille : logo + coordonnées établissement + liste des demandes.
+router.get('/:id/rapport-etablissement/export-xlsx', etabFacturesAccess, async (req, res) => {
+  const etabId = parseInt(req.params.id, 10);
+  if (Number.isNaN(etabId)) {
+    return res.status(400).json({ message: 'Identifiant établissement invalide.' });
+  }
+
+  const etab = db.get('etablissements').find({ id: etabId }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+
+  const { getFormationIdsForEtab, demandeAppartientAEtablissement } = require('../utils/etablissementScope');
+  const { EXPORT_LIMITS, capArray } = require('../utils/exportLimits');
+
+  const formationIds = getFormationIdsForEtab(db.get('formations').value(), etabId) || [];
+  let demandes = (db.get('demandes_proforma').value() || []).filter((d) =>
+    demandeAppartientAEtablissement(d, etabId, formationIds),
+  );
+  demandes.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  const capped = capArray(demandes, EXPORT_LIMITS.maxExcelRowsPerSheet, 'Demandes');
+  demandes = capped.items;
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'UniPortail';
+  wb.created = new Date();
+  wb.title = `Rapport ${etab.nom || 'établissement'}`;
+  const primary = hexToArgb(etab.couleur_primaire, 'FFE5742A');
+  const logoImageId = await prepareExcelLogoImageId(wb, etab.logo_url);
+
+  const statutLabel = (s) => {
+    const map = {
+      acceptee: 'Acceptée',
+      refusee: 'Refusée',
+      nouvelle: 'Nouvelle',
+      en_attente: 'En attente',
+      vue: 'Vue',
+      traitee: 'Traitée',
+    };
+    return map[s] || s || '—';
+  };
+  const typeLabel = (t) => (t === 'en_ligne' ? 'FAD' : t === 'presentiel' ? 'Présentiel' : t || '—');
+  const fmtDate = (d) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    return Number.isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('fr-FR');
+  };
+
+  const sheet = wb.addWorksheet('Rapport');
+  sheet.views = [{ state: 'frozen', ySplit: 9 }];
+  sheet.getRow(1).height = 52;
+  sheet.getRow(2).height = 18;
+  ;[18, 14, 14, 28, 16, 12, 42, 14, 12, 12].forEach((w, i) => {
+    sheet.getColumn(i + 1).width = w;
+  });
+
+  // En-tête établissement (logo + identité + contacts)
+  sheet.mergeCells('B1:J1');
+  sheet.getCell('B1').value = etab.nom || 'Établissement';
+  sheet.getCell('B1').font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+  sheet.getCell('B1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: primary } };
+  sheet.getCell('B1').alignment = { vertical: 'middle', horizontal: 'left' };
+
+  sheet.mergeCells('B2:J2');
+  sheet.getCell('B2').value = [
+    etab.adresse ? `Adresse : ${etab.adresse}` : null,
+    etab.telephone ? `Tél. : ${etab.telephone}` : null,
+    (etab.email_contact || etab.email) ? `E-mail : ${etab.email_contact || etab.email}` : null,
+    etab.site_web ? `Site : ${etab.site_web}` : null,
+  ]
+    .filter(Boolean)
+    .join('  ·  ') || 'Coordonnées non renseignées';
+  sheet.getCell('B2').font = { size: 10, color: { argb: 'FF1F2937' } };
+  sheet.getCell('B2').alignment = { vertical: 'middle', wrapText: true };
+  sheet.getRow(2).height = 28;
+
+  sheet.mergeCells('B3:J3');
+  sheet.getCell('B3').value = [
+    etab.ninea ? `NINEA : ${etab.ninea}` : null,
+    etab.rc ? `RC : ${etab.rc}` : null,
+    etab.arrete ? `Arrêté : ${etab.arrete}` : null,
+  ]
+    .filter(Boolean)
+    .join('  ·  ');
+  sheet.getCell('B3').font = { size: 9, color: { argb: 'FF6B7280' } };
+
+  sheet.mergeCells('B4:J4');
+  sheet.getCell('B4').value = `Rapport préinscriptions — généré le ${new Date().toLocaleString('fr-FR')} — UniPortail${
+    capped.truncated ? ` (${capped.message})` : ''
+  }`;
+  sheet.getCell('B4').font = { italic: true, size: 9, color: { argb: 'FF6B7280' } };
+
+  if (logoImageId) {
+    sheet.addImage(logoImageId, {
+      tl: { col: 0, row: 0 },
+      ext: { width: 64, height: 64 },
+    });
+  }
+
+  // Ligne vide puis en-têtes tableau
+  const headerRow = 6;
+  const headers = [
+    'Référence',
+    'Prénom',
+    'Nom',
+    'Email',
+    'Téléphone',
+    'Modalité',
+    'Formation',
+    'Montant (FCFA)',
+    'Statut',
+    'Date',
+  ];
+  headers.forEach((h, i) => {
+    const cell = sheet.getCell(headerRow, i + 1);
+    cell.value = h;
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: primary } };
+    cell.alignment = { vertical: 'middle', wrapText: true };
+  });
+  sheet.getRow(headerRow).height = 22;
+
+  if (demandes.length === 0) {
+    sheet.getCell(headerRow + 1, 1).value = 'Aucune demande de préinscription pour cet établissement';
+  } else {
+    demandes.forEach((d, idx) => {
+      const r = headerRow + 1 + idx;
+      sheet.getCell(r, 1).value = d.reference || '';
+      sheet.getCell(r, 2).value = d.prenom || '';
+      sheet.getCell(r, 3).value = d.nom || '';
+      sheet.getCell(r, 4).value = d.email || '';
+      sheet.getCell(r, 5).value = d.telephone || '';
+      sheet.getCell(r, 6).value = typeLabel(d.type_formation);
+      sheet.getCell(r, 7).value = d.formation_titre || '';
+      sheet.getCell(r, 8).value = d.facture?.montant_ttc != null ? Number(d.facture.montant_ttc) : '';
+      sheet.getCell(r, 9).value = statutLabel(d.statut);
+      sheet.getCell(r, 10).value = fmtDate(d.created_at);
+    });
+  }
+
+  const slug = String(etab.nom || 'etablissement')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase()
+    .slice(0, 40);
+
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="rapport-${slug || 'etablissement'}-${etabId}.xlsx"`,
   );
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   await wb.xlsx.write(res);

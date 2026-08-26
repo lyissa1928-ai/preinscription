@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { NATIONALITES_SUGGESTIONS_FR } from '../../data/nationalites'
 import { DashboardPage, DashboardHero, Panel } from '../../components/dashboard/DashboardChrome'
+import { normalizeTypeDocument, titreTypeDocument } from '../../utils/factureTypeDocument'
 
 const DIPLOMES = [
   'Baccalauréat',
@@ -48,6 +49,8 @@ const EMPTY = {
  */
 export default function StaffPreinscriptionGuichet() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const natureFacture = normalizeTypeDocument(searchParams.get('nature'))
   const isAdmin = user?.role === 'admin'
   const [etablissements, setEtablissements] = useState([])
   const [etabId, setEtabId] = useState(isAdmin ? '' : user?.etablissement_id ?? '')
@@ -156,6 +159,8 @@ export default function StaffPreinscriptionGuichet() {
         ...form,
         formation_id: Number(formationId),
         numero_passeport: form.numero_passeport || form.numero_piece,
+        type_document: natureFacture,
+        nature: natureFacture,
       })
       setResult(data)
       toast.success(data.message)
@@ -178,6 +183,7 @@ export default function StaffPreinscriptionGuichet() {
   if (result?.dossier) {
     const d = result.dossier
     const facture = result.facture
+    const titreDoc = titreTypeDocument(facture?.type_document || natureFacture, { uppercase: false })
     return (
       <DashboardPage>
         <DashboardHero
@@ -193,7 +199,7 @@ export default function StaffPreinscriptionGuichet() {
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Link to={`/facture/${d.id}`} target="_blank" className="btn-primary text-center">
-              Facture proforma
+              {titreDoc}
             </Link>
             <Link to={`/attestation/${d.id}`} target="_blank" className="btn-outline text-center">
               Attestation de préinscription
@@ -204,7 +210,7 @@ export default function StaffPreinscriptionGuichet() {
           </p>
           {facture?.numero && (
             <p className="text-xs text-slate-500">
-              Proforma {facture.numero} · Total {fmt(facture.montant_ttc)} FCFA (tarif catalogue)
+              {titreDoc} {facture.numero} · Total {fmt(facture.montant_ttc)} FCFA (tarif catalogue)
             </p>
           )}
           <div className="flex flex-wrap gap-2">
@@ -224,7 +230,7 @@ export default function StaffPreinscriptionGuichet() {
     <DashboardPage>
       <DashboardHero
         eyebrow="Accueil scolarité"
-        title="Préinscription & facture proforma"
+        title={`Préinscription & ${titreTypeDocument(natureFacture, { uppercase: false }).toLowerCase()}`}
         subtitle="Mode → formation → bénéficiaire → générer → prévisualiser / imprimer → archiver."
       />
 

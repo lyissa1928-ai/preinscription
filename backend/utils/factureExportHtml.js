@@ -33,6 +33,10 @@ function oneInvoiceHtml(facture) {
   const fo = facture.formation_snapshot || {};
   const p1 = eb.couleur_primaire || '#1e3a8a';
   const p2 = eb.couleur_secondaire || '#4338ca';
+  const typeRaw = String(facture.type_document || '').toLowerCase();
+  const isDef = typeRaw === 'definitive' || typeRaw === 'définitive' || typeRaw === 'def';
+  const titreDoc = isDef ? 'FACTURE DÉFINITIVE' : 'FACTURE PROFORMA';
+  const sousTitre = isDef ? 'Facture définitive' : 'Facture proforma — préinscription';
   const lignes = Array.isArray(facture.lignes) ? facture.lignes : [];
   const lignesSupp = Array.isArray(facture.lignes_supplementaires) ? facture.lignes_supplementaires : [];
 
@@ -67,14 +71,14 @@ function oneInvoiceHtml(facture) {
     <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;">
       <div>
         <div style="font-size:20px;font-weight:800;">${esc(eb.nom || 'Établissement')}</div>
-        <div style="opacity:0.9;font-size:11px;margin-top:4px;">Facture proforma — préinscription</div>
+        <div style="opacity:0.9;font-size:11px;margin-top:4px;">${esc(sousTitre)}</div>
         <div style="opacity:0.85;font-size:11px;margin-top:8px;line-height:1.5;">
           ${eb.adresse ? `<div>${esc(eb.adresse)}</div>` : ''}
           <div>${esc([eb.email_contact, eb.telephone].filter(Boolean).join(' · ') || '—')}</div>
         </div>
       </div>
       <div style="text-align:right;">
-        <div style="display:inline-block;background:#facc15;color:#111827;font-weight:900;font-size:16px;padding:8px 20px;border-radius:10px;margin-bottom:8px;">FACTURE PROFORMA</div>
+        <div style="display:inline-block;background:#facc15;color:#111827;font-weight:900;font-size:16px;padding:8px 20px;border-radius:10px;margin-bottom:8px;">${esc(titreDoc)}</div>
         <div style="font-size:12px;opacity:0.9;">N° <strong style="font-family:monospace;color:#fff;">${esc(facture.numero)}</strong></div>
         <div style="font-size:12px;opacity:0.9;">Émission : <strong style="color:#fff;">${esc(fmtDate(facture.date_emission))}</strong></div>
         <div style="font-size:12px;opacity:0.9;">Valable jusqu'au : <strong style="color:#fff;">${esc(fmtDate(facture.date_echeance))}</strong></div>

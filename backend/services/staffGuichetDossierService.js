@@ -98,8 +98,12 @@ function creerDossierGuichet({ staffUser, body }) {
     formationId: fid,
     etablissementId: etabId,
   });
+  const typeOpts = {
+    type_document: body.type_document || body.nature || 'proforma',
+  };
+
   if (existing) {
-    const facture = genererOuRecupererFactureDossier(existing.id);
+    const facture = genererOuRecupererFactureDossier(existing.id, typeOpts);
     return {
       ok: true,
       reused: true,
@@ -167,7 +171,7 @@ function creerDossierGuichet({ staffUser, body }) {
   };
 
   db.get('dossiers').push(dossier).write();
-  const facture = genererOuRecupererFactureDossier(id);
+  const facture = genererOuRecupererFactureDossier(id, typeOpts);
 
   return {
     ok: true,

@@ -34,7 +34,7 @@ export default function AdminFacturesEtabPage() {
       <DashboardHero
         eyebrow="Comptabilité"
         title="Factures par établissement"
-        subtitle="Même outil que pour le personnel : liste, export HTML, sélection multiple et suppression définitive en base. Choisissez un établissement."
+        subtitle="Liste paginée (10), PDF individuel ou sélection, suppression."
       />
 
       <div className="mb-6 max-w-xl">
@@ -58,11 +58,14 @@ export default function AdminFacturesEtabPage() {
 
       {etabId ? (
         <div className="card overflow-hidden p-6">
-          <TabFacturesEtab etabId={parseInt(etabId, 10)} />
+          <TabFacturesEtab
+            etabId={parseInt(etabId, 10)}
+            etabNom={etablissements.find((e) => String(e.id) === String(etabId))?.nom}
+          />
         </div>
       ) : (
         <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-500">
-          Sélectionnez un établissement pour afficher et gérer ses factures proforma.
+          Sélectionnez un établissement.
         </p>
       )}
     </DashboardPage>

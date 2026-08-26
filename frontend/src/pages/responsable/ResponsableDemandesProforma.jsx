@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
@@ -6,21 +6,20 @@ import { mediaUrl } from '../../utils/mediaUrl'
 import { useAuth } from '../../context/AuthContext'
 import { actsAsResponsable } from '../../utils/roles'
 import { chatWithStudentUrl } from '../../utils/chatWithStudentUrl'
-import CreerProformaModal from '../../components/CreerProformaModal'
+import { TabAcceptesParFormation } from '../admin/TabAcceptesParFormation'
 
-const fmt = n => new Intl.NumberFormat('fr-FR').format(n || 0)
+const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n || 0)
 
 function justifUrl(rel) {
   if (!rel) return '#'
-  const p = String(rel).replace(/^\//, '')
-  return mediaUrl(`/uploads/${p}`)
+  return mediaUrl(`/uploads/${String(rel).replace(/^\//, '')}`)
 }
+
+const isPending = (s) => s === 'nouvelle' || s === 'en_attente' || s === 'vue'
 
 export default function ResponsableDemandesProforma() {
   const { user } = useAuth()
-  // Chat avec le candidat : rôle responsable OU fonction « responsable d'établissement » désignée
-  const canChatterEtudiant =
-    actsAsResponsable(user) && user?.etablissement_id != null
+  const canChatterEtudiant = actsAsResponsable(user) && user?.etablissement_id != null
   const [demandes, setDemandes] = useState([])
   const [pagination, setPagination] = useState({})
   const [page, setPage] = useState(1)
@@ -28,11 +27,13 @@ export default function ResponsableDemandesProforma() {
   const [modal, setModal] = useState(null)
   const [motifRefus, setMotifRefus] = useState('')
   const [saving, setSaving] = useState(false)
-  const [creerOpen, setCreerOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  /** a_traiter | acceptations | listes */
+  const [onglet, setOnglet] = useState('a_traiter')
 
   const load = (p = page) => {
     setLoading(true)
-    axios.get(`/api/responsable/demandes-proforma?page=${p}&limit=15`)
+    axios.get(`/api/responsable/demandes-proforma?page=${p}&limit=20`)
       .then(({ data }) => {
         setDemandes(data.demandes || [])
         setPagination(data.pagination || {})
@@ -43,9 +44,15 @@ export default function ResponsableDemandesProforma() {
 
   useEffect(() => { load(page) }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const visible = useMemo(() => {
+    if (onglet === 'a_traiter') return demandes.filter((d) => isPending(d.statut))
+    if (onglet === 'acceptations') return demandes.filter((d) => d.statut === 'acceptee')
+    return demandes
+  }, [demandes, onglet])
+
   const marquerVue = (id) => {
     axios.put(`/api/responsable/demandes-proforma/${id}/statut`, { statut: 'vue' })
-      .then(() => setDemandes(prev => prev.map(d => d.id === id ? { ...d, statut: 'vue' } : d)))
+      .then(() => setDemandes((prev) => prev.map((d) => (d.id === id ? { ...d, statut: 'vue' } : d))))
       .catch(() => {})
   }
 
@@ -65,9 +72,9 @@ export default function ResponsableDemandesProforma() {
     try {
       await axios.put(`/api/responsable/demandes-proforma/${demande.id}/decision`, {
         decision: type === 'accepter' ? 'accepter' : 'refuser',
-        motif_refus: type === 'refuser' ? motifRefus.trim() : undefined
+        motif_refus: type === 'refuser' ? motifRefus.trim() : undefined,
       })
-      toast.success(type === 'accepter' ? 'Demande acceptée — facture proforma et attestation disponibles pour le demandeur.' : 'Demande refusée.')
+      toast.success(type === 'accepter' ? 'Demande acceptée.' : 'Demande refusée.')
       setModal(null)
       load()
     } catch (err) {
@@ -77,133 +84,206 @@ export default function ResponsableDemandesProforma() {
     }
   }
 
+  const exportRapportExcel = async () => {
+    const etabId = user?.etablissement_id
+    if (!etabId) {
+      toast.error('Aucun établissement rattaché.')
+      return
+    }
+    setExporting(true)
+    try {
+      const { data } = await axios.get(
+        `/api/etablissements/${etabId}/rapport-etablissement/export-xlsx`,
+        { responseType: 'blob' },
+      )
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `rapport-etablissement-${etabId}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Rapport Excel téléchargé')
+    } catch {
+      toast.error('Export Excel impossible')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const statutBadge = (s) => {
+    if (s === 'acceptee') return 'bg-emerald-100 text-emerald-800'
+    if (s === 'refusee') return 'bg-red-100 text-red-700'
+    if (isPending(s)) return 'bg-amber-100 text-amber-800'
+    return 'bg-gray-100 text-gray-600'
+  }
+  const statutLabel = (s) => {
+    const m = { acceptee: 'Acceptée', refusee: 'Refusée', nouvelle: 'Nouvelle', en_attente: 'En attente', vue: 'Vue' }
+    return m[s] || s
+  }
+
   return (
-    <main className="max-w-4xl mx-auto px-4 py-8 w-full">
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
+    <main className="mx-auto w-full max-w-6xl px-4 py-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link to="/mon-etablissement" className="text-sm text-gray-500 hover:text-blue-700">← Mon établissement</Link>
-          <h1 className="text-2xl font-bold text-gray-900 mt-2">Demandes de préinscription (proforma)</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Uniquement les demandes de votre établissement. Le candidat ne reçoit la facture proforma et
-            l’attestation de préinscription qu’après votre <strong>acceptation</strong> (ou celle d’un administrateur).
+          <h1 className="text-xl font-black text-gray-900">Préinscriptions à traiter</h1>
+          <p className="text-sm text-gray-500">
+            Dossiers à traiter, acceptations et listes d’étudiants acceptés par formation et niveau.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" className="btn-primary text-sm" onClick={() => setCreerOpen(true)}>
-            Nouvelle facture proforma
-          </button>
-          <Link to="/responsable" className="btn-secondary text-sm">Dossiers complets →</Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {user?.etablissement_id && (
+            <button
+              type="button"
+              className="btn-secondary text-sm disabled:opacity-50"
+              disabled={exporting}
+              onClick={exportRapportExcel}
+            >
+              {exporting ? 'Export…' : 'Excel'}
+            </button>
+          )}
         </div>
       </div>
 
-      <CreerProformaModal open={creerOpen} onClose={() => setCreerOpen(false)} onCreated={() => load(1)} />
+      <div className="mb-4 flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 text-sm font-semibold">
+        {[
+          { id: 'a_traiter', label: 'À traiter' },
+          { id: 'acceptations', label: 'Acceptations' },
+          { id: 'listes', label: 'Listes acceptés' },
+        ].map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setOnglet(t.id)}
+            className={`rounded-lg px-3 py-2 ${onglet === t.id ? 'bg-orange-500 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {loading ? (
-        <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent" /></div>
-      ) : demandes.length === 0 ? (
-        <div className="card text-center py-16 text-gray-400">
-          <div className="text-4xl mb-3">🧾</div>
-          <p>Aucune demande pour cet établissement</p>
+      {onglet === 'listes' ? (
+        user?.etablissement_id ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <TabAcceptesParFormation etabId={user.etablissement_id} />
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">Aucun établissement rattaché.</p>
+        )
+      ) : loading ? (
+        <div className="flex justify-center py-12">
+          <div className="h-9 w-9 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-white py-12 text-center text-sm text-slate-400">
+          {onglet === 'a_traiter' ? 'Aucune préinscription en attente.' : 'Aucune acceptation pour le moment.'}
         </div>
       ) : (
-        <div className="space-y-3">
-          {demandes.map(d => (
-            <div
-              key={d.id}
-              className={`card p-4 border ${d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'border-amber-200 bg-amber-50/50' : 'border-gray-100'}`}
-              onClick={() => (d.statut === 'nouvelle' || d.statut === 'en_attente') && marquerVue(d.id)}
-              role="presentation"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-gray-900">{d.prenom} {d.nom}</span>
-                    {(d.statut === 'nouvelle' || d.statut === 'en_attente') && (
-                      <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">NOUVEAU</span>
-                    )}
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${d.type_formation === 'en_ligne' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {d.type_formation === 'en_ligne' ? 'FAD' : 'Présentiel'}
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium text-gray-700 mt-1">{d.formation_titre}</p>
-                  <p className="text-xs text-gray-500 mt-1">📧 {d.email} · 📞 {d.telephone}</p>
-                  <p className="text-xs text-gray-400 mt-1 font-mono">{d.reference} · {new Date(d.created_at).toLocaleDateString('fr-FR')}</p>
-                  {d.justificatifs && (
-                    <div className="flex flex-wrap gap-2 mt-2 text-xs" onClick={e => e.stopPropagation()}>
-                      <a href={justifUrl(d.justificatifs.diplome)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-semibold">Diplôme</a>
-                      <span className="text-gray-300">|</span>
-                      <a href={justifUrl(d.justificatifs.releve)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-semibold">Relevé</a>
-                      <span className="text-gray-300">|</span>
-                      <a href={justifUrl(d.justificatifs.formation)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-semibold">Formation</a>
-                    </div>
-                  )}
-                  {d.facture?.montant_ttc != null && (
-                    <p className="text-sm font-semibold text-blue-700 mt-2">{fmt(d.facture.montant_ttc)} FCFA</p>
-                  )}
-                </div>
-                <div className="flex flex-col items-stretch sm:items-end gap-2">
-                  {canChatterEtudiant && d.etudiant_id != null && Number(d.etudiant_id) > 0 && (
-                    <Link
-                      to={chatWithStudentUrl(d.etudiant_id, d.prenom, d.nom)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-xs font-bold text-center sm:text-right rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900 hover:bg-emerald-100"
-                    >
-                      💬 Chatter avec le candidat
-                    </Link>
-                  )}
-                  <span className={`text-xs font-semibold px-2 py-1 rounded-full self-start sm:self-end ${
-                    d.statut === 'acceptee' ? 'bg-emerald-100 text-emerald-800'
-                    : d.statut === 'refusee' ? 'bg-red-100 text-red-700'
-                    : d.statut === 'nouvelle' || d.statut === 'en_attente' ? 'bg-amber-100 text-amber-800'
-                    : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {d.statut === 'acceptee' ? 'Acceptée' : d.statut === 'refusee' ? 'Refusée' : d.statut === 'en_attente' ? 'En attente' : d.statut === 'nouvelle' ? 'Nouvelle' : d.statut === 'vue' ? 'Vue' : d.statut}
-                  </span>
-                  {d.statut !== 'acceptee' && d.statut !== 'refusee' && (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); ouvrirDecision(d, 'accepter') }}
-                        className="text-xs font-bold bg-emerald-600 text-white px-3 py-2 rounded-lg hover:bg-emerald-700"
-                      >
-                        Accepter
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); ouvrirDecision(d, 'refuser') }}
-                        className="text-xs font-bold border border-red-300 text-red-700 px-3 py-2 rounded-lg hover:bg-red-50"
-                      >
-                        Refuser
-                      </button>
-                    </div>
-                  )}
-                  {d.statut === 'acceptee' && d.reference && (
-                    <Link
-                      to={`/facture-publique/${d.reference}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-blue-600 hover:underline"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      Voir facture →
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {pagination.totalPages > 1 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
-              <p className="text-sm text-slate-500">{pagination.total} demande(s)</p>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="max-h-[min(62vh,560px)] overflow-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2.5 font-semibold">Candidat</th>
+                  <th className="px-3 py-2.5 font-semibold">Formation</th>
+                  <th className="px-3 py-2.5 font-semibold">Réf.</th>
+                  <th className="px-3 py-2.5 font-semibold">Montant</th>
+                  <th className="px-3 py-2.5 font-semibold">Statut</th>
+                  <th className="px-3 py-2.5 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {visible.map((d) => (
+                  <tr
+                    key={d.id}
+                    className={isPending(d.statut) ? 'bg-amber-50/40' : 'bg-white'}
+                    onClick={() => (d.statut === 'nouvelle' || d.statut === 'en_attente') && marquerVue(d.id)}
+                  >
+                    <td className="px-3 py-2.5">
+                      <div className="font-semibold text-slate-900">{d.prenom} {d.nom}</div>
+                      <div className="text-xs text-slate-500">
+                        {d.type_formation === 'en_ligne' ? 'FAD' : 'Présentiel'}
+                        {d.telephone ? ` · ${d.telephone}` : ''}
+                      </div>
+                    </td>
+                    <td className="max-w-[220px] truncate px-3 py-2.5 text-slate-700" title={d.formation_titre}>
+                      {d.formation_titre}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-slate-500">
+                      {d.reference}
+                      <div className="text-[11px] text-slate-400">
+                        {d.created_at ? new Date(d.created_at).toLocaleDateString('fr-FR') : ''}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 font-semibold tabular-nums text-slate-800">
+                      {d.facture?.montant_ttc != null ? `${fmt(d.facture.montant_ttc)}` : '—'}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${statutBadge(d.statut)}`}>
+                        {statutLabel(d.statut)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-wrap gap-1">
+                        {d.statut !== 'acceptee' && d.statut !== 'refusee' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => ouvrirDecision(d, 'accepter')}
+                              className="rounded-md bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700"
+                            >
+                              Accepter
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => ouvrirDecision(d, 'refuser')}
+                              className="rounded-md border border-red-300 px-2 py-1 text-xs font-bold text-red-700 hover:bg-red-50"
+                            >
+                              Refuser
+                            </button>
+                          </>
+                        )}
+                        {d.statut === 'acceptee' && d.reference && (
+                          <Link
+                            to={`/facture-publique/${d.reference}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-md border border-blue-200 px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50"
+                          >
+                            Facture
+                          </Link>
+                        )}
+                        {canChatterEtudiant && d.etudiant_id != null && Number(d.etudiant_id) > 0 && (
+                          <Link
+                            to={chatWithStudentUrl(d.etudiant_id, d.prenom, d.nom)}
+                            className="rounded-md border border-emerald-200 px-2 py-1 text-xs font-bold text-emerald-800"
+                          >
+                            Chat
+                          </Link>
+                        )}
+                        {d.justificatifs && (
+                          <a
+                            href={justifUrl(d.justificatifs.diplome)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600"
+                          >
+                            Docs
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {pagination.totalPages > 1 && onglet === 'a_traiter' && (
+            <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
+              <span>{pagination.total} demande(s)</span>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page === 1} className="btn-secondary py-1.5 px-3 text-xs disabled:opacity-40">
-                  ← Préc.
-                </button>
-                <span className="text-sm text-slate-500">Page {page}/{pagination.totalPages}</span>
-                <button type="button" onClick={() => setPage((p) => p + 1)} disabled={page === pagination.totalPages} className="btn-secondary py-1.5 px-3 text-xs disabled:opacity-40">
-                  Suiv. →
-                </button>
+                <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page === 1} className="btn-secondary px-2 py-1 text-xs disabled:opacity-40">←</button>
+                <span>{page}/{pagination.totalPages}</span>
+                <button type="button" onClick={() => setPage((p) => p + 1)} disabled={page === pagination.totalPages} className="btn-secondary px-2 py-1 text-xs disabled:opacity-40">→</button>
               </div>
             </div>
           )}
@@ -211,37 +291,41 @@ export default function ResponsableDemandesProforma() {
       )}
 
       {modal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-            <h3 className="font-bold text-lg text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900">
               {modal.type === 'accepter' ? 'Accepter la demande ?' : 'Refuser la demande ?'}
             </h3>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="mt-2 text-sm text-gray-600">
               {modal.demande.prenom} {modal.demande.nom} — {modal.demande.formation_titre}
             </p>
             {modal.type === 'accepter' && (
-              <p className="text-xs text-emerald-700 mt-3 bg-emerald-50 rounded-lg p-3">
-                La facture proforma et l&apos;attestation seront disponibles sur l&apos;espace du candidat après validation.
+              <p className="mt-3 text-sm text-emerald-800">
+                Facture et attestation seront disponibles pour le candidat.
               </p>
             )}
             {modal.type === 'refuser' && (
               <textarea
-                className="input-field mt-4 w-full"
+                className="input-field mt-3"
                 rows={3}
-                placeholder="Motif du refus *"
+                placeholder="Motif du refus…"
                 value={motifRefus}
-                onChange={e => setMotifRefus(e.target.value)}
+                onChange={(e) => setMotifRefus(e.target.value)}
               />
             )}
-            <div className="flex gap-3 mt-6">
-              <button type="button" className="btn-secondary flex-1" onClick={() => setModal(null)} disabled={saving}>Annuler</button>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="btn-secondary text-sm" onClick={() => setModal(null)} disabled={saving}>
+                Annuler
+              </button>
               <button
                 type="button"
-                className={`flex-1 font-semibold py-2.5 rounded-xl text-white ${modal.type === 'accepter' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
+                className={`text-sm font-bold text-white px-4 py-2 rounded-lg ${
+                  modal.type === 'accepter' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                }`}
                 onClick={confirmerDecision}
                 disabled={saving}
               >
-                {saving ? '…' : modal.type === 'accepter' ? 'Confirmer' : 'Refuser'}
+                {saving ? '…' : 'Confirmer'}
               </button>
             </div>
           </div>

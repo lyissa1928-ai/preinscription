@@ -13,7 +13,7 @@ const NAV_LINKS = {
   ],
   responsable: [
     { to: '/responsable', label: 'Tableau de bord' },
-    { to: '/responsable/demandes-proforma', label: 'Proforma' },
+    { to: '/responsable/demandes-proforma', label: 'À traiter' },
     { to: '/chat', label: 'Messages' },
   ],
   agent_admin: [
@@ -23,7 +23,7 @@ const NAV_LINKS = {
   ],
   comptable: [
     { to: '/comptable', label: 'Tableau de bord' },
-    { to: '/responsable/demandes-proforma', label: 'Proforma' },
+    { to: '/responsable/demandes-proforma', label: 'À traiter' },
     { to: '/mon-etablissement/factures', label: 'Factures' },
   ],
   controleur_qualite: [
