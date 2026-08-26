@@ -6,6 +6,7 @@ import {
   setRefreshToken,
   clearSession,
 } from './tokenStorage'
+import { withAppBase } from '../utils/appBasePath'
 
 export const SESSION_EXPIRED_EVENT = 'auth:session-expired'
 
@@ -57,8 +58,9 @@ export function setupAuthInterceptors() {
       if (!original || original._retry) return Promise.reject(error)
 
       if (error.response?.status === 403 && error.response?.data?.code === 'MUST_CHANGE_PASSWORD') {
-        if (!window.location.pathname.startsWith('/changer-mot-de-passe-obligatoire')) {
-          window.location.assign('/changer-mot-de-passe-obligatoire')
+        const pwdPath = withAppBase('/changer-mot-de-passe-obligatoire')
+        if (!window.location.pathname.startsWith(pwdPath)) {
+          window.location.assign(pwdPath)
         }
         return Promise.reject(error)
       }

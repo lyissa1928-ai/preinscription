@@ -16,6 +16,7 @@ function mergedViteEnv(mode) {
 export default defineConfig(({ mode }) => {
   const v = mergedViteEnv(mode)
   return {
+  base: v.VITE_BASE_PATH || '/',
   plugins: [react()],
   /** Garantit que les clés publiques sont bien prises si .env.production est à la racine du repo. */
   define: {

@@ -213,19 +213,26 @@ export default function Login() {
                 <Link to="/inscription" className="text-blue-600 hover:underline font-medium">
                   Créer un compte
                 </Link>
-                {' '}(vérification anti-bot requise)
+                {import.meta.env.DEV && (
+                  <span className="text-gray-500"> (vérification anti-bot requise)</span>
+                )}
               </p>
-              <p className="text-sm flex flex-col gap-1">
+              <p className="text-sm text-gray-600">
+                Mot de passe oublié ?{' '}
                 {authOptions.password_reset_email && (
-                  <Link to="/mot-de-passe-oublie-email" className="text-blue-600 hover:underline font-medium">
-                    Mot de passe oublié (lien par e-mail)
-                  </Link>
+                  <>
+                    <Link to="/mot-de-passe-oublie-email" className="text-blue-600 hover:underline font-medium">
+                      Par e-mail
+                    </Link>
+                    <span className="text-gray-400"> · </span>
+                  </>
                 )}
                 <Link to="/mot-de-passe-oublie-matricule" className="text-blue-600 hover:underline font-medium">
-                  Mot de passe oublié — Étudiant (matricule)
+                  Étudiant
                 </Link>
+                <span className="text-gray-400"> · </span>
                 <Link to="/mot-de-passe-oublie-personnel" className="text-blue-600 hover:underline font-medium">
-                  Mot de passe oublié — Personnel (matricule + téléphone)
+                  Personnel
                 </Link>
               </p>
               {authOptions.email_verification && form.email.trim() && (
@@ -252,15 +259,22 @@ export default function Login() {
                   </button>
                 </p>
               )}
-              <p className="text-xs text-gray-500">
-                Matricule oublié ?{' '}
-                <a
-                  href="mailto:lyissa15@gmail.com?subject=UniPr%C3%A9inscription%20%E2%80%94%20R%C3%A9cup%C3%A9ration%20de%20matricule"
-                  className="text-blue-600 hover:underline"
-                >
-                  Contacter le support
-                </a>
-              </p>
+              {!import.meta.env.DEV && (
+                <p className="text-xs text-gray-500">
+                  Matricule oublié ? Contactez la scolarité de votre établissement.
+                </p>
+              )}
+              {import.meta.env.DEV && (
+                <p className="text-xs text-gray-500">
+                  Matricule oublié ?{' '}
+                  <a
+                    href="mailto:lyissa15@gmail.com?subject=UniPr%C3%A9inscription%20%E2%80%94%20R%C3%A9cup%C3%A9ration%20de%20matricule"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Support dev
+                  </a>
+                </p>
+              )}
             </div>
 
             {import.meta.env.DEV && (

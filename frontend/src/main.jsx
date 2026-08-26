@@ -8,6 +8,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { reportClientError } from './utils/reportClientError'
 import { resolveApiBaseUrl } from './utils/resolveApiBaseUrl'
 import { setupAuthInterceptors } from './lib/setupAuthInterceptors'
+import { getRouterBasename } from './utils/appBasePath'
 import './index.css'
 import './lettre-print-additive.css'
 
@@ -65,7 +66,7 @@ if (!rootEl) {
 ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter basename={getRouterBasename() || undefined}>
         <App />
         <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
       </BrowserRouter>

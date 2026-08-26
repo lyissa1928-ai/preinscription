@@ -9,6 +9,7 @@ import {
 } from '../lib/tokenStorage'
 import { SESSION_EXPIRED_EVENT } from '../lib/setupAuthInterceptors'
 import { applyEtabTheme, clearEtabTheme, getUserBrandColor } from '../utils/etabTheme'
+import { stripAppBasePath, withAppBase } from '../utils/appBasePath'
 
 const AuthContext = createContext(null)
 
@@ -27,8 +28,9 @@ const PUBLIC_PATH_PREFIXES = [
 ]
 
 function isPublicPath(pathname) {
-  if (pathname === '/') return true
-  return PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p))
+  const p = stripAppBasePath(pathname)
+  if (p === '/') return true
+  return PUBLIC_PATH_PREFIXES.some((prefix) => p.startsWith(prefix))
 }
 
 export function AuthProvider({ children }) {
@@ -43,7 +45,7 @@ export function AuthProvider({ children }) {
       clearEtabTheme()
       if (typeof window !== 'undefined' && !isPublicPath(window.location.pathname)) {
         const next = encodeURIComponent(window.location.pathname + window.location.search)
-        window.location.assign(`/connexion?next=${next}`)
+        window.location.assign(withAppBase(`/connexion?next=${next}`))
       }
     }
     window.addEventListener(SESSION_EXPIRED_EVENT, handleExpiry)

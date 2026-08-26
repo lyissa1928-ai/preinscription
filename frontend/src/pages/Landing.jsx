@@ -270,7 +270,7 @@ export default function Landing() {
       >
         <Navbar />
 
-        {etablissementsLoaded && etablissements.length === 0 && (
+        {import.meta.env.DEV && etablissementsLoaded && etablissements.length === 0 && (
           <div className="relative z-20 mx-auto max-w-4xl px-4 pt-4">
             <div className="rounded-2xl border border-amber-300/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
               <p className="font-bold">Aucun établissement affiché pour le moment</p>
