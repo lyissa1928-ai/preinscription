@@ -132,6 +132,22 @@ echo ">>> 6/7 Dépendances + build frontend..."
 npm run install:all
 npm run build
 
+# config-site.js : URL API sans rebuild (obligatoire si app sous /uniportail/)
+API_PUBLIC="${UNIPORTAIL_API_PUBLIC_URL:-https://esebat-digitalservices.com/uniportail}"
+write_config_site() {
+  local target="$1"
+  mkdir -p "$(dirname "$target")"
+  cat > "$target" <<EOF
+window.__PREINSCRIPTION_SITE_KEYS__ = {
+  recaptcha: '',
+  apiBaseUrl: '${API_PUBLIC}',
+}
+EOF
+  echo "    config-site.js → $target (apiBaseUrl=${API_PUBLIC})"
+}
+write_config_site frontend/dist/config-site.js
+write_config_site frontend/public/config-site.js
+
 echo ">>> 7/7 Redémarrage API..."
 if pm2 describe uniportail-api >/dev/null 2>&1; then
   pm2 restart uniportail-api

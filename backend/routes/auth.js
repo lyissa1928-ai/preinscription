@@ -1033,6 +1033,9 @@ router.post('/reinitialiser-mot-de-passe-staff', resetPwdLimiter, (req, res) => 
   db.get('utilisateurs').find({ id: user.id }).assign({
     mot_de_passe: hash,
     must_change_password: true,
+    login_attempts: 0,
+    is_locked: false,
+    lock_until: null,
     password_reset_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).write();
