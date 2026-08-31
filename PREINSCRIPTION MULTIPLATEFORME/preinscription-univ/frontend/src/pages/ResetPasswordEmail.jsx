@@ -39,7 +39,7 @@ export default function ResetPasswordEmail() {
         nouveau_mot_de_passe: pwd,
         confirmation: confirm,
       })
-      login(data.token, data.utilisateur)
+      login(data.token, data.utilisateur, data.refresh_token)
       toast.success(data.message || 'Mot de passe mis à jour.')
       const role = data.utilisateur?.role
       const dest =

@@ -1,4 +1,17 @@
 require('dotenv').config();
+const { warnPm2ClusterRisk } = require('./utils/dbWriteQueue');
+const { initTokenRevocationFromDisk } = require('./utils/tokenRevocation');
+const { runChatRetentionPrune } = require('./utils/chatRetention');
+warnPm2ClusterRisk();
+initTokenRevocationFromDisk();
+try {
+  const chatPrune = runChatRetentionPrune();
+  if (chatPrune.removed > 0) {
+    console.log(`[chat] rétention au démarrage : ${chatPrune.removed} message(s) supprimé(s)`);
+  }
+} catch (e) {
+  console.warn('[chat] rétention au démarrage ignorée:', e.message);
+}
 const http = require('http');
 const express = require('express');
 const { inscriptionCaptchaEnforced } = require('./utils/antiBot');
@@ -7,7 +20,9 @@ const path = require('path');
 const { runMaintenancePrune, retentionConfigFromEnv } = require('./utils/maintenance');
 const { recordRequest, getRuntimeMetricsSnapshot } = require('./utils/runtimeMetrics');
 const { runHealthChecks } = require('./utils/healthCheck');
-
+const { maintenanceGate } = require('./middleware/maintenanceGate');
+const { startAutoBackupScheduler } = require('./utils/autoBackupScheduler');
+const { isMaintenanceModeEnabled } = require('./utils/maintenanceMode');
 const app = express();
 const PORT = process.env.PORT || 5000;
 app.disable('x-powered-by');
@@ -62,7 +77,9 @@ app.use((req, res, next) => {
 const BODY_LIMIT = process.env.JSON_BODY_LIMIT || '5mb';
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// /uploads protégé : logos publics, documents/justificatifs/PJ derrière auth + ACL (Lot 1 sécurité).
+const { uploadsGuard } = require('./middleware/uploadsGuard');
+app.use('/uploads', uploadsGuard, express.static(path.join(__dirname, 'uploads')));
 
 // Metrics middleware (best effort, sans impact métier).
 app.use((req, res, next) => {
@@ -79,6 +96,23 @@ app.use((req, res, next) => {
   next();
 });
 
+// Rate limit global (filet anti-scraping / brute force) : plafond large par IP
+// sur toute l'API. Les limiteurs ciblés (login, inscription, chat…) restent en
+// place et sont plus stricts. /health et /api/health sont exemptés (probes).
+const { rateLimit: makeRateLimit, getClientIp: clientIp } = require('./utils/rateLimit');
+const globalApiLimiter = makeRateLimit({
+  windowMs: Number(process.env.GLOBAL_RATE_WINDOW_MS || 60_000),
+  max: Number(process.env.GLOBAL_RATE_MAX || 300),
+  message: 'Trop de requêtes depuis cette adresse. Réessayez dans un instant.',
+  keyGenerator: (req) => `global:${clientIp(req)}`,
+});
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') return next();
+  return globalApiLimiter(req, res, next);
+});
+
+app.use(maintenanceGate);
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/public', require('./routes/public'));             // Public — sans auth
 app.use('/api/conditions-admission', require('./routes/conditionsAdmission'));
@@ -92,6 +126,7 @@ app.use('/api/etablissements', require('./routes/etablissements'));
 app.use('/api/formations', require('./routes/formations'));
 app.use('/api/factures', require('./routes/factures'));
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/chatbot', require('./routes/chatbot')); // Orientation IA (RAG) — distinct du chat humain
 
 function sendHealth(req, res) {
   const m = getRuntimeMetricsSnapshot();
@@ -99,10 +134,20 @@ function sendHealth(req, res) {
   const payload = {
     status: checks.ok ? 'OK' : 'DEGRADED',
     time: new Date().toISOString(),
+    maintenance_mode: isMaintenanceModeEnabled(),
     checks: {
+      json_file: checks.json_file.ok ? 'ok' : 'error',
       database: checks.database.ok ? 'ok' : 'error',
       uploads: checks.uploads.ok ? 'ok' : 'error',
       chat_file: checks.chat_file.ok ? 'ok' : 'error',
+      disk: checks.disk.ok ? 'ok' : 'error',
+      socket_io: checks.socket_io.ok ? 'ok' : 'error',
+      maintenance: checks.maintenance.ok ? 'ok' : 'error',
+    },
+    details: {
+      disk_free_mb: checks.disk.free_mb ?? null,
+      socket_clients: checks.socket_io.connected_clients ?? null,
+      maintenance_enabled: checks.maintenance.enabled === true,
     },
     uptime_s: m.uptime_s,
     requests_total: m.requests_total,
@@ -110,9 +155,17 @@ function sendHealth(req, res) {
     avg_duration_ms: m.avg_duration_ms,
     memory_mb: m.memory_mb,
   };
-  if (!checks.database.ok && checks.database.error) payload.database_error = checks.database.error;
-  if (!checks.uploads.ok && checks.uploads.error) payload.uploads_error = checks.uploads.error;
-  if (!checks.chat_file.ok && checks.chat_file.error) payload.chat_file_error = checks.chat_file.error;
+  const errFields = [
+    ['json_file', checks.json_file],
+    ['database', checks.database],
+    ['uploads', checks.uploads],
+    ['chat_file', checks.chat_file],
+    ['disk', checks.disk],
+    ['socket_io', checks.socket_io],
+  ];
+  errFields.forEach(([key, c]) => {
+    if (!c.ok && c.error) payload[`${key}_error`] = c.error;
+  });
   res.status(checks.ok ? 200 : 503).json(payload);
 }
 
@@ -136,7 +189,11 @@ app.use((err, req, res, next) => {
     });
   }
   console.error(err.stack);
-  res.status(500).json({ message: err.message || 'Erreur serveur interne' });
+  // Ne pas divulguer err.message au client en production (fuite d'implémentation).
+  const isProd = process.env.NODE_ENV === 'production';
+  res.status(500).json({
+    message: isProd ? 'Erreur serveur interne. Réessayez plus tard.' : (err.message || 'Erreur serveur interne'),
+  });
 });
 
 const server = http.createServer(app);
@@ -145,6 +202,10 @@ initChatSocket(server, { allowedCorsOrigins });
 
 server.listen(PORT, () => {
   console.log(`🚀 Serveur : http://localhost:${PORT}`);
+  startAutoBackupScheduler();
+  if (isMaintenanceModeEnabled()) {
+    console.warn('[MAINTENANCE] Mode maintenance actif (MAINTENANCE_MODE)');
+  }
   if (!inscriptionCaptchaEnforced()) {
     console.warn(
       '[auth] AUTH_INSCRIPTION_BYPASS_CAPTCHA actif — aucune vérification captcha sur POST /api/auth/inscription (réservé au développement local).'

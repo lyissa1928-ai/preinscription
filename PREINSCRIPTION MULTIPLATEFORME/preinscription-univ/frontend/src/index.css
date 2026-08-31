@@ -94,7 +94,12 @@
 
 @layer components {
   .btn-primary {
-    @apply inline-flex h-10 items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex h-10 items-center justify-center rounded-md px-5 text-sm font-semibold shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    background-color: var(--etab-primary, hsl(var(--primary)));
+    color: var(--etab-on-primary, hsl(var(--primary-foreground)));
+  }
+  .btn-primary:hover {
+    filter: brightness(0.92);
   }
   .btn-secondary {
     @apply inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-5 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
@@ -106,7 +111,13 @@
     @apply inline-flex h-10 items-center justify-center rounded-md bg-emerald-600 px-5 text-sm font-semibold text-white shadow transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
   }
   .btn-outline {
-    @apply inline-flex h-10 items-center justify-center rounded-md border-2 border-primary bg-transparent px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+    @apply inline-flex h-10 items-center justify-center rounded-md border-2 bg-transparent px-5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+    border-color: var(--etab-primary, hsl(var(--primary)));
+    color: var(--etab-primary, hsl(var(--primary)));
+  }
+  .btn-outline:hover {
+    background-color: var(--etab-primary, hsl(var(--primary)));
+    color: var(--etab-on-primary, hsl(var(--primary-foreground)));
   }
   .input-field {
     @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
@@ -168,5 +179,12 @@
   .print-page {
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
+  }
+  /* Sécurité : masquer chrome même sans :has() sur anciens navigateurs */
+  aside.sidebar,
+  .app-sidebar,
+  [data-sidebar] {
+    display: none !important;
   }
 }

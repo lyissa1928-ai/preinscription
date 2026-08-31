@@ -4,7 +4,9 @@ const path = require('path')
 const { conversationKey } = require('../utils/chatRules')
 
 const CHAT_PATH = path.join(__dirname, 'chat.json')
+const { installWriteLockOnAdapter, runWithDbLockSync } = require('../utils/dbWriteQueue')
 const adapter = new FileSync(CHAT_PATH)
+installWriteLockOnAdapter(adapter, CHAT_PATH)
 let chatDb
 try {
   chatDb = low(adapter)
@@ -40,9 +42,11 @@ chatDb
 })()
 
 function nextMessageId() {
-  const id = chatDb.get('_nextId.messages').value() || 1
-  chatDb.set('_nextId.messages', id + 1).write()
-  return id
+  return runWithDbLockSync(CHAT_PATH, () => {
+    const id = chatDb.get('_nextId.messages').value() || 1
+    chatDb.set('_nextId.messages', id + 1).write()
+    return id
+  })
 }
 
 function upsertConversation(etablissementId, key, participants, last) {
@@ -107,6 +111,12 @@ function addMessage(etablissementId, senderId, peerId, body, attachment = null) 
     attachment_size: attachment?.size != null ? Number(attachment.size) : null,
   }
   chatDb.get('messages').push(msg).write()
+  try {
+    const { runChatRetentionPrune } = require('../utils/chatRetention')
+    runChatRetentionPrune()
+  } catch {
+    /* ignore prune errors */
+  }
   upsertConversation(
     etablissementId,
     key,
@@ -125,26 +135,79 @@ function listAttachmentMessagesForEtablissement(etablissementId) {
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 }
 
-function getMessagesForConversation(conversationKeyStr, { limit = 80, beforeId } = {}) {
+function getDefaultMessagePageLimit() {
+  const n = parseInt(process.env.CHAT_MESSAGES_PAGE_LIMIT || '80', 10)
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 200) : 80
+}
+
+function getMessagesForConversation(conversationKeyStr, { limit, beforeId } = {}) {
+  const pageLimit = limit != null ? Math.min(Number(limit) || 80, 200) : getDefaultMessagePageLimit()
   const raw = chatDb.get('messages').value() || []
   const all = raw.filter((m) => m.conversation_key === conversationKeyStr)
   let list = [...all].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  const hasMore = list.length > pageLimit
   if (beforeId) {
     const idx = list.findIndex((m) => m.id === beforeId)
     if (idx > 0) list = list.slice(0, idx)
     else if (idx === 0) list = []
+    const slice = list.length > pageLimit ? list.slice(-pageLimit) : list
+    return { messages: slice, has_more: list.length > slice.length }
   }
-  if (list.length > limit) list = list.slice(-limit)
-  return list
+  const slice = list.length > pageLimit ? list.slice(-pageLimit) : list
+  return { messages: slice, has_more: hasMore || list.length > slice.length }
 }
 
-function listConversationsForUser(userId, etablissementId) {
+function listConversationsForUser(userId, etablissementId, { limit } = {}) {
   const uid = Number(userId)
   const eid = Number(etablissementId)
+  const maxList = limit != null
+    ? Math.min(Number(limit) || 500, 500)
+    : parseInt(process.env.CHAT_MAX_CONVERSATIONS_LIST || '500', 10)
   const convs = chatDb.get('conversations').value() || []
-  return convs
+  const sorted = convs
     .filter((c) => c.etablissement_id === eid && (c.participants || []).includes(uid))
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+  return sorted.slice(0, maxList)
+}
+
+function pruneChatData(cfg) {
+  const retentionMs = cfg.retentionDays * 24 * 60 * 60 * 1000
+  const cutoff = Date.now() - retentionMs
+  let messages = chatDb.get('messages').value() || []
+  const beforeCount = messages.length
+
+  messages = messages.filter((m) => {
+    const t = new Date(m.created_at).getTime()
+    return Number.isFinite(t) && t >= cutoff
+  })
+
+  const byConv = new Map()
+  for (const m of messages) {
+    const k = m.conversation_key
+    if (!byConv.has(k)) byConv.set(k, [])
+    byConv.get(k).push(m)
+  }
+  const kept = []
+  for (const [, arr] of byConv) {
+    arr.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    const slice = arr.length > cfg.maxPerConversation
+      ? arr.slice(-cfg.maxPerConversation)
+      : arr
+    kept.push(...slice)
+  }
+  kept.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  if (kept.length > cfg.maxTotalMessages) {
+    kept.splice(0, kept.length - cfg.maxTotalMessages)
+  }
+  messages = kept
+
+  chatDb.set('messages', messages).write()
+
+  const convKeys = new Set(messages.map((m) => m.conversation_key))
+  const convs = (chatDb.get('conversations').value() || []).filter((c) => convKeys.has(c.key))
+  chatDb.set('conversations', convs).write()
+
+  return { removed: beforeCount - messages.length, remaining: messages.length }
 }
 
 function getReadState(userId, key) {
@@ -186,4 +249,5 @@ module.exports = {
   unreadCountForConversation,
   getReadState,
   listAttachmentMessagesForEtablissement,
+  pruneChatData,
 }

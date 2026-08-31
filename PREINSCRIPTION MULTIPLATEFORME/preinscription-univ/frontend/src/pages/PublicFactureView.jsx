@@ -4,6 +4,7 @@ import axios from 'axios'
 import { jsPDF } from 'jspdf'
 import { mediaUrl } from '../utils/mediaUrl'
 import autoTable from 'jspdf-autotable'
+import { titreTypeDocument } from '../utils/factureTypeDocument'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt     = (n) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0))
@@ -148,12 +149,12 @@ async function generatePDF(data) {
   if (etabRC)     { doc.setFont('helvetica', 'bold'); doc.text(`RC : ${etabRC}`, txX, iy); iy += 4; doc.setFont('helvetica', 'normal') }
   if (etabArrete) { doc.setFont('helvetica', 'bold'); doc.text(`Arrêté : ${etabArrete}`, txX, iy); doc.setFont('helvetica', 'normal') }
 
-  // ── BLOC FACTURE PROFORMA (droite) ────────────────────────────────────────
+  // ── BLOC TYPE FACTURE (droite) ───────────────────────────────────────────
   const bx = 128, bw = W - bx - M
   const headerTopY = 7
   doc.setFillColor(...P); doc.roundedRect(bx, headerTopY, bw, 9, 2, 2, 'F')
   doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont('helvetica', 'bold')
-  doc.text('FACTURE PROFORMA', bx + bw / 2, headerTopY + 6, { align: 'center' })
+  doc.text(titreTypeDocument(facture?.type_document), bx + bw / 2, headerTopY + 6, { align: 'center' })
 
   doc.setFontSize(7.5); doc.setTextColor(50, 60, 80)
   const meta = [
@@ -355,14 +356,14 @@ async function generatePDF(data) {
     y += 17
   }
 
-  // ── LA DIRECTION (cachet) ─────────────────────────────────────────────────
+  // ── LA SCOLARITÉ (cachet) ─────────────────────────────────────────────────
   if (cachetB64) {
     const cW = 30, cH = 30
     const cx = W - M - cW
     try {
-      doc.addImage(cachetB64, 'AUTO', cx, y, cW, cH)
-      doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 70, 90)
-      doc.text('La Direction', cx + cW / 2, y + cH + 4, { align: 'center' })
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(71, 85, 105)
+      doc.text('LA SCOLARITÉ', cx + cW / 2, y + 3, { align: 'center' })
+      doc.addImage(cachetB64, 'AUTO', cx, y + 5, cW, cH)
     } catch { /* pas de cachet */ }
   }
 
@@ -549,7 +550,7 @@ export default function PublicFactureView() {
             <div className="text-right flex-shrink-0">
               <div className="inline-block text-white font-black text-sm px-5 py-2.5 rounded-xl mb-3"
                 style={{ background: primary }}>
-                FACTURE PROFORMA
+                {titreTypeDocument(facture?.type_document)}
               </div>
               <div className="text-xs text-gray-500 space-y-1">
                 <p><span className="font-semibold text-gray-700">N° :</span>{' '}
@@ -766,15 +767,15 @@ export default function PublicFactureView() {
           </div>
         </div>
 
-        {/* ── CACHET / LA DIRECTION ───────────────────────────────────────── */}
-        {etab.cachet_url && (
-          <div className="px-8 mb-6 flex justify-end">
-            <div className="text-center">
-              <img src={mediaUrl(etab.cachet_url)} alt="La Direction" className="w-28 h-28 object-contain opacity-90" />
-              <p className="text-xs text-gray-500 mt-1 font-semibold">La Direction</p>
-            </div>
+        {/* ── CACHET / LA SCOLARITÉ ───────────────────────────────────────── */}
+        <div className="px-8 mb-6 flex justify-end">
+          <div className="text-center">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">La scolarité</p>
+            {etab.cachet_url ? (
+              <img src={mediaUrl(etab.cachet_url)} alt="Cachet de la scolarité" className="mx-auto my-2 w-28 h-28 object-contain opacity-90" />
+            ) : null}
           </div>
-        )}
+        </div>
 
         {/* ── CTA ──────────────────────────────────────────────────────────── */}
         <div className="px-8 mb-8">

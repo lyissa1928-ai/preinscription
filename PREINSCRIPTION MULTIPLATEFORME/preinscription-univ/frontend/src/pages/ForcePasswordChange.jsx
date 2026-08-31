@@ -91,7 +91,7 @@ export default function ForcePasswordChange() {
         confirmation: form.confirmation,
       })
       if (data.token && data.utilisateur) {
-        login(data.token, data.utilisateur)
+        login(data.token, data.utilisateur, data.refresh_token)
       } else {
         await refreshUser()
       }

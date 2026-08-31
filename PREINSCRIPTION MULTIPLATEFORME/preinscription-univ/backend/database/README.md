@@ -31,3 +31,19 @@ Ou récupérez la version d’un commit précis depuis l’historique GitHub (fi
 ## Évolution
 
 En enrichissant le catalogue (nouvelles filières, formations), **commitez** `preinscription.json` si vous souhaitez partager ce jeu de données avec l’équipe sur GitHub.
+
+## Migrations de schéma (continuité sans perte)
+
+Au démarrage du serveur, `utils/schemaMigrations.js` applique les migrations manquantes :
+
+1. Lecture de `_schemaVersion` dans `preinscription.json`
+2. **Backup** automatique (`pre-migrate-vX-to-vY-…`) avant toute migration
+3. Exécution idempotente des versions `v1`, `v2`, … jusqu’à la version cible
+4. Journal dans `_migrations` (id, date, résumé)
+
+| Version | Contenu |
+|--------|---------|
+| v1 | Formations : `frais_bibliotheque`, `frais_epi`, `duree_mois` (dérivé du texte si besoin), forfait `prix` recalculé, `frais_supplementaires` normalisés — **aucune suppression** |
+| v2 | `nombre_photos_preinscription`, `actif` par défaut |
+
+Les champs historiques (`ville`, `places`, `autres_frais`, etc.) sont **conservés**. Pour ajouter une migration : créer une entrée dans `MIGRATIONS` avec `version` incrémentée et une fonction `up(db)` additive uniquement.

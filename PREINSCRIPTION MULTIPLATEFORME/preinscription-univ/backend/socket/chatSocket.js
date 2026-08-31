@@ -1,9 +1,11 @@
 const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
 const db = require('../database/db');
-const { JWT_SECRET } = require('../utils/jwtHelpers');
+const { verifyAccessToken } = require('../utils/jwtHelpers');
 const { isTokenRevoked } = require('../utils/tokenRevocation');
+const { socketRateLimit } = require('../utils/socketRateLimit');
 const { canChatWith, conversationKey } = require('../utils/chatRules');
+const { withFonctions } = require('../utils/userFonctions');
+const { sanitizeChatAttachment } = require('../utils/chatAttachment');
 const chatStore = require('../database/chatStore');
 
 /** @type {import('socket.io').Server | null} */
@@ -33,9 +35,11 @@ function initChatSocket(httpServer, { allowedCorsOrigins }) {
 
   io.use((socket, next) => {
     try {
-      const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+      // Token uniquement via le payload `auth` du handshake (chiffré dans le
+      // corps), jamais via la query string (fuite dans logs proxy / historique).
+      const token = socket.handshake.auth?.token;
       if (!token) return next(new Error('auth'));
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = verifyAccessToken(token);
       if (decoded.jti && isTokenRevoked(decoded.jti)) return next(new Error('auth'));
       const dbUser = db.get('utilisateurs').find({ id: decoded.id }).value();
       if (!dbUser || dbUser.actif === false) return next(new Error('auth'));
@@ -67,29 +71,42 @@ function initChatSocket(httpServer, { allowedCorsOrigins }) {
       io.to(`etab:${eid}`).emit('presence:update', { userId: u.id, online: true });
     }
 
-    socket.join(`user:${u.id}`);
-    socket.join(`etab:${eid}`);
+    const allowedRooms = new Set([`user:${u.id}`, `etab:${eid}`]);
+    const safeJoin = socket.join.bind(socket);
+    socket.join = (room) => {
+      if (allowedRooms.has(String(room))) return safeJoin(room);
+      console.warn(`[chat] join bloqué room=${room} user=${u.id}`);
+      return socket;
+    };
+
+    safeJoin(`user:${u.id}`);
+    safeJoin(`etab:${eid}`);
 
     socket.emit('chat:ready', { userId: u.id });
 
     socket.on('chat:send', (payload, cb) => {
+      const rl = socketRateLimit(`chat_send:${u.id}`, {
+        windowMs: 60_000,
+        max: parseInt(process.env.CHAT_SOCKET_MSG_MAX_PER_MIN || '30', 10) || 30,
+      });
+      if (!rl.allowed) {
+        if (typeof cb === 'function') {
+          cb({ ok: false, error: 'Trop de messages. Réessayez dans quelques secondes.' });
+        }
+        return;
+      }
       const peerId = Number(payload?.peerId);
       const body = payload?.body;
       const peer = db.get('utilisateurs').find({ id: peerId }).value();
-      if (!peer || !canChatWith(u, peer)) {
+      if (!peer || !canChatWith(withFonctions(u), withFonctions(peer))) {
         if (typeof cb === 'function') cb({ ok: false, error: 'Interdit' });
         return;
       }
-      const att = payload?.attachment;
-      const attObj =
-        att && typeof att === 'object' && att.url
-          ? {
-              url: String(att.url).trim(),
-              original_name: att.original_name || att.name || null,
-              mime: att.mime || null,
-              size: att.size != null ? Number(att.size) : null,
-            }
-          : null;
+      const { attachment: attObj, invalid: attInvalid } = sanitizeChatAttachment(payload?.attachment);
+      if (attInvalid) {
+        if (typeof cb === 'function') cb({ ok: false, error: 'Pièce jointe invalide.' });
+        return;
+      }
       const msg = chatStore.addMessage(eid, u.id, peer.id, body, attObj);
       if (!msg) {
         if (typeof cb === 'function') cb({ ok: false, error: 'Message vide' });
@@ -121,7 +138,7 @@ function initChatSocket(httpServer, { allowedCorsOrigins }) {
       const pid = Number(peerId);
       if (!pid) return;
       const peer = db.get('utilisateurs').find({ id: pid }).value();
-      if (!peer || !canChatWith(u, peer)) return;
+      if (!peer || !canChatWith(withFonctions(u), withFonctions(peer))) return;
       const key = conversationKey(eid, u.id, pid);
       chatStore.markConversationRead(u.id, key);
       io.to(`user:${pid}`).emit('chat:read', { byUserId: u.id, conversation_key: key });

@@ -1,19 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
-const { authMiddleware, responsableOrAdmin, staffLettreAttestation, staffProformaDecision } = require('../middleware/auth');
-const { proformaDemandeDecision } = require('../services/proformaDemandeDecisionService');
+const { authMiddleware, staffLettreAttestation, staffProformaDecision, staffDossierDecision, staffGuichet } = require('../middleware/auth');
+const { proformaDemandeDecision, creerProformaPourEtudiant } = require('../services/proformaDemandeDecisionService');
 const { genererOuRecupererFactureDossier } = require('../services/factureService');
-const { snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
+const { snapshotFromEtab, snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
 const { logAudit } = require('../utils/auditLog');
 const { DOSSIER_STATUSES, canTransitionDossierStatus, requiresRejectionComment } = require('../utils/dossierWorkflow');
 const { createUserNotification } = require('../utils/notificationService');
 const { buildAttestationPayloadForDossier } = require('../utils/buildAttestationPayload');
-const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
+const { canIssueOfficialDocs } = require('../utils/canIssueOfficialDocs');
+const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
+const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
 const { primaryPhotoDocumentFromList } = require('../utils/preinscriptionDocumentRules');
 
 // ─── Lettres / attestations (staff établissement, même périmètre que facture dossier) ─
-// Enregistrées avant le guard responsableOrAdmin pour autoriser agent_admin, comptable.
+// Enregistrées avant le guard staffDossierDecision.
 router.get('/lettre/:dossierId', authMiddleware, staffLettreAttestation, (req, res) => {
   const id = parseInt(String(req.params.dossierId), 10);
   if (Number.isNaN(id)) return res.status(400).json({ message: 'Identifiant dossier invalide' });
@@ -22,32 +24,41 @@ router.get('/lettre/:dossierId', authMiddleware, staffLettreAttestation, (req, r
   if (!assertDossierPourResponsable(req, dossier)) {
     return res.status(403).json({ message: 'Ce dossier ne concerne pas votre établissement.' });
   }
-  if (!isDossierAcceptePourLettre(dossier.statut)) {
-    return res.status(403).json({ message: 'La préinscription doit être acceptée pour générer la lettre.' });
+  if (!canIssueLettrePreinscription(dossier)) {
+    return res.status(403).json({
+      message:
+        'La lettre de préinscription est réservée aux candidats étrangers acceptés ayant déposé une demande en ligne.',
+    });
   }
 
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
+  const identite = resolveCandidatIdentite(dossier, u);
   const formation = dossier.formation_id
     ? db.get('formations').find({ id: dossier.formation_id }).value()
     : null;
   const documents = db.get('documents').filter({ dossier_id: id }).value();
   const photoDoc = primaryPhotoDocumentFromList(documents);
   const etablissement =
-    snapshotFromFormation(formation) || snapshotFromEtablissementId(u.etablissement_id);
+    snapshotFromFormation(formation) ||
+    snapshotFromEtablissementId(dossier.etablissement_id || u.etablissement_id);
 
   const y = new Date().getFullYear();
   const lettre_extensions = {
     reference_lettre: `LPI-${y}-${String(dossier.id).padStart(5, '0')}`,
     numero_dossier: dossier.numero_dossier,
     date_soumission: dossier.created_at,
-    matricule_candidat: u.matricule || null,
-    numero_passeport: dossier.numero_passeport || null,
+    matricule_candidat: identite.matricule || null,
+    numero_passeport: identite.numero_passeport || null,
+    nationalite: identite.nationalite || null,
+    sexe: identite.sexe || null,
+    niveau: formation?.niveau || dossier.formation_niveau_cible || null,
+    duree: formation?.duree || null,
   };
 
   res.json({
     type: 'dossier',
     dossier,
-    etudiant: { nom: u.nom, prenom: u.prenom, email: u.email },
+    etudiant: { nom: identite.nom, prenom: identite.prenom, email: identite.email },
     formation,
     etablissement,
     photo_url: photoDoc ? `/uploads/${photoDoc.chemin}` : null,
@@ -118,6 +129,128 @@ router.put('/demandes-proforma/:id/statut', authMiddleware, staffProformaDecisio
   res.json({ message: 'Statut mis à jour' });
 });
 
+// POST /api/responsable/demandes-proforma/creer — proforma (responsable, comptable, admin)
+router.post('/demandes-proforma/creer', authMiddleware, staffProformaDecision, (req, res) => {
+  const {
+    etudiant_id,
+    formation_id,
+    prenom,
+    nom,
+    telephone,
+    email,
+    remise,
+  } = req.body || {};
+  const result = creerProformaPourEtudiant({
+    staffUser: req.user,
+    etudiantId: etudiant_id,
+    formationId: formation_id,
+    prenom,
+    nom,
+    telephone,
+    email,
+    remise,
+    buildEtabSnapshot: snapshotFromEtab,
+  });
+  if (!result.ok) return res.status(result.status).json({ message: result.message });
+
+  logAudit(req, 'create', 'demande_proforma', result.demande.id, {
+    reference: result.demande.reference,
+    etudiant_id: result.demande.etudiant_id,
+    formation_id: result.demande.formation_id,
+    source: 'staff',
+    mode: result.demande.etudiant_id ? 'compte_existant' : 'saisie_libre',
+  });
+  res.status(201).json({ message: result.message, demande: result.demande });
+});
+
+// POST /api/responsable/dossiers/guichet — préinscription accueil (même modèle que l'étudiant)
+router.post('/dossiers/guichet', authMiddleware, staffGuichet, (req, res) => {
+  const { creerDossierGuichet } = require('../services/staffGuichetDossierService');
+  const result = creerDossierGuichet({ staffUser: req.user, body: req.body || {} });
+  if (!result.ok) return res.status(result.status).json({ message: result.message });
+  logAudit(req, result.reused ? 'update' : 'create', 'dossier', result.dossier.id, {
+    numero_dossier: result.dossier.numero_dossier,
+    source: 'staff_guichet',
+    reused: !!result.reused,
+    facture_id: result.facture?.id || null,
+  });
+  res.status(result.reused ? 200 : 201).json({
+    message: result.message,
+    dossier: result.dossier,
+    facture: result.facture,
+    tarif: result.tarif,
+    reused: !!result.reused,
+  });
+});
+
+// GET /api/responsable/formations/:id/tarif — tarif catalogue (lecture seule)
+router.get('/formations/:id/tarif', authMiddleware, staffGuichet, (req, res) => {
+  const { tarifFromFormation } = require('../services/staffGuichetDossierService');
+  const fid = parseInt(String(req.params.id), 10);
+  const formation = db.get('formations').find({ id: fid }).value();
+  if (!formation || formation.actif === false) {
+    return res.status(404).json({ message: 'Formation introuvable.' });
+  }
+  if (req.user.role !== 'admin' && Number(req.user.etablissement_id) !== Number(formation.etablissement_id)) {
+    return res.status(403).json({ message: 'Cette formation n’appartient pas à votre établissement.' });
+  }
+  res.json({
+    formation: {
+      id: formation.id,
+      titre: formation.titre,
+      niveau: formation.niveau,
+      niveau_requis: formation.niveau_requis,
+      duree: formation.duree,
+      etablissement_id: formation.etablissement_id,
+    },
+    tarif: tarifFromFormation(formation),
+  });
+});
+
+// GET /api/responsable/etudiants?search=&etablissement_id= — recherche d'étudiants
+// pour la création de proforma (scopée à l'établissement du staff ; admin : tous).
+router.get('/etudiants', authMiddleware, staffProformaDecision, (req, res) => {
+  const search = String(req.query.search || '').trim().toLowerCase();
+  const etabFiltre =
+    req.user.role === 'admin'
+      ? parseInt(String(req.query.etablissement_id || ''), 10)
+      : Number(req.user.etablissement_id);
+
+  let etudiants = db
+    .get('utilisateurs')
+    .value()
+    .filter((u) => u.role === 'etudiant' && u.actif !== false);
+
+  if (Number.isFinite(etabFiltre)) {
+    // Un étudiant sans rattachement peut recevoir une proforma de n'importe quel établissement.
+    etudiants = etudiants.filter(
+      (u) => u.etablissement_id == null || Number(u.etablissement_id) === etabFiltre,
+    );
+  }
+
+  if (search) {
+    etudiants = etudiants.filter((u) =>
+      [u.prenom, u.nom, u.email, u.matricule]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(search)),
+    );
+  }
+
+  etudiants.sort((a, b) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`, 'fr'));
+
+  res.json({
+    etudiants: etudiants.slice(0, 20).map((u) => ({
+      id: u.id,
+      prenom: u.prenom,
+      nom: u.nom,
+      email: u.email,
+      matricule: u.matricule || null,
+      etablissement_id: u.etablissement_id ?? null,
+    })),
+    total: etudiants.length,
+  });
+});
+
 router.put('/demandes-proforma/:id/decision', authMiddleware, staffProformaDecision, (req, res) => {
   const id = parseInt(req.params.id);
   const demande = db.get('demandes_proforma').find({ id }).value();
@@ -139,24 +272,26 @@ router.put('/demandes-proforma/:id/decision', authMiddleware, staffProformaDecis
   res.json({ message: result.message, demande: result.demande });
 });
 
-router.use(authMiddleware, responsableOrAdmin);
+router.use(authMiddleware, staffDossierDecision);
 
 // ─── Helpers accès par établissement ─────────────────────────────────────────
 
+const {
+  getFormationIdsForEtab,
+  dossierAppartientAEtablissement: dossierScope,
+  demandeAppartientAEtablissement: demandeScope,
+  buildFormationsMap,
+} = require('../utils/etablissementScope');
+
 function getEtabFormationIds(req) {
   const etabId = req.user.role === 'admin' ? null : req.user.etablissement_id;
-  if (!etabId) return null;
-  return (db.get('formations').value() || []).filter((f) => f.etablissement_id === etabId).map((f) => f.id);
+  return getFormationIdsForEtab(db.get('formations').value(), etabId);
 }
 
+const _formationsMap = () => buildFormationsMap(db.get('formations').value());
+
 function dossierAppartientAEtablissement(dossier, etabId) {
-  if (!etabId) return true;
-  if (dossier.etablissement_id && dossier.etablissement_id === etabId) return true;
-  if (dossier.formation_id) {
-    const f = db.get('formations').find({ id: dossier.formation_id }).value();
-    return f && f.etablissement_id === etabId;
-  }
-  return false;
+  return dossierScope(dossier, etabId, _formationsMap());
 }
 
 function assertDossierPourResponsable(req, dossier) {
@@ -165,10 +300,7 @@ function assertDossierPourResponsable(req, dossier) {
 }
 
 function demandeAppartientAEtablissement(demande, etabId, formationIds) {
-  if (!etabId) return true;
-  if (demande.etablissement_id === etabId) return true;
-  if (!demande.etablissement_id && demande.formation_id && formationIds.includes(demande.formation_id)) return true;
-  return false;
+  return demandeScope(demande, etabId, formationIds);
 }
 
 function assertDemandePourResponsable(req, demande) {
@@ -227,6 +359,7 @@ router.get('/dossiers', (req, res) => {
 });
 
 router.get('/statistiques', (req, res) => {
+  const { topFormationsDemandees } = require('../utils/statsHelpers');
   const formationIds = getEtabFormationIds(req);
   const etabId = req.user.role === 'admin' ? null : req.user.etablissement_id;
 
@@ -251,12 +384,77 @@ router.get('/statistiques', (req, res) => {
     refuses: arr.filter(d => d.statut === 'refuse').length,
   });
 
+  const global = counts(dossiers);
+
+  const demandesSorted = [...demandes].sort(
+    (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+  );
+  const demandes_recentes = demandesSorted.slice(0, 6).map((d) => ({
+    id: d.id,
+    reference: d.reference,
+    prenom: d.prenom,
+    nom: d.nom,
+    email: d.email,
+    telephone: d.telephone,
+    formation_titre: d.formation_titre,
+    type_formation: d.type_formation,
+    statut: d.statut,
+    montant_ttc: d.facture?.montant_ttc ?? null,
+    created_at: d.created_at,
+  }));
+
+  const { isFactureSupprimee } = require('../utils/factureVisibility');
+  let factures = db.get('factures').value() || [];
+  if (etabId) {
+    const formById = _formationsMap();
+    factures = factures.filter((f) => {
+      if (isFactureSupprimee(f)) return false;
+      if (f.formation_id) {
+        const fo = formById.get(f.formation_id) || formById.get(Number(f.formation_id));
+        if (fo && Number(fo.etablissement_id) === Number(etabId)) return true;
+      }
+      if (f.dossier_id) {
+        const dos = db.get('dossiers').find({ id: f.dossier_id }).value();
+        if (dos && dossierAppartientAEtablissement(dos, etabId)) return true;
+      }
+      if (f.etablissement_snapshot?.id != null && Number(f.etablissement_snapshot.id) === Number(etabId)) {
+        return true;
+      }
+      return false;
+    });
+  } else {
+    factures = factures.filter((f) => !isFactureSupprimee(f));
+  }
+  factures.sort((a, b) => new Date(b.date_emission || 0) - new Date(a.date_emission || 0));
+  const factures_recentes = factures.slice(0, 6).map((f) => {
+    const et = f.etudiant_snapshot || {};
+    return {
+      id: f.id,
+      numero: f.numero,
+      prenom: et.prenom,
+      nom: et.nom,
+      formation_titre: f.formation_snapshot?.titre || null,
+      montant_ttc: f.montant_ttc,
+      statut: f.statut,
+      date_emission: f.date_emission,
+      dossier_id: f.dossier_id || null,
+    };
+  });
+  const montant_total = factures.reduce((s, f) => s + (Number(f.montant_ttc) || 0), 0);
+
   res.json({
     fad: counts(fad),
     presentiel: counts(presentiel),
     total: dossiers.length,
+    taux_acceptation_pct: global.acceptes + global.refuses > 0
+      ? Math.round((global.acceptes / (global.acceptes + global.refuses)) * 1000) / 10
+      : null,
     demandes_proforma: demandes.length,
-    nouvelles_demandes: demandes.filter(d => d.statut === 'nouvelle' || d.statut === 'en_attente').length
+    nouvelles_demandes: demandes.filter(d => d.statut === 'nouvelle' || d.statut === 'en_attente').length,
+    formations_plus_demandees: topFormationsDemandees(demandes, 8),
+    demandes_recentes,
+    factures: { total: factures.length, montant_total },
+    factures_recentes,
   });
 });
 
@@ -269,13 +467,27 @@ router.get('/dossiers/:id', (req, res) => {
   }
 
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
+  const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
+  const identite = resolveCandidatIdentite(dossier, u);
   const documents = db.get('documents').filter({ dossier_id: id }).value();
   const formation = db.get('formations').find({ id: dossier.formation_id }).value();
   const factureRow = db.get('factures').find({ dossier_id: id }).value() || null;
   const facture = factureRow ? genererOuRecupererFactureDossier(id) : null;
 
   res.json({
-    dossier: { ...dossier, nom: u.nom, prenom: u.prenom, email: u.email, date_inscription: u.created_at },
+    dossier: {
+      ...dossier,
+      prenom: identite.prenom || null,
+      nom: identite.nom || null,
+      email: identite.email || null,
+      telephone: identite.telephone || dossier.telephone || null,
+      date_naissance: identite.date_naissance || dossier.date_naissance || null,
+      lieu_naissance: identite.lieu_naissance || dossier.lieu_naissance || null,
+      nationalite: identite.nationalite || dossier.nationalite || null,
+      adresse: identite.adresse || dossier.adresse || null,
+      matricule: identite.matricule || null,
+      date_inscription: u.created_at || dossier.created_at || null,
+    },
     documents,
     formation,
     facture
@@ -334,6 +546,9 @@ router.put('/dossiers/:id/statut', (req, res) => {
     from: dossier.statut,
     to: statut,
     motif_rejet: statut === 'refuse' ? String(motif_rejet || '').slice(0, 180) : null,
+    actor_role: req.user.role,
+    actor_id: req.user.id,
+    visible_admin: true,
   });
 
   let facture = null;

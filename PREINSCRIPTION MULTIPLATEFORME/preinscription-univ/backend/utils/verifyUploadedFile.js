@@ -85,6 +85,19 @@ async function verifyEtablissementAssetBuffer(buf, extLower) {
   return { ok: false, message: 'Format de fichier non autorisé.' };
 }
 
+const CHAT_BLOCKED_EXT = new Set(['.svg', '.html', '.htm', '.js', '.exe', '.php', '.sh', '.bat']);
+const CHAT_MAX_BYTES = 12 * 1024 * 1024;
+
+async function verifyChatUploadBuffer(buf, extLower) {
+  if (!buf || buf.length > CHAT_MAX_BYTES) {
+    return { ok: false, message: 'Fichier trop volumineux (12 Mo max.).' };
+  }
+  if (CHAT_BLOCKED_EXT.has(extLower)) {
+    return { ok: false, message: 'Format de fichier non autorisé pour le chat.' };
+  }
+  return verifyDossierUploadBuffer(buf, extLower);
+}
+
 async function verifyDiskFile(filePath, originalname, kind) {
   let buf;
   try {
@@ -93,11 +106,9 @@ async function verifyDiskFile(filePath, originalname, kind) {
     return { ok: false, message: 'Lecture du fichier impossible.' };
   }
   const ext = path.extname(originalname || '').toLowerCase();
-  const r =
-    kind === 'dossier'
-      ? await verifyDossierUploadBuffer(buf, ext)
-      : await verifyEtablissementAssetBuffer(buf, ext);
-  return r;
+  if (kind === 'dossier') return verifyDossierUploadBuffer(buf, ext);
+  if (kind === 'chat') return verifyChatUploadBuffer(buf, ext);
+  return verifyEtablissementAssetBuffer(buf, ext);
 }
 
 function unlinkQuiet(p) {
@@ -110,9 +121,11 @@ function unlinkQuiet(p) {
 
 module.exports = {
   verifyDossierUploadBuffer,
+  verifyChatUploadBuffer,
   verifyEtablissementAssetBuffer,
   verifyDiskFile,
   unlinkQuiet,
   detectDossierMagicFormat,
   extensionForStoredDossierFile,
+  CHAT_MAX_BYTES,
 };

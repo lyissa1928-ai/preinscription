@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import StatutBadge from '../../components/StatutBadge'
@@ -56,7 +56,20 @@ export default function AgentAdminDashboard() {
       <DashboardHero
         eyebrow="Contrôle administratif"
         title="Vérification des dossiers"
-        subtitle="Suivi de la complétude des pièces et traitement des dossiers de préinscription."
+        subtitle="Complétude des pièces et traitement des dossiers."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link to="/responsable/preinscription-guichet" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Guichet
+            </Link>
+            <Link to="/chat" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Messages
+            </Link>
+            <Link to="/mon-etablissement/factures" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Factures
+            </Link>
+          </div>
+        }
       />
 
       {stats && (

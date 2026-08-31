@@ -1,12 +1,8 @@
-import { useMemo } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { sanitizeNextPath } from '@/lib/navigation'
 import { FaGraduationCap, FaCopy } from 'react-icons/fa'
 import toast from 'react-hot-toast'
-
-const STORAGE_KEY = 'signup_creds_once'
-const TTL_MS = 15 * 60 * 1000
 
 export default function BienvenueCompte() {
   const { user } = useAuth()
@@ -14,20 +10,9 @@ export default function BienvenueCompte() {
   const location = useLocation()
   const afterWelcome = sanitizeNextPath(location.state?.next) || '/dashboard'
 
-  const { passwordOnce, expired } = useMemo(() => {
-    try {
-      const raw = sessionStorage.getItem(STORAGE_KEY)
-      if (!raw) return { passwordOnce: null, expired: false }
-      const o = JSON.parse(raw)
-      if (!o?.t || Date.now() - o.t > TTL_MS) {
-        sessionStorage.removeItem(STORAGE_KEY)
-        return { passwordOnce: null, expired: true }
-      }
-      return { passwordOnce: o.p || null, expired: false }
-    } catch {
-      return { passwordOnce: null, expired: false }
-    }
-  }, [])
+  // Mot de passe reçu via l'état de navigation (mémoire uniquement, jamais
+  // persisté) : il disparaît au refresh ou dès qu'on quitte la page.
+  const passwordOnce = location.state?.passwordOnce || null
 
   const copy = (label, text) => {
     if (!text) return
@@ -35,7 +20,6 @@ export default function BienvenueCompte() {
   }
 
   const continuer = () => {
-    sessionStorage.removeItem(STORAGE_KEY)
     navigate(afterWelcome, { replace: true })
   }
 
@@ -93,9 +77,9 @@ export default function BienvenueCompte() {
             </div>
           ) : (
             <p className="text-sm text-amber-900">
-              {expired
-                ? 'La fenêtre d’affichage du mot de passe a expiré. Utilisez « Mot de passe oublié » avec votre matricule depuis la page de connexion, ou contactez le support si vous avez oublié votre matricule.'
-                : 'Si vous ne voyez pas le mot de passe, c’est que vous avez déjà quitté cette page ou rafraîchi : utilisez la réinitialisation par matricule depuis la connexion.'}
+              Le mot de passe n’est affiché qu’une seule fois, juste après la création du compte.
+              Si vous l’avez oublié, utilisez « Mot de passe oublié » depuis la page de connexion :
+              un lien de réinitialisation sera envoyé à votre adresse e-mail.
             </p>
           )}
         </div>

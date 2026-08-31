@@ -6,6 +6,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { mediaUrl } from '../utils/mediaUrl'
 import { resolveApiBaseUrl } from '../utils/resolveApiBaseUrl'
+import { getAccessToken } from '../lib/tokenStorage'
 
 /** Palette proche de WhatsApp Web (2024) */
 const WA = {
@@ -22,9 +23,9 @@ const WA = {
 }
 
 const ROLE_LABELS = {
-  etudiant: 'Étudiant',
-  responsable: 'Pédagogie',
-  agent_admin: 'Services',
+  etudiant: 'Étudiants',
+  responsable: 'Responsables',
+  agent_admin: 'Agents administratifs',
   comptable: 'Comptabilité',
   controleur_qualite: 'Qualité',
 }
@@ -167,7 +168,7 @@ export default function ChatPage() {
   }, [messages, selectedPeer])
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token = getAccessToken()
     if (!token) return
 
     const s = io(socketBaseUrl(), {

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import CreerProformaModal from '../../components/CreerProformaModal'
 import {
   DashboardPage,
   DashboardHero,
@@ -28,7 +30,10 @@ export default function ComptableDashboard() {
   const [tarifs, setTarifs] = useState(null)
   const [dossiers, setDossiers] = useState([])
   const [filtreType, setFiltreType] = useState('')
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState({})
   const [loading, setLoading] = useState(false)
+  const [creerOpen, setCreerOpen] = useState(false)
 
   useEffect(() => {
     axios.get('/api/comptable/dashboard').then(({ data }) => setStats(data)).catch(() => {})
@@ -37,10 +42,10 @@ export default function ComptableDashboard() {
   useEffect(() => {
     if (tab === 'proformas') {
       setLoading(true)
-      const params = new URLSearchParams({ limit: 50 })
+      const params = new URLSearchParams({ page, limit: 15 })
       if (filtreType) params.append('type', filtreType)
       axios.get(`/api/comptable/proformas?${params}`)
-        .then(({ data }) => setProformas(data.demandes))
+        .then(({ data }) => { setProformas(data.demandes); setPagination(data.pagination || {}) })
         .catch(() => {})
         .finally(() => setLoading(false))
     }
@@ -49,12 +54,29 @@ export default function ComptableDashboard() {
     }
     if (tab === 'dossiers') {
       setLoading(true)
-      axios.get('/api/comptable/dossiers?limit=50')
-        .then(({ data }) => setDossiers(data.dossiers))
+      axios.get(`/api/comptable/dossiers?page=${page}&limit=15`)
+        .then(({ data }) => { setDossiers(data.dossiers); setPagination(data.pagination || {}) })
         .catch(() => {})
         .finally(() => setLoading(false))
     }
-  }, [tab, filtreType])
+  }, [tab, filtreType, page])
+
+  const handleTab = (id) => { setTab(id); setPage(1); setPagination({}) }
+
+  const pager = pagination.totalPages > 1 && (
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
+      <p className="text-sm text-slate-500">{pagination.total} élément(s)</p>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page === 1} className="btn-secondary py-1.5 px-3 text-xs disabled:opacity-40">
+          ← Préc.
+        </button>
+        <span className="text-sm text-slate-500">Page {page}/{pagination.totalPages}</span>
+        <button type="button" onClick={() => setPage((p) => p + 1)} disabled={page === pagination.totalPages} className="btn-secondary py-1.5 px-3 text-xs disabled:opacity-40">
+          Suiv. →
+        </button>
+      </div>
+    </div>
+  )
 
   const handleValidationFinanciere = async (id, validation_financiere) => {
     try {
@@ -71,12 +93,43 @@ export default function ComptableDashboard() {
       <DashboardHero
         eyebrow="Finance"
         title="Espace comptabilité"
-        subtitle="Supervision des factures proforma, tarifs et validation financière des dossiers."
+        subtitle="Factures proforma, tarifs et validation financière."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link to="/responsable/demandes-proforma" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Demandes proforma
+            </Link>
+            <Link to="/mon-etablissement/factures" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Factures
+            </Link>
+            <button
+              type="button"
+              onClick={() => setCreerOpen(true)}
+              className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700"
+            >
+              Nouvelle facture proforma
+            </button>
+          </div>
+        }
+      />
+
+      <CreerProformaModal
+        open={creerOpen}
+        onClose={() => setCreerOpen(false)}
+        onCreated={() => {
+          if (tab === 'proformas') {
+            setPage(1)
+            setLoading(true)
+            axios.get('/api/comptable/proformas?page=1&limit=15')
+              .then(({ data }) => { setProformas(data.demandes); setPagination(data.pagination || {}) })
+              .finally(() => setLoading(false))
+          }
+        }}
       />
 
       <TabPillBar>
         {TABS.map((t) => (
-          <TabPill key={t.id} active={tab === t.id} onClick={() => setTab(t.id)}>
+          <TabPill key={t.id} active={tab === t.id} onClick={() => handleTab(t.id)}>
             {t.label}
           </TabPill>
         ))}
@@ -138,12 +191,19 @@ export default function ComptableDashboard() {
 
         {tab === 'proformas' && (
           <Panel title="Factures proforma" bodyClassName="p-6">
-            <div className="flex gap-3 mb-6">
-              <select className="input-field sm:w-52" value={filtreType} onChange={e => setFiltreType(e.target.value)}>
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <select className="input-field sm:w-52" value={filtreType} onChange={e => { setFiltreType(e.target.value); setPage(1) }}>
                 <option value="">Tous les types</option>
                 <option value="en_ligne">🌐 FAD uniquement</option>
                 <option value="presentiel">🏫 Présentiel uniquement</option>
               </select>
+              <button
+                type="button"
+                onClick={() => setCreerOpen(true)}
+                className="ml-auto rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+              >
+                Nouvelle facture proforma
+              </button>
             </div>
 
             {loading ? (
@@ -184,6 +244,7 @@ export default function ComptableDashboard() {
                 {proformas.length === 0 && <div className="py-10 text-center text-slate-400">Aucune facture proforma trouvée.</div>}
               </div>
             )}
+            {!loading && pager}
           </Panel>
         )}
 
@@ -279,6 +340,7 @@ export default function ComptableDashboard() {
                 {dossiers.length === 0 && <div className="py-10 text-center text-slate-400">Aucun dossier trouvé.</div>}
               </div>
             )}
+            {!loading && pager}
           </Panel>
         )}
     </DashboardPage>

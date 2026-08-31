@@ -1,6 +1,12 @@
 /**
- * Révocation JWT en mémoire (jti) — déconnexion serveur, sans casser les anciens tokens sans jti.
+ * Révocation JWT (jti) — mémoire + persistance fichier légère.
  */
+const {
+  persistRevokedJti,
+  isJtiPersistentlyRevoked,
+  loadRevokedJtisIntoMemory,
+} = require('../database/authSessionStore');
+
 const revoked = new Map();
 
 function pruneExpired() {
@@ -14,11 +20,13 @@ function revokeToken(jti, expMsEpoch) {
   if (!jti || !expMsEpoch) return;
   pruneExpired();
   revoked.set(String(jti), Number(expMsEpoch));
+  persistRevokedJti(jti, expMsEpoch);
 }
 
 function isTokenRevoked(jti) {
   if (!jti) return false;
   pruneExpired();
+  if (isJtiPersistentlyRevoked(jti)) return true;
   const expMs = revoked.get(String(jti));
   if (expMs == null) return false;
   if (Date.now() > expMs) {
@@ -28,4 +36,8 @@ function isTokenRevoked(jti) {
   return true;
 }
 
-module.exports = { revokeToken, isTokenRevoked };
+function initTokenRevocationFromDisk() {
+  loadRevokedJtisIntoMemory(revokeToken);
+}
+
+module.exports = { revokeToken, isTokenRevoked, initTokenRevocationFromDisk };

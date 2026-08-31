@@ -1,0 +1,17 @@
+# Exemple Apache — esebat-digitalservices.com
+# UniPortail sous /uniportail/ ; ancienne app PHP à la racine.
+#
+# Rediriger les anciennes URLs React vers /uniportail/ pour éviter
+# d'afficher une version obsolète (ex. /connexion sans le bon build).
+
+# Dans le VirtualHost HTTPS du domaine :
+
+RedirectMatch 301 ^/connexion/?$ /uniportail/connexion
+RedirectMatch 301 ^/inscription/?$ /uniportail/inscription
+RedirectMatch 301 ^/accueil/?$ /uniportail/accueil
+RedirectMatch 301 ^/mot-de-passe-oublie/?$ /uniportail/mot-de-passe-oublie
+
+# Alias application (déjà en place normalement) :
+# Alias /uniportail /var/www/uniportail/frontend/dist
+# ProxyPass /uniportail/api/ http://127.0.0.1:5000/api/
+# ProxyPassReverse /uniportail/api/ http://127.0.0.1:5000/api/

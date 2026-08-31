@@ -13,6 +13,7 @@ const TYPE_FORMATION_META = {
 }
 
 const ROLE_LINKS = {
+  admin_etablissement: { label: 'Équipe & comptes', path: '/mon-etablissement/equipe', icon: '👥' },
   responsable: { label: 'Traiter les dossiers',    path: '/responsable',  icon: '📋' },
   agent_admin:  { label: 'Contrôle administratif', path: '/agent-admin',   icon: '🗂️' },
   comptable:    { label: 'Finance & Facturation',   path: '/comptable',    icon: '💰' },
@@ -121,6 +122,7 @@ export default function EtablissementHome() {
   const [selectedFiliereNom, setSelectedFiliereNom] = useState(null)
   /** 'presentiel' | 'en_ligne' */
   const [selectedFormationType, setSelectedFormationType] = useState(null)
+  const [exportingRapport, setExportingRapport] = useState(false)
 
   const etabId = user?.etablissement_id
 
@@ -288,7 +290,7 @@ export default function EtablissementHome() {
             { label: 'Formations',        value: formations.length,             icon: '🎓', color: primary },
             { label: 'Dossiers total',    value: stats.total,                   icon: '📂', color: secondary },
             { label: 'En attente',        value: stats.fad?.en_attente + stats.presentiel?.en_attente || 0, icon: '⏳', color: '#f59e0b' },
-            { label: 'Demandes proforma', value: stats.demandes_proforma || 0,  icon: '🧾', color: '#10b981' },
+            { label: 'Préinscriptions à traiter', value: stats.demandes_proforma || 0,  icon: '🧾', color: '#10b981' },
           ].map((s, i) => (
             <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
               <div className="text-2xl mb-1">{s.icon}</div>
@@ -327,6 +329,43 @@ export default function EtablissementHome() {
               Voir les listes
             </Link>
           </div>
+          {(user?.role === 'responsable' || user?.role === 'comptable') && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
+              <div>
+                <p className="font-bold text-gray-800 text-sm">Rapport Excel établissement</p>
+                <p className="text-xs text-gray-500">
+                  Logo, formations les plus demandées, demandes proforma et factures — fichier propre à cet établissement.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-sm font-bold px-4 py-2 rounded-xl border-2 shrink-0 transition-all hover:opacity-80 disabled:opacity-50"
+                style={{ color: primary, borderColor: primary }}
+                disabled={exportingRapport}
+                onClick={async () => {
+                  setExportingRapport(true)
+                  try {
+                    const { data } = await axios.get(
+                      `/api/etablissements/${etabId}/rapport-etablissement/export-xlsx`,
+                      { responseType: 'blob' },
+                    )
+                    const url = URL.createObjectURL(data)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `rapport-etablissement-${etabId}.xlsx`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  } catch {
+                    /* ignore */
+                  } finally {
+                    setExportingRapport(false)
+                  }
+                }}
+              >
+                {exportingRapport ? 'Export…' : 'Télécharger Excel'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -349,7 +388,7 @@ export default function EtablissementHome() {
               </p>
             )}
           </div>
-          {user?.role === 'responsable' && (
+          {(user?.role === 'responsable' || user?.fonctions?.includes?.('responsable')) && (
             <Link to="/responsable/gestion-etablissement"
               className="text-sm font-bold px-4 py-2 rounded-xl border-2 transition-all hover:opacity-80 shrink-0 self-start"
               style={{ color: primary, borderColor: primary }}>
@@ -556,21 +595,45 @@ export default function EtablissementHome() {
       </div>
 
       {!isEtudiant && (() => {
-        const proformaRoles = ['responsable', 'admin', 'agent_admin', 'comptable', 'controleur_qualite']
-        const showProforma = proformaRoles.includes(user?.role)
+        const role = user?.role
         const quick = [
-          roleLink && { ...roleLink, desc: 'Gérer les dossiers de préinscription' },
-          showProforma && {
-            label: 'Demandes proforma',
+          roleLink && { ...roleLink, desc: 'Tableau de bord de votre rôle' },
+          role === 'responsable' && {
+            label: 'Dossiers & acceptation',
+            path: '/responsable',
+            icon: '✅',
+            desc: 'Accepter ou refuser les préinscriptions',
+          },
+          ['responsable', 'comptable'].includes(role) && {
+            label: 'Préinscriptions à traiter',
             path: '/responsable/demandes-proforma',
             icon: '🧾',
-            desc: "Demandes de facture proforma et validation",
+            desc: 'Demandes en attente d’acceptation',
           },
-          user?.role === 'responsable' && { label: 'Valider des dossiers', path: '/responsable', icon: '✅', desc: 'Accepter ou refuser des candidatures' },
-          user?.role === 'agent_admin' && { label: 'Vérifier les documents', path: '/agent-admin', icon: '📎', desc: 'Contrôle de complétude des dossiers' },
-          user?.role === 'comptable' && { label: 'Finance', path: '/comptable', icon: '💰', desc: 'Gestion financière et facturation' },
-          user?.role === 'admin' && { label: 'Administration', path: '/admin', icon: '👁️', desc: 'Vue globale de la plateforme' },
-          user?.role === 'controleur_qualite' && { label: 'Qualité', path: '/qualite', icon: '✅', desc: 'Contrôle et conformité' },
+          ['responsable', 'agent_admin'].includes(role) && {
+            label: 'Guichet',
+            path: '/responsable/preinscription-guichet',
+            icon: '🧾',
+            desc: 'Saisie walk-in',
+          },
+          role === 'responsable' && {
+            label: 'Formations',
+            path: '/responsable/gestion-etablissement',
+            icon: '📚',
+            desc: 'Filières et formations',
+          },
+          {
+            label: 'Messages',
+            path: '/chat',
+            icon: '💬',
+            desc: 'Messagerie',
+          },
+          ['responsable', 'agent_admin', 'comptable'].includes(role) && {
+            label: 'Factures',
+            path: '/mon-etablissement/factures',
+            icon: '📄',
+            desc: 'Historique des factures',
+          },
         ].filter(Boolean)
         return (
           <div>

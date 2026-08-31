@@ -7,6 +7,8 @@ import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
 import { reportClientError } from './utils/reportClientError'
 import { resolveApiBaseUrl } from './utils/resolveApiBaseUrl'
+import { setupAuthInterceptors } from './lib/setupAuthInterceptors'
+import { getRouterBasename } from './utils/appBasePath'
 import './index.css'
 import './lettre-print-additive.css'
 
@@ -16,18 +18,26 @@ if (apiBase) {
 }
 /** Évite un chargement infini si l’API ne répond pas (écran blanc / spinner bloqué). */
 axios.defaults.timeout = 25000
+setupAuthInterceptors()
 
-axios.interceptors.response.use(
-  (r) => r,
-  (err) => {
-    if (err.response?.status === 403 && err.response?.data?.code === 'MUST_CHANGE_PASSWORD') {
-      if (!window.location.pathname.startsWith('/changer-mot-de-passe-obligatoire')) {
-        window.location.assign('/changer-mot-de-passe-obligatoire')
-      }
-    }
-    return Promise.reject(err)
-  }
-)
+window.addEventListener('error', (ev) => {
+  reportClientError({
+    type: 'window-error',
+    message: ev.message,
+    filename: ev.filename,
+    lineno: ev.lineno,
+    colno: ev.colno,
+  })
+})
+
+window.addEventListener('unhandledrejection', (ev) => {
+  const r = ev.reason
+  reportClientError({
+    type: 'unhandledrejection',
+    message: r?.message != null ? String(r.message) : String(r),
+    stack: r?.stack,
+  })
+})
 
 window.addEventListener('error', (ev) => {
   reportClientError({
@@ -56,7 +66,7 @@ if (!rootEl) {
 ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter basename={getRouterBasename() || undefined}>
         <App />
         <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
       </BrowserRouter>

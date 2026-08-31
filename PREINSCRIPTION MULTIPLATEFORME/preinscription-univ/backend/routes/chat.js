@@ -6,8 +6,26 @@ const router = express.Router();
 const db = require('../database/db');
 const { authMiddleware, staffOnly } = require('../middleware/auth');
 const { canChatWith, conversationKey } = require('../utils/chatRules');
+const { withFonctions } = require('../utils/userFonctions');
 const chatStore = require('../database/chatStore');
 const { getIO } = require('../socket/chatSocket');
+const { verifyDiskFile, extensionForStoredDossierFile, detectDossierMagicFormat, unlinkQuiet } = require('../utils/verifyUploadedFile');
+const { parsePagination, wantsPagination, paginateArray } = require('../utils/pagination');
+const { rateLimit, getClientIp } = require('../utils/rateLimit');
+const { sanitizeChatAttachment } = require('../utils/chatAttachment');
+
+const chatUploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: 'Trop d’envois de fichiers. Réessayez plus tard.',
+  keyGenerator: (req) => `chat_upload:${getClientIp(req)}:${req.user?.id || 'anon'}`,
+});
+const chatMessageLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 40,
+  message: 'Trop de messages envoyés. Ralentissez.',
+  keyGenerator: (req) => `chat_msg:${getClientIp(req)}:${req.user?.id || 'anon'}`,
+});
 
 const CHAT_UPLOAD_DIR = path.join(__dirname, '../uploads/chat-attachments');
 try {
@@ -16,16 +34,24 @@ try {
   /* ignore */
 }
 
+const CHAT_MAX_UPLOAD = 12 * 1024 * 1024;
+
 const chatUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, CHAT_UPLOAD_DIR),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname || '') || '';
+    filename: (_req, _file, cb) => {
       const base = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      cb(null, base + ext);
+      cb(null, `${base}.upload`);
     },
   }),
-  limits: { fileSize: 12 * 1024 * 1024 },
+  limits: { fileSize: CHAT_MAX_UPLOAD },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (['.svg', '.html', '.htm', '.js', '.exe'].includes(ext)) {
+      return cb(new Error('Format non autorisé.'));
+    }
+    cb(null, true);
+  },
 });
 
 function publicUser(u) {
@@ -48,19 +74,7 @@ function requireEtab(req, res, next) {
   next();
 }
 
-function parseAttachmentFromBody(body) {
-  if (!body || typeof body !== 'object') return null;
-  const a = body.attachment;
-  if (!a || typeof a !== 'object') return null;
-  if (!a.url || !String(a.url).trim()) return null;
-  const nameRaw = a.original_name || a.name;
-  return {
-    url: String(a.url).trim(),
-    original_name: nameRaw ? String(nameRaw).slice(0, 500) : null,
-    mime: a.mime ? String(a.mime).slice(0, 200) : null,
-    size: a.size != null ? Number(a.size) : null,
-  };
-}
+// Validation stricte des pièces jointes : voir utils/chatAttachment.js.
 
 function emitChatMessage(io, eid, me, peer, msg) {
   const envelope = { ...msg, peer_id: peer.id };
@@ -79,17 +93,44 @@ router.use(authMiddleware);
 router.use(requireEtab);
 
 /** Upload fichier pour message (retourne URL publique /uploads/...) */
-router.post('/upload', chatUpload.single('file'), (req, res) => {
+router.post('/upload', chatUploadLimiter, chatUpload.single('file'), async (req, res) => {
   const me = db.get('utilisateurs').find({ id: req.user.id }).value();
   if (!me) return res.status(401).json({ message: 'Utilisateur introuvable' });
   if (!req.file) {
     return res.status(400).json({ message: 'Fichier manquant.' });
   }
-  const rel = `chat-attachments/${req.file.filename}`;
+
+  const tempPath = path.join(CHAT_UPLOAD_DIR, req.file.filename);
+  const v = await verifyDiskFile(tempPath, req.file.originalname, 'chat');
+  if (!v.ok) {
+    unlinkQuiet(tempPath);
+    return res.status(400).json({ message: v.message || 'Fichier refusé.' });
+  }
+
+  let buf;
+  try {
+    buf = fs.readFileSync(tempPath);
+  } catch {
+    unlinkQuiet(tempPath);
+    return res.status(400).json({ message: 'Lecture du fichier impossible.' });
+  }
+  const magic = detectDossierMagicFormat(buf);
+  const extFinal = extensionForStoredDossierFile(magic);
+  const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extFinal}`;
+  const finalPath = path.join(CHAT_UPLOAD_DIR, safeName);
+  try {
+    fs.renameSync(tempPath, finalPath);
+  } catch {
+    unlinkQuiet(tempPath);
+    return res.status(500).json({ message: 'Enregistrement du fichier impossible.' });
+  }
+
+  const rel = `chat-attachments/${safeName}`;
   const url = `/uploads/${rel}`;
+  const safeOriginal = path.basename(String(req.file.originalname || safeName)).slice(0, 200);
   return res.status(201).json({
     url,
-    original_name: req.file.originalname || req.file.filename,
+    original_name: safeOriginal,
     mime: req.file.mimetype || null,
     size: req.file.size,
   });
@@ -115,19 +156,24 @@ router.get('/documents', staffOnly, (req, res) => {
     sender: publicUser(byId.get(m.sender_id)),
     conversation_key: m.conversation_key,
   }));
+  if (wantsPagination(req.query)) {
+    const { page, limit } = parsePagination(req.query, { page: 1, limit: 50 });
+    const { items, pagination } = paginateArray(out, page, limit);
+    return res.json({ documents: items, pagination });
+  }
   return res.json({ documents: out });
 });
 
 /** Contacts autorisés (même établissement) */
 router.get('/contacts', (req, res) => {
   const eid = Number(req.user.etablissement_id);
-  const me = db.get('utilisateurs').find({ id: req.user.id }).value();
+  const me = withFonctions(db.get('utilisateurs').find({ id: req.user.id }).value());
   if (!me) return res.status(401).json({ message: 'Utilisateur introuvable' });
 
   const users = db.get('utilisateurs').value() || [];
   const contacts = users
     .filter((u) => u && u.actif !== false && Number(u.etablissement_id) === eid && u.id !== me.id)
-    .filter((u) => canChatWith(me, u))
+    .filter((u) => canChatWith(me, withFonctions(u)))
     .map(publicUser)
     .sort((a, b) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`, 'fr'));
 
@@ -163,24 +209,28 @@ router.get('/conversations', (req, res) => {
 router.get('/peer/:peerId/messages', (req, res) => {
   const peerId = Number(req.params.peerId);
   const eid = Number(req.user.etablissement_id);
-  const me = db.get('utilisateurs').find({ id: req.user.id }).value();
-  const peer = db.get('utilisateurs').find({ id: peerId }).value();
+  const me = withFonctions(db.get('utilisateurs').find({ id: req.user.id }).value());
+  const peer = withFonctions(db.get('utilisateurs').find({ id: peerId }).value());
   if (!me || !peer || !canChatWith(me, peer)) {
     return res.status(403).json({ message: 'Conversation non autorisée' });
   }
 
   const key = conversationKey(eid, me.id, peer.id);
   const beforeId = req.query.before ? Number(req.query.before) : undefined;
-  const messages = chatStore.getMessagesForConversation(key, { limit: 100, beforeId });
+  const pageLimit = req.query.limit ? Math.min(Number(req.query.limit) || 80, 200) : undefined;
+  const { messages, has_more: hasMore } = chatStore.getMessagesForConversation(key, {
+    limit: pageLimit,
+    beforeId,
+  });
 
-  return res.json({ conversation_key: key, messages });
+  return res.json({ conversation_key: key, messages, has_more: !!hasMore });
 });
 
 router.post('/peer/:peerId/read', (req, res) => {
   const peerId = Number(req.params.peerId);
   const eid = Number(req.user.etablissement_id);
-  const me = db.get('utilisateurs').find({ id: req.user.id }).value();
-  const peer = db.get('utilisateurs').find({ id: peerId }).value();
+  const me = withFonctions(db.get('utilisateurs').find({ id: req.user.id }).value());
+  const peer = withFonctions(db.get('utilisateurs').find({ id: peerId }).value());
   if (!me || !peer || !canChatWith(me, peer)) {
     return res.status(403).json({ message: 'Conversation non autorisée' });
   }
@@ -190,16 +240,19 @@ router.post('/peer/:peerId/read', (req, res) => {
 });
 
 /** Envoi HTTP (secours si WebSocket indisponible) */
-router.post('/peer/:peerId/messages', (req, res) => {
+router.post('/peer/:peerId/messages', chatMessageLimiter, (req, res) => {
   const peerId = Number(req.params.peerId);
   const eid = Number(req.user.etablissement_id);
-  const me = db.get('utilisateurs').find({ id: req.user.id }).value();
-  const peer = db.get('utilisateurs').find({ id: peerId }).value();
+  const me = withFonctions(db.get('utilisateurs').find({ id: req.user.id }).value());
+  const peer = withFonctions(db.get('utilisateurs').find({ id: peerId }).value());
   if (!me || !peer || !canChatWith(me, peer)) {
     return res.status(403).json({ message: 'Conversation non autorisée' });
   }
   const body = req.body?.body ?? req.body?.message ?? '';
-  const attachment = parseAttachmentFromBody(req.body);
+  const { attachment, invalid } = sanitizeChatAttachment(req.body?.attachment);
+  if (invalid) {
+    return res.status(400).json({ message: 'Pièce jointe invalide.' });
+  }
   const msg = chatStore.addMessage(eid, me.id, peer.id, body, attachment);
   if (!msg) return res.status(400).json({ message: 'Message vide ou pièce jointe manquante.' });
   const io = getIO();

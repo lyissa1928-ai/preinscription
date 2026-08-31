@@ -23,7 +23,17 @@ const { createUserNotification } = require('../utils/notificationService');
 const { rateLimit, getClientIp } = require('../utils/rateLimit');
 const { retentionConfigFromEnv, runMaintenancePrune } = require('../utils/maintenance');
 const { getRuntimeMetricsSnapshot } = require('../utils/runtimeMetrics');
+const { generateTempPassword } = require('../utils/accountLock');
+const { logSecurityEvent } = require('../utils/securityEvent');
 const { proformaDemandeDecision } = require('../services/proformaDemandeDecisionService');
+const {
+  countDossiersByStatut,
+  dossiersRecents,
+  statsParEtablissement,
+} = require('../utils/statsHelpers');
+const { isMaintenanceModeEnabled } = require('../utils/maintenanceMode');
+const { runHealthChecks } = require('../utils/healthCheck');
+const { parsePagination, wantsPagination, paginateArray } = require('../utils/pagination');
 
 router.use(authMiddleware);
 router.use((req, res, next) => {
@@ -248,28 +258,33 @@ router.put('/dossiers/:id/statut', (req, res) => {
 router.get('/statistiques', (req, res) => {
   const dossiers = db.get('dossiers').value();
   const utilisateurs = db.get('utilisateurs').value();
+  const etablissements = db.get('etablissements').value();
+  const formations = db.get('formations').value();
 
   const parFiliere = {};
   dossiers.forEach(d => { parFiliere[d.filiere] = (parFiliere[d.filiere] || 0) + 1; });
   const parFiliereArr = Object.entries(parFiliere).map(([filiere, count]) => ({ filiere, count })).sort((a, b) => b.count - a.count);
 
-  const recents = [...dossiers]
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  const counts = countDossiersByStatut(dossiers);
+  const recents = dossiersRecents(dossiers, utilisateurs, 5);
+  const securityAlerts = (db.get('security_events').value() || [])
+    .filter((e) => e.severity === 'warning' || e.severity === 'critical')
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
     .slice(0, 5)
-    .map(d => {
-      const u = utilisateurs.find(u => u.id === d.etudiant_id) || {};
-      return { numero_dossier: d.numero_dossier, statut: d.statut, created_at: d.created_at, nom: u.nom, prenom: u.prenom };
-    });
+    .map((e) => ({ type: e.type, severity: e.severity, created_at: e.created_at }));
 
   res.json({
-    total: dossiers.length,
-    en_attente: dossiers.filter(d => d.statut === 'en_attente').length,
-    en_cours: dossiers.filter(d => d.statut === 'en_cours').length,
-    acceptes: dossiers.filter(d => d.statut === 'accepte').length,
-    refuses: dossiers.filter(d => d.statut === 'refuse').length,
+    total: counts.total,
+    en_attente: counts.en_attente,
+    en_cours: counts.en_cours,
+    acceptes: counts.acceptes,
+    refuses: counts.refuses,
+    taux_acceptation_pct: counts.taux_acceptation_pct,
     total_etudiants: utilisateurs.filter(u => u.role === 'etudiant').length,
     par_filiere: parFiliereArr,
-    recents
+    par_etablissement: statsParEtablissement(dossiers, etablissements, formations),
+    recents,
+    alertes_securite: securityAlerts,
   });
 });
 
@@ -277,6 +292,11 @@ router.get('/statistiques', (req, res) => {
 router.get('/demandes-proforma', (req, res) => {
   const demandes = db.get('demandes_proforma').value()
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  if (wantsPagination(req.query)) {
+    const { page, limit } = parsePagination(req.query, { page: 1, limit: 50 });
+    const { items, pagination } = paginateArray(demandes, page, limit);
+    return res.json({ demandes: items, pagination });
+  }
   res.json(demandes);
 });
 
@@ -405,7 +425,7 @@ router.post('/demandes-proforma/delete-batch', adminSensitiveLimiter, (req, res)
 router.get('/utilisateurs', (req, res) => {
   const { role = 'all', page, limit, search = '', etablissement_id = '' } = req.query;
   const dossiers = db.get('dossiers').value();
-  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const STAFF_ROLES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
 
   let utilisateurs = db.get('utilisateurs').value();
   if (role === 'etudiant') {
@@ -542,7 +562,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     prenom, nom, email, mot_de_passe, mot_de_passe_confirmation,
     role, etablissement_id, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_STAFF = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const ROLES_STAFF = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
 
   if (!prenom || !nom || !email || !mot_de_passe || !role || !telephone) {
     return res.status(400).json({
@@ -620,9 +640,16 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   };
   db.get('utilisateurs').push(user).write();
 
+  if (role === 'admin_etablissement' && etabIdForUser) {
+    const { enforceSingleAdminEtablissement } = require('../utils/adminEtablissement');
+    enforceSingleAdminEtablissement(etabIdForUser, id);
+  }
+
   const { mot_de_passe: _, ...safe } = user;
   res.status(201).json({
-    message: `Compte ${role} créé. L'utilisateur devra changer son mot de passe à la première connexion.`,
+    message: role === 'admin_etablissement'
+      ? 'Compte administrateur d’établissement créé. S’il existait déjà un admin pour cet établissement, il a été remplacé automatiquement.'
+      : `Compte ${role} créé. L'utilisateur devra changer son mot de passe à la première connexion.`,
     utilisateur: safe,
   });
 });
@@ -637,7 +664,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     nom, prenom, email, role, actif, etablissement_id, mot_de_passe,
     matricule, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_VALIDES = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'etudiant'];
+  const ROLES_VALIDES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'etudiant'];
   const update = { updated_at: new Date().toISOString(), updated_by: req.user.id };
   let matriculeRegenerated = false;
 
@@ -687,7 +714,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     }
     if (
       nextRole !== 'admin' &&
-      ['responsable', 'agent_admin', 'comptable'].includes(nextRole) &&
+      ['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(nextRole) &&
       user.role === 'admin' &&
       etablissement_id === undefined
     ) {
@@ -719,7 +746,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
         matriculeRegenerated = true;
       }
     } else {
-      if (['responsable', 'agent_admin', 'comptable'].includes(effectiveRoleAfter)) {
+      if (['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(effectiveRoleAfter)) {
         return res.status(400).json({
           message: 'L\'établissement est obligatoire pour ce rôle.',
         });
@@ -749,6 +776,13 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
   }
 
   db.get('utilisateurs').find({ id }).assign(update).write();
+
+  const fresh = db.get('utilisateurs').find({ id }).value();
+  if (fresh.role === 'admin_etablissement' && fresh.etablissement_id) {
+    const { enforceSingleAdminEtablissement } = require('../utils/adminEtablissement');
+    enforceSingleAdminEtablissement(fresh.etablissement_id, id);
+  }
+
   res.json({ message: 'Utilisateur mis à jour.' });
 });
 
@@ -808,18 +842,23 @@ router.get('/statistiques-globales', (req, res) => {
   const dossiers = db.get('dossiers').value();
   const utilisateurs = db.get('utilisateurs').value();
   const demandes = db.get('demandes_proforma').value();
-  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const etablissements = db.get('etablissements').value();
+  const formations = db.get('formations').value();
+  const STAFF_ROLES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
 
   const parRole = {};
   STAFF_ROLES.forEach(r => { parRole[r] = utilisateurs.filter(u => u.role === r).length; });
 
+  const dossierCounts = countDossiersByStatut(dossiers);
+
   res.json({
     dossiers: {
-      total: dossiers.length,
-      en_attente: dossiers.filter(d => d.statut === 'en_attente').length,
-      en_cours: dossiers.filter(d => d.statut === 'en_cours').length,
-      acceptes: dossiers.filter(d => d.statut === 'accepte').length,
-      refuses: dossiers.filter(d => d.statut === 'refuse').length
+      total: dossierCounts.total,
+      en_attente: dossierCounts.en_attente,
+      en_cours: dossierCounts.en_cours,
+      acceptes: dossierCounts.acceptes,
+      refuses: dossierCounts.refuses,
+      taux_acceptation_pct: dossierCounts.taux_acceptation_pct,
     },
     utilisateurs: {
       total: utilisateurs.length,
@@ -827,13 +866,22 @@ router.get('/statistiques-globales', (req, res) => {
       staff: utilisateurs.filter(u => STAFF_ROLES.includes(u.role)).length,
       par_role: parRole
     },
-    demandes_proforma: demandes.length
+    demandes_proforma: demandes.length,
+    demandes_proforma_en_attente: demandes.filter(
+      (d) => d.statut !== 'acceptee' && d.statut !== 'refusee'
+    ).length,
+    par_etablissement: statsParEtablissement(dossiers, etablissements, formations),
+    dossiers_recents: dossiersRecents(dossiers, utilisateurs, 5),
+    systeme: {
+      maintenance_mode: isMaintenanceModeEnabled(),
+      health_ok: runHealthChecks().ok,
+    },
   });
 });
 
 // GET /api/admin/audit-logs?entity=formation&action=create&user_id=12&page=1&limit=50
 router.get('/audit-logs', (req, res) => {
-  const { entity = '', action = '', user_id = '', q = '', page = 1, limit = 50 } = req.query;
+  const { entity = '', action = '', user_id = '', user_role = '', q = '', page = 1, limit = 50 } = req.query;
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
   const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
   const userId = user_id ? parseInt(user_id, 10) : null;
@@ -842,6 +890,7 @@ router.get('/audit-logs', (req, res) => {
   if (entity) logs = logs.filter((x) => String(x.entity || '') === String(entity));
   if (action) logs = logs.filter((x) => String(x.action || '') === String(action));
   if (userId && !Number.isNaN(userId)) logs = logs.filter((x) => Number(x.user_id) === userId);
+  if (user_role) logs = logs.filter((x) => String(x.user_role || '') === String(user_role));
   if (q) {
     const s = String(q).trim().toLowerCase();
     logs = logs.filter((x) => {

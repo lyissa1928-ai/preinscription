@@ -314,17 +314,32 @@ pm2 restart uniportail-api
 N. DÉPLOIEMENTS ULTÉRIEURS (MISE À JOUR DU CODE)
 ================================================================================
 
+  IMPORTANT — Ne pas perdre les données prod (utilisateurs, factures, dossiers) :
+  le fichier backend/database/preinscription.json est dans Git (jeu démo).
+  Un git pull naïf peut écraser la base du serveur.
+
+  Procédure sécurisée (recommandée) :
+
 --------------------------------------------------------------------------------
 cd /var/www/uniportail
+bash deploy/proteger-donnees-prod.sh    # une seule fois après installation
+bash deploy/mise-a-jour-prod.sh         # à chaque mise à jour
+--------------------------------------------------------------------------------
+
+  Alternative manuelle :
+
+--------------------------------------------------------------------------------
+cd /var/www/uniportail
+cp backend/database/preinscription.json /var/backups/uniportail/preinscription-$(date +%Y%m%d-%H%M).json
 git pull
+cp /var/backups/uniportail/preinscription-*.json backend/database/preinscription.json   # si écrasé
 npm run install:all
 npm run build
 pm2 restart uniportail-api
-nginx -t && systemctl reload nginx
 --------------------------------------------------------------------------------
 
-  Si vous changez des variables VITE_* : refaire npm run build après les avoir
-  modifiées dans frontend/.env.production.
+  URL application : https://esebat-digitalservices.com/uniportail/connexion
+  (pas /connexion à la racine — voir deploy/apache-esebat-redirections.conf.example)
 
 ================================================================================
 O. SAUVEGARDES (RECOMMANDÉ)

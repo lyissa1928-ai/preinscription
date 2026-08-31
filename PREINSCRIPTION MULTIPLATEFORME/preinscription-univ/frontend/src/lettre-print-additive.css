@@ -1,113 +1,84 @@
 /**
- * Styles additifs : impression lettre de préinscription
- * Masque chrome app (sidebar / topbar) pour n'imprimer que le document.
+ * Impression documents officiels — masque tout le chrome de l’application.
+ * Cible : pages avec .lettre-print-scope (facture, lettre, attestation).
  */
 @media print {
+  @page {
+    margin: 12mm 14mm;
+  }
+
   body:has(.lettre-print-scope) {
     background: white !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  body:has(.lettre-print-scope) aside {
+  /* Masquer sidebar, topbar mobile, boutons, toasts, widgets */
+  body:has(.lettre-print-scope) aside,
+  body:has(.lettre-print-scope) nav,
+  body:has(.lettre-print-scope) .no-print,
+  body:has(.lettre-print-scope) [data-no-print],
+  body:has(.lettre-print-scope) div.fixed.top-0.left-0.right-0.z-40,
+  body:has(.lettre-print-scope) .fixed.bottom-4,
+  body:has(.lettre-print-scope) .fixed.bottom-6,
+  body:has(.lettre-print-scope) [class*="Toaster"],
+  body:has(.lettre-print-scope) [role="status"] {
     display: none !important;
+    visibility: hidden !important;
   }
 
-  body:has(.lettre-print-scope) div.fixed.top-0.left-0.right-0.z-40 {
-    display: none !important;
-  }
-
+  /* Layout AuthenticatedLayout actuel */
+  body:has(.lettre-print-scope) .app-shell-bg,
+  body:has(.lettre-print-scope) .flex.h-screen.overflow-hidden,
   body:has(.lettre-print-scope) .flex.h-screen.bg-gray-50.overflow-hidden {
     display: block !important;
     height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
+    background: white !important;
   }
 
+  body:has(.lettre-print-scope) .app-shell-bg > .relative.z-10.flex,
+  body:has(.lettre-print-scope) .app-shell-bg > div:last-child,
+  body:has(.lettre-print-scope) .flex.h-screen.overflow-hidden > .flex-1,
   body:has(.lettre-print-scope) .flex.h-screen.bg-gray-50.overflow-hidden > .flex-1 {
+    display: block !important;
     padding-top: 0 !important;
     overflow: visible !important;
     min-height: 0 !important;
+    height: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   body:has(.lettre-print-scope) .lettre-print-scope {
     min-height: 0 !important;
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.25rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
     background: white !important;
   }
 
-  /* Document : pas de overflow caché (évite contenu coupé / ordre bizarre en PDF) */
   body:has(.lettre-print-scope) .print-page {
     overflow: visible !important;
-    border-radius: 0 !important;
     max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 auto !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 0 !important;
   }
 
-  /* En-tête lettre : garder logo + coordonnées en haut, flux ligne stable */
   body:has(.lettre-print-scope) .lettre-print-header-root {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
-  body:has(.lettre-print-scope) .lettre-print-header-row {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: flex-start !important;
-    justify-content: space-between !important;
-  }
-
-  /* Une seule photo à l’impression : bloc identité en bas (évite doublon) */
-  body:has(.lettre-print-scope) .lettre-print-photo-top {
+  /* Ne pas imprimer les fonds décoratifs du shell */
+  body:has(.lettre-print-scope) .app-shell-bg::before,
+  body:has(.lettre-print-scope) .app-shell-bg::after {
     display: none !important;
-  }
-
-  body:has(.lettre-print-scope) .lettre-print-encadre-infos {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  body:has(.lettre-print-scope) .lettre-print-blocsynthese {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  body:has(.lettre-print-scope) .lettre-print-meta-row {
-    flex-wrap: wrap !important;
-    justify-content: center !important;
-    gap: 0.75rem 1.25rem !important;
-  }
-
-  /* Marges intérieures légèrement réduites pour tenir sur une page quand c’est possible */
-  body:has(.lettre-print-scope) .print-page .px-10 {
-    padding-left: 1.5rem !important;
-    padding-right: 1.5rem !important;
-  }
-
-  body:has(.lettre-print-scope) .print-page .py-8 {
-    padding-top: 1rem !important;
-    padding-bottom: 1rem !important;
-  }
-
-  body:has(.lettre-print-scope) .print-page .pt-8 {
-    padding-top: 1rem !important;
-  }
-
-  body:has(.lettre-print-scope) .print-page .pb-6 {
-    padding-bottom: 0.75rem !important;
-  }
-
-  body:has(.lettre-print-scope) .print-page .mb-8 {
-    margin-bottom: 1.25rem !important;
-  }
-
-  body:has(.lettre-print-scope) .print-page .mt-10 {
-    margin-top: 1.25rem !important;
-  }
-
-  @page {
-    margin: 10mm;
-    size: A4;
   }
 }

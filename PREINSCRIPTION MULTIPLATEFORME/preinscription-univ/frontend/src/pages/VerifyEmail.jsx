@@ -25,7 +25,7 @@ export default function VerifyEmail() {
       try {
         const { data } = await axios.post('/api/auth/verifier-email', { token })
         if (cancelled) return
-        login(data.token, data.utilisateur)
+        login(data.token, data.utilisateur, data.refresh_token)
         toast.success(data.message || 'E-mail confirmé.')
         setStatus('ok')
         const role = data.utilisateur?.role

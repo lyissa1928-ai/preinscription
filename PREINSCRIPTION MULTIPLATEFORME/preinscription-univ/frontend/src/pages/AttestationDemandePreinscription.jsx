@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import { mediaUrl } from '../utils/mediaUrl'
+import CachetScolarite from '../components/CachetScolarite'
+import DocumentDownloadBar from '../components/DocumentDownloadBar'
 
 const fmtDate = (d) => {
   if (d == null || d === '') return '—'
@@ -13,6 +15,7 @@ export default function AttestationDemandePreinscription() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const documentRef = useRef(null)
 
   useEffect(() => {
     axios
@@ -30,8 +33,6 @@ export default function AttestationDemandePreinscription() {
       document.title = prev
     }
   }, [data])
-
-  const handlePrint = () => window.print()
 
   if (loading) {
     return (
@@ -74,7 +75,6 @@ export default function AttestationDemandePreinscription() {
   const secondary = etab?.couleur_secondaire || '#4f46e5'
   const bandStyle = { background: `linear-gradient(to right, ${primary}, ${secondary})` }
   const logoSrc = mediaUrl(etab?.logo_url)
-  const cachetSrc = mediaUrl(etab?.cachet_url)
   const refAtt = ext.reference_attestation || `ATT-DEM-${demande?.id || ''}`
 
   const prenomT = (etudiant?.prenom || '').trim()
@@ -92,30 +92,18 @@ export default function AttestationDemandePreinscription() {
 
   return (
     <div className="lettre-print-scope min-h-screen bg-slate-200 py-8 px-4">
-      <div className="no-print max-w-3xl mx-auto mb-6 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            to="/dashboard"
-            className="flex items-center gap-2 font-medium text-sm bg-white px-4 py-2 rounded-lg border transition-colors"
-            style={{ color: primary, borderColor: `${primary}55` }}
-          >
-            ← Retour
-          </Link>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="flex items-center gap-2 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors shadow-md text-sm"
-            style={{ backgroundColor: primary }}
-          >
-            Imprimer / PDF
-          </button>
-        </div>
-        <p className="text-xs text-gray-700 bg-amber-50/90 border border-amber-100 rounded-lg px-4 py-2.5 leading-relaxed">
-          <span className="font-semibold text-amber-900">PDF :</span> désactivez « En-têtes et pieds de page » dans l’impression.
-        </p>
-      </div>
+      <DocumentDownloadBar
+        documentRef={documentRef}
+        filename={`${refAtt}.pdf`}
+        primaryColor={primary}
+        backHref="/dashboard"
+        className="mx-auto mb-5 flex max-w-3xl flex-wrap items-center justify-between gap-3"
+      />
 
-      <div className="print-page max-w-3xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden">
+      <div
+        ref={documentRef}
+        className="print-page max-w-3xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden"
+      >
         <div className="h-2" style={bandStyle} />
 
         <div className="px-8 pt-8 pb-4">
@@ -201,19 +189,7 @@ export default function AttestationDemandePreinscription() {
           </div>
 
           <div className="flex flex-col items-center pt-6 pb-2">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-3">Cachet de la direction</p>
-            {cachetSrc ? (
-              <img src={cachetSrc} alt="Cachet" className="max-h-36 mx-auto object-contain" />
-            ) : (
-              <div
-                className="mx-auto w-40 h-28 rounded-xl border-2 border-dashed flex items-center justify-center text-gray-400 text-xs px-2"
-                style={{ borderColor: `${primary}44` }}
-              >
-                Cachet
-              </div>
-            )}
-            <p className="text-sm font-bold text-gray-900 mt-6">{etab?.signataire_nom || 'Le Responsable pédagogique'}</p>
-            <p className="text-xs text-gray-500">{etab?.signataire_fonction || 'Pour la direction'}</p>
+            <CachetScolarite cachetUrl={etab?.cachet_url} />
             <p className="text-xs text-gray-400 mt-3">Fait à {etab?.nom || '…'}, le {fmtDate(new Date())}</p>
           </div>
 

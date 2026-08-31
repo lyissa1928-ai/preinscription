@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import StatutBadge from '../components/StatutBadge'
 import PreinscriptionConditionsBlock from '../components/PreinscriptionConditionsBlock'
 import { isDossierAcceptePourDocuments } from '../utils/dossierStatut'
+import { mediaUrl } from '../utils/mediaUrl'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n)
 const ALLOWED_TRANSITIONS = {
@@ -146,7 +147,7 @@ export default function AdminDossier() {
                         <div className="w-9 h-9 bg-white rounded-lg border border-gray-200 flex items-center justify-center text-lg">📄</div>
                         <div><p className="text-sm font-semibold text-gray-700 capitalize">{doc.type_document.replace('_', ' ')}</p><p className="text-xs text-gray-400">{doc.nom_fichier}</p></div>
                       </div>
-                      <a href={`/uploads/${doc.chemin}`} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:text-blue-800 font-semibold border border-blue-200 hover:border-blue-400 px-3 py-1 rounded-lg transition-colors">
+                      <a href={mediaUrl(`/uploads/${doc.chemin}`)} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:text-blue-800 font-semibold border border-blue-200 hover:border-blue-400 px-3 py-1 rounded-lg transition-colors">
                         Voir
                       </a>
                     </div>
@@ -207,15 +208,19 @@ export default function AdminDossier() {
             {isDossierAcceptePourDocuments(dossier.statut) && (
               <div className="card border-emerald-200 bg-emerald-50">
                 <h2 className="font-bold text-emerald-900 mb-3">📜 Documents officiels</h2>
-                <p className="text-sm text-emerald-800 mb-4">Dossier accepté : lettre et attestation de préinscription.</p>
+                <p className="text-sm text-emerald-800 mb-4">
+                  Attestation disponible. Lettre réservée aux candidats étrangers acceptés en ligne.
+                </p>
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <Link
-                    to={`/lettre/${id}`}
-                    target="_blank"
-                    className="btn-primary text-center text-sm flex-1"
-                  >
-                    Lettre
-                  </Link>
+                  {dossier.source !== 'staff' && (
+                    <Link
+                      to={`/lettre/${id}`}
+                      target="_blank"
+                      className="btn-primary text-center text-sm flex-1"
+                    >
+                      Lettre
+                    </Link>
+                  )}
                   <Link
                     to={`/attestation/${id}`}
                     target="_blank"

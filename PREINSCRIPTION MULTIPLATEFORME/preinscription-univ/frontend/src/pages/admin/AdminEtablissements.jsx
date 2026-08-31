@@ -440,6 +440,17 @@ export default function AdminEtablissements() {
                     />
                     <span className="text-xs font-medium text-slate-500">Identité visuelle</span>
                   </div>
+
+                  <div className="rounded-lg border border-blue-50 bg-blue-50/50 px-2.5 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700/80">Admin. établissement</p>
+                    {e.admin_etablissement ? (
+                      <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">
+                        {e.admin_etablissement.prenom} {e.admin_etablissement.nom}
+                      </p>
+                    ) : (
+                      <p className="mt-0.5 text-xs text-slate-500">Non désigné</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-auto flex flex-col gap-2 border-t border-slate-100 bg-slate-50/40 p-4 sm:flex-row sm:items-stretch">
