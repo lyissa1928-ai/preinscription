@@ -23,8 +23,12 @@ UniPortail = SEULE application sur https://esebat-digitalservices.com
   mkdir -p /var/backups/uniportail
   cp /var/www/uniportail/backend/database/preinscription.json \
      /var/backups/uniportail/preinscription-$(date +%Y%m%d-%H%M).json 2>/dev/null || true
-  tar czf /var/backups/uniportail/public_html-esebat-$(date +%Y%m%d-%H%M).tar.gz \
-     -C /home/admin/web/esebat-digitalservices.com public_html 2>/dev/null || true
+  # Optionnel — seulement si Hestia (/home/admin/web/...) :
+  # tar czf /var/backups/uniportail/public_html-esebat-$(date +%Y%m%d-%H%M).tar.gz \
+  #    -C /home/admin/web/esebat-digitalservices.com public_html
+  # Sur AWS/Lightsail (Nginx seul) : sauvegarder la config web existante :
+  tar czf /var/backups/uniportail/nginx-esebat-$(date +%Y%m%d-%H%M).tar.gz \
+     /etc/nginx/sites-enabled /etc/nginx/conf.d 2>/dev/null || true
 
 ================================================================================
 ÉTAPE 2 — Code à jour + protection données
@@ -53,17 +57,24 @@ UniPortail = SEULE application sur https://esebat-digitalservices.com
   - installe nginx-esebat-digitalservices.conf si /etc/nginx/conf.d existe
 
 ================================================================================
-ÉTAPE 4 — Si le serveur utilise Apache (Hestia sans override nginx)
+ÉTAPE 4 — Apache2 (votre cas)
 ================================================================================
 
-  Éditer le vhost SSL du domaine et ajouter le contenu de :
-    deploy/apache-esebat-digitalservices-root.conf.example
+  Le script configurer-racine-esebat.sh détecte Apache2 et installe :
+    /etc/apache2/sites-available/esebat-digitalservices.com.conf
 
-  Puis :
+  Si le build est déjà fait, vhost seul :
+    cd /var/www/uniportail
+    git pull origin main
+    bash deploy/activer-apache-esebat.sh
+
+  Modules requis (faits automatiquement) :
+    proxy proxy_http proxy_wstunnel rewrite ssl headers
+
+  Vérifier :
+    apache2ctl -S
+    apache2ctl configtest
     systemctl reload apache2
-
-  DocumentRoot doit pointer vers :
-    /var/www/uniportail/frontend/dist
 
 ================================================================================
 ÉTAPE 5 — Vérifications
