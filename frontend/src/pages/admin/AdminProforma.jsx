@@ -128,7 +128,7 @@ function ModalDetail({ demande, onClose, onDecisionDone }) {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-center gap-3">
               {es.logo_url ? (
                 <img
-                  src={es.logo_url}
+                  src={mediaUrl(es.logo_url)}
                   alt=""
                   className="w-10 h-10 rounded-lg object-contain border border-gray-200 bg-white"
                 />

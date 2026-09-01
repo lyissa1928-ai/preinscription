@@ -696,7 +696,12 @@ router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
   };
 
   db.get('etablissements').push(etab).write();
-  res.status(201).json(etab);
+  const created = db.get('etablissements').find({ id }).value();
+  res.status(201).json({
+    ...created,
+    logo_url: publicAssetUrl(req, created.logo_url),
+    cachet_url: publicAssetUrl(req, created.cachet_url),
+  });
 });
 
 // POST /api/etablissements/:id/upload — upload logo/cachet séparé
@@ -712,7 +717,12 @@ router.post('/:id/upload', adminOnly, upload.fields([{ name: 'logo', maxCount: 1
   if (req.files?.logo?.[0])   updates.logo_url   = `/uploads/etablissements/${req.files.logo[0].filename}`;
   if (req.files?.cachet?.[0]) updates.cachet_url = `/uploads/etablissements/${req.files.cachet[0].filename}`;
   db.get('etablissements').find({ id }).assign(updates).write();
-  res.json(db.get('etablissements').find({ id }).value());
+  const updated = db.get('etablissements').find({ id }).value();
+  res.json({
+    ...updated,
+    logo_url: publicAssetUrl(req, updated.logo_url),
+    cachet_url: publicAssetUrl(req, updated.cachet_url),
+  });
 });
 
 // ─── Préinscriptions acceptées, par formation (dérivé des dossiers) ─────────
@@ -1521,7 +1531,14 @@ router.put('/:id/responsable', adminOnly, (req, res) => {
     nouveau_responsable_id: designe ? designe.id : null,
     role_principal_designe: designe ? designe.role : null,
   });
-  res.json({ message: designe ? 'Responsable désigné.' : 'Responsable retiré.' });
+  const responsable = designe
+    ? db.get('utilisateurs').find({ id: designe.id }).pick(['id', 'prenom', 'nom', 'email', 'role']).value()
+    : null;
+  res.json({
+    message: designe ? 'Responsable pédagogique désigné.' : 'Responsable pédagogique retiré.',
+    responsable,
+    responsable_id: designe ? designe.id : null,
+  });
 });
 
 // PUT /api/etablissements/:id/admin-etablissement — désigner l’unique admin établissement (admin plateforme).
@@ -2531,30 +2548,49 @@ router.post('/:etabId/membres/:id/supprimer-definitif', adminOnly, (req, res) =>
 const {
   exportEtablissementData,
   restoreEtablissementData,
+  getManifestForRole,
 } = require('../utils/userDataExport');
+const {
+  buildUserDataZip,
+  sendZipDownload,
+  handleBackupUpload,
+  isRestoreConfirmed,
+  parseUploadedBackupZip,
+} = require('../utils/backupZip');
 
-// GET /api/etablissements/:id/donnees/export — sauvegarde JSON de l'établissement
+// GET /api/etablissements/:id/donnees/export — sauvegarde ZIP de l'établissement
 router.get('/:id/donnees/export', etabMembresManageAccess, (req, res) => {
   const etabId = parseInt(req.params.id, 10);
   const data = exportEtablissementData(etabId);
   if (!data) return res.status(404).json({ message: 'Établissement introuvable.' });
+  const manifest = getManifestForRole('admin_etablissement');
+  const { buffer, filename } = buildUserDataZip(data, {
+    included: manifest.included,
+    excluded: manifest.excluded,
+  });
   logAudit(req, 'export_donnees_etablissement', 'etablissement', etabId, {
     scope: 'etablissement',
     etablissement_id: etabId,
+    format: 'zip',
+    filename,
   });
-  return res.json(data);
+  return sendZipDownload(res, buffer, filename);
 });
 
-// POST /api/etablissements/:id/donnees/restore — fusion additive
-router.post('/:id/donnees/restore', etabMembresManageAccess, (req, res) => {
+// POST /api/etablissements/:id/donnees/restore — fusion additive depuis ZIP
+router.post('/:id/donnees/restore', etabMembresManageAccess, handleBackupUpload('backup'), (req, res) => {
   const etabId = parseInt(req.params.id, 10);
-  if (!req.body?.confirm) {
-    return res.status(400).json({ message: 'Confirmation requise (confirm: true).' });
+  if (!isRestoreConfirmed(req.body)) {
+    return res.status(400).json({ message: 'Confirmation requise (confirm=true).' });
   }
   try {
-    const { preBackup, stats } = restoreEtablissementData(etabId, req.body.payload, req);
+    const parsed = parseUploadedBackupZip(req.file.buffer);
+    if (parsed.kind !== 'donnees') {
+      return res.status(400).json({ message: 'ZIP établissement attendu (donnees.json).' });
+    }
+    const { preBackup, stats } = restoreEtablissementData(etabId, parsed.payload, req);
     return res.json({
-      message: 'Restauration terminée. Les enregistrements ont été fusionnés par identifiant.',
+      message: 'Restauration terminée depuis le ZIP. Données fusionnées par identifiant.',
       pre_backup: preBackup,
       stats,
     });

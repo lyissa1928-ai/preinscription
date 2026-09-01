@@ -48,15 +48,19 @@ Au démarrage du serveur, `utils/schemaMigrations.js` applique les migrations ma
 
 Les champs historiques (`ville`, `places`, `autres_frais`, etc.) sont **conservés**. Pour ajouter une migration : créer une entrée dans `MIGRATIONS` avec `version` incrémentée et une fonction `up(db)` additive uniquement.
 
-## Sauvegarde et restauration par rôle
+## Sauvegarde et restauration par rôle (format **ZIP**)
 
-| Rôle | Export | Restauration | Contenu principal |
-|------|--------|--------------|-------------------|
-| **Admin plateforme** | `GET /api/admin/backup/export` (page Maintenance / Profil) | Manuelle sur serveur (remplacer `preinscription.json` après backup) | Base complète |
-| **Admin établissement** | `GET /api/etablissements/:id/donnees/export` (page Équipe) | `POST …/donnees/restore` — fusion par identifiant, backup auto avant | Fiche étab., filières, formations, conditions, staff (sans MDP), dossiers, factures |
-| **Étudiant** | `GET /api/auth/mes-donnees/export` (Mon profil) | Profil uniquement (nom, contact) | Dossiers, documents (métadonnées), factures |
-| **Staff** (resp., agent, etc.) | `GET /api/auth/mes-donnees/export` | Profil uniquement | Identité du compte |
+| Rôle | Export | Restauration | Contenu de l’archive |
+|------|--------|--------------|----------------------|
+| **Admin plateforme** | `GET /api/admin/backup/export` → `.zip` | `POST /api/admin/backup/restore` (multipart `.zip`) | `preinscription.json` + `manifest.json` + `LISEZMOI.txt` |
+| **Admin établissement** | `GET /api/etablissements/:id/donnees/export` | `POST …/donnees/restore` (multipart `.zip`) | `donnees.json` (périmètre étab.) + manifest |
+| **Étudiant / staff** | `GET /api/auth/mes-donnees/export` | `POST /api/auth/mes-donnees/restore` (multipart `.zip`) | `donnees.json` (profil + dossiers) + manifest |
 
-**Non exporté** : mots de passe, tokens, fichiers uploadés (PDF/images — copie séparée du dossier `uploads/` en production).
+**Non exporté dans le ZIP** : mots de passe en clair, tokens, fichiers uploadés (`uploads/`).
 
-**Mises à jour sans perte** : au démarrage, `schemaMigrations.js` + backup `pre-migrate-*` ; au déploiement prod, `deploy/redeploy-prod-complet.sh` crée aussi une sauvegarde. Le fichier prod `preinscription.json` est protégé (`skip-worktree`) pour ne pas être écrasé par un `git pull`.
+## Mises à jour production — données intactes
+
+1. **`deploy/proteger-donnees-prod.sh`** — `git update-index --skip-worktree` sur `preinscription.json`, `.env`, etc. → un `git pull` **ne remplace pas** la base prod.
+2. **`schemaMigrations.js`** — migrations **additives** uniquement + backup `pre-migrate-*` avant changement de schéma.
+3. **`deploy/redeploy-prod-complet.sh`** — copie de sauvegarde dans `/var/backups/uniportail/` avant déploiement.
+4. **Restauration manuelle** — archive ZIP admin si besoin ; backup JSON automatique avant toute restauration via l’API.

@@ -14,6 +14,7 @@ import {
   FaChevronDown,
 } from 'react-icons/fa'
 import Navbar from '../components/Navbar'
+import { mediaUrl } from '../utils/mediaUrl'
 import { useAuth } from '../context/AuthContext'
 
 const DASHBOARD_BY_ROLE = {
@@ -354,7 +355,7 @@ export default function Landing() {
                     >
                       <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/15 ring-1 ring-white/20">
                         {e.logo_url ? (
-                          <img src={e.logo_url} alt="" className="h-full w-full object-contain p-0.5" />
+                          <img src={mediaUrl(e.logo_url)} alt="" className="h-full w-full object-contain p-0.5" />
                         ) : (
                           <span className="text-xs font-bold">{e.nom[0]}</span>
                         )}
@@ -638,7 +639,7 @@ export default function Landing() {
                       <div className="relative -mt-10 px-5 pb-6">
                         <div className="mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-lg">
                           {e.logo_url ? (
-                            <img src={e.logo_url} alt={e.nom} className="h-full w-full object-contain p-1" />
+                            <img src={mediaUrl(e.logo_url)} alt={e.nom} className="h-full w-full object-contain p-1" />
                           ) : (
                             <span className="text-2xl font-black" style={{ color: e.couleur_primaire || '#1e40af' }}>
                               {e.nom[0]}
@@ -871,7 +872,7 @@ export default function Landing() {
                       title={e.nom}
                     >
                       {e.logo_url ? (
-                        <img src={e.logo_url} alt="" className="h-full w-full object-contain p-0.5" />
+                        <img src={mediaUrl(e.logo_url)} alt="" className="h-full w-full object-contain p-0.5" />
                       ) : (
                         <span className="text-[11px] font-bold" style={{ color: e.couleur_primaire || '#9ca3af' }}>
                           {String(e.nom || '?')[0]}

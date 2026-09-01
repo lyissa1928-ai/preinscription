@@ -8,6 +8,7 @@ import { TabFacturesEtab } from '../admin/TabFacturesEtab'
 import { TabAcceptesParFormation } from '../admin/TabAcceptesParFormation'
 import { FaBook, FaGraduationCap, FaCheckCircle, FaFileInvoice, FaClipboardList } from 'react-icons/fa'
 import TabConditionsAdmissionEtab from '../../components/TabConditionsAdmissionEtab'
+import { mediaUrl } from '../../utils/mediaUrl'
 
 const TABS = [
   { id: 'filieres', label: 'Filières', Icon: FaBook },
@@ -91,7 +92,7 @@ export default function ResponsableGestionEtab() {
           <div className="flex items-center gap-4 min-w-0">
             <div className="w-14 h-14 rounded-2xl border border-slate-200 bg-white flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
               {etab.logo_url ? (
-                <img src={etab.logo_url} alt="" className="w-full h-full object-contain p-1" />
+                <img src={mediaUrl(etab.logo_url)} alt="" className="w-full h-full object-contain p-1" />
               ) : (
                 <span className="text-xl font-black text-slate-400">{String(etab.nom || '?')[0]}</span>
               )}

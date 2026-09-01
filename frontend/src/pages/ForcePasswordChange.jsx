@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { FaGraduationCap, FaEye, FaEyeSlash, FaInfoCircle, FaShieldAlt } from 'react-icons/fa'
@@ -10,7 +10,7 @@ import PasswordStrengthMeter from '../components/PasswordStrengthMeter'
 const MIN_LEN = 6
 
 export default function ForcePasswordChange() {
-  const { user, loading, refreshUser, login } = useAuth()
+  const { user, loading, refreshUser, login, logout } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({
     matricule: '',
@@ -22,6 +22,7 @@ export default function ForcePasswordChange() {
   const [showNouveau, setShowNouveau] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [quitting, setQuitting] = useState(false)
   const [serverError, setServerError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
 
@@ -114,6 +115,19 @@ export default function ForcePasswordChange() {
     }
   }
 
+  const handleQuit = async () => {
+    setQuitting(true)
+    try {
+      await logout()
+      toast.success('Déconnecté. Vous pourrez vous reconnecter plus tard.')
+      navigate('/', { replace: true })
+    } catch {
+      toast.error('Impossible de se déconnecter.')
+    } finally {
+      setQuitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen relative overflow-hidden px-4 py-8 md:py-12">
       <AuthCinematicBackground showProgressDots={false} />
@@ -136,7 +150,8 @@ export default function ForcePasswordChange() {
           <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5 mb-5 text-xs text-amber-950">
             <FaGraduationCap className="shrink-0 mt-0.5 text-amber-700" aria-hidden />
             <p>
-              Obligatoire pour continuer : ce changement protège votre accès (mot de passe temporaire ou initial remplacé).
+              Recommandé avant d’utiliser l’application : remplacez le mot de passe temporaire ou initial.
+              Vous pouvez aussi quitter — vous serez déconnecté et pourrez revenir plus tard.
             </p>
           </div>
 
@@ -286,7 +301,7 @@ export default function ForcePasswordChange() {
 
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || quitting}
               className="w-full h-12 rounded-md bg-gradient-to-r from-amber-600 to-orange-600 text-sm font-semibold text-white shadow-lg shadow-amber-900/20 transition hover:from-amber-700 hover:to-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
             >
               {saving ? (
@@ -298,16 +313,20 @@ export default function ForcePasswordChange() {
                 'Valider et accéder à l’application'
               )}
             </button>
+
+            <button
+              type="button"
+              onClick={handleQuit}
+              disabled={saving || quitting}
+              className="w-full h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              {quitting ? 'Déconnexion…' : 'Quitter sans changer (déconnexion)'}
+            </button>
           </form>
         </div>
 
-        <p className="mt-6 text-center text-sm">
-          <Link
-            to="/"
-            className="font-medium text-white/95 underline-offset-4 [text-shadow:0_1px_8px_rgba(0,0,0,0.5)] hover:underline"
-          >
-            ← Retour à l’accueil
-          </Link>
+        <p className="mt-6 text-center text-sm text-blue-100/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.5)]">
+          En quittant, votre session est fermée. Reconnectez-vous quand vous souhaitez changer votre mot de passe.
         </p>
       </div>
     </div>

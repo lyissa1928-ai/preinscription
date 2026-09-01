@@ -57,14 +57,50 @@ const adminSensitiveLimiter = rateLimit({
   keyGenerator: (req) => `admin-sensitive:${getClientIp(req)}:${req.method}:${req.path}`,
 });
 
-// GET /api/admin/backup/export — crée un snapshot et le télécharge
+// GET /api/admin/backup/export — archive ZIP (preinscription.json + manifest)
 router.get('/backup/export', (req, res) => {
   try {
-    const backupPath = createBackup('admin-export');
-    return res.download(backupPath);
+    const { buildPlatformBackupZip, sendZipDownload } = require('../utils/backupZip');
+    createBackup('admin-export');
+    const { buffer, filename } = buildPlatformBackupZip(DB_PATH);
+    logAudit(req, 'export_backup_plateforme_zip', 'system', null, { filename });
+    return sendZipDownload(res, buffer, filename);
   } catch (e) {
     return res.status(500).json({ message: `Backup impossible: ${e.message}` });
   }
+});
+
+// POST /api/admin/backup/restore — restauration depuis ZIP plateforme
+router.post('/backup/restore', adminSensitiveLimiter, (req, res, next) => {
+  const {
+    handleBackupUpload,
+    isRestoreConfirmed,
+    parseUploadedBackupZip,
+    restorePlatformDatabaseFromObject,
+  } = require('../utils/backupZip');
+  return handleBackupUpload('backup')(req, res, (uploadErr) => {
+    if (uploadErr) return next(uploadErr);
+    if (!isRestoreConfirmed(req.body)) {
+      return res.status(400).json({ message: 'Confirmation requise (confirm=true).' });
+    }
+    try {
+      const preBackup = createBackup('pre-restore-admin');
+      const parsed = parseUploadedBackupZip(req.file.buffer);
+      if (parsed.kind !== 'plateforme') {
+        return res.status(400).json({
+          message: 'Archive plateforme attendue (fichier preinscription.json dans le ZIP).',
+        });
+      }
+      restorePlatformDatabaseFromObject(parsed.payload);
+      logAudit(req, 'restauration_backup_plateforme_zip', 'system', null, { pre_backup: preBackup });
+      return res.json({
+        message: 'Base restaurée depuis le ZIP. Reconnectez les utilisateurs si nécessaire.',
+        pre_backup: preBackup,
+      });
+    } catch (e) {
+      return res.status(400).json({ message: e.message });
+    }
+  });
 });
 
 // GET /api/admin/backup/db — télécharge le fichier base actuel
@@ -967,6 +1003,60 @@ router.get('/security-events', (req, res) => {
       limit: limitNum,
       totalPages: Math.max(Math.ceil(total / limitNum), 1),
     },
+  });
+});
+
+// ─── Identité plateforme (favicon, nom) ─────────────────────────────────────
+const {
+  getSiteConfigForClient,
+  getSiteConfigRaw,
+  updateSiteConfig,
+  platformUpload,
+  verifyPlatformFile,
+  removeOldPlatformFile,
+} = require('../utils/siteConfig');
+
+router.get('/site-config', (req, res) => {
+  return res.json(getSiteConfigForClient(req));
+});
+
+router.put('/site-config', adminSensitiveLimiter, (req, res) => {
+  const { platform_name } = req.body || {};
+  if (platform_name != null && !String(platform_name).trim()) {
+    return res.status(400).json({ message: 'Le nom de la plateforme ne peut pas être vide.' });
+  }
+  const patch = {};
+  if (platform_name != null) patch.platform_name = String(platform_name).trim();
+  updateSiteConfig(patch);
+  logAudit(req, 'site_config_update', 'system', null, { fields: Object.keys(patch) });
+  return res.json(getSiteConfigForClient(req));
+});
+
+router.post('/site-config/favicon', adminSensitiveLimiter, platformUpload.single('favicon'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'Fichier favicon requis (.ico, .png, .svg, .webp).' });
+  }
+  const ve = await verifyPlatformFile(req.file, 'favicon');
+  if (!ve.ok) return res.status(400).json({ message: ve.message || 'Fichier invalide.' });
+  const prev = getSiteConfigRaw();
+  removeOldPlatformFile(prev.favicon_url, 'favicon');
+  const favicon_url = `/uploads/platform/${req.file.filename}`;
+  updateSiteConfig({ favicon_url });
+  logAudit(req, 'site_config_favicon', 'system', null, { favicon_url });
+  return res.json({
+    message: 'Favicon enregistré.',
+    ...getSiteConfigForClient(req),
+  });
+});
+
+router.delete('/site-config/favicon', adminSensitiveLimiter, (req, res) => {
+  const prev = getSiteConfigRaw();
+  removeOldPlatformFile(prev.favicon_url, 'favicon');
+  updateSiteConfig({ favicon_url: null });
+  logAudit(req, 'site_config_favicon_remove', 'system', null, {});
+  return res.json({
+    message: 'Favicon supprimé.',
+    ...getSiteConfigForClient(req),
   });
 });
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import axios from 'axios'
 import Navbar from '../components/Navbar'
+import { mediaUrl } from '../utils/mediaUrl'
 import PreinscriptionConditionsBlock from '../components/PreinscriptionConditionsBlock'
 
 const TYPE_META = {
@@ -154,7 +155,7 @@ export default function PublicEtablissementPage() {
           <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:gap-6">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-inner sm:h-20 sm:w-20">
               {etab.logo_url ? (
-                <img src={etab.logo_url} alt="" className="h-full w-full object-contain p-1" />
+                <img src={mediaUrl(etab.logo_url)} alt="" className="h-full w-full object-contain p-1" />
               ) : (
                 <span className="text-2xl font-black" style={{ color: primary }}>
                   {etab.nom[0]}

@@ -4,6 +4,7 @@ import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import PreinscriptionConditionsBlock from '../components/PreinscriptionConditionsBlock'
 import { forfaitAnnuelFromFormation } from '../lib/formationTarifs'
+import { mediaUrl } from '../utils/mediaUrl'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n || 0)
 
@@ -251,7 +252,7 @@ export default function EtablissementHome() {
             <div className="flex min-w-0 flex-1 items-end gap-3 sm:gap-5">
               <div className="h-16 w-16 sm:h-20 sm:w-20 shrink-0 rounded-2xl border-4 border-white bg-white shadow-xl flex items-center justify-center overflow-hidden">
                 {etab.logo_url
-                  ? <img src={etab.logo_url} alt="" className="h-full w-full object-contain" />
+                  ? <img src={mediaUrl(etab.logo_url)} alt="" className="h-full w-full object-contain" />
                   : <span className="text-2xl font-black sm:text-3xl" style={{ color: primary }}>{etab.nom[0]}</span>}
               </div>
               <div className="min-w-0 flex-1 pt-6 sm:pt-10">

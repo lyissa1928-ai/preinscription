@@ -68,10 +68,14 @@ fi
 
 # config-site.js (API même origine)
 mkdir -p frontend/public frontend/dist
+mkdir -p backend/uploads/etablissements backend/uploads/platform
+chmod -R u+rwX backend/uploads 2>/dev/null || true
 cat > frontend/public/config-site.js <<'JS'
 window.__PREINSCRIPTION_SITE_KEYS__ = {
   recaptcha: '',
   apiBaseUrl: '',
+  platform_name: '',
+  faviconUrl: '',
 }
 JS
 
@@ -166,9 +170,14 @@ echo ">>> [9/9] Tests publics..."
 echo ""
 HTTP_ROOT="$(curl -sI --max-time 15 "https://${DOMAIN}/" | head -1 || echo 'ERREUR')"
 HTTP_API="$(curl -s --max-time 15 "https://${DOMAIN}/api/health" | head -c 80 || echo 'ERREUR')"
+UPLOADS_TEST="$(curl -sI --max-time 15 "https://${DOMAIN}/uploads/etablissements/__probe__.png" | head -1 || echo 'ERREUR')"
 echo "    Site  : $HTTP_ROOT"
 echo "    API   : $HTTP_API"
+echo "    /uploads (proxy Apache→Node, attendu 404 et non HTML SPA) : $UPLOADS_TEST"
 echo ""
+if echo "$UPLOADS_TEST" | grep -qi '200.*OK'; then
+  echo "    ATTENTION : /uploads renvoie 200 — vérifiez ProxyPass /uploads/ dans Apache."
+fi
 echo "══════════════════════════════════════════════════════════════"
 echo "  TERMINÉ"
 echo "  URL      : https://${DOMAIN}/"

@@ -12,8 +12,17 @@ export default function StaffEtabEquipe() {
   const [etab, setEtab] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const reload = () => {
+    if (!etabId) return
+    axios
+      .get(`/api/etablissements/${etabId}`)
+      .then(({ data }) => setEtab(data))
+      .catch(() => toast.error('Impossible de charger l’établissement.'))
+  }
+
   useEffect(() => {
     if (!etabId) return
+    setLoading(true)
     axios
       .get(`/api/etablissements/${etabId}`)
       .then(({ data }) => setEtab(data))
@@ -50,7 +59,13 @@ export default function StaffEtabEquipe() {
           </p>
         </header>
         <div className="card overflow-hidden border-slate-200/80 shadow-md p-5 md:p-8 space-y-8">
-          <TabMembres etabId={etab.id} membres={etab.membres || []} responsable_id={etab.responsable_id} />
+          <TabMembres
+            etabId={etab.id}
+            membres={etab.membres || []}
+            responsable_id={etab.responsable_id}
+            admin_etablissement_id={etab.admin_etablissement_id}
+            onEtabRefresh={reload}
+          />
         </div>
       </div>
     </main>

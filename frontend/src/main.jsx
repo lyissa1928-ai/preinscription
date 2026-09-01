@@ -9,6 +9,7 @@ import { reportClientError } from './utils/reportClientError'
 import { resolveApiBaseUrl } from './utils/resolveApiBaseUrl'
 import { setupAuthInterceptors } from './lib/setupAuthInterceptors'
 import { getRouterBasename } from './utils/appBasePath'
+import { loadAndApplySiteBranding } from './utils/applySiteBranding'
 import './index.css'
 import './lettre-print-additive.css'
 
@@ -19,6 +20,7 @@ if (apiBase) {
 /** Évite un chargement infini si l’API ne répond pas (écran blanc / spinner bloqué). */
 axios.defaults.timeout = 25000
 setupAuthInterceptors()
+loadAndApplySiteBranding()
 
 window.addEventListener('error', (ev) => {
   reportClientError({

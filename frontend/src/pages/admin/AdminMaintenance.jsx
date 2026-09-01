@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 
+import DonneesBackupPanel from '../../components/DonneesBackupPanel'
+import PlatformBrandingPanel from '../../components/PlatformBrandingPanel'
+
 export default function AdminMaintenance() {
   const [cfg, setCfg] = useState(null)
   const [form, setForm] = useState({
@@ -59,6 +62,10 @@ export default function AdminMaintenance() {
         <h1 className="text-2xl font-black text-gray-900">Maintenance & Rétention</h1>
         <p className="text-sm text-gray-500">Purge opérationnelle des logs, événements sécurité, notifications et backups.</p>
       </div>
+
+      <PlatformBrandingPanel className="mt-2" />
+
+      <DonneesBackupPanel className="mt-2" />
 
       <div className="bg-white border border-gray-200 rounded-2xl p-4">
         {loading ? (

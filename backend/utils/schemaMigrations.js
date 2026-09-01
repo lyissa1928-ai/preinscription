@@ -9,7 +9,7 @@ const { createBackup } = require('./dbBackup');
 const { getDureeMoisEffectif, computePrixAnnuel, normalizeFraisSupplementaires } = require('./formationTarifs');
 
 /** Version cible de l’application actuelle. */
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
 function toNonNegInt(v, fallback = 0) {
   if (v === undefined || v === null || v === '') return fallback;
@@ -123,6 +123,20 @@ function migrateFormationsMetaV2(db) {
   return { formations_updated: touched };
 }
 
+/** v3 — Configuration plateforme (favicon, nom affiché). */
+function migrateSiteConfigV3(db) {
+  if (db.get('site_config').value() == null) {
+    db.set('site_config', {
+      platform_name: 'Préinscription Universitaire',
+      favicon_url: null,
+      platform_logo_url: null,
+      updated_at: null,
+    }).write();
+    return { site_config_created: true };
+  }
+  return { site_config_created: false };
+}
+
 const MIGRATIONS = [
   {
     version: 1,
@@ -135,6 +149,12 @@ const MIGRATIONS = [
     id: '2026_08_formations_photos_actif',
     description: 'Normalise photos préinscription et statut actif sur les formations existantes.',
     up: migrateFormationsMetaV2,
+  },
+  {
+    version: 3,
+    id: '2026_09_site_config',
+    description: 'Ajoute site_config (favicon plateforme, nom affiché).',
+    up: migrateSiteConfigV3,
   },
 ];
 

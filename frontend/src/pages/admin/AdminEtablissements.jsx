@@ -12,6 +12,7 @@ import {
   FaBuilding,
   FaFilter,
 } from 'react-icons/fa'
+import { mediaUrl } from '../../utils/mediaUrl'
 
 const TYPES = [
   { val: 'sante',   label: 'Santé', icon: '🏥' },
@@ -385,7 +386,7 @@ export default function AdminEtablissements() {
                   <div className="flex items-start gap-3">
                     <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 ring-1 ring-slate-100">
                       {e.logo_url ? (
-                        <img src={e.logo_url} alt="" className="h-full w-full object-contain" />
+                        <img src={mediaUrl(e.logo_url)} alt="" className="h-full w-full object-contain" />
                       ) : (
                         <FaBuilding className="h-7 w-7 text-slate-300" aria-hidden />
                       )}

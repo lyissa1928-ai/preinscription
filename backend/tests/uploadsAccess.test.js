@@ -25,6 +25,9 @@ describe('uploadsAccess.isPublicUploadPath', () => {
   it('logos établissements = public', () => {
     assert.equal(isPublicUploadPath('etablissements/logo.png'), true);
   });
+  it('favicon plateforme = public', () => {
+    assert.equal(isPublicUploadPath('platform/favicon.png'), true);
+  });
   it('document racine != public', () => {
     assert.equal(isPublicUploadPath('1774287072389-x.pdf'), false);
   });

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { FaPhone, FaEnvelope, FaGlobe, FaArrowLeft, FaBuilding } from 'react-icons/fa'
 import Navbar from '../components/Navbar'
+import { mediaUrl } from '../utils/mediaUrl'
 
 const TYPE_ETAB_COLORS = {
   sante: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: '🏥' },
@@ -287,7 +288,7 @@ export default function PublicEtablissementsPage() {
                       <div className="px-5 pb-5 -mt-10 relative flex-1 flex flex-col">
                         <div className="w-20 h-20 rounded-2xl border-[3px] border-white shadow-lg bg-white flex items-center justify-center mb-4">
                           {e.logo_url ? (
-                            <img src={e.logo_url} alt="" className="w-full h-full object-contain p-1.5" />
+                            <img src={mediaUrl(e.logo_url)} alt="" className="w-full h-full object-contain p-1.5" />
                           ) : (
                             <span className="text-2xl font-black" style={{ color: cardPrim }}>
                               {String(e.nom || '?')[0]}

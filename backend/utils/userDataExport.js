@@ -125,16 +125,19 @@ function getManifestForRole(role) {
   if (role === 'admin') {
     return {
       title: 'Sauvegarde complète de la plateforme',
+      format: 'zip',
       included: [
-        'Toute la base (établissements, formations, dossiers, factures, utilisateurs, etc.)',
+        'Archive ZIP : preinscription.json (base complète)',
+        'Utilisateurs, établissements, formations, dossiers, factures, etc.',
         'Historique des migrations appliquées',
       ],
       excluded: [
         ...commonExcluded,
-        'Dossier uploads/ (utiliser la maintenance ou une copie serveur)',
+        'Dossier uploads/ (pièces jointes PDF/images — copie serveur séparée)',
       ],
-      canRestore: false,
-      restoreHint: 'La restauration complète se fait manuellement sur le serveur (remplacement du fichier preinscription.json après backup).',
+      canRestore: true,
+      restoreHint:
+        'Restauration depuis un fichier .zip contenant preinscription.json. Un backup automatique est créé avant toute opération. Les mises à jour git ne remplacent pas vos données prod (skip-worktree).',
       migrationNote,
     };
   }
@@ -142,6 +145,7 @@ function getManifestForRole(role) {
   if (role === 'admin_etablissement') {
     return {
       title: 'Sauvegarde de votre établissement',
+      format: 'zip',
       included: [
         'Fiche établissement (identité, contact, banque, charte graphique)',
         'Filières et formations (grilles tarifaires incluses)',
@@ -158,7 +162,7 @@ function getManifestForRole(role) {
       ],
       canRestore: true,
       restoreHint:
-        'La restauration fusionne les enregistrements par identifiant (ajout / mise à jour). Aucune suppression automatique. Un backup complet est créé avant restauration.',
+        'Restauration depuis un fichier .zip (donnees.json). Fusion par identifiant — aucune suppression automatique. Backup auto avant restauration.',
       migrationNote,
     };
   }
@@ -166,6 +170,7 @@ function getManifestForRole(role) {
   if (role === 'etudiant') {
     return {
       title: 'Export de mes données candidat',
+      format: 'zip',
       included: [
         'Profil du compte (nom, contact, adresse)',
         'Dossiers de préinscription',
@@ -178,17 +183,18 @@ function getManifestForRole(role) {
       ],
       canRestore: true,
       restoreHint:
-        'Restauration limitée au profil (nom, téléphone, adresse). Les dossiers ne sont pas écrasés automatiquement.',
+        'Restauration depuis un fichier .zip — profil uniquement (nom, téléphone, adresse).',
       migrationNote,
     };
   }
 
   return {
     title: 'Export de mon profil staff',
+    format: 'zip',
     included: ['Profil du compte (identité, contact, rôle, matricule)'],
     excluded: [...commonExcluded, 'Données métier de l’établissement (réservées à l’administrateur établissement)'],
     canRestore: true,
-    restoreHint: 'Restauration limitée aux champs de profil (nom, téléphone, adresse).',
+    restoreHint: 'Restauration depuis un fichier .zip — champs de profil uniquement.',
     migrationNote,
   };
 }
@@ -199,7 +205,7 @@ function getBackupEndpointsForUser(user) {
     return {
       ...manifest,
       exportUrl: '/api/admin/backup/export',
-      restoreUrl: null,
+      restoreUrl: '/api/admin/backup/restore',
     };
   }
   if (isAdminEtablissement(user) && user.etablissement_id) {

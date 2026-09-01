@@ -136,4 +136,10 @@ router.get('/formations', (req, res) => {
   })));
 });
 
+// GET /api/public/site-branding — favicon et nom plateforme (sans auth)
+router.get('/site-branding', (req, res) => {
+  const { getSiteConfigForClient } = require('../utils/siteConfig');
+  return res.json(getSiteConfigForClient(req));
+});
+
 module.exports = router;

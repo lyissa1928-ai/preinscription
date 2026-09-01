@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { FaCloudDownloadAlt, FaCloudUploadAlt, FaDatabase, FaInfoCircle } from 'react-icons/fa'
+import { FaCloudDownloadAlt, FaCloudUploadAlt, FaDatabase, FaInfoCircle, FaFileArchive } from 'react-icons/fa'
 
-function triggerJsonDownload(data, filename) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+function filenameFromDisposition(header, fallback) {
+  if (!header) return fallback
+  const m = /filename="?([^";\n]+)"?/i.exec(header)
+  return m?.[1] || fallback
+}
+
+function triggerBlobDownload(blob, filename) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -32,23 +37,11 @@ export default function DonneesBackupPanel({ className = '' }) {
     if (!info?.exportUrl) return
     setExporting(true)
     try {
-      if (info.exportUrl.includes('/admin/backup/')) {
-        const { data } = await axios.get(info.exportUrl, { responseType: 'blob' })
-        const url = URL.createObjectURL(data)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `uniportail-backup-${Date.now()}.json`
-        a.click()
-        URL.revokeObjectURL(url)
-      } else {
-        const { data } = await axios.get(info.exportUrl)
-        const name =
-          data._exportType === 'etablissement'
-            ? `export-etab-${data._etablissementId}-${Date.now()}.json`
-            : `export-donnees-${Date.now()}.json`
-        triggerJsonDownload(data, name)
-      }
-      toast.success('Export téléchargé.')
+      const response = await axios.get(info.exportUrl, { responseType: 'blob' })
+      const fallback = `uniportail-sauvegarde-${Date.now()}.zip`
+      const name = filenameFromDisposition(response.headers['content-disposition'], fallback)
+      triggerBlobDownload(response.data, name.endsWith('.zip') ? name : `${name}.zip`)
+      toast.success('Archive ZIP téléchargée.')
     } catch (err) {
       toast.error(err.response?.data?.message || 'Export impossible.')
     } finally {
@@ -60,15 +53,22 @@ export default function DonneesBackupPanel({ className = '' }) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file || !info?.restoreUrl) return
+    if (!/\.zip$/i.test(file.name)) {
+      toast.error('Seuls les fichiers .zip sont acceptés.')
+      return
+    }
     if (!window.confirm(
-      'Restaurer ce fichier ? Un backup complet sera créé avant toute modification. Les données seront fusionnées (pas de suppression automatique).',
+      'Restaurer cette archive ZIP ? Un backup automatique sera créé avant toute modification. Les données existantes en production ne seront pas effacées par une simple mise à jour — cette action fusionne ou remplace selon votre rôle.',
     )) return
 
     setRestoring(true)
     try {
-      const text = await file.text()
-      const payload = JSON.parse(text)
-      const { data } = await axios.post(info.restoreUrl, { payload, confirm: true })
+      const fd = new FormData()
+      fd.append('backup', file)
+      fd.append('confirm', 'true')
+      const { data } = await axios.post(info.restoreUrl, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
       toast.success(data.message || 'Restauration terminée.')
     } catch (err) {
       toast.error(err.response?.data?.message || 'Restauration impossible.')
@@ -93,15 +93,19 @@ export default function DonneesBackupPanel({ className = '' }) {
         <div className="flex items-center gap-2">
           <FaDatabase className="h-5 w-5 text-indigo-600" aria-hidden />
           <h3 className="text-lg font-bold text-slate-900">{info.title || 'Mes données'}</h3>
+          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-800">
+            <FaFileArchive className="h-3 w-3" aria-hidden />
+            Format ZIP
+          </span>
         </div>
         <p className="mt-1 text-sm text-slate-600">
-          Sauvegardez vos données avant une mise à jour ou une manipulation importante.
+          Téléchargez une archive .zip avant une mise à jour. Restaurez en important le même type de fichier .zip.
         </p>
       </div>
 
       <div className="grid gap-5 p-5 lg:grid-cols-2">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Inclus dans l’export</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Inclus dans le ZIP</p>
           <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
             {(info.included || []).map((line) => (
               <li key={line} className="flex gap-2">
@@ -139,7 +143,7 @@ export default function DonneesBackupPanel({ className = '' }) {
           className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
         >
           <FaCloudDownloadAlt aria-hidden />
-          {exporting ? 'Export…' : 'Télécharger ma sauvegarde'}
+          {exporting ? 'Export ZIP…' : 'Télécharger (.zip)'}
         </button>
 
         {info.canRestore && info.restoreUrl && (
@@ -147,7 +151,7 @@ export default function DonneesBackupPanel({ className = '' }) {
             <input
               ref={fileRef}
               type="file"
-              accept="application/json,.json"
+              accept=".zip,application/zip,application/x-zip-compressed"
               className="hidden"
               onChange={handleRestoreFile}
             />
@@ -158,7 +162,7 @@ export default function DonneesBackupPanel({ className = '' }) {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
             >
               <FaCloudUploadAlt aria-hidden />
-              {restoring ? 'Restauration…' : 'Restaurer depuis un fichier'}
+              {restoring ? 'Restauration…' : 'Restaurer (.zip)'}
             </button>
           </>
         )}

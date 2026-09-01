@@ -3,6 +3,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { mediaUrl } from '../utils/mediaUrl'
 
 const ROLES_STAFF = [
   { val: 'admin', label: 'Administrateur (plateforme)' },
@@ -414,7 +415,7 @@ export default function AdminUsers() {
                   <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-100"
                     style={{ background: etab ? `linear-gradient(135deg, ${etab.couleur_primaire}15, ${etab.couleur_secondaire || etab.couleur_primaire}08)` : '#f9fafb' }}>
                     {etab?.logo_url
-                      ? <img src={etab.logo_url} alt="" className="w-7 h-7 rounded-lg object-contain bg-white border border-gray-200 p-0.5" />
+                      ? <img src={mediaUrl(etab.logo_url)} alt="" className="w-7 h-7 rounded-lg object-contain bg-white border border-gray-200 p-0.5" />
                       : <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black"
                           style={{ background: etab?.couleur_primaire || '#6b7280' }}>
                           {group.nom[0]}

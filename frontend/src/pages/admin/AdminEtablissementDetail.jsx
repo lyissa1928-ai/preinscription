@@ -29,6 +29,7 @@ import FormationExcelGrid from '../../components/FormationExcelGrid'
 import { computeScolariteAnnuelle, computeTotalMensualites, dureeLabelFromMois } from '../../lib/formationTarifs'
 import { loadColumnState, templateColumnsFromState, formationToGridRow } from '../../lib/formationGridSchema'
 import DonneesBackupPanel from '../../components/DonneesBackupPanel'
+import { mediaUrl } from '../../utils/mediaUrl'
 import {
   canCreateStaffAccount as userCanCreateStaff,
   creatableRoleOptions,
@@ -58,6 +59,39 @@ const ROLE_COLORS = {
   responsable: 'bg-teal-100 text-teal-700', agent_admin: 'bg-orange-100 text-orange-700',
   comptable: 'bg-violet-100 text-violet-700',
   controleur_qualite: 'bg-cyan-100 text-cyan-800',
+}
+
+const ROLE_LABELS = {
+  admin_etablissement: 'Administrateur établissement',
+  responsable: 'Responsable pédagogique',
+  agent_admin: 'Agent administratif',
+  comptable: 'Comptable',
+  controleur_qualite: 'Contrôleur qualité',
+}
+
+function staffEligiblesDesignation(membres) {
+  return (membres || []).filter(
+    (m) => m.actif !== false && m.role !== 'admin' && m.role !== 'etudiant',
+  )
+}
+
+function PersonCard({ person, emptyLabel }) {
+  if (!person) {
+    return <p className="text-sm text-gray-500 mt-1">{emptyLabel}</p>
+  }
+  return (
+    <div className="flex items-center gap-3 mt-2">
+      <div className="w-10 h-10 rounded-full bg-teal-500 text-white font-bold text-sm flex items-center justify-center">
+        {(person.prenom?.[0] || '?')}{(person.nom?.[0] || '')}
+      </div>
+      <div>
+        <p className="font-semibold text-gray-800">{person.prenom} {person.nom}</p>
+        <p className="text-xs text-gray-400">
+          {person.email} · {ROLE_LABELS[person.role] || person.role}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 // ─── Helper label ──────────────────────────────────────────────────────────────
@@ -193,7 +227,7 @@ function TabIdentite({ etab, onUpdated }) {
         {/* Fichiers */}
         <div>
           <L>Logo</L>
-          {etab.logo_url && <img src={etab.logo_url} alt="logo" className="w-20 h-20 object-contain border rounded-xl mb-2 p-1 bg-gray-50" />}
+          {etab.logo_url && <img src={mediaUrl(etab.logo_url)} alt="logo" className="w-20 h-20 object-contain border rounded-xl mb-2 p-1 bg-gray-50" />}
           <input type="file" accept=".png,.jpg,.jpeg,.svg,.webp" onChange={e => setLogo(e.target.files[0])} className="block w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
         </div>
         <div>
@@ -1395,7 +1429,7 @@ const EMPTY_EDIT_FORM = {
   mot_de_passe: '', mot_de_passe_confirmation: '',
 }
 
-export function TabMembres({ etabId, membres: init, responsable_id }) {
+export function TabMembres({ etabId, membres: init, responsable_id, admin_etablissement_id, onEtabRefresh }) {
   const { user } = useAuth()
   const isPlatformAdmin = user?.role === 'admin'
   const canCreateStaffAccount = userCanCreateStaff(user)
@@ -1472,6 +1506,7 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
       )
       setShowForm(false)
       setForm(EMPTY_MEMBRE_FORM)
+      onEtabRefresh?.()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Erreur.')
     } finally { setSaving(false) }
@@ -1502,6 +1537,7 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
       toast.success(data.message || 'Membre mis à jour.')
       setEditId(null)
       setEditForm(EMPTY_EDIT_FORM)
+      onEtabRefresh?.()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Erreur.')
     } finally { setSavingEdit(false) }
@@ -1662,7 +1698,12 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
                     {m.id === responsable_id && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
                         <FaUserTie className="h-3 w-3" aria-hidden />
-                        Désigné resp.
+                        Resp. pédagogique
+                      </span>
+                    )}
+                    {m.id === admin_etablissement_id && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-800 ring-1 ring-indigo-200">
+                        Admin étab.
                       </span>
                     )}
                     {m.actif === false && (
@@ -1895,67 +1936,142 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
   )
 }
 // ═══════════════════════════════════════════════════════════════════════
-// Onglet 5 — Responsable
+// Onglet — Responsables & administrateur établissement
 // ═══════════════════════════════════════════════════════════════════════
-function TabResponsable({ etabId, responsable: initResp, membres }) {
+function TabResponsable({
+  etabId,
+  responsable: initResp,
+  adminEtab: initAdmin,
+  membres,
+  onUpdated,
+  isPlatformAdmin,
+}) {
   const [responsable, setResponsable] = useState(initResp)
-  const [selectedId, setSelectedId] = useState(initResp?.id ? String(initResp.id) : '')
-  const [saving, setSaving] = useState(false)
+  const [adminEtab, setAdminEtab] = useState(initAdmin)
+  const [selectedRespId, setSelectedRespId] = useState(initResp?.id ? String(initResp.id) : '')
+  const [selectedAdminId, setSelectedAdminId] = useState(initAdmin?.id ? String(initAdmin.id) : '')
+  const [savingResp, setSavingResp] = useState(false)
+  const [savingAdmin, setSavingAdmin] = useState(false)
 
-  const eligibles = membres.filter(m => m.role === 'responsable' && m.actif !== false)
+  const eligibles = staffEligiblesDesignation(membres)
 
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      await axios.put(`/api/etablissements/${etabId}/responsable`, { utilisateur_id: selectedId || null })
-      const found = membres.find(m => String(m.id) === selectedId) || null
-      setResponsable(found)
-      toast.success(selectedId ? 'Responsable désigné.' : 'Responsable retiré.')
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Erreur.')
-    } finally { setSaving(false) }
+  useEffect(() => {
+    setResponsable(initResp)
+    setSelectedRespId(initResp?.id ? String(initResp.id) : '')
+  }, [initResp])
+
+  useEffect(() => {
+    setAdminEtab(initAdmin)
+    setSelectedAdminId(initAdmin?.id ? String(initAdmin.id) : '')
+  }, [initAdmin])
+
+  const refreshEtab = async () => {
+    const { data } = await axios.get(`/api/etablissements/${etabId}`)
+    setResponsable(data.responsable || null)
+    setAdminEtab(data.admin_etablissement || null)
+    setSelectedRespId(data.responsable?.id ? String(data.responsable.id) : '')
+    setSelectedAdminId(data.admin_etablissement?.id ? String(data.admin_etablissement.id) : '')
+    onUpdated?.(data)
+    return data
   }
 
-  return (
-    <div className="max-w-lg space-y-6">
-      <div className="card bg-blue-50 border-blue-100">
-        <p className="font-semibold text-blue-900 mb-1">Responsable actuel</p>
-        {responsable ? (
-          <div className="flex items-center gap-3 mt-2">
-            <div className="w-10 h-10 rounded-full bg-teal-500 text-white font-bold text-sm flex items-center justify-center">
-              {(responsable.prenom?.[0] || '?')}{(responsable.nom?.[0] || '')}
-            </div>
-            <div>
-              <p className="font-semibold text-gray-800">{responsable.prenom} {responsable.nom}</p>
-              <p className="text-xs text-gray-400">{responsable.email} · {responsable.role}</p>
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500 mt-1">Aucun responsable désigné.</p>
-        )}
-      </div>
+  const handleSaveResp = async () => {
+    setSavingResp(true)
+    try {
+      await axios.put(`/api/etablissements/${etabId}/responsable`, { utilisateur_id: selectedRespId || null })
+      await refreshEtab()
+      toast.success(selectedRespId ? 'Responsable pédagogique désigné.' : 'Responsable pédagogique retiré.')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur.')
+    } finally { setSavingResp(false) }
+  }
 
+  const handleSaveAdmin = async () => {
+    setSavingAdmin(true)
+    try {
+      const { data } = await axios.put(`/api/etablissements/${etabId}/admin-etablissement`, {
+        utilisateur_id: selectedAdminId || null,
+      })
+      await refreshEtab()
+      toast.success(data.message || (selectedAdminId ? 'Administrateur désigné.' : 'Administrateur retiré.'))
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur.')
+    } finally { setSavingAdmin(false) }
+  }
+
+  const renderDesignationBlock = ({
+    title,
+    hint,
+    current,
+    emptyLabel,
+    selectedId,
+    setSelectedId,
+    onSave,
+    saving,
+    cardClass,
+  }) => (
+    <div className="space-y-4">
+      <div className={`card ${cardClass}`}>
+        <p className="font-semibold mb-1">{title}</p>
+        <PersonCard person={current} emptyLabel={emptyLabel} />
+      </div>
       <div>
-        <p className="font-semibold text-gray-800 mb-3">Désigner un responsable</p>
+        <p className="font-semibold text-gray-800 mb-1">Changer la désignation</p>
+        <p className="text-xs text-gray-500 mb-3">{hint}</p>
         {eligibles.length === 0 ? (
           <div className="p-4 bg-amber-50 rounded-xl text-sm text-amber-700">
-            ⚠ Créez d&apos;abord un membre avec le rôle <strong>Responsable pédagogique</strong>.
+            ⚠ Ajoutez d&apos;abord un membre du staff actif (onglet <strong>Membres</strong>).
           </div>
         ) : (
           <>
-            <select className="input-field mb-4" value={selectedId} onChange={e => setSelectedId(e.target.value)}>
-              <option value="">-- Aucun responsable --</option>
-              {eligibles.map(m => (
-                <option key={m.id} value={String(m.id)}>{m.prenom} {m.nom} ({m.role})</option>
+            <select className="input-field mb-4" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
+              <option value="">-- Aucune désignation --</option>
+              {eligibles.map((m) => (
+                <option key={m.id} value={String(m.id)}>
+                  {m.prenom} {m.nom} ({ROLE_LABELS[m.role] || m.role})
+                </option>
               ))}
             </select>
-            <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-40">
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2 disabled:opacity-40"
+            >
               {saving ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : null}
               Enregistrer
             </button>
           </>
         )}
       </div>
+    </div>
+  )
+
+  return (
+    <div className="max-w-2xl space-y-10">
+      {isPlatformAdmin && renderDesignationBlock({
+        title: 'Administrateur établissement',
+        hint: 'Gère le staff et l’établissement. Un seul administrateur à la fois — l’ancien est rétrogradé automatiquement.',
+        current: adminEtab,
+        emptyLabel: 'Aucun administrateur établissement désigné.',
+        selectedId: selectedAdminId,
+        setSelectedId: setSelectedAdminId,
+        onSave: handleSaveAdmin,
+        saving: savingAdmin,
+        cardClass: 'bg-indigo-50 border-indigo-100',
+      })}
+
+      {renderDesignationBlock({
+        title: 'Responsable pédagogique',
+        hint: 'Droits pédagogiques (dossiers, proforma, etc.) en plus de son rôle principal. Tout membre staff actif peut être désigné.',
+        current: responsable,
+        emptyLabel: 'Aucun responsable pédagogique désigné.',
+        selectedId: selectedRespId,
+        setSelectedId: setSelectedRespId,
+        onSave: handleSaveResp,
+        saving: savingResp,
+        cardClass: 'bg-blue-50 border-blue-100',
+      })}
     </div>
   )
 }
@@ -1970,7 +2086,7 @@ const TABS_ALL = [
   { id: 'acceptes', label: 'Acceptés', Icon: FaCheckCircle },
   { id: 'factures', label: 'Factures', Icon: FaFileInvoice },
   { id: 'membres', label: 'Membres', Icon: FaUsers },
-  { id: 'responsable', label: 'Responsable', Icon: FaUserTie },
+  { id: 'responsable', label: 'Responsables', Icon: FaUserTie },
 ]
 
 export default function AdminEtablissementDetail() {
@@ -2057,7 +2173,7 @@ export default function AdminEtablissementDetail() {
                 style={{ borderColor: `${primary}35` }}
               >
                 {etab.logo_url ? (
-                  <img src={etab.logo_url} alt="" className="w-full h-full object-contain p-1" />
+                  <img src={mediaUrl(etab.logo_url)} alt="" className="w-full h-full object-contain p-1" />
                 ) : (
                   <span className="text-2xl sm:text-3xl font-black" style={{ color: primary }}>
                     {String(etab.nom || '?')[0]}
@@ -2161,10 +2277,23 @@ export default function AdminEtablissementDetail() {
           <TabFacturesEtab etabId={etab.id} />
         )}
         {tab === 'membres' && (
-          <TabMembres etabId={etab.id} membres={etab.membres || []} responsable_id={etab.responsable_id} />
+          <TabMembres
+            etabId={etab.id}
+            membres={etab.membres || []}
+            responsable_id={etab.responsable_id}
+            admin_etablissement_id={etab.admin_etablissement_id}
+            onEtabRefresh={load}
+          />
         )}
         {tab === 'responsable' && (
-          <TabResponsable etabId={etab.id} responsable={etab.responsable} membres={etab.membres || []} />
+          <TabResponsable
+            etabId={etab.id}
+            responsable={etab.responsable}
+            adminEtab={etab.admin_etablissement}
+            membres={etab.membres || []}
+            isPlatformAdmin={user?.role === 'admin'}
+            onUpdated={(data) => setEtab((prev) => (prev ? { ...prev, ...data } : data))}
+          />
         )}
           </div>
         </div>

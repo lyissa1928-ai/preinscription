@@ -1,8 +1,8 @@
 import { resolveApiBaseUrl } from './resolveApiBaseUrl'
 import { getAccessToken } from '../lib/tokenStorage'
 
-/** Sous-dossiers /uploads restés publics côté API (logos établissements). */
-const PUBLIC_UPLOAD_PREFIXES = ['/uploads/etablissements/']
+/** Sous-dossiers /uploads restés publics côté API (logos établissements, branding plateforme). */
+const PUBLIC_UPLOAD_PREFIXES = ['/uploads/etablissements/', '/uploads/platform/']
 
 /**
  * URL affichable pour un fichier API (/uploads/...).

@@ -61,6 +61,12 @@ db.defaults({
   conditions_admission: [],
   chatbot_logs: [],
   chatbot_config: [],
+  site_config: {
+    platform_name: 'Préinscription Universitaire',
+    favicon_url: null,
+    platform_logo_url: null,
+    updated_at: null,
+  },
   _schemaVersion: 0,
   _migrations: [],
   _nextId: {
