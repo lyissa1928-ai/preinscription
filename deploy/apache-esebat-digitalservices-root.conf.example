@@ -1,0 +1,28 @@
+# Apache — UniPortail SEUL à la racine de esebat-digitalservices.com
+# (remplace l’ancienne app PHP + le déploiement sous /uniportail/)
+#
+# Dans le VirtualHost HTTPS du domaine (Hestia : custom ou apache2.ssl.conf) :
+
+# ─── Redirections anciennes URLs ───
+RedirectMatch 301 ^/uniportail/?(.*)$ /$1
+
+# ─── DocumentRoot = build React UniPortail ───
+DocumentRoot /var/www/uniportail/frontend/dist
+<Directory /var/www/uniportail/frontend/dist>
+    Options -Indexes +FollowSymLinks
+    AllowOverride None
+    Require all granted
+    FallbackResource /index.html
+</Directory>
+
+# ─── API Node (PM2 uniportail-api, port 5000) ───
+ProxyPreserveHost On
+ProxyPass        /api/       http://127.0.0.1:5000/api/
+ProxyPassReverse /api/       http://127.0.0.1:5000/api/
+ProxyPass        /uploads/   http://127.0.0.1:5000/uploads/
+ProxyPassReverse /uploads/   http://127.0.0.1:5000/uploads/
+ProxyPass        /socket.io/ http://127.0.0.1:5000/socket.io/
+ProxyPassReverse /socket.io/ http://127.0.0.1:5000/socket.io/
+
+# Désactiver l’accès à l’ancien public_html (PHP) :
+# Alias /ancien-site /home/admin/web/esebat-digitalservices.com/public_html.OLD

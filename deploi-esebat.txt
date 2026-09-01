@@ -338,8 +338,8 @@ npm run build
 pm2 restart uniportail-api
 --------------------------------------------------------------------------------
 
-  URL application : https://esebat-digitalservices.com/uniportail/connexion
-  (pas /connexion à la racine — voir deploy/apache-esebat-redirections.conf.example)
+  URL application : https://esebat-digitalservices.com/connexion
+  (UniPortail seul à la racine — voir deploy/prod-esebat-uniportail-seul.txt)
 
 ================================================================================
 O. SAUVEGARDES (RECOMMANDÉ)

@@ -132,8 +132,10 @@ echo ">>> 6/7 Dépendances + build frontend..."
 npm run install:all
 npm run build
 
-# config-site.js : URL API sans rebuild (obligatoire si app sous /uniportail/)
-API_PUBLIC="${UNIPORTAIL_API_PUBLIC_URL:-https://esebat-digitalservices.com/uniportail}"
+# config-site.js : apiBaseUrl vide = même origine (/api proxifié par nginx/apache).
+# Sous-dossier legacy : UNIPORTAIL_API_PUBLIC_URL=https://esebat-digitalservices.com/uniportail
+API_PUBLIC="${UNIPORTAIL_API_PUBLIC_URL-}"
+SITE_URL="${UNIPORTAIL_SITE_URL:-https://esebat-digitalservices.com}"
 write_config_site() {
   local target="$1"
   mkdir -p "$(dirname "$target")"
@@ -143,7 +145,7 @@ window.__PREINSCRIPTION_SITE_KEYS__ = {
   apiBaseUrl: '${API_PUBLIC}',
 }
 EOF
-  echo "    config-site.js → $target (apiBaseUrl=${API_PUBLIC})"
+  echo "    config-site.js → $target (apiBaseUrl=${API_PUBLIC:-<same-origin>})"
 }
 write_config_site frontend/dist/config-site.js
 write_config_site frontend/public/config-site.js
@@ -180,8 +182,8 @@ fi
 
 echo ""
 echo "=== Mise à jour terminée ==="
-echo "URL application : https://esebat-digitalservices.com/uniportail/"
-echo "Connexion       : https://esebat-digitalservices.com/uniportail/connexion"
+echo "URL application : ${SITE_URL}/"
+echo "Connexion       : ${SITE_URL}/connexion"
 echo "Sauvegarde      : $BACKUP_ROOT/preinscription-$STAMP.json"
 echo ""
-echo "Test rapide : curl -sI https://esebat-digitalservices.com/uniportail/api/etablissements | head -3"
+echo "Test rapide : curl -sI ${SITE_URL}/api/health | head -3"

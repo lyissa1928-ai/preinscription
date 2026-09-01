@@ -96,7 +96,11 @@ pm2 logs uniportail-api --lines 30 | grep -i migr
 
 **À chaque mise à jour** : `bash deploy/mise-a-jour-prod.sh` (sauvegarde + vérif compteurs + build + PM2).
 
-**URL correcte** : `https://esebat-digitalservices.com/uniportail/connexion` — **pas** `/connexion` à la racine (ancienne app). Voir `deploy/apache-esebat-redirections.conf.example`.
+**URL production ESEBAT** : `https://esebat-digitalservices.com/connexion` — UniPortail à la **racine** du domaine.
+
+Bascule initiale (une fois) : `bash deploy/configurer-racine-esebat.sh` — voir `deploy/prod-esebat-uniportail-seul.txt`.
+
+Les anciennes URLs `/uniportail/...` redirigent vers `/...`.
 
 ## Rollback rapide
 
