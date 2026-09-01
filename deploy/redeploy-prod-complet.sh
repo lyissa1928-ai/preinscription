@@ -33,6 +33,20 @@ echo "    OK → $BACKUP_ROOT"
 
 # ─── 2. GIT (débloquer fichiers locaux) ───
 echo ">>> [2/9] Mise à jour code GitHub..."
+
+# Skip-worktree sur la base et les .env avant pull (données prod intactes)
+[[ -f backend/database/preinscription.json ]] && \
+  git update-index --skip-worktree backend/database/preinscription.json 2>/dev/null || true
+[[ -f backend/.env ]] && git update-index --skip-worktree backend/.env 2>/dev/null || true
+[[ -f frontend/.env.production ]] && git update-index --skip-worktree frontend/.env.production 2>/dev/null || true
+
+# config-site.js : souvent édité à la main en prod → sauvegarde + reset pour débloquer git pull
+if [[ -f frontend/public/config-site.js ]]; then
+  cp frontend/public/config-site.js "$BACKUP_ROOT/config-site.js.$STAMP"
+  git update-index --no-skip-worktree frontend/public/config-site.js 2>/dev/null || true
+  git checkout -- frontend/public/config-site.js 2>/dev/null || true
+fi
+
 git checkout -- deploy/ 2>/dev/null || true
 git checkout -- frontend/package-lock.json backend/package-lock.json 2>/dev/null || true
 git fetch origin main
@@ -78,6 +92,35 @@ window.__PREINSCRIPTION_SITE_KEYS__ = {
   faviconUrl: '',
 }
 JS
+
+# Réinjecter recaptcha / apiBaseUrl depuis la sauvegarde pre-pull si présente
+CFG_BACKUP="$BACKUP_ROOT/config-site.js.$STAMP"
+if [[ -f "$CFG_BACKUP" ]]; then
+  node -e "
+    const fs = require('fs');
+    const backupPath = process.argv[1];
+    const targetPath = process.argv[2];
+    const read = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } };
+    const backup = read(backupPath);
+    const pick = (src, key) => {
+      const m = src.match(new RegExp(key + \"\\\\s*:\\\\s*['\\\"]([^'\\\"]*)['\\\"]\"));
+      return m ? m[1] : '';
+    };
+    let out = read(targetPath);
+    for (const key of ['recaptcha', 'apiBaseUrl', 'platform_name', 'faviconUrl']) {
+      const val = pick(backup, key);
+      if (val !== '') {
+        out = out.replace(
+          new RegExp(key + \"\\\\s*:\\\\s*['\\\"][^'\\\"]*['\\\"]\"),
+          key + \": '\" + val.replace(/'/g, \"\\\\'\") + \"'\"
+        );
+      }
+    }
+    fs.writeFileSync(targetPath, out);
+  " "$CFG_BACKUP" frontend/public/config-site.js 2>/dev/null \
+    && echo "    config-site.js : clés prod conservées depuis la sauvegarde." \
+    || true
+fi
 
 # ─── 5. BUILD ───
 echo ">>> [5/9] npm install + build (2-5 min)..."

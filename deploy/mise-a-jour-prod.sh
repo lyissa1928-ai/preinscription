@@ -70,6 +70,13 @@ fi
 # ─── 4. Mise à jour du code ───
 echo ">>> 3/7 git fetch + pull ($BRANCH)..."
 # package-lock.json modifié localement (npm install) ne doit pas bloquer le déploiement
+# config-site.js : souvent édité localement → reset si nécessaire avant pull
+if [[ -f frontend/public/config-site.js ]] && ! git diff --quiet HEAD -- frontend/public/config-site.js 2>/dev/null; then
+  cp frontend/public/config-site.js "$BACKUP_ROOT/config-site.js.$STAMP"
+  git update-index --no-skip-worktree frontend/public/config-site.js 2>/dev/null || true
+  git checkout -- frontend/public/config-site.js 2>/dev/null || true
+  echo "    reset local : frontend/public/config-site.js"
+fi
 for lockfile in frontend/package-lock.json backend/package-lock.json; do
   if [[ -f "$lockfile" ]] && ! git diff --quiet HEAD -- "$lockfile" 2>/dev/null; then
     git checkout -- "$lockfile" 2>/dev/null || true
