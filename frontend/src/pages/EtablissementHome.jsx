@@ -13,6 +13,7 @@ const TYPE_FORMATION_META = {
 }
 
 const ROLE_LINKS = {
+  admin_etablissement: { label: 'Équipe & comptes', path: '/mon-etablissement/equipe', icon: '👥' },
   responsable: { label: 'Traiter les dossiers',    path: '/responsable',  icon: '📋' },
   agent_admin:  { label: 'Contrôle administratif', path: '/agent-admin',   icon: '🗂️' },
   comptable:    { label: 'Finance & Facturation',   path: '/comptable',    icon: '💰' },

@@ -61,6 +61,8 @@ db.defaults({
   conditions_admission: [],
   chatbot_logs: [],
   chatbot_config: [],
+  _schemaVersion: 0,
+  _migrations: [],
   _nextId: {
     etablissements: 1,
     filieres: 1,
@@ -77,6 +79,19 @@ db.defaults({
     chatbot_logs: 1,
   },
 }).write();
+
+// Migrations versionnées (continuité données anciennes → nouvelle app)
+try {
+  const { runSchemaMigrations } = require('../utils/schemaMigrations');
+  const mig = runSchemaMigrations(db);
+  if (mig.ok && !mig.skipped) {
+    console.log(`📦 Schéma base : v${mig.to} (${mig.applied.length} migration(s)). Backup: ${mig.backup || 'n/a'}`);
+  } else if (!mig.ok) {
+    console.error(`❌ Échec migrations schéma (v${mig.failed_at}): ${mig.error}. Backup: ${mig.backup || 'n/a'}`);
+  }
+} catch (e) {
+  console.warn('⚠️ Migrations schéma:', e.message);
+}
 
 // Les formations ne sont pas préremplies : elles sont créées par l’admin / le responsable (par établissement).
 

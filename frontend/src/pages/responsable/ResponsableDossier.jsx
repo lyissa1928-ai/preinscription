@@ -18,17 +18,17 @@ const ALLOWED_TRANSITIONS = {
 }
 
 const panel =
-  'rounded-2xl border border-slate-200/90 bg-white/95 text-card-foreground shadow-[0_1px_3px_rgba(15,23,42,0.06)] ring-1 ring-slate-100/80'
+  'rounded-xl border border-slate-200/90 bg-white text-card-foreground shadow-sm'
 
 const FieldLabel = ({ children }) => (
-  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">{children}</span>
+  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{children}</span>
 )
 
 function SectionTitle({ icon, children }) {
   return (
-    <h2 className="mb-5 flex items-center gap-2.5 text-base font-bold tracking-tight text-slate-900">
+    <h2 className="mb-3 flex items-center gap-2 text-sm font-bold tracking-tight text-slate-900">
       <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg shadow-inner ring-1 ring-slate-200/80"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm ring-1 ring-slate-200/80"
         aria-hidden
       >
         {icon}
@@ -295,11 +295,11 @@ export default function ResponsableDossier() {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Dossier {dossier.numero_dossier}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Dossier {dossier.numero_dossier}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <StatutBadge statut={dossier.statut} />
               <span
-                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset ${
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${
                   dossier.type_formation === 'en_ligne'
                     ? 'bg-emerald-100 text-emerald-800 ring-emerald-200/80'
                     : 'bg-sky-100 text-sky-900 ring-sky-200/80'
@@ -307,51 +307,52 @@ export default function ResponsableDossier() {
               >
                 {dossier.type_formation === 'en_ligne' ? 'FAD (en ligne)' : 'Présentiel'}
               </span>
+              <span className="text-xs text-slate-500">
+                Déposé le{' '}
+                <time dateTime={dossier.created_at}>
+                  {new Date(dossier.created_at).toLocaleDateString('fr-FR', { dateStyle: 'long' })}
+                </time>
+              </span>
             </div>
-            <p className="mt-3 text-sm text-slate-600">
-              Déposé le{' '}
-              <time dateTime={dossier.created_at}>
-                {new Date(dossier.created_at).toLocaleDateString('fr-FR', { dateStyle: 'long' })}
-              </time>
-            </p>
           </div>
         </div>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-12 lg:gap-10">
+      <div className="grid gap-4 lg:grid-cols-12 lg:gap-5">
         {/* Colonne principale */}
-        <div className="space-y-6 lg:col-span-8">
+        <div className="space-y-4 lg:col-span-8">
           {/* Photo + identité */}
-          <section className={`${panel} p-5 sm:p-6`}>
-            <SectionTitle icon="👤">Candidat</SectionTitle>
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+          <section className={`${panel} p-4`}>
+            <SectionTitle icon="👤">Informations personnelles</SectionTitle>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               {photoDoc ? (
                 <img
                   src={mediaUrl(`/uploads/${photoDoc.chemin}`)}
                   alt=""
-                  className="h-32 w-28 shrink-0 rounded-2xl border-2 border-white object-cover shadow-md ring-2 ring-slate-200/80"
+                  className="h-24 w-20 shrink-0 rounded-xl border border-slate-200 object-cover shadow-sm"
                   onError={(e) => {
                     e.target.style.display = 'none'
                   }}
                 />
               ) : (
-                <div className="flex h-32 w-28 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-gradient-to-br from-slate-100 to-slate-50 text-4xl text-slate-400 shadow-inner">
+                <div className="flex h-24 w-20 shrink-0 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-2xl text-slate-400">
                   <span aria-hidden>👤</span>
                 </div>
               )}
-              <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+              <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-2.5 text-sm sm:grid-cols-2">
                 {[
-                  ['Nom complet', `${dossier.prenom} ${dossier.nom}`],
-                  ['Email', dossier.email],
-                  ['Téléphone', dossier.telephone],
-                  ['Nationalité', dossier.nationalite],
-                  ['Date de naissance', new Date(dossier.date_naissance).toLocaleDateString('fr-FR')],
-                  ['Lieu de naissance', dossier.lieu_naissance],
-                  ['Adresse', dossier.adresse],
+                  ['Nom complet', [dossier.prenom, dossier.nom].filter(Boolean).join(' ') || '—'],
+                  ['Matricule (compte)', dossier.matricule || '—'],
+                  ['Email', dossier.email || '—'],
+                  ['Téléphone', dossier.telephone || '—'],
+                  ['Nationalité', dossier.nationalite || '—'],
+                  ['Date de naissance', dossier.date_naissance ? new Date(dossier.date_naissance).toLocaleDateString('fr-FR') : '—'],
+                  ['Lieu de naissance', dossier.lieu_naissance || '—'],
+                  ['Adresse', dossier.adresse || '—'],
                 ].map(([l, v]) => (
                   <div key={l} className="min-w-0">
                     <FieldLabel>{l}</FieldLabel>
-                    <p className="mt-1.5 font-semibold leading-snug text-slate-900">{v}</p>
+                    <p className="mt-0.5 font-semibold leading-snug text-slate-900 break-words">{v || '—'}</p>
                   </div>
                 ))}
               </div>
@@ -359,9 +360,9 @@ export default function ResponsableDossier() {
           </section>
 
           {/* Formation */}
-          <section className={`${panel} p-5 sm:p-6`}>
+          <section className={`${panel} p-4`}>
             <SectionTitle icon="🎓">Formation demandée</SectionTitle>
-            <div className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-2.5 text-sm sm:grid-cols-2">
               {[
                 ['Formation', dossier.filiere],
                 ['Type', dossier.type_formation === 'en_ligne' ? 'FAD (en ligne)' : 'Présentiel'],
@@ -375,27 +376,41 @@ export default function ResponsableDossier() {
               ].map(([l, v]) => (
                 <div key={l} className="min-w-0">
                   <FieldLabel>{l}</FieldLabel>
-                  <p className="mt-1.5 font-semibold leading-snug text-slate-900">{v}</p>
+                  <p className="mt-0.5 font-semibold leading-snug text-slate-900">{v || '—'}</p>
                 </div>
               ))}
             </div>
             {formation && (
-              <div className="mt-6 border-t border-slate-100 pt-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <FieldLabel>Frais totaux</FieldLabel>
-                    <p className="mt-1 text-2xl font-bold tabular-nums text-indigo-700">
-                      {new Intl.NumberFormat('fr-FR').format(formation.prix || 0)}{' '}
-                      <span className="text-lg font-semibold text-slate-600">FCFA</span>
-                    </p>
-                  </div>
-                  <p className="max-w-md text-right text-xs leading-relaxed text-slate-600 sm:text-left">
-                    Forfait annuel (inscription + mensualités × durée)
+              <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-4">
+                <div>
+                  <FieldLabel>Inscription</FieldLabel>
+                  <p className="font-semibold tabular-nums text-slate-800">{new Intl.NumberFormat('fr-FR').format(formation.frais_inscription || 0)}</p>
+                </div>
+                <div>
+                  <FieldLabel>Mensualité × mois</FieldLabel>
+                  <p className="font-semibold tabular-nums text-slate-800">
+                    {new Intl.NumberFormat('fr-FR').format(formation.mensualite || 0)}
+                    {' × '}
+                    {formation.duree_mois || '—'}
+                  </p>
+                </div>
+                <div>
+                  <FieldLabel>Total mensualités</FieldLabel>
+                  <p className="font-semibold tabular-nums text-emerald-800">
+                    {new Intl.NumberFormat('fr-FR').format(
+                      (Number(formation.mensualite) || 0) * (Number(formation.duree_mois) || 0)
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <FieldLabel>Forfait annuel</FieldLabel>
+                  <p className="text-lg font-bold tabular-nums text-indigo-700">
+                    {new Intl.NumberFormat('fr-FR').format(formation.prix || 0)}
                   </p>
                 </div>
               </div>
             )}
-            <div className="mt-6 border-t border-slate-100 pt-6">
+            <div className="mt-3 border-t border-slate-100 pt-3">
               <PreinscriptionConditionsBlock
                 formationNiveau={dossier.formation_niveau_cible || formation?.niveau}
                 profileKey={dossier.document_rule_profile}
@@ -404,21 +419,21 @@ export default function ResponsableDossier() {
           </section>
 
           {/* Documents */}
-          <section className={`${panel} p-5 sm:p-6`}>
+          <section className={`${panel} p-4`}>
             <SectionTitle icon="📎">Documents soumis</SectionTitle>
             {documents.length === 0 ? (
-              <p className="text-sm text-slate-500">Aucun document soumis</p>
+              <p className="text-sm text-slate-500 py-1">Aucun document soumis.</p>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {documents.map((doc) => (
                   <a
                     key={doc.id}
                     href={mediaUrl(`/uploads/${doc.chemin}`)}
                     target="_blank"
                     rel="noreferrer"
-                    className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 transition hover:border-indigo-300 hover:bg-indigo-50/60"
+                    className="group flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50/80 p-2.5 transition hover:border-indigo-300 hover:bg-indigo-50/60"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white bg-white text-lg shadow-sm">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white bg-white text-base shadow-sm">
                       {isPhotoDocumentType(doc.type_document) ? '🖼️' : '📄'}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -427,20 +442,6 @@ export default function ResponsableDossier() {
                       </p>
                       <p className="truncate text-sm font-medium text-slate-800">{doc.nom_fichier}</p>
                     </div>
-                    <svg
-                      className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-indigo-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                      />
-                    </svg>
                   </a>
                 ))}
               </div>
@@ -449,21 +450,21 @@ export default function ResponsableDossier() {
         </div>
 
         {/* Colonne décision + documents */}
-        <aside className="space-y-4 lg:col-span-4 lg:sticky lg:top-6 lg:self-start">
+        <aside className="space-y-3 lg:col-span-4 lg:sticky lg:top-4 lg:self-start">
           {isAccepte ? (
-            <div className="overflow-hidden rounded-2xl border border-slate-200/90 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.12)] ring-1 ring-slate-100/80">
+            <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
               {decisionBlock}
               {documentsOfficielsBlock}
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200/90 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.12)] ring-1 ring-slate-100/80">
+            <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
               {decisionBlock}
             </div>
           )}
 
           {dossier.commentaire_admin && (
-            <div className={`${panel} p-5`}>
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Dernier commentaire</p>
+            <div className={`${panel} p-4`}>
+              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Dernier commentaire</p>
               <p className="text-sm leading-relaxed text-slate-700">{dossier.commentaire_admin}</p>
             </div>
           )}

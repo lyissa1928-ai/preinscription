@@ -19,6 +19,26 @@ const { syncStoredFactureById } = require('../services/factureService');
 const { isFactureSupprimee } = require('../utils/factureVisibility');
 const { stripEtabSensitiveFields } = require('../utils/etablissementSanitize');
 const { actsAsResponsable } = require('../utils/userFonctions');
+const {
+  canManageEtabMembres,
+  rolesCreatablesMembres,
+  canManageTargetMembre,
+  isPlatformAdmin,
+  ROLE_ADMIN_ETABLISSEMENT,
+} = require('../utils/staffRoles');
+const {
+  findAdminEtablissementUser,
+  designateAdminEtablissement,
+  enforceSingleAdminEtablissement,
+  pickAdminPublic,
+} = require('../utils/adminEtablissement');
+const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
+const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
+const {
+  resolveHeaderToKey,
+  parseCustomColumns,
+  defaultTemplateColumns,
+} = require('../utils/formationImportColumns');
 
 function parseDureeMoisInput(v) {
   if (v === undefined || v === null || v === '') return 0;
@@ -30,16 +50,23 @@ function parseDureeMoisInput(v) {
 /** Recalcule le champ `prix` (forfait annuel) à partir inscription + mensualité × durée. */
 function formationAvecPrixRecalcule(formation) {
   if (!formation || typeof formation !== 'object') return formation;
-  return { ...formation, prix: computePrixAnnuel(formation) };
+  const next = { ...formation, prix: computePrixAnnuel(formation) };
+  const mois = parseDureeMoisInput(next.duree_mois);
+  if (mois > 0 && (!next.duree || !String(next.duree).trim())) {
+    next.duree = mois === 12 ? '12 mois (1 an)' : `${mois} mois`;
+  }
+  if (mois > 0) next.duree_mois = mois;
+  return next;
 }
 
 /**
  * Admin, ou responsable (rôle / fonction désignée) de l’établissement :id / :etabId.
  * Journalisé (audit) pour l’administrateur.
+ * Important : préférer :etabId quand la route a aussi :id (id formation), sinon parseInt('batch') → NaN.
  */
 function etabPedagogieWrite(req, res, next) {
   if (req.user.role === 'admin') return next();
-  const raw = req.params.id ?? req.params.etabId;
+  const raw = req.params.etabId ?? req.params.id;
   const etabId = parseInt(raw, 10);
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
@@ -62,7 +89,7 @@ function etabFacturesAccess(req, res, next) {
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
   }
-  const roles = ['responsable', 'comptable', 'agent_admin', 'controleur_qualite'];
+  const roles = ['responsable', 'comptable', 'agent_admin', 'controleur_qualite', 'admin_etablissement'];
   if (
     (roles.includes(req.user.role) || actsAsResponsable(req.user)) &&
     Number(req.user.etablissement_id) === etabId
@@ -70,6 +97,23 @@ function etabFacturesAccess(req, res, next) {
     return next();
   }
   return res.status(403).json({ message: 'Accès refusé.' });
+}
+
+function etabIdFromMembresReq(req) {
+  const raw = req.params.etabId ?? req.params.id;
+  return parseInt(raw, 10);
+}
+
+/** Admin plateforme ou administrateur établissement : gestion des membres staff. */
+function etabMembresManageAccess(req, res, next) {
+  const etabId = etabIdFromMembresReq(req);
+  if (Number.isNaN(etabId)) {
+    return res.status(400).json({ message: 'Identifiant établissement invalide.' });
+  }
+  if (canManageEtabMembres(req.user, etabId)) return next();
+  return res.status(403).json({
+    message: 'Accès réservé à l’administrateur plateforme ou à l’administrateur de cet établissement.',
+  });
 }
 
 function factureEtablissementId(facture) {
@@ -158,6 +202,242 @@ function parseCsvSemicolon(csvText) {
     return { rowNumber: i + 2, data };
   });
   return { headers, rows };
+}
+
+function cellText(cell) {
+  if (cell == null) return '';
+  if (typeof cell === 'object') {
+    if (cell.text != null) return String(cell.text).trim();
+    if (cell.result != null) return String(cell.result).trim();
+    if (cell.richText) return cell.richText.map((t) => t.text || '').join('').trim();
+  }
+  return String(cell).trim();
+}
+
+/**
+ * Parse CSV ou XLSX → { headers (clés techniques), rows: [{rowNumber, data}] }
+ */
+async function parseFormationImportBuffer(buffer, originalname, customLabels = []) {
+  const name = String(originalname || '').toLowerCase();
+  const isXlsx = name.endsWith('.xlsx') || name.endsWith('.xls');
+
+  if (isXlsx) {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer);
+    const ws = wb.worksheets[0];
+    if (!ws) return { headers: [], rows: [], error: 'Feuille Excel vide.' };
+
+    const matrix = [];
+    ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      const vals = [];
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        vals[colNumber - 1] = cellText(cell.value);
+      });
+      matrix.push({ rowNumber, vals });
+    });
+
+    // Chercher une ligne de clés techniques (titre, duree_mois…) ou une ligne de libellés
+    let headerIdx = -1;
+    let keyMap = null; // colIndex → key
+
+    for (let i = 0; i < Math.min(matrix.length, 8); i += 1) {
+      const vals = matrix[i].vals;
+      const mapped = vals.map((h) => resolveHeaderToKey(h, customLabels));
+      const hitCount = mapped.filter(Boolean).length;
+      if (hitCount >= 2 && mapped.includes('titre')) {
+        headerIdx = i;
+        keyMap = mapped;
+        break;
+      }
+    }
+    if (headerIdx < 0) {
+      return {
+        headers: [],
+        rows: [],
+        error: 'En-têtes introuvables. Utilisez le template Excel fourni (ligne « Nom de la formation », « Nombre de mois », …).',
+      };
+    }
+
+    const headers = keyMap.filter(Boolean);
+    const rows = [];
+    for (let i = headerIdx + 1; i < matrix.length; i += 1) {
+      const { rowNumber, vals } = matrix[i];
+      // Sauter une éventuelle 2e ligne de libellés si la précédente était des clés
+      if (i === headerIdx + 1) {
+        const maybeLabels = vals.map((h) => resolveHeaderToKey(h, customLabels));
+        if (maybeLabels.filter(Boolean).length >= 2 && maybeLabels.includes('titre')) {
+          continue;
+        }
+      }
+      const data = {};
+      let any = false;
+      keyMap.forEach((key, colIdx) => {
+        if (!key) return;
+        const v = vals[colIdx] ?? '';
+        data[key] = v;
+        if (String(v).trim()) any = true;
+      });
+      if (!any) continue;
+      rows.push({ rowNumber, data });
+    }
+    return { headers, rows };
+  }
+
+  // CSV (compatibilité)
+  const parsed = parseCsvSemicolon(buffer.toString('utf8'));
+  const keyHeaders = parsed.headers.map((h) => resolveHeaderToKey(h, customLabels) || h);
+  const rows = parsed.rows.map(({ rowNumber, data }) => {
+    const mapped = {};
+    parsed.headers.forEach((h, idx) => {
+      const key = keyHeaders[idx];
+      if (key) mapped[key] = data[h];
+    });
+    return { rowNumber, data: mapped };
+  });
+  return { headers: keyHeaders.filter(Boolean), rows };
+}
+
+async function buildFormationsTemplateWorkbook({ type, columns, etabNom }) {
+  const cols = columns?.length ? columns : defaultTemplateColumns();
+  const modeLabel = type === 'en_ligne' ? 'En ligne (FAD)' : 'Présentiel';
+  const accent = type === 'en_ligne' ? 'FF059669' : 'FF1D4ED8';
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'UniPortail';
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet(safeSheetName(`Formations ${modeLabel}`), {
+    views: [{ state: 'frozen', ySplit: 4 }],
+  });
+
+  // Ligne 1 — bannière
+  ws.mergeCells(1, 1, 1, cols.length);
+  const titleCell = ws.getCell(1, 1);
+  titleCell.value = `Template formations — ${modeLabel}${etabNom ? ` · ${etabNom}` : ''}`;
+  titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: accent } };
+  titleCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  ws.getRow(1).height = 28;
+
+  // Ligne 2 — consignes
+  ws.mergeCells(2, 1, 2, cols.length);
+  const hint = ws.getCell(2, 1);
+  hint.value =
+    'Ne modifiez pas la ligne des clés techniques (ligne 3). Remplissez à partir de la ligne 5. ' +
+    'Total des mensualités = Nombre de mois × Mensualité. Mode déjà fixé : ' + modeLabel +
+    ' (ne pas ajouter de colonne type / ville / places).';
+  hint.font = { size: 9, italic: true, color: { argb: 'FF475569' } };
+  hint.alignment = { wrapText: true, vertical: 'middle' };
+  ws.getRow(2).height = 36;
+
+  // Ligne 3 — clés techniques (pour import robuste)
+  cols.forEach((c, i) => {
+    const cell = ws.getCell(3, i + 1);
+    cell.value = c.key;
+    cell.font = { size: 8, color: { argb: 'FF94A3B8' }, name: 'Consolas' };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    cell.alignment = { horizontal: 'center' };
+  });
+  ws.getRow(3).height = 14;
+
+  // Ligne 4 — libellés humains
+  cols.forEach((c, i) => {
+    const cell = ws.getCell(4, i + 1);
+    cell.value = c.label;
+    cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: accent } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      right: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+    };
+  });
+  ws.getRow(4).height = 22;
+
+  // Ligne 5 — exemple
+  const example = type === 'en_ligne'
+    ? {
+      titre: 'Certification DAO BTP',
+      niveau: 'Certificat',
+      niveau_requis: 'Baccalauréat',
+      duree_mois: 6,
+      frais_inscription: 15000,
+      mensualite: 30000,
+      frais_soutenance: 0,
+      frais_bibliotheque: 10000,
+      frais_epi: 0,
+      description: 'AutoCAD et dessin technique',
+      actif: true,
+    }
+    : {
+      titre: 'Licence 1 Génie Civil',
+      niveau: 'L1',
+      niveau_requis: 'Baccalauréat',
+      duree_mois: 10,
+      frais_inscription: 25000,
+      mensualite: 85000,
+      frais_soutenance: 0,
+      frais_bibliotheque: 15000,
+      frais_epi: 25000,
+      description: 'Bases du génie civil',
+      actif: true,
+    };
+  cols.forEach((c, i) => {
+    const cell = ws.getCell(5, i + 1);
+    cell.value = example[c.key] ?? '';
+    cell.font = { size: 10, italic: true, color: { argb: 'FF64748B' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF9C3' } };
+    cell.border = {
+      top: { style: 'hair', color: { argb: 'FFE2E8F0' } },
+      left: { style: 'hair', color: { argb: 'FFE2E8F0' } },
+      bottom: { style: 'hair', color: { argb: 'FFE2E8F0' } },
+      right: { style: 'hair', color: { argb: 'FFE2E8F0' } },
+    };
+  });
+
+  // Lignes vides prêtes à remplir
+  for (let r = 6; r <= 25; r += 1) {
+    cols.forEach((_, i) => {
+      const cell = ws.getCell(r, i + 1);
+      cell.border = {
+        top: { style: 'hair', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'hair', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'hair', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'hair', color: { argb: 'FFE2E8F0' } },
+      };
+    });
+  }
+
+  cols.forEach((c, i) => {
+    const widths = {
+      titre: 32,
+      niveau: 14,
+      niveau_requis: 16,
+      duree_mois: 14,
+      frais_inscription: 14,
+      mensualite: 14,
+      frais_soutenance: 12,
+      frais_bibliotheque: 14,
+      frais_epi: 10,
+      description: 36,
+      actif: 10,
+    };
+    ws.getColumn(i + 1).width = widths[c.key] || 14;
+  });
+
+  const guide = wb.addWorksheet('Guide');
+  guide.getColumn(1).width = 88;
+  guide.getCell(1, 1).value = 'Guide d’utilisation du template';
+  guide.getCell(1, 1).font = { bold: true, size: 13 };
+  guide.getCell(3, 1).value = '• « Nom de la formation » = nom officiel affiché aux candidats (anciennement « Intitulé »).';
+  guide.getCell(4, 1).value = '• Remplissez une ligne par formation. Les montants sont en FCFA (entiers).';
+  guide.getCell(5, 1).value = '• Nombre de mois × Mensualité = total des mensualités (calculé automatiquement à l’import).';
+  guide.getCell(6, 1).value = `• Ce fichier est réservé au mode ${modeLabel}. Téléchargez l’autre template pour l’autre mode.`;
+  guide.getCell(7, 1).value = '• N’ajoutez pas les colonnes type, ville ou places.';
+  guide.getCell(8, 1).value = '• La ligne jaune est un exemple : remplacez-la ou ajoutez vos lignes en dessous.';
+
+  return wb;
 }
 
 function toInt(v, fallback = 0) {
@@ -338,6 +618,7 @@ router.get('/', (req, res) => {
       .filter((u) => u.etablissement_id === e.id && isEtabStaffMember(u))
       .value().length;
     const base = userRole === 'admin' ? { ...e } : stripEtabSensitiveFields(e);
+    const adminUser = userRole === 'admin' ? findAdminEtablissementUser(e.id) : null;
     return {
       ...base,
       logo_url: publicAssetUrl(req, e.logo_url),
@@ -345,6 +626,9 @@ router.get('/', (req, res) => {
       nb_filieres,
       nb_formations,
       nb_membres,
+      admin_etablissement: adminUser
+        ? { id: adminUser.id, prenom: adminUser.prenom, nom: adminUser.nom, email: adminUser.email }
+        : null,
     };
   });
   res.json(enrichis);
@@ -466,6 +750,8 @@ router.get('/:id/acceptes-par-formation', etabFacturesAccess, (req, res) => {
             prenom: u.prenom || '',
             email: u.email || '',
             matricule: u.matricule || null,
+            attestation_disponible: isDossierAcceptePourLettre(d.statut),
+            lettre_disponible: canIssueLettrePreinscription(d),
           };
         })
         .sort((a, b) => {
@@ -1050,19 +1336,36 @@ router.get('/:id/factures', etabFacturesAccess, (req, res) => {
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * limit;
   const slice = factures.slice(start, start + limit);
-  const items = slice.map((f) => ({
-    id: f.id,
-    numero: f.numero,
-    dossier_id: f.dossier_id,
-    date_emission: f.date_emission,
-    date_echeance: f.date_echeance,
-    montant_ttc: f.montant_ttc,
-    statut: f.statut,
-    etudiant_snapshot: f.etudiant_snapshot,
-    formation_snapshot: f.formation_snapshot,
-    etablissement_id: etabId,
-    etablissement_nom: etab.nom,
-  }));
+  const items = slice.map((f) => {
+    let attestation_disponible = false;
+    let lettre_disponible = false;
+    let dossier_statut = null;
+    if (f.dossier_id) {
+      const dossier = db.get('dossiers').find({ id: f.dossier_id }).value();
+      if (dossier) {
+        dossier_statut = dossier.statut;
+        attestation_disponible = isDossierAcceptePourLettre(dossier.statut);
+        lettre_disponible = canIssueLettrePreinscription(dossier);
+      }
+    }
+    return {
+      id: f.id,
+      numero: f.numero,
+      dossier_id: f.dossier_id,
+      type_document: f.type_document,
+      date_emission: f.date_emission,
+      date_echeance: f.date_echeance,
+      montant_ttc: f.montant_ttc,
+      statut: f.statut,
+      dossier_statut,
+      attestation_disponible,
+      lettre_disponible,
+      etudiant_snapshot: f.etudiant_snapshot,
+      formation_snapshot: f.formation_snapshot,
+      etablissement_id: etabId,
+      etablissement_nom: etab.nom,
+    };
+  });
   return res.json({
     items,
     total,
@@ -1117,6 +1420,11 @@ router.get('/:id', (req, res) => {
   const responsable = etab.responsable_id
     ? db.get('utilisateurs').find({ id: etab.responsable_id }).pick(['id', 'prenom', 'nom', 'email', 'role']).value()
     : null;
+  const adminEtabUser = findAdminEtablissementUser(id);
+  // Sync pointeur si manquant
+  if (adminEtabUser && Number(etab.admin_etablissement_id) !== Number(adminEtabUser.id)) {
+    db.get('etablissements').find({ id }).assign({ admin_etablissement_id: adminEtabUser.id }).write();
+  }
 
   // Étudiant : pas de coordonnées bancaires ni d'annuaire du staff (PII).
   const isEtudiant = req.user.role === 'etudiant';
@@ -1124,12 +1432,14 @@ router.get('/:id', (req, res) => {
 
   res.json({
     ...base,
+    admin_etablissement_id: adminEtabUser?.id ?? etab.admin_etablissement_id ?? null,
     logo_url: publicAssetUrl(req, etab.logo_url),
     cachet_url: publicAssetUrl(req, etab.cachet_url),
     filieres,
     formations,
     membres: isEtudiant ? [] : membres,
     responsable,
+    admin_etablissement: isEtudiant ? null : pickAdminPublic(adminEtabUser),
   });
 });
 
@@ -1212,6 +1522,30 @@ router.put('/:id/responsable', adminOnly, (req, res) => {
     role_principal_designe: designe ? designe.role : null,
   });
   res.json({ message: designe ? 'Responsable désigné.' : 'Responsable retiré.' });
+});
+
+// PUT /api/etablissements/:id/admin-etablissement — désigner l’unique admin établissement (admin plateforme).
+router.put('/:id/admin-etablissement', adminOnly, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { utilisateur_id } = req.body;
+  const result = designateAdminEtablissement(id, utilisateur_id || null);
+  if (!result.ok) {
+    return res.status(result.status || 400).json({ message: result.message });
+  }
+  logAudit(req, result.nouveau_id ? 'etablissement_admin_designe' : 'etablissement_admin_retire', 'etablissement', id, {
+    ancien_admin_etablissement_id: result.previous_id,
+    nouveau_admin_etablissement_id: result.nouveau_id,
+  });
+  const admin = result.nouveau_id
+    ? pickAdminPublic(db.get('utilisateurs').find({ id: result.nouveau_id }).value())
+    : null;
+  return res.json({
+    message: result.nouveau_id
+      ? 'Administrateur d’établissement désigné (l’ancien a perdu ce rôle).'
+      : 'Administrateur d’établissement retiré.',
+    admin_etablissement: admin,
+    admin_etablissement_id: result.nouveau_id,
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1335,6 +1669,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     ville, places,
     frais_inscription, mensualite, frais_soutenance, autres_frais,
     duree_mois, frais_supplementaires,
+    frais_bibliotheque, frais_epi,
     nombre_photos_preinscription,
   } = req.body;
 
@@ -1350,10 +1685,12 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
   const fraisInscriptionN = parseInt(frais_inscription, 10) || 0;
   const mensualiteN = parseInt(mensualite, 10) || 0;
   const fraisSoutenanceN = parseInt(frais_soutenance, 10) || 0;
+  const fraisBibN = parseInt(frais_bibliotheque, 10) || 0;
+  const fraisEpiN = parseInt(frais_epi, 10) || 0;
   const autresFraisN = parseInt(autres_frais, 10) || 0;
   const dureeMoisN = parseDureeMoisInput(duree_mois);
   const fraisSupp = normalizeFraisSupplementaires(frais_supplementaires);
-  if (![placesN, fraisInscriptionN, mensualiteN, fraisSoutenanceN, autresFraisN].every(isNonNegativeInt)) {
+  if (![placesN, fraisInscriptionN, mensualiteN, fraisSoutenanceN, fraisBibN, fraisEpiN, autresFraisN].every(isNonNegativeInt)) {
     return res.status(400).json({ message: 'Les champs numériques doivent être des entiers positifs ou nuls.' });
   }
 
@@ -1370,11 +1707,13 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     duree: duree || '',
     duree_mois: dureeMoisN,
     description: description || '',
-    ville: normalizedType === 'presentiel' ? (ville || '') : null,
-    places: placesN,
+    ville: null,
+    places: 0,
     frais_inscription: fraisInscriptionN,
     mensualite: mensualiteN,
     frais_soutenance: fraisSoutenanceN,
+    frais_bibliotheque: fraisBibN,
+    frais_epi: fraisEpiN,
     autres_frais: autresFraisN,
     frais_supplementaires: fraisSupp,
     nombre_photos_preinscription: nPhotos,
@@ -1396,30 +1735,89 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
   res.status(201).json(formation);
 });
 
-// POST /api/etablissements/:id/formations/import/:filiereId?dry_run=true
-// Import en lot de formations pour UNE filière donnée.
-router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.single('file'), (req, res) => {
+// GET /api/etablissements/:id/formations/template.xlsx?type=presentiel|en_ligne&columns=JSON
+router.get('/:id/formations/template.xlsx', etabPedagogieWrite, async (req, res) => {
+  const etablissement_id = parseInt(req.params.id, 10);
+  const forcedType = normalizeFormationType(req.query.type || '');
+  if (Number.isNaN(etablissement_id)) {
+    return res.status(400).json({ message: 'Identifiant établissement invalide.' });
+  }
+  if (!['presentiel', 'en_ligne'].includes(forcedType)) {
+    return res.status(400).json({
+      message: 'Précisez ?type=presentiel ou ?type=en_ligne.',
+    });
+  }
+  const etab = db.get('etablissements').find({ id: etablissement_id }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+
+  const columns = parseCustomColumns(req.query.columns);
+  const wb = await buildFormationsTemplateWorkbook({
+    type: forcedType,
+    columns,
+    etabNom: etab.nom,
+  });
+  const filename = `template-formations-${forcedType}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  await wb.xlsx.write(res);
+  res.end();
+});
+
+// POST /api/etablissements/:id/formations/import/:filiereId?dry_run=true&type=presentiel|en_ligne
+// Import en lot Excel (ou CSV legacy) — filière + mode obligatoires.
+router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.single('file'), async (req, res) => {
   const etablissement_id = parseInt(req.params.id, 10);
   const filiereId = parseInt(req.params.filiereId, 10);
   const dryRun = ['1', 'true', 'yes', 'oui'].includes(String(req.query.dry_run || '').toLowerCase());
+  const forcedType = normalizeFormationType(req.query.type || '');
   if (Number.isNaN(etablissement_id) || Number.isNaN(filiereId)) {
     return res.status(400).json({ message: 'Identifiant établissement/filière invalide.' });
   }
-  if (!req.file) return res.status(400).json({ message: 'Fichier CSV requis (champ file).' });
+  if (!['presentiel', 'en_ligne'].includes(forcedType)) {
+    return res.status(400).json({
+      message: 'Précisez le mode via ?type=presentiel ou ?type=en_ligne (templates séparés pour éviter les erreurs).',
+    });
+  }
+  if (!req.file) return res.status(400).json({ message: 'Fichier Excel (.xlsx) requis (champ file).' });
 
   const etab = db.get('etablissements').find({ id: etablissement_id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
   const filiere = db.get('filieres').find({ id: filiereId, etablissement_id }).value();
   if (!filiere) return res.status(404).json({ message: 'Filière introuvable pour cet établissement.' });
 
-  const { headers, rows } = parseCsvSemicolon(req.file.buffer.toString('utf8'));
-  const expected = [
-    'titre', 'type', 'niveau', 'niveau_requis', 'duree', 'description', 'ville',
-    'places', 'frais_inscription', 'prix', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
-  ];
-  const missing = expected.filter((h) => !headers.includes(h));
-  if (missing.length > 0) {
-    return res.status(400).json({ message: `En-têtes manquants: ${missing.join(', ')}` });
+  let customLabels = [];
+  try {
+    if (req.query.columns) customLabels = parseCustomColumns(req.query.columns);
+  } catch {
+    customLabels = [];
+  }
+
+  let parsed;
+  try {
+    parsed = await parseFormationImportBuffer(req.file.buffer, req.file.originalname, customLabels);
+  } catch (err) {
+    return res.status(400).json({ message: err.message || 'Impossible de lire le fichier Excel.' });
+  }
+  if (parsed.error) {
+    return res.status(400).json({ message: parsed.error });
+  }
+
+  const { headers, rows } = parsed;
+  const headerSet = new Set(headers);
+  if (headerSet.has('type') || headerSet.has('ville') || headerSet.has('places')) {
+    return res.status(400).json({
+      message: 'Ancien format détecté (colonnes type/ville/places). Utilisez le nouveau template présentiel ou en ligne.',
+    });
+  }
+  if (!headerSet.has('titre')) {
+    return res.status(400).json({
+      message: 'Colonne « Nom de la formation » (titre) manquante. Téléchargez le template Excel.',
+    });
+  }
+  if (!headerSet.has('duree_mois')) {
+    return res.status(400).json({
+      message: 'Colonne « Nombre de mois » manquante. Téléchargez le template Excel.',
+    });
   }
 
   const errors = [];
@@ -1428,57 +1826,50 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
 
   rows.forEach(({ rowNumber, data }) => {
     const titre = String(data.titre || '').trim();
-    const type = normalizeFormationType(data.type);
     const niveau = String(data.niveau || '').trim();
     const niveau_requis = String(data.niveau_requis || '').trim();
-    const duree = String(data.duree || '').trim();
     const description = String(data.description || '').trim();
-    const ville = String(data.ville || '').trim();
-    const places = toInt(data.places, 0);
+    const duree_mois = toInt(data.duree_mois, 0);
     const frais_inscription = toInt(data.frais_inscription, 0);
-    const prix = toInt(data.prix, 0);
     const mensualite = toInt(data.mensualite, 0);
     const frais_soutenance = toInt(data.frais_soutenance, 0);
-    const autres_frais = toInt(data.autres_frais, 0);
+    const frais_bibliotheque = toInt(data.frais_bibliotheque, 0);
+    const frais_epi = toInt(data.frais_epi, 0);
     const actif = parseBoolean(data.actif, true);
 
-    if (!titre) errors.push({ row: rowNumber, field: 'titre', message: 'Titre obligatoire.' });
-    if (!['presentiel', 'en_ligne'].includes(type)) {
-      errors.push({ row: rowNumber, field: 'type', message: 'Type invalide (exemples acceptés: presentiel, en_ligne, en ligne, fad).' });
+    if (!titre) errors.push({ row: rowNumber, field: 'titre', message: 'Nom de la formation obligatoire.' });
+    if (duree_mois === null || duree_mois < 0 || duree_mois > 120) {
+      errors.push({ row: rowNumber, field: 'duree_mois', message: 'Nombre de mois invalide (0–120).' });
     }
-    if (type === 'presentiel' && !ville) errors.push({ row: rowNumber, field: 'ville', message: 'Ville obligatoire en présentiel.' });
-    if ([places, frais_inscription, prix, mensualite, frais_soutenance, autres_frais].some((v) => v === null || v < 0)) {
-      errors.push({ row: rowNumber, field: 'montants', message: 'Montants/places invalides (entiers >= 0).' });
+    if ([frais_inscription, mensualite, frais_soutenance, frais_bibliotheque, frais_epi].some((v) => v === null || v < 0)) {
+      errors.push({ row: rowNumber, field: 'montants', message: 'Montants invalides (entiers >= 0).' });
     }
     if (actif === null) errors.push({ row: rowNumber, field: 'actif', message: 'Valeur booléenne invalide.' });
 
-    const dup = db.get('formations').find({ etablissement_id, filiere_id: filiereId, titre, type }).value();
+    const dup = db.get('formations').find({
+      etablissement_id, filiere_id: filiereId, titre, type: forcedType,
+    }).value();
     if (dup) {
       skipped += 1;
       return;
     }
 
-    const duree_mois =
-      data.duree_mois != null && String(data.duree_mois).trim() !== ''
-        ? toInt(data.duree_mois, 0)
-        : 0;
-
     toCreate.push({
       titre,
-      type,
+      type: forcedType,
       niveau,
       niveau_requis,
-      duree,
-      duree_mois,
+      duree: duree_mois > 0 ? (duree_mois === 12 ? '12 mois (1 an)' : `${duree_mois} mois`) : '',
+      duree_mois: duree_mois || 0,
       description,
-      // En ligne: ville forcée à null pour éviter les incohérences importées.
-      ville: type === 'presentiel' ? ville : null,
-      places,
+      ville: null,
+      places: 0,
       frais_inscription,
-      prix,
       mensualite,
       frais_soutenance,
-      autres_frais,
+      frais_bibliotheque,
+      frais_epi,
+      autres_frais: 0,
       frais_supplementaires: [],
       actif,
     });
@@ -1489,6 +1880,7 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
       ok: false,
       entity: 'formations',
       dry_run: dryRun,
+      mode: forcedType,
       summary: { total_rows: rows.length, valid_rows: 0, invalid_rows: errors.length, created: 0, updated: 0, skipped },
       errors,
     });
@@ -1511,11 +1903,12 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
     ok: true,
     entity: 'formations',
     dry_run: dryRun,
+    mode: forcedType,
     summary: {
       total_rows: rows.length,
       valid_rows: toCreate.length,
       invalid_rows: 0,
-      created: toCreate.length,
+      created: dryRun ? 0 : toCreate.length,
       updated: 0,
       skipped,
     },
@@ -1523,70 +1916,7 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
   });
 });
 
-// PUT /api/etablissements/:etabId/formations/:id
-router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
-  const etabId = parseInt(req.params.etabId, 10);
-  const id = parseInt(req.params.id);
-  const formation = db.get('formations').find({ id }).value();
-  if (!formation || Number(formation.etablissement_id) !== etabId) {
-    return res.status(404).json({ message: 'Formation introuvable.' });
-  }
-
-  const fields = [
-    'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree',
-    'description', 'ville', 'places',
-    'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
-    'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
-  ];
-  const updates = {};
-  fields.forEach(f => {
-    if (req.body[f] === undefined) return;
-    if (f === 'frais_supplementaires') {
-      updates[f] = normalizeFraisSupplementaires(req.body[f]);
-      return;
-    }
-    if (f === 'duree_mois') {
-      updates[f] = parseDureeMoisInput(req.body[f]);
-      return;
-    }
-    const numFields = ['filiere_id', 'places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais'];
-    updates[f] = numFields.includes(f) ? parseInt(req.body[f]) : req.body[f];
-  });
-  if (updates.nombre_photos_preinscription !== undefined) {
-    const { normalizeNombrePhotosPreinscription } = require('../utils/preinscriptionDocumentRules');
-    updates.nombre_photos_preinscription = normalizeNombrePhotosPreinscription(updates.nombre_photos_preinscription);
-  }
-  if (updates.type !== undefined) {
-    updates.type = normalizeFormationType(updates.type);
-    if (!['presentiel', 'en_ligne'].includes(updates.type)) {
-      return res.status(400).json({ message: 'Type invalide.' });
-    }
-  }
-  const numericFields = ['places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'duree_mois'];
-  for (const f of numericFields) {
-    if (updates[f] !== undefined && !isNonNegativeInt(updates[f])) {
-      return res.status(400).json({ message: `Champ numérique invalide: ${f}.` });
-    }
-  }
-  if (updates.type === 'en_ligne') updates.ville = null;
-  if (updates.actif === true) updates.deleted_at = null;
-
-  db.get('formations').find({ id }).assign(updates).write();
-  let saved = db.get('formations').find({ id }).value();
-  saved = formationAvecPrixRecalcule(saved);
-  db.get('formations').find({ id }).assign({ prix: saved.prix }).write();
-  saved = db.get('formations').find({ id }).value();
-  logAudit(req, 'update', 'formation', id, {
-    etablissement_id: etabId,
-    updates,
-    actor_role: req.user.role,
-    actor_id: req.user.id,
-    visible_admin: true,
-  });
-  res.json(saved);
-});
-
-// PUT /api/etablissements/:etabId/formations/batch
+// PUT /api/etablissements/:etabId/formations/batch  (AVANT /:id pour ne pas capturer "batch")
 // body: { items: [{ id, ...champs_modifiables }] }
 router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
   const etabId = parseInt(req.params.etabId, 10);
@@ -1603,9 +1933,11 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
     'description', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
     'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
+    'frais_bibliotheque', 'frais_epi',
   ]);
   const numericFields = new Set([
     'filiere_id', 'places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'duree_mois',
+    'frais_bibliotheque', 'frais_epi',
   ]);
 
   const updated = [];
@@ -1646,7 +1978,7 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
         return;
       }
     }
-    for (const k of ['places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'duree_mois']) {
+    for (const k of ['places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'duree_mois', 'frais_bibliotheque', 'frais_epi']) {
       if (updates[k] !== undefined && !isNonNegativeInt(updates[k])) {
         errors.push({ index: idx, id: Number.isNaN(id) ? null : id, message: `Champ numérique invalide: ${k}.` });
         return;
@@ -1697,11 +2029,13 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
         duree: updates.duree || '',
         duree_mois: updates.duree_mois !== undefined ? updates.duree_mois : 0,
         description: updates.description || '',
-        ville: type === 'presentiel' ? String(updates.ville || '') : null,
-        places: parseInt(updates.places, 10) || 0,
+        ville: null,
+        places: 0,
         frais_inscription: parseInt(updates.frais_inscription, 10) || 0,
         mensualite: parseInt(updates.mensualite, 10) || 0,
         frais_soutenance: parseInt(updates.frais_soutenance, 10) || 0,
+        frais_bibliotheque: parseInt(updates.frais_bibliotheque, 10) || 0,
+        frais_epi: parseInt(updates.frais_epi, 10) || 0,
         autres_frais: parseInt(updates.autres_frais, 10) || 0,
         frais_supplementaires: Array.isArray(updates.frais_supplementaires) ? updates.frais_supplementaires : [],
         actif: updates.actif === undefined ? true : !!updates.actif,
@@ -1750,6 +2084,70 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
     created,
     errors,
   });
+});
+
+// PUT /api/etablissements/:etabId/formations/:id
+router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
+  const etabId = parseInt(req.params.etabId, 10);
+  const id = parseInt(req.params.id);
+  const formation = db.get('formations').find({ id }).value();
+  if (!formation || Number(formation.etablissement_id) !== etabId) {
+    return res.status(404).json({ message: 'Formation introuvable.' });
+  }
+
+  const fields = [
+    'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree',
+    'description', 'ville', 'places',
+    'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
+    'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
+    'frais_bibliotheque', 'frais_epi',
+  ];
+  const updates = {};
+  fields.forEach(f => {
+    if (req.body[f] === undefined) return;
+    if (f === 'frais_supplementaires') {
+      updates[f] = normalizeFraisSupplementaires(req.body[f]);
+      return;
+    }
+    if (f === 'duree_mois') {
+      updates[f] = parseDureeMoisInput(req.body[f]);
+      return;
+    }
+    const numFields = ['filiere_id', 'places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais'];
+    updates[f] = numFields.includes(f) ? parseInt(req.body[f]) : req.body[f];
+  });
+  if (updates.nombre_photos_preinscription !== undefined) {
+    const { normalizeNombrePhotosPreinscription } = require('../utils/preinscriptionDocumentRules');
+    updates.nombre_photos_preinscription = normalizeNombrePhotosPreinscription(updates.nombre_photos_preinscription);
+  }
+  if (updates.type !== undefined) {
+    updates.type = normalizeFormationType(updates.type);
+    if (!['presentiel', 'en_ligne'].includes(updates.type)) {
+      return res.status(400).json({ message: 'Type invalide.' });
+    }
+  }
+  const numericFields = ['places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'duree_mois'];
+  for (const f of numericFields) {
+    if (updates[f] !== undefined && !isNonNegativeInt(updates[f])) {
+      return res.status(400).json({ message: `Champ numérique invalide: ${f}.` });
+    }
+  }
+  if (updates.type === 'en_ligne') updates.ville = null;
+  if (updates.actif === true) updates.deleted_at = null;
+
+  db.get('formations').find({ id }).assign(updates).write();
+  let saved = db.get('formations').find({ id }).value();
+  saved = formationAvecPrixRecalcule(saved);
+  db.get('formations').find({ id }).assign({ prix: saved.prix }).write();
+  saved = db.get('formations').find({ id }).value();
+  logAudit(req, 'update', 'formation', id, {
+    etablissement_id: etabId,
+    updates,
+    actor_role: req.user.role,
+    actor_id: req.user.id,
+    visible_admin: true,
+  });
+  res.json(saved);
 });
 
 // POST /api/etablissements/:etabId/formations/delete-batch
@@ -1855,8 +2253,8 @@ router.delete('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
 //  MEMBRES (utilisateurs rattachés à un établissement)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// GET /api/etablissements/:id/membres (admin)
-router.get('/:id/membres', adminOnly, (req, res) => {
+// GET /api/etablissements/:id/membres
+router.get('/:id/membres', etabMembresManageAccess, (req, res) => {
   const etablissement_id = parseInt(req.params.id);
   const membres = db.get('utilisateurs')
     .filter((u) => u.etablissement_id === etablissement_id && isEtabStaffMember(u))
@@ -1876,8 +2274,8 @@ router.get('/:id/membres', adminOnly, (req, res) => {
   res.json(membres);
 });
 
-// POST /api/etablissements/:id/membres — créer un compte membre (admin uniquement)
-router.post('/:id/membres', adminOnly, (req, res) => {
+// POST /api/etablissements/:id/membres — créer un compte membre (admin ou responsable étab.)
+router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
   const etablissement_id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id: etablissement_id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
@@ -1895,8 +2293,14 @@ router.post('/:id/membres', adminOnly, (req, res) => {
     return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
   }
 
-  const ROLES_AUTORISÉS = ['responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
-  if (!ROLES_AUTORISÉS.includes(role)) return res.status(400).json({ message: 'Rôle invalide.' });
+  const ROLES_AUTORISÉS = rolesCreatablesMembres(req.user);
+  if (!ROLES_AUTORISÉS.includes(role)) {
+    return res.status(403).json({
+      message: isPlatformAdmin(req.user)
+        ? 'Rôle invalide.'
+        : 'Vous ne pouvez créer que des comptes staff pour votre établissement (hors administrateur établissement).',
+    });
+  }
 
   const gen = generateNextMatriculeForEtablissement(etablissement_id);
   if (gen.error) return res.status(400).json({ message: gen.error });
@@ -1940,6 +2344,20 @@ router.post('/:id/membres', adminOnly, (req, res) => {
   };
 
   db.get('utilisateurs').push(user).write();
+  let demotedPrevious = null;
+  if (role === ROLE_ADMIN_ETABLISSEMENT) {
+    const enforced = enforceSingleAdminEtablissement(etablissement_id, id);
+    demotedPrevious = enforced.previous_id;
+  }
+  logAudit(req, 'membre_staff_cree', 'etablissement', etablissement_id, {
+    membre_id: id,
+    role,
+    email: user.email,
+    scope: 'etablissement',
+    etablissement_id,
+    actor_scope: isPlatformAdmin(req.user) ? 'platform' : 'admin_etablissement',
+    admin_etablissement_remplace: demotedPrevious,
+  });
   res.status(201).json({
     id,
     prenom: user.prenom,
@@ -1950,16 +2368,21 @@ router.post('/:id/membres', adminOnly, (req, res) => {
     etablissement_id,
     actif: true,
     must_change_password: true,
+    message: demotedPrevious
+      ? 'Compte créé. L’ancien administrateur d’établissement a été remplacé automatiquement.'
+      : undefined,
   });
 });
 
-// PUT /api/etablissements/:etabId/membres/:id — modifier (admin)
-router.put('/:etabId/membres/:id', adminOnly, (req, res) => {
+// PUT /api/etablissements/:etabId/membres/:id — modifier (admin ou responsable étab.)
+router.put('/:etabId/membres/:id', etabMembresManageAccess, (req, res) => {
   const etabId = parseInt(req.params.etabId, 10);
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(etabId) || Number.isNaN(id)) {
     return res.status(400).json({ message: 'Identifiant invalide.' });
   }
+  const etab = db.get('etablissements').find({ id: etabId }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
   const user = db.get('utilisateurs').find({ id }).value();
   if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
   if (user.etablissement_id !== etabId) {
@@ -1968,16 +2391,23 @@ router.put('/:etabId/membres/:id', adminOnly, (req, res) => {
   if (user.role === 'etudiant') {
     return res.status(400).json({ message: 'Les comptes étudiants ne sont pas gérés dans la liste des membres du staff.' });
   }
+  if (!canManageTargetMembre(req.user, user, etab) && !isPlatformAdmin(req.user)) {
+    return res.status(403).json({ message: 'Vous ne pouvez pas modifier ce compte.' });
+  }
 
   const {
     role, actif, prenom, nom, email, telephone, adresse, mot_de_passe,
   } = req.body;
-  const ROLES_STAFF = ['responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const ROLES_STAFF = rolesCreatablesMembres(req.user);
   const updates = { updated_at: new Date().toISOString() };
 
   if (role !== undefined) {
     if (!ROLES_STAFF.includes(role)) {
-      return res.status(400).json({ message: 'Rôle invalide pour un membre du staff.' });
+      return res.status(403).json({
+        message: isPlatformAdmin(req.user)
+          ? 'Rôle invalide pour un membre du staff.'
+          : 'Vous ne pouvez pas attribuer ce rôle.',
+      });
     }
     updates.role = role;
   }
@@ -2017,6 +2447,18 @@ router.put('/:etabId/membres/:id', adminOnly, (req, res) => {
 
   db.get('utilisateurs').find({ id }).assign(updates).write();
   const fresh = db.get('utilisateurs').find({ id }).value();
+  if (fresh.role === ROLE_ADMIN_ETABLISSEMENT) {
+    enforceSingleAdminEtablissement(etabId, id);
+  } else if (Number(etab.admin_etablissement_id) === id) {
+    db.get('etablissements').find({ id: etabId }).assign({ admin_etablissement_id: null }).write();
+  }
+  logAudit(req, 'membre_staff_modifie', 'etablissement', etabId, {
+    membre_id: id,
+    updates: Object.keys(updates).filter((k) => k !== 'updated_at' && k !== 'mot_de_passe'),
+    scope: 'etablissement',
+    etablissement_id: etabId,
+    actor_scope: isPlatformAdmin(req.user) ? 'platform' : 'admin_etablissement',
+  });
   res.json({
     message: 'Membre mis à jour.',
     membre: {
@@ -2033,10 +2475,12 @@ router.put('/:etabId/membres/:id', adminOnly, (req, res) => {
   });
 });
 
-// DELETE /api/etablissements/:etabId/membres/:id — désactiver (soft) (admin)
-router.delete('/:etabId/membres/:id', adminOnly, (req, res) => {
+// DELETE /api/etablissements/:etabId/membres/:id — désactiver (soft)
+router.delete('/:etabId/membres/:id', etabMembresManageAccess, (req, res) => {
   const etabId = parseInt(req.params.etabId, 10);
   const id = parseInt(req.params.id, 10);
+  const etab = db.get('etablissements').find({ id: etabId }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
   const user = db.get('utilisateurs').find({ id }).value();
   if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
   if (user.etablissement_id !== etabId) {
@@ -2045,7 +2489,16 @@ router.delete('/:etabId/membres/:id', adminOnly, (req, res) => {
   if (user.role === 'etudiant') {
     return res.status(400).json({ message: 'Les comptes étudiants ne font pas partie du staff de l’établissement.' });
   }
+  if (!canManageTargetMembre(req.user, user, etab) && !isPlatformAdmin(req.user)) {
+    return res.status(403).json({ message: 'Vous ne pouvez pas désactiver ce compte.' });
+  }
   db.get('utilisateurs').find({ id }).assign({ actif: false, updated_at: new Date().toISOString() }).write();
+  logAudit(req, 'membre_staff_desactive', 'etablissement', etabId, {
+    membre_id: id,
+    scope: 'etablissement',
+    etablissement_id: etabId,
+    actor_scope: isPlatformAdmin(req.user) ? 'platform' : 'admin_etablissement',
+  });
   res.json({ message: 'Compte désactivé.' });
 });
 

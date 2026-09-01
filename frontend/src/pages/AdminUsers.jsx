@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 
 const ROLES_STAFF = [
   { val: 'admin', label: 'Administrateur (plateforme)' },
+  { val: 'admin_etablissement', label: 'Administrateur établissement' },
   { val: 'responsable', label: 'Responsable pédagogique' },
   { val: 'agent_admin', label: 'Agent administratif' },
   { val: 'comptable', label: 'Comptable / Finance' },
@@ -14,6 +15,7 @@ const ROLES_STAFF = [
 
 const ROLE_COLORS = {
   admin:       'bg-red-100 text-red-700',
+  admin_etablissement: 'bg-blue-100 text-blue-800',
   responsable: 'bg-teal-100 text-teal-700',
   agent_admin: 'bg-orange-100 text-orange-700',
   comptable:   'bg-purple-100 text-purple-700',
@@ -21,7 +23,7 @@ const ROLE_COLORS = {
   etudiant:    'bg-gray-100 text-gray-700'
 }
 const ROLE_LABELS = {
-  admin: 'Administrateur', responsable: 'Resp. Pédagogique',
+  admin: 'Administrateur', admin_etablissement: 'Admin. établissement', responsable: 'Resp. Pédagogique',
   agent_admin: 'Agent Administratif', comptable: 'Comptable',
   controleur_qualite: 'Contrôleur qualité', etudiant: 'Étudiant'
 }
@@ -182,7 +184,7 @@ export default function AdminUsers() {
     if (
       editForm.role !== 'admin' &&
       editForm.role !== 'etudiant' &&
-      ['responsable', 'agent_admin', 'comptable'].includes(editForm.role) &&
+      ['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(editForm.role) &&
       !editForm.etablissement_id
     ) {
       toast.error('Indiquez un établissement pour ce rôle.')

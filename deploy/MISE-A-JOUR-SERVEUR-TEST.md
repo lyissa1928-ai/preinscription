@@ -62,10 +62,26 @@ Recharger nginx si la config a changé :
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
+## Migrations de schéma (LowDB)
+
+Au **premier redémarrage** après mise à jour, l’API exécute automatiquement les migrations (`backend/utils/schemaMigrations.js`) :
+
+- backup `preinscription-pre-migration-*.json` dans `UNIPORTAIL_BACKUP_DIR` (défaut `/var/backups/uniportail`)
+- champs formations : `frais_bibliotheque`, `frais_epi`, `duree_mois`, recalcul des prix
+- journal dans `_migrations` et version `_schemaVersion`
+
+Vérifier après déploiement :
+
+```bash
+node -e "const d=require('./backend/database/preinscription.json'); console.log(d._schemaVersion, d._migrations?.slice(-2))"
+pm2 logs uniportail-api --lines 30 | grep -i migr
+```
+
 ## Vérifications post-déploiement
 
 - `curl -sI https://VOTRE-DOMAINE-TEST/` — HTTP 200
 - `curl -s https://VOTRE-DOMAINE-TEST/api/health` — JSON `status: OK`
+- Admin établissement → Formations : import Excel, grille, modification par lot
 - Page d'accueil + connexion + préinscription (parcours rapide)
 
 ## Fichiers à ne jamais écraser depuis Git sur la prod/test

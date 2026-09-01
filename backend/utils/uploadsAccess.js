@@ -7,7 +7,7 @@
  * et retourne une décision normalisée.
  */
 const PUBLIC_PREFIXES = ['etablissements/'];
-const STAFF_ROLES = new Set(['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']);
+const STAFF_ROLES = new Set(['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']);
 
 /** Normalise un chemin d'upload et détecte les tentatives de traversal. */
 function normalizeUploadPath(rawPath) {

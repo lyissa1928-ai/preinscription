@@ -148,13 +148,35 @@ EOF
 write_config_site frontend/dist/config-site.js
 write_config_site frontend/public/config-site.js
 
-echo ">>> 7/7 Redémarrage API..."
+echo ">>> 7/8 Redémarrage API (migrations schéma au démarrage)..."
 if pm2 describe uniportail-api >/dev/null 2>&1; then
   pm2 restart uniportail-api
+  sleep 2
 else
   echo "    PM2 uniportail-api introuvable — démarrez manuellement depuis backend/"
 fi
 pm2 save 2>/dev/null || true
+
+echo ">>> 8/8 Vérification schéma base + API..."
+if [[ -f "$DB_FILE" ]]; then
+  SCHEMA_INFO="$(node -e "
+    const d=require('./$DB_FILE');
+    const v=d._schemaVersion??0;
+    const mig=Array.isArray(d._migrations)?d._migrations.length:0;
+    console.log('version='+v+' migrations='+mig);
+  " 2>/dev/null || echo 'version=?')"
+  echo "    Schéma : $SCHEMA_INFO"
+  if [[ -d "$BACKUP_ROOT" ]]; then
+    ls -1t "$BACKUP_ROOT"/preinscription-pre-migration-*.json 2>/dev/null | head -1 | while read -r bak; do
+      echo "    Backup pré-migration : $bak"
+    done
+  fi
+fi
+if curl -sf --max-time 10 "http://127.0.0.1:5000/api/health" >/dev/null 2>&1; then
+  echo "    API health : OK"
+else
+  echo "    API health : indisponible — vérifiez pm2 logs uniportail-api"
+fi
 
 echo ""
 echo "=== Mise à jour terminée ==="

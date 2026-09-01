@@ -11,6 +11,34 @@ const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n || 0)
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 
+function DocumentLinks({ dossierId, attestationDisponible, lettreDisponible }) {
+  if (!dossierId) return null
+  return (
+    <>
+      {attestationDisponible && (
+        <Link
+          to={`/attestation/${dossierId}`}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-md border border-indigo-200 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+        >
+          Attestation
+        </Link>
+      )}
+      {lettreDisponible && (
+        <Link
+          to={`/lettre/${dossierId}`}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+        >
+          Lettre
+        </Link>
+      )}
+    </>
+  )
+}
+
 export function TabFacturesEtab({ etabId, etabNom }) {
   const [list, setList] = useState([])
   const [total, setTotal] = useState(0)
@@ -144,7 +172,7 @@ export function TabFacturesEtab({ etabId, etabNom }) {
       ) : (
         <>
           <div className="max-h-[min(58vh,520px)] overflow-auto rounded-xl border border-slate-200 bg-white">
-            <table className="w-full min-w-[700px] text-left text-sm">
+            <table className="w-full min-w-[860px] text-left text-sm">
               <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="w-10 p-2.5">
@@ -188,10 +216,15 @@ export function TabFacturesEtab({ etabId, etabNom }) {
                             PDF
                           </button>
                           {f.dossier_id && (
-                            <Link to={`/facture/${f.dossier_id}`} className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                              Voir
+                            <Link to={`/facture/${f.dossier_id}`} target="_blank" rel="noreferrer" className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                              Facture
                             </Link>
                           )}
+                          <DocumentLinks
+                            dossierId={f.dossier_id}
+                            attestationDisponible={f.attestation_disponible}
+                            lettreDisponible={f.lettre_disponible}
+                          />
                         </div>
                       </td>
                     </tr>

@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
-
+import DocumentDownloadBar from '../components/DocumentDownloadBar'
 const fmtDate = (d) =>
   new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
 
@@ -18,7 +18,7 @@ export default function LettrePreinscription() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-
+  const documentRef = useRef(null)
   useEffect(() => {
     if (authLoading) return
     setLoading(true)
@@ -87,26 +87,14 @@ export default function LettrePreinscription() {
 
   return (
     <div className="lettre-print-scope min-h-screen bg-slate-200 px-4 py-8">
-      {/* Actions écran */}
-      <div className="no-print mx-auto mb-6 flex max-w-[210mm] flex-wrap items-center justify-between gap-3">
-        <Link to={-1} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-          ← Retour
-        </Link>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
-        >
-          Imprimer / Enregistrer PDF
-        </button>
-      </div>
-      <p className="no-print mx-auto mb-4 max-w-[210mm] rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-        Pour un PDF sans URL ni date du navigateur : dans la fenêtre d’impression, désactivez « En-têtes et pieds de page ».
-      </p>
-
-      {/* Document A4 */}
-      <article className="print-page mx-auto max-w-[210mm] bg-white px-10 py-10 text-[13px] leading-relaxed text-slate-800 shadow-xl sm:px-14 sm:py-12">
-
+      <DocumentDownloadBar
+        documentRef={documentRef}
+        filename={`${refLettre}.pdf`}
+      />
+      <article
+        ref={documentRef}
+        className="print-page mx-auto max-w-[210mm] bg-white px-10 py-10 text-[13px] leading-relaxed text-slate-800 shadow-xl sm:px-14 sm:py-12"
+      >
         {/* En-tête établissement */}
         <header className="lettre-print-header-root flex items-start justify-between gap-6 border-b-2 border-slate-800 pb-5">
           <div className="flex min-w-0 items-start gap-4">

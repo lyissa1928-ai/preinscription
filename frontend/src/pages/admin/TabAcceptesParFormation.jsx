@@ -184,9 +184,15 @@ export function TabAcceptesParFormation({ etabId }) {
                                 <td className="hidden max-w-[180px] truncate px-3 py-2 text-slate-600 sm:table-cell">{row.formation_titre}</td>
                                 <td className="px-3 py-2 font-mono text-xs text-slate-500">{row.numero_dossier || '—'}</td>
                                 <td className="px-3 py-2 text-right">
-                                  <div className="flex justify-end gap-1">
+                                  <div className="flex flex-wrap justify-end gap-1">
                                     {href && <Link to={href} className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">Dossier</Link>}
-                                    <Link to={`/facture/${row.dossier_id}`} className="rounded-md bg-orange-500 px-2 py-1 text-xs font-bold text-white">Facture</Link>
+                                    <Link to={`/facture/${row.dossier_id}`} target="_blank" rel="noreferrer" className="rounded-md bg-orange-500 px-2 py-1 text-xs font-bold text-white">Facture</Link>
+                                    {row.attestation_disponible !== false && (
+                                      <Link to={`/attestation/${row.dossier_id}`} target="_blank" rel="noreferrer" className="rounded-md border border-indigo-200 px-2 py-1 text-xs font-semibold text-indigo-700">Attestation</Link>
+                                    )}
+                                    {row.lettre_disponible && (
+                                      <Link to={`/lettre/${row.dossier_id}`} target="_blank" rel="noreferrer" className="rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700">Lettre</Link>
+                                    )}
                                   </div>
                                 </td>
                               </tr>

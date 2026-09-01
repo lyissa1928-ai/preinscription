@@ -425,7 +425,7 @@ router.post('/demandes-proforma/delete-batch', adminSensitiveLimiter, (req, res)
 router.get('/utilisateurs', (req, res) => {
   const { role = 'all', page, limit, search = '', etablissement_id = '' } = req.query;
   const dossiers = db.get('dossiers').value();
-  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const STAFF_ROLES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
 
   let utilisateurs = db.get('utilisateurs').value();
   if (role === 'etudiant') {
@@ -562,7 +562,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     prenom, nom, email, mot_de_passe, mot_de_passe_confirmation,
     role, etablissement_id, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_STAFF = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const ROLES_STAFF = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
 
   if (!prenom || !nom || !email || !mot_de_passe || !role || !telephone) {
     return res.status(400).json({
@@ -640,9 +640,16 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   };
   db.get('utilisateurs').push(user).write();
 
+  if (role === 'admin_etablissement' && etabIdForUser) {
+    const { enforceSingleAdminEtablissement } = require('../utils/adminEtablissement');
+    enforceSingleAdminEtablissement(etabIdForUser, id);
+  }
+
   const { mot_de_passe: _, ...safe } = user;
   res.status(201).json({
-    message: `Compte ${role} créé. L'utilisateur devra changer son mot de passe à la première connexion.`,
+    message: role === 'admin_etablissement'
+      ? 'Compte administrateur d’établissement créé. S’il existait déjà un admin pour cet établissement, il a été remplacé automatiquement.'
+      : `Compte ${role} créé. L'utilisateur devra changer son mot de passe à la première connexion.`,
     utilisateur: safe,
   });
 });
@@ -657,7 +664,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     nom, prenom, email, role, actif, etablissement_id, mot_de_passe,
     matricule, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_VALIDES = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'etudiant'];
+  const ROLES_VALIDES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'etudiant'];
   const update = { updated_at: new Date().toISOString(), updated_by: req.user.id };
   let matriculeRegenerated = false;
 
@@ -707,7 +714,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     }
     if (
       nextRole !== 'admin' &&
-      ['responsable', 'agent_admin', 'comptable'].includes(nextRole) &&
+      ['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(nextRole) &&
       user.role === 'admin' &&
       etablissement_id === undefined
     ) {
@@ -739,7 +746,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
         matriculeRegenerated = true;
       }
     } else {
-      if (['responsable', 'agent_admin', 'comptable'].includes(effectiveRoleAfter)) {
+      if (['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(effectiveRoleAfter)) {
         return res.status(400).json({
           message: 'L\'établissement est obligatoire pour ce rôle.',
         });
@@ -769,6 +776,13 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
   }
 
   db.get('utilisateurs').find({ id }).assign(update).write();
+
+  const fresh = db.get('utilisateurs').find({ id }).value();
+  if (fresh.role === 'admin_etablissement' && fresh.etablissement_id) {
+    const { enforceSingleAdminEtablissement } = require('../utils/adminEtablissement');
+    enforceSingleAdminEtablissement(fresh.etablissement_id, id);
+  }
+
   res.json({ message: 'Utilisateur mis à jour.' });
 });
 
@@ -830,7 +844,7 @@ router.get('/statistiques-globales', (req, res) => {
   const demandes = db.get('demandes_proforma').value();
   const etablissements = db.get('etablissements').value();
   const formations = db.get('formations').value();
-  const STAFF_ROLES = ['admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const STAFF_ROLES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
 
   const parRole = {};
   STAFF_ROLES.forEach(r => { parRole[r] = utilisateurs.filter(u => u.role === r).length; });
@@ -867,7 +881,7 @@ router.get('/statistiques-globales', (req, res) => {
 
 // GET /api/admin/audit-logs?entity=formation&action=create&user_id=12&page=1&limit=50
 router.get('/audit-logs', (req, res) => {
-  const { entity = '', action = '', user_id = '', q = '', page = 1, limit = 50 } = req.query;
+  const { entity = '', action = '', user_id = '', user_role = '', q = '', page = 1, limit = 50 } = req.query;
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
   const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
   const userId = user_id ? parseInt(user_id, 10) : null;
@@ -876,6 +890,7 @@ router.get('/audit-logs', (req, res) => {
   if (entity) logs = logs.filter((x) => String(x.entity || '') === String(entity));
   if (action) logs = logs.filter((x) => String(x.action || '') === String(action));
   if (userId && !Number.isNaN(userId)) logs = logs.filter((x) => Number(x.user_id) === userId);
+  if (user_role) logs = logs.filter((x) => String(x.user_role || '') === String(user_role));
   if (q) {
     const s = String(q).trim().toLowerCase();
     logs = logs.filter((x) => {

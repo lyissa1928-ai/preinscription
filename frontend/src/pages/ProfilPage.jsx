@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext'
 import { DashboardPage, Panel } from '../components/dashboard/DashboardChrome'
 
 const ROLE_LABELS = {
-  admin: 'Administrateur',
+  admin: 'Administrateur plateforme',
+  admin_etablissement: 'Administrateur établissement',
   responsable: 'Responsable pédagogique',
   agent_admin: 'Agent administratif',
   comptable: 'Comptable',

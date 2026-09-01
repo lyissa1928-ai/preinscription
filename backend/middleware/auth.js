@@ -73,6 +73,7 @@ const staffGuichet = roleGuard('admin', 'responsable', 'agent_admin');
 /** Lecture lettre / attestation officielle. */
 const staffLettreAttestation = roleGuard(
   'admin',
+  'admin_etablissement',
   'responsable',
   'agent_admin',
   'comptable',
@@ -83,7 +84,7 @@ const agentAdminOrAdmin = roleGuard('agent_admin', 'admin');
 const comptableOrAdmin = roleGuard('comptable', 'admin');
 const directeurOrAdmin = adminOnly;
 const controleurQualiteOrAdmin = roleGuard('controleur_qualite', 'admin');
-const staffOnly = roleGuard('admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite');
+const staffOnly = roleGuard('admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite');
 
 module.exports = {
   authMiddleware,

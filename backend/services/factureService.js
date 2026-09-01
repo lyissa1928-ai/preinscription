@@ -134,6 +134,9 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
   const identite = resolveCandidatIdentite(dossierRow, etudiant || {});
   if (!identite.prenom || !identite.nom) return null;
 
+  const typePayeur = dossierRow.type_payeur === 'organisation' ? 'organisation' : 'etudiant';
+  const payeur = typePayeur === 'organisation' && dossierRow.payeur ? dossierRow.payeur : null;
+
   const tarif = buildLignesForfaitAnnuel(formation);
   const tva_taux = 0;
   const montant_ht = tarif.montant_ht;
@@ -167,6 +170,8 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
       adresse: identite.adresse || dossierRow.adresse,
       nationalite: identite.nationalite || dossierRow.nationalite,
     },
+    type_payeur: typePayeur,
+    payeur,
     formation_snapshot: buildFormationSnapshot(formation, tarif),
     etablissement_snapshot: etabSnap,
     created_at: new Date().toISOString(),

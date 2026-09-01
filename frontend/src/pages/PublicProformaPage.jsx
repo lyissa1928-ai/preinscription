@@ -6,18 +6,7 @@ import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
 import { forfaitAnnuelFromFormation } from '../lib/formationTarifs'
 import { sanitizeConditionsHtml, renderConditionsLooksLikeHtml } from '../utils/conditionsHtml'
-import 'react-quill/dist/quill.snow.css'
-
-const NIVEAUX = [
-  'Terminale / Baccalauréat',
-  'Bac+1 / Licence 1',
-  'Bac+2 / Licence 2',
-  'Bac+3 / Licence 3',
-  'Bac+4 / Master 1',
-  'Bac+5 / Master 2',
-  'Doctorat',
-  'Autre',
-]
+import IdentiteBeneficiaireProforma from '../components/proforma/IdentiteBeneficiaireProforma'
 
 const BRAND_COLORS = {
   esebat: { prim: '#F97316', sec: '#FB923C' },
@@ -202,20 +191,15 @@ function BlocConditionsAdmission({ etablissementId, onAckChange, ack, theme, rea
 function FormulaireDemandeProforma({ etablissements, initialEtablissementId, user, lockEtablissementId }) {
   const navigate = useNavigate()
   const [form, setForm] = useState({
-    niveau: '',
     etablissement_id: '',
     type_formation: '',
     formation_id: '',
-    details: '',
     type_payeur: 'etudiant',
-    payeur_nom: '',
-    payeur_prenom: '',
-    payeur_relation: '',
-    payeur_telephone: '',
-    payeur_org_nom: '',
-    payeur_org_ninea: '',
-    payeur_org_contact: '',
+    destinataire: '',
     telephone: user?.telephone || '',
+    prenom: user?.prenom || '',
+    nom: user?.nom || '',
+    email: user?.email || '',
   })
   const [files, setFiles] = useState({ diplome: null, releve: null, formation: null })
   const [formations, setFormations] = useState([])
@@ -238,10 +222,15 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
   }, [lockEtablissementId, initialEtablissementId])
 
   useEffect(() => {
-    if (user?.telephone && !form.telephone) {
-      setForm((p) => ({ ...p, telephone: user.telephone }))
-    }
-  }, [user?.telephone])
+    if (!user) return
+    setForm((p) => ({
+      ...p,
+      telephone: p.telephone || user.telephone || '',
+      prenom: user.prenom || p.prenom,
+      nom: user.nom || p.nom,
+      email: user.email || p.email,
+    }))
+  }, [user])
 
   useEffect(() => {
     if (!form.etablissement_id) {
@@ -287,6 +276,10 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
       toast.error('Indiquez un numéro de téléphone valide (au moins 8 caractères).')
       return
     }
+    if (form.type_payeur === 'organisation' && !String(form.destinataire || '').trim()) {
+      toast.error('Indiquez le destinataire (entreprise, État ou organisation).')
+      return
+    }
     if (!files.diplome || !files.releve || !files.formation) {
       toast.error('Les trois justificatifs sont obligatoires : diplôme, relevé de notes, document formation.')
       return
@@ -298,19 +291,9 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
       fd.append('type_formation', form.type_formation)
       fd.append('formation_id', form.formation_id)
       fd.append('etablissement_id', form.etablissement_id)
-      if (form.niveau) fd.append('niveau', form.niveau)
-      if (form.details) fd.append('details', form.details)
       fd.append('type_payeur', form.type_payeur || 'etudiant')
-      if (form.type_payeur === 'tuteur') {
-        fd.append('payeur_prenom', form.payeur_prenom)
-        fd.append('payeur_nom', form.payeur_nom)
-        fd.append('payeur_relation', form.payeur_relation || '')
-        fd.append('payeur_telephone', form.payeur_telephone || '')
-      }
       if (form.type_payeur === 'organisation') {
-        fd.append('payeur_org_nom', form.payeur_org_nom)
-        fd.append('payeur_org_ninea', form.payeur_org_ninea || '')
-        fd.append('payeur_org_contact', form.payeur_org_contact || '')
+        fd.append('payeur_org_nom', String(form.destinataire || '').trim())
       }
       fd.append('justificatif_diplome', files.diplome)
       fd.append('justificatif_releve', files.releve)
@@ -342,29 +325,10 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
         </p>
       </div>
 
-      <div>
-        <LBL required>Téléphone (contact)</LBL>
-        <input
-          className="input-field"
-          type="tel"
-          value={form.telephone}
-          onChange={up('telephone')}
-          required
-          placeholder="+221 77 000 00 00"
-        />
+      <div className="border-t border-gray-200 pt-3">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Identité du bénéficiaire</p>
       </div>
-
-      <div>
-        <LBL>Niveau actuel</LBL>
-        <select className="input-field" value={form.niveau} onChange={up('niveau')}>
-          <option value="">-- Votre niveau d&apos;études --</option>
-          {NIVEAUX.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-      </div>
+      <IdentiteBeneficiaireProforma form={form} up={up} identityReadOnly />
 
       <div className="border-t border-gray-200 pt-3">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Formation souhaitée</p>
@@ -501,72 +465,6 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
         </div>
       </div>
 
-      <div className="border-t border-gray-200 pt-3">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Destinataire de la facture</p>
-      </div>
-      <div>
-        <LBL required>Qui règle les frais ?</LBL>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {[
-            { val: 'etudiant', label: '🎓 Étudiant', sub: 'Lui-même' },
-            { val: 'tuteur', label: '👨‍👩‍👧 Tuteur', sub: 'Parent / tuteur' },
-            { val: 'organisation', label: '🏢 Organisme', sub: 'Entreprise / ONG' },
-          ].map(({ val, label, sub }) => (
-            <label
-              key={val}
-              className={`flex flex-col gap-0.5 p-2.5 rounded-xl border-2 cursor-pointer transition-all text-center ${
-                form.type_payeur === val ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-200'
-              }`}
-            >
-              <input type="radio" name="type_payeur" value={val} checked={form.type_payeur === val} onChange={up('type_payeur')} className="sr-only" />
-              <span className="font-semibold text-gray-800 text-xs">{label}</span>
-              <span className="text-xs text-gray-400">{sub}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-      {form.type_payeur === 'tuteur' && (
-        <div className="space-y-3 bg-gray-50 rounded-xl p-3 border border-gray-100">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <LBL required>Prénom du tuteur</LBL>
-              <input className="input-field" value={form.payeur_prenom} onChange={up('payeur_prenom')} required placeholder="Ex: Aissatou" />
-            </div>
-            <div>
-              <LBL required>Nom du tuteur</LBL>
-              <input className="input-field" value={form.payeur_nom} onChange={up('payeur_nom')} required placeholder="Ex: Diallo" />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <LBL>Lien avec l&apos;étudiant</LBL>
-              <input className="input-field" value={form.payeur_relation} onChange={up('payeur_relation')} placeholder="Ex: Père, Mère…" />
-            </div>
-            <div>
-              <LBL>Téléphone du tuteur</LBL>
-              <input className="input-field" value={form.payeur_telephone} onChange={up('payeur_telephone')} placeholder="+221 77 000 00 00" />
-            </div>
-          </div>
-        </div>
-      )}
-      {form.type_payeur === 'organisation' && (
-        <div className="space-y-3 bg-gray-50 rounded-xl p-3 border border-gray-100">
-          <div>
-            <LBL required>Nom de l&apos;organisation</LBL>
-            <input className="input-field" value={form.payeur_org_nom} onChange={up('payeur_org_nom')} required placeholder="Ex: Société XYZ SARL" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <LBL>NINEA / NIF</LBL>
-              <input className="input-field" value={form.payeur_org_ninea} onChange={up('payeur_org_ninea')} placeholder="Ex: 00123456 2Z1" />
-            </div>
-            <div>
-              <LBL>Personne de contact</LBL>
-              <input className="input-field" value={form.payeur_org_contact} onChange={up('payeur_org_contact')} placeholder="Ex: M. Fall DRH" />
-            </div>
-          </div>
-        </div>
-      )}
       <button type="submit" disabled={loading} className="btn-primary w-full py-3 flex items-center justify-center gap-2 text-base disabled:opacity-40">
         {loading ? (
           <>

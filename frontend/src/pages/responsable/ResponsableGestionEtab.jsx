@@ -136,7 +136,7 @@ export default function ResponsableGestionEtab() {
         )}
         {tab === 'formations' && (
           <TabFormations
-            etabId={etab.id}
+            etabId={etab.id ?? etabId}
             formations={etab.formations}
             filieres={etab.filieres || []}
             onRefreshFilieres={refreshFilieresOnly}

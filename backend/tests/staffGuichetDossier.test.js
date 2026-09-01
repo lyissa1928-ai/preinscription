@@ -73,6 +73,30 @@ describe('guichet préinscription', () => {
     assert.equal(r.facture.montant_ttc, tarif.prix_annuel);
   });
 
+  it('crée une facture proforma guichet avec identité allégée', () => {
+    const formation = (db.get('formations').value() || []).find((f) => Number(f.etablissement_id) === 1 && f.actif !== false);
+    assert.ok(formation);
+    const tel = `77${Date.now().toString().slice(-7)}1`;
+    const r = creerDossierGuichet({
+      staffUser: { id: 1, role: 'admin', etablissement_id: null },
+      body: {
+        prenom: 'Awa',
+        nom: 'Sow',
+        telephone: tel,
+        email: `awa.proforma.${Date.now()}@test.sn`,
+        formation_id: formation.id,
+        type_document: 'proforma',
+        type_payeur: 'organisation',
+        destinataire: 'Ministère du Travail',
+      },
+    });
+    assert.equal(r.ok, true);
+    assert.equal(r.facture.type_document, 'proforma');
+    assert.equal(r.dossier.type_payeur, 'organisation');
+    assert.equal(r.dossier.payeur.org_nom, 'Ministère du Travail');
+    assert.equal(r.facture.type_payeur, 'organisation');
+  });
+
   it('ne duplique pas le même candidat / formation', () => {
     const formation = (db.get('formations').value() || []).find((f) => Number(f.etablissement_id) === 1 && f.actif !== false);
     const tel = `76${Date.now().toString().slice(-8)}`;

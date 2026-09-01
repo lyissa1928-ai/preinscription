@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
+import DocumentDownloadBar from '../components/DocumentDownloadBar'
 
 const fmtDate = (d) => {
   if (d == null || d === '') return '—'
@@ -14,6 +15,7 @@ export default function AttestationDemandePreinscription() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const documentRef = useRef(null)
 
   useEffect(() => {
     axios
@@ -31,8 +33,6 @@ export default function AttestationDemandePreinscription() {
       document.title = prev
     }
   }, [data])
-
-  const handlePrint = () => window.print()
 
   if (loading) {
     return (
@@ -92,30 +92,18 @@ export default function AttestationDemandePreinscription() {
 
   return (
     <div className="lettre-print-scope min-h-screen bg-slate-200 py-8 px-4">
-      <div className="no-print max-w-3xl mx-auto mb-6 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            to="/dashboard"
-            className="flex items-center gap-2 font-medium text-sm bg-white px-4 py-2 rounded-lg border transition-colors"
-            style={{ color: primary, borderColor: `${primary}55` }}
-          >
-            ← Retour
-          </Link>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="flex items-center gap-2 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors shadow-md text-sm"
-            style={{ backgroundColor: primary }}
-          >
-            Imprimer / PDF
-          </button>
-        </div>
-        <p className="text-xs text-gray-700 bg-amber-50/90 border border-amber-100 rounded-lg px-4 py-2.5 leading-relaxed">
-          <span className="font-semibold text-amber-900">PDF :</span> désactivez « En-têtes et pieds de page » dans l’impression.
-        </p>
-      </div>
+      <DocumentDownloadBar
+        documentRef={documentRef}
+        filename={`${refAtt}.pdf`}
+        primaryColor={primary}
+        backHref="/dashboard"
+        className="mx-auto mb-5 flex max-w-3xl flex-wrap items-center justify-between gap-3"
+      />
 
-      <div className="print-page max-w-3xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden">
+      <div
+        ref={documentRef}
+        className="print-page max-w-3xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden"
+      >
         <div className="h-2" style={bandStyle} />
 
         <div className="px-8 pt-8 pb-4">

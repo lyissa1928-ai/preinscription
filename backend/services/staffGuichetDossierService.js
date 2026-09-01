@@ -3,7 +3,7 @@
  * Un seul dossier = facture + attestation + lettre. Pas de doublon candidat pour la même formation.
  */
 const db = require('../database/db');
-const { genererOuRecupererFactureDossier } = require('./factureService');
+const { genererOuRecupererFactureDossier, normalizeTypeDocument } = require('./factureService');
 const { buildLignesForfaitAnnuel, getDureeMoisEffectif } = require('../utils/formationTarifs');
 const { normalizePreinscriptionNiveau } = require('../utils/preinscriptionDocumentRules');
 
@@ -61,20 +61,31 @@ function creerDossierGuichet({ staffUser, body }) {
     return { ok: false, status: 400, message: 'Formation obligatoire.' };
   }
 
-  const required = [
-    'date_naissance',
-    'lieu_naissance',
-    'nationalite',
-    'adresse',
-    'dernier_diplome',
-    'etablissement_origine',
-    'annee_obtention',
-    'annee_academique',
-  ];
-  for (const k of required) {
-    if (!String(body[k] || '').trim()) {
-      return { ok: false, status: 400, message: 'Tous les champs obligatoires de préinscription doivent être renseignés.' };
+  const typeDoc = normalizeTypeDocument(body.type_document || body.nature || 'proforma');
+  const isProformaGuichet = typeDoc === 'proforma';
+
+  if (!isProformaGuichet) {
+    const required = [
+      'date_naissance',
+      'lieu_naissance',
+      'nationalite',
+      'adresse',
+      'dernier_diplome',
+      'etablissement_origine',
+      'annee_obtention',
+      'annee_academique',
+    ];
+    for (const k of required) {
+      if (!String(body[k] || '').trim()) {
+        return { ok: false, status: 400, message: 'Tous les champs obligatoires de préinscription doivent être renseignés.' };
+      }
     }
+  }
+
+  const typePayeur = body.type_payeur === 'organisation' ? 'organisation' : 'etudiant';
+  const destinataireOrg = String(body.destinataire || body.payeur_org_nom || '').trim();
+  if (isProformaGuichet && typePayeur === 'organisation' && !destinataireOrg) {
+    return { ok: false, status: 400, message: 'Destinataire obligatoire (entreprise, État ou organisation).' };
   }
 
   const email = String(body.email || '').trim().toLowerCase();
@@ -114,6 +125,9 @@ function creerDossierGuichet({ staffUser, body }) {
     };
   }
 
+  const year = new Date().getFullYear();
+  const defaultAnneeAcad = `${year}-${year + 1}`;
+
   // Lier un compte existant si email connu — sans créer de nouveau compte.
   let etudiantId = null;
   if (email) {
@@ -142,28 +156,32 @@ function creerDossierGuichet({ staffUser, body }) {
     niveau: formation.niveau_requis,
     formation_niveau_cible: formation.niveau != null ? String(formation.niveau) : null,
     document_rule_profile: documentRuleProfile,
-    annee_academique: String(body.annee_academique).trim(),
+    annee_academique: String(body.annee_academique || '').trim() || defaultAnneeAcad,
     prenom,
     nom,
     email: email || '',
     sexe: String(body.sexe || '').trim() || null,
-    date_naissance: String(body.date_naissance).trim(),
-    lieu_naissance: String(body.lieu_naissance).trim(),
-    nationalite: String(body.nationalite).trim(),
+    date_naissance: body.date_naissance ? String(body.date_naissance).trim() : null,
+    lieu_naissance: body.lieu_naissance ? String(body.lieu_naissance).trim() : null,
+    nationalite: body.nationalite ? String(body.nationalite).trim() : null,
     pays_residence: String(body.pays_residence || '').trim() || null,
     telephone,
-    adresse: String(body.adresse).trim(),
+    adresse: body.adresse ? String(body.adresse).trim() : null,
     type_piece: String(body.type_piece || '').trim() || null,
     numero_piece: String(body.numero_piece || '').trim() || (passeport || null),
     numero_passeport: passeport || null,
-    dernier_diplome: String(body.dernier_diplome).trim(),
-    etablissement_origine: String(body.etablissement_origine).trim(),
+    dernier_diplome: body.dernier_diplome ? String(body.dernier_diplome).trim() : null,
+    etablissement_origine: body.etablissement_origine ? String(body.etablissement_origine).trim() : null,
     mention: String(body.mention || '').trim() || null,
-    annee_obtention: parseInt(String(body.annee_obtention), 10) || null,
+    annee_obtention: body.annee_obtention ? parseInt(String(body.annee_obtention), 10) || null : null,
+    type_payeur: typePayeur,
+    payeur: typePayeur === 'organisation' ? { org_nom: destinataireOrg } : null,
     statut: 'accepte',
     source: 'staff',
     creee_par: staffUser.id,
-    commentaire_admin: 'Préinscription guichet — documents générables immédiatement.',
+    commentaire_admin: isProformaGuichet
+      ? 'Facture proforma guichet — saisie allégée.'
+      : 'Préinscription guichet — documents générables immédiatement.',
     date_acceptation: now,
     lettre_generee: true,
     created_at: now,

@@ -5,7 +5,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { NATIONALITES_SUGGESTIONS_FR } from '../../data/nationalites'
 import { DashboardPage, DashboardHero, Panel } from '../../components/dashboard/DashboardChrome'
-import { normalizeTypeDocument, titreTypeDocument } from '../../utils/factureTypeDocument'
+import { normalizeTypeDocument, titreTypeDocument, isFactureDefinitive } from '../../utils/factureTypeDocument'
+import IdentiteBeneficiaireProforma from '../../components/proforma/IdentiteBeneficiaireProforma'
 
 const DIPLOMES = [
   'Baccalauréat',
@@ -42,6 +43,8 @@ const EMPTY = {
   annee_obtention: '',
   mention: '',
   annee_academique: '2025-2026',
+  type_payeur: 'etudiant',
+  destinataire: '',
 }
 
 /**
@@ -51,6 +54,7 @@ export default function StaffPreinscriptionGuichet() {
   const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const natureFacture = normalizeTypeDocument(searchParams.get('nature'))
+  const isProforma = !isFactureDefinitive(natureFacture)
   const isAdmin = user?.role === 'admin'
   const [etablissements, setEtablissements] = useState([])
   const [etabId, setEtabId] = useState(isAdmin ? '' : user?.etablissement_id ?? '')
@@ -153,6 +157,14 @@ export default function StaffPreinscriptionGuichet() {
       toast.error('Nom et prénom obligatoires.')
       return
     }
+    if (!form.telephone.trim()) {
+      toast.error('Téléphone obligatoire.')
+      return
+    }
+    if (isProforma && form.type_payeur === 'organisation' && !form.destinataire.trim()) {
+      toast.error('Indiquez le destinataire (entreprise, État ou organisation).')
+      return
+    }
     setSaving(true)
     try {
       const { data } = await axios.post('/api/responsable/dossiers/guichet', {
@@ -161,6 +173,9 @@ export default function StaffPreinscriptionGuichet() {
         numero_passeport: form.numero_passeport || form.numero_piece,
         type_document: natureFacture,
         nature: natureFacture,
+        type_payeur: isProforma ? form.type_payeur : 'etudiant',
+        payeur_org_nom: isProforma && form.type_payeur === 'organisation' ? form.destinataire.trim() : '',
+        destinataire: isProforma && form.type_payeur === 'organisation' ? form.destinataire.trim() : '',
       })
       setResult(data)
       toast.success(data.message)
@@ -193,9 +208,9 @@ export default function StaffPreinscriptionGuichet() {
         />
         <Panel title="Documents à remettre" bodyClassName="p-6 space-y-4">
           <p className="text-sm text-slate-600">
-            Une seule saisie. Les trois documents s’appuient sur ce dossier
+            Une seule saisie. Les documents s’appuient sur ce dossier
             {result.reused ? ' (déjà existant — aucun doublon créé).' : '.'}
-            {' '}La facture est archivée dans l’historique de l’établissement.
+            {' '}Téléchargez la facture, l’attestation ou la lettre depuis les liens ci-dessous.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Link to={`/facture/${d.id}`} target="_blank" className="btn-primary text-center">
@@ -231,7 +246,7 @@ export default function StaffPreinscriptionGuichet() {
       <DashboardHero
         eyebrow="Accueil scolarité"
         title={`Préinscription & ${titreTypeDocument(natureFacture, { uppercase: false }).toLowerCase()}`}
-        subtitle="Mode → formation → bénéficiaire → générer → prévisualiser / imprimer → archiver."
+        subtitle="Mode → formation → bénéficiaire → générer → télécharger → archiver."
       />
 
       <div className="space-y-6">
@@ -344,6 +359,9 @@ export default function StaffPreinscriptionGuichet() {
         )}
 
         <Panel title="3. Identité du bénéficiaire" bodyClassName="p-6">
+          {isProforma ? (
+            <IdentiteBeneficiaireProforma form={form} up={up} />
+          ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-semibold">Prénom(s) *</label>
@@ -416,8 +434,10 @@ export default function StaffPreinscriptionGuichet() {
               />
             </div>
           </div>
+          )}
         </Panel>
 
+        {!isProforma && (
         <Panel title="4. Parcours académique" bodyClassName="p-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -457,10 +477,15 @@ export default function StaffPreinscriptionGuichet() {
             </div>
           </div>
         </Panel>
+        )}
 
         <div className="flex justify-end">
           <button type="button" className="btn-primary" onClick={enregistrer} disabled={saving || !formationId}>
-            {saving ? 'Enregistrement…' : 'Générer la facture et l’attestation'}
+            {saving
+              ? 'Enregistrement…'
+              : isProforma
+                ? 'Générer la facture proforma'
+                : 'Générer la facture et l’attestation'}
           </button>
         </div>
       </div>

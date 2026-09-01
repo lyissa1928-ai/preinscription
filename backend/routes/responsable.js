@@ -467,13 +467,27 @@ router.get('/dossiers/:id', (req, res) => {
   }
 
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
+  const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
+  const identite = resolveCandidatIdentite(dossier, u);
   const documents = db.get('documents').filter({ dossier_id: id }).value();
   const formation = db.get('formations').find({ id: dossier.formation_id }).value();
   const factureRow = db.get('factures').find({ dossier_id: id }).value() || null;
   const facture = factureRow ? genererOuRecupererFactureDossier(id) : null;
 
   res.json({
-    dossier: { ...dossier, nom: u.nom, prenom: u.prenom, email: u.email, date_inscription: u.created_at },
+    dossier: {
+      ...dossier,
+      prenom: identite.prenom || null,
+      nom: identite.nom || null,
+      email: identite.email || null,
+      telephone: identite.telephone || dossier.telephone || null,
+      date_naissance: identite.date_naissance || dossier.date_naissance || null,
+      lieu_naissance: identite.lieu_naissance || dossier.lieu_naissance || null,
+      nationalite: identite.nationalite || dossier.nationalite || null,
+      adresse: identite.adresse || dossier.adresse || null,
+      matricule: identite.matricule || null,
+      date_inscription: u.created_at || dossier.created_at || null,
+    },
     documents,
     formation,
     facture

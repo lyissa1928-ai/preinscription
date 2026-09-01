@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
+import DocumentDownloadBar from '../components/DocumentDownloadBar'
 
 const fmtDate = (d) => {
   if (d == null || d === '') return '—'
@@ -16,6 +17,7 @@ export default function AttestationPreinscription() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const documentRef = useRef(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -50,8 +52,6 @@ export default function AttestationPreinscription() {
     }
   }, [data])
 
-  const handlePrint = () => window.print()
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-200 flex items-center justify-center">
@@ -81,13 +81,11 @@ export default function AttestationPreinscription() {
   const {
     dossier,
     etudiant,
-    candidat,
     etablissement: etab,
     formation_libelle,
     filiere_libelle,
     niveau_libelle,
     annee_academique,
-    photo_url: rawPhoto,
     attestation_extensions: ext = {},
   } = data
 
@@ -95,7 +93,6 @@ export default function AttestationPreinscription() {
   const secondary = etab?.couleur_secondaire || '#4f46e5'
   const bandStyle = { background: `linear-gradient(to right, ${primary}, ${secondary})` }
   const logoSrc = mediaUrl(etab?.logo_url)
-  const photoSrc = mediaUrl(rawPhoto)
   const refAtt = ext.reference_attestation || `ATT-${new Date().getFullYear()}-${String(dossier.id).padStart(5, '0')}`
 
   const prenomT = (etudiant?.prenom || dossier?.prenom || '').trim()
@@ -107,38 +104,17 @@ export default function AttestationPreinscription() {
 
   return (
     <div className="lettre-print-scope min-h-screen bg-slate-200 py-8 px-4">
-      <div className="no-print max-w-3xl mx-auto mb-6 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            to={-1}
-            className="flex items-center gap-2 font-medium text-sm bg-white px-4 py-2 rounded-lg border transition-colors"
-            style={{ color: primary, borderColor: `${primary}55` }}
-          >
-            ← Retour
-          </Link>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="flex items-center gap-2 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors shadow-md text-sm"
-            style={{ backgroundColor: primary }}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-              />
-            </svg>
-            Imprimer / PDF
-          </button>
-        </div>
-        <p className="text-xs text-gray-700 bg-amber-50/90 border border-amber-100 rounded-lg px-4 py-2.5 leading-relaxed">
-          <span className="font-semibold text-amber-900">PDF :</span> désactivez « En-têtes et pieds de page » dans l’impression.
-        </p>
-      </div>
+      <DocumentDownloadBar
+        documentRef={documentRef}
+        filename={`${refAtt}.pdf`}
+        primaryColor={primary}
+        className="mx-auto mb-5 flex max-w-3xl flex-wrap items-center justify-between gap-3"
+      />
 
-      <div className="print-page max-w-3xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden">
+      <div
+        ref={documentRef}
+        className="print-page max-w-3xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden"
+      >
         <div className="h-2" style={bandStyle} />
 
         <div className="px-8 pt-8 pb-4">
@@ -180,44 +156,27 @@ export default function AttestationPreinscription() {
 
         <div className="mx-8 border-t border-gray-100" />
 
-        <div className="px-8 py-6 space-y-6 text-gray-800">
-          <div className="grid md:grid-cols-3 gap-6 items-start">
-            <div className="md:col-span-2 space-y-3">
-              <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500">Candidat</h2>
-              <dl className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div>
-                  <dt className="text-gray-400 text-[11px] uppercase">Nom et prénom</dt>
-                  <dd className="font-semibold">{nomComplet}</dd>
-                </div>
-                <div>
-                  <dt className="text-gray-400 text-[11px] uppercase">N° dossier</dt>
-                  <dd className="font-mono font-semibold">{nDossier || '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-gray-400 text-[11px] uppercase">Date de naissance</dt>
-                  <dd className="font-medium">{fmtDate(candidat?.date_naissance || dossier.date_naissance)}</dd>
-                </div>
-                <div>
-                  <dt className="text-gray-400 text-[11px] uppercase">Nationalité</dt>
-                  <dd className="font-medium">{candidat?.nationalite || dossier.nationalite || '—'}</dd>
-                </div>
-              </dl>
-            </div>
-            <div className="text-center md:text-left">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Photo</p>
-              {photoSrc ? (
-                <img
-                  src={photoSrc}
-                  alt=""
-                  className="w-24 h-32 object-cover rounded-lg border-2 mx-auto md:mx-0 shadow-sm"
-                  style={{ borderColor: `${primary}55` }}
-                />
-              ) : (
-                <div className="w-24 h-32 rounded-lg border border-dashed border-gray-200 mx-auto md:mx-0 flex items-center justify-center text-[10px] text-gray-400 px-1">
-                  Non fournie
-                </div>
-              )}
-            </div>
+        <div className="px-8 py-6 space-y-5 text-gray-800">
+          <div className="space-y-3">
+            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500">Bénéficiaire</h2>
+            <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              <div>
+                <dt className="text-gray-400 text-[11px] uppercase">Prénom(s)</dt>
+                <dd className="font-semibold text-base">{prenomT || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-400 text-[11px] uppercase">Nom</dt>
+                <dd className="font-semibold text-base uppercase">{nomT || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-400 text-[11px] uppercase">N° dossier</dt>
+                <dd className="font-mono font-semibold">{nDossier || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-400 text-[11px] uppercase">Date de préinscription</dt>
+                <dd className="font-medium">{fmtDate(dossier.created_at || dossier.date_acceptation)}</dd>
+              </div>
+            </dl>
           </div>
 
           <div className="rounded-xl border border-gray-100 bg-slate-50/90 px-4 py-3">
@@ -249,7 +208,7 @@ export default function AttestationPreinscription() {
             )}
           </div>
 
-          <div className="flex flex-col items-center pt-6 pb-2">
+          <div className="flex flex-col items-center pt-4 pb-1">
             <CachetScolarite cachetUrl={etab?.cachet_url} />
             <p className="text-xs text-gray-400 mt-3">Fait à {etab?.nom || '…'}, le {fmtDate(new Date())}</p>
           </div>

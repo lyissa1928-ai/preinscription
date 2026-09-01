@@ -42,6 +42,7 @@ import {
   PublicEtablissementPage,
   PublicEtablissementsPage,
   ForcePasswordChange,
+  StaffEtabEquipe,
   StaffFacturesEtab,
   StaffAcceptesParFormation,
   BienvenueCompte,
@@ -85,6 +86,7 @@ function AppRoutes() {
     if (!user) return '/'
     if (user.must_change_password) return '/changer-mot-de-passe-obligatoire'
     if (user.role === 'admin') return '/admin'
+    if (user.role === 'admin_etablissement') return '/mon-etablissement/equipe'
     if (user.role === 'controleur_qualite') return '/qualite'
     if (user.role === 'responsable') return '/responsable'
     if (user.role === 'agent_admin') return '/agent-admin'
@@ -101,7 +103,7 @@ function AppRoutes() {
           : <Landing />
       } />
       <Route path="/accueil" element={
-        user && ['responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'admin'].includes(user.role)
+        user && ['responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'admin_etablissement', 'admin'].includes(user.role)
           ? <Navigate to={homeRedirect()} replace />
           : <Landing />
       } />
@@ -132,11 +134,11 @@ function AppRoutes() {
         <Route path="/mes-acces" element={<PrivateRoute roles={['etudiant']}><MesAccesEtudiant /></PrivateRoute>} />
         <Route path="/preinscription" element={<PrivateRoute roles={['etudiant']}><Preinscription /></PrivateRoute>} />
         <Route path="/preinscription/:formationId" element={<PrivateRoute roles={['etudiant']}><Preinscription /></PrivateRoute>} />
-        <Route path="/facture/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'responsable', 'comptable', 'agent_admin', 'controleur_qualite']}><FactureView /></PrivateRoute>} />
+        <Route path="/facture/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'admin_etablissement', 'responsable', 'comptable', 'agent_admin', 'controleur_qualite']}><FactureView /></PrivateRoute>} />
 
         {/* Lettre */}
-        <Route path="/lettre/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}><LettrePreinscription /></PrivateRoute>} />
-        <Route path="/attestation/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}><AttestationPreinscription /></PrivateRoute>} />
+        <Route path="/lettre/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}><LettrePreinscription /></PrivateRoute>} />
+        <Route path="/attestation/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}><AttestationPreinscription /></PrivateRoute>} />
         <Route
           path="/lettre-demande/:demandeId"
           element={
@@ -149,12 +151,17 @@ function AppRoutes() {
 
         {/* Accueil établissement (staff + étudiants : catalogue sans tarifs pour les étudiants) */}
         <Route path="/mon-etablissement" element={
-          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'etudiant']}>
+          <PrivateRoute roles={['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'etudiant']}>
             <EtablissementHome />
           </PrivateRoute>
         } />
+        <Route path="/mon-etablissement/equipe" element={
+          <PrivateRoute roles={['admin', 'admin_etablissement']}>
+            <StaffEtabEquipe />
+          </PrivateRoute>
+        } />
         <Route path="/mon-etablissement/factures" element={
-          <PrivateRoute roles={['responsable', 'agent_admin', 'comptable', 'controleur_qualite']}>
+          <PrivateRoute roles={['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}>
             <StaffFacturesEtab />
           </PrivateRoute>
         } />

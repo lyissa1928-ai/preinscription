@@ -75,6 +75,13 @@ const MENUS = {
     { label: 'Maintenance', to: '/admin/maintenance', icon: ICONS.settings },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
+  admin_etablissement: [
+    { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
+    { label: 'Équipe & comptes', to: '/mon-etablissement/equipe', icon: ICONS.users, exact: true },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
+    { label: 'Messages', to: '/chat', icon: ICONS.chat },
+    { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
+  ],
   responsable: [
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     {
@@ -127,6 +134,7 @@ const MENUS = {
 
 const ROLE_CONFIG = {
   admin:       { label: 'Administrateur',     color: 'from-purple-700 to-purple-900', badge: 'bg-purple-500' },
+  admin_etablissement: { label: 'Admin. établissement', color: 'from-blue-700 to-blue-900', badge: 'bg-blue-500' },
   responsable: { label: 'Resp. Pédagogique', color: 'from-teal-700 to-teal-900',    badge: 'bg-teal-500' },
   agent_admin: { label: 'Agent Administratif',color: 'from-orange-600 to-orange-800',badge: 'bg-orange-500' },
   comptable:   { label: 'Comptable',          color: 'from-violet-700 to-violet-900',badge: 'bg-violet-500' },

@@ -25,16 +25,11 @@ import {
 import { TabFacturesEtab } from './TabFacturesEtab'
 import { TabAcceptesParFormation } from './TabAcceptesParFormation'
 import PreinscriptionConditionsBlock from '../../components/PreinscriptionConditionsBlock'
+import FormationExcelGrid from '../../components/FormationExcelGrid'
+import { computeScolariteAnnuelle, computeTotalMensualites, dureeLabelFromMois } from '../../lib/formationTarifs'
+import { loadColumnState, templateColumnsFromState, formationToGridRow } from '../../lib/formationGridSchema'
 
 const fmt = n => new Intl.NumberFormat('fr-FR').format(n || 0)
-
-/** Forfait annuel = inscription + mensualité × durée (mois). */
-function computeScolariteAnnuelle(fi, men, mois) {
-  const a = parseInt(String(fi ?? ''), 10) || 0
-  const b = parseInt(String(men ?? ''), 10) || 0
-  const c = parseInt(String(mois ?? ''), 10) || 0
-  return a + b * c
-}
 
 function normalizeFraisSuppFromForm(rows) {
   if (!Array.isArray(rows)) return []
@@ -44,61 +39,6 @@ function normalizeFraisSuppFromForm(rows) {
       montant: parseInt(x?.montant, 10) || 0,
     }))
     .filter((x) => x.designation && x.montant > 0)
-}
-
-function parseFraisSuppJson(s) {
-  if (s == null || !String(s).trim()) return []
-  try {
-    const j = JSON.parse(String(s))
-    if (!Array.isArray(j)) return []
-    return j
-      .map((x) => ({
-        designation: String(x?.designation || '').trim(),
-        montant: parseInt(x?.montant, 10) || 0,
-      }))
-      .filter((x) => x.designation && x.montant > 0)
-  } catch {
-    return []
-  }
-}
-
-/** Validation locale avant envoi du batch (évite un aller-retour API inutile). */
-function validateBatchFormationRows(rows) {
-  const issues = []
-  rows.forEach((r, i) => {
-    const line = i + 1
-    if (!String(r.titre || '').trim()) {
-      issues.push({ index: i, line, message: 'Titre obligatoire.' })
-    }
-    const fid = parseInt(r.filiere_id, 10)
-    if (!r.filiere_id || Number.isNaN(fid)) {
-      issues.push({ index: i, line, message: 'Filière obligatoire.' })
-    }
-    const rawJson = String(r.frais_supplementaires_json ?? '').trim()
-    if (rawJson && rawJson !== '[]') {
-      try {
-        const j = JSON.parse(rawJson)
-        if (!Array.isArray(j)) {
-          issues.push({ index: i, line, message: 'Frais supplémentaires : un tableau JSON est attendu, ex. [].' })
-        } else {
-          j.forEach((item, k) => {
-            const des = String(item?.designation || '').trim()
-            const m = parseInt(item?.montant, 10)
-            if (!des || Number.isNaN(m) || m < 0) {
-              issues.push({
-                index: i,
-                line,
-                message: `Frais sup. entrée ${k + 1} : désignation et montant ≥ 0 requis.`,
-              })
-            }
-          })
-        }
-      } catch {
-        issues.push({ index: i, line, message: 'JSON des frais supplémentaires invalide.' })
-      }
-    }
-  })
-  return issues
 }
 
 const TYPES_ETAB = [
@@ -530,9 +470,15 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
   const [importing, setImporting] = useState(false)
   const [importDryRun, setImportDryRun] = useState(true)
   const [importResult, setImportResult] = useState(null)
+  const [importMode, setImportMode] = useState('presentiel') // presentiel | en_ligne
+  const [showExcelGrid, setShowExcelGrid] = useState(false)
+  const [excelGridVariant, setExcelGridVariant] = useState('create') // create | edit
+  const [excelEditRows, setExcelEditRows] = useState([])
+  const [excelSaving, setExcelSaving] = useState(false)
   const EMPTY = {
-    filiere_id: '', titre: '', type: 'presentiel', niveau: '', niveau_requis: '', duree: '', description: '', ville: '', places: '',
-    frais_inscription: '', mensualite: '', duree_mois: '', frais_soutenance: '', autres_frais: '0',
+    filiere_id: '', titre: '', type: 'presentiel', niveau: '', niveau_requis: '', duree: '', description: '',
+    frais_inscription: '', mensualite: '', duree_mois: '', frais_soutenance: '',
+    frais_bibliotheque: '', frais_epi: '', autres_frais: '0',
     frais_supplementaires: [],
     nombre_photos_preinscription: '1',
   }
@@ -541,10 +487,6 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
   const [hardDeleteModal, setHardDeleteModal] = useState(null)
   const [hardDeleteLoading, setHardDeleteLoading] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
-  const [showBatchEdit, setShowBatchEdit] = useState(false)
-  const [batchRows, setBatchRows] = useState([])
-  const [batchSaving, setBatchSaving] = useState(false)
-  const [batchApiErrors, setBatchApiErrors] = useState([])
 
   useEffect(() => {
     if (init !== undefined) setFormations(Array.isArray(init) ? init : [])
@@ -571,12 +513,12 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       niveau_requis: f.niveau_requis || '',
       duree: f.duree || '',
       description: f.description || '',
-      ville: f.ville || '',
-      places: String(f.places || ''),
       frais_inscription: String(f.frais_inscription || ''),
       mensualite: String(f.mensualite || ''),
       duree_mois: String(f.duree_mois ?? ''),
       frais_soutenance: String(f.frais_soutenance || ''),
+      frais_bibliotheque: String(f.frais_bibliotheque || ''),
+      frais_epi: String(f.frais_epi || ''),
       autres_frais: String(f.autres_frais || '0'),
       frais_supplementaires: supp.length ? supp : [],
       nombre_photos_preinscription: String(f.nombre_photos_preinscription ?? 1),
@@ -594,15 +536,17 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         type: form.type,
         niveau: form.niveau,
         niveau_requis: form.niveau_requis,
-        duree: form.duree,
+        duree: form.duree || dureeLabelFromMois(form.duree_mois),
         description: form.description,
-        ville: form.ville,
-        places: parseInt(form.places, 10) || 0,
+        ville: null,
+        places: 0,
         frais_inscription: parseInt(form.frais_inscription, 10) || 0,
         mensualite: parseInt(form.mensualite, 10) || 0,
         duree_mois: parseInt(form.duree_mois, 10) || 0,
         frais_supplementaires: normalizeFraisSuppFromForm(form.frais_supplementaires),
         frais_soutenance: parseInt(form.frais_soutenance, 10) || 0,
+        frais_bibliotheque: parseInt(form.frais_bibliotheque, 10) || 0,
+        frais_epi: parseInt(form.frais_epi, 10) || 0,
         autres_frais: parseInt(form.autres_frais, 10) || 0,
         nombre_photos_preinscription: Math.min(10, Math.max(1, parseInt(form.nombre_photos_preinscription, 10) || 1)),
       }
@@ -684,7 +628,6 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       f.titre,
       f.niveau,
       f.niveau_requis,
-      f.ville,
       f.filiere_nom,
       f.type === 'en_ligne' ? 'fad' : 'presentiel',
     ].filter(Boolean).join(' ').toLowerCase()
@@ -717,161 +660,55 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
 
   const selectedFiliereId = filtreFiliere || ''
 
-  /** Mise à jour d’une ligne du lot + recalcul du forfait annuel affiché. */
-  const updateBatchRow = (i, patch) => {
-    setBatchRows((p) =>
-      p.map((row, idx) => {
-        if (idx !== i) return row
-        const next = { ...row, ...patch }
-        if (patch.type === 'en_ligne') next.ville = ''
-        const fi = parseInt(String(next.frais_inscription), 10) || 0
-        const men = parseInt(String(next.mensualite), 10) || 0
-        const mois = parseInt(String(next.duree_mois), 10) || 0
-        next.prix = String(fi + men * mois)
-        return next
-      })
-    )
-  }
-
-  const removeBatchRow = (i) => {
-    setBatchRows((p) => {
-      const row = p[i]
-      if (!row) return p
-      if (
-        row.id != null &&
-        !confirm('Retirer cette ligne du tableau ? (aucune modification en base tant que vous n’avez pas validé.)')
-      ) {
-        return p
-      }
-      return p.filter((_, idx) => idx !== i)
-    })
-  }
-
   const openBatchEdit = () => {
     const rows = formations
       .filter((f) => selectedIds.includes(f.id))
-      .map((f) => ({
-        _tmpId: `existing-${f.id}`,
-        id: f.id,
-        filiere_id: String(f.filiere_id || ''),
-        titre: f.titre || '',
-        type: f.type || 'presentiel',
-        niveau: f.niveau || '',
-        niveau_requis: f.niveau_requis || '',
-        duree: f.duree || '',
-        ville: f.ville || '',
-        places: String(f.places || 0),
-        frais_inscription: String(f.frais_inscription || 0),
-        mensualite: String(f.mensualite || 0),
-        duree_mois: String(f.duree_mois ?? ''),
-        prix: String(
-          computeScolariteAnnuelle(f.frais_inscription, f.mensualite, f.duree_mois) || f.prix || 0
-        ),
-        frais_soutenance: String(f.frais_soutenance || 0),
-        autres_frais: String(f.autres_frais || 0),
-        frais_supplementaires_json: JSON.stringify(
-          Array.isArray(f.frais_supplementaires) && f.frais_supplementaires.length
-            ? f.frais_supplementaires
-            : f.autres_frais > 0
-              ? [{ designation: 'Autres frais', montant: f.autres_frais }]
-              : [],
-          null,
-          0
-        ),
-        nombre_photos_preinscription: String(f.nombre_photos_preinscription ?? 1),
-        actif: f.actif !== false,
-      }))
+      .map((f) => formationToGridRow(f))
     if (rows.length === 0) {
       toast.error('Aucune formation sélectionnée.')
       return
     }
-    setBatchApiErrors([])
-    setBatchRows(rows)
-    setShowBatchEdit(true)
+    setExcelEditRows(rows)
+    setExcelGridVariant('edit')
+    setShowExcelGrid(true)
   }
 
-  const addBatchRow = () => {
-    const defaultFiliere = filtreFiliere || (filieres[0] ? String(filieres[0].id) : '')
-    if (!defaultFiliere) {
-      toast.error('Créez d’abord une filière pour ajouter une formation.')
+  const openCreateGrid = () => {
+    if (filieres.length === 0) {
+      toast.error('Créez d’abord une filière.')
       return
     }
-    const nextTmp = `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    setBatchRows((prev) => ([
-      ...prev,
-      {
-        _tmpId: nextTmp,
-        id: null,
-        filiere_id: defaultFiliere,
-        titre: '',
-        type: 'presentiel',
-        niveau: '',
-        niveau_requis: '',
-        duree: '',
-        ville: '',
-        places: '0',
-        frais_inscription: '0',
-        mensualite: '0',
-        duree_mois: '0',
-        prix: '0',
-        frais_soutenance: '0',
-        autres_frais: '0',
-        frais_supplementaires_json: '[]',
-        nombre_photos_preinscription: '1',
-        actif: true,
-      },
-    ]))
+    setExcelEditRows([])
+    setExcelGridVariant('create')
+    setShowExcelGrid(true)
   }
 
-  const saveBatchEdit = async () => {
-    if (batchRows.length === 0) return
-    const localIssues = validateBatchFormationRows(batchRows)
-    if (localIssues.length > 0) {
-      setBatchApiErrors(localIssues.map((x) => ({ index: x.index, message: x.message })))
-      toast.error(`Corrigez ${localIssues.length} erreur(s) avant d’enregistrer (voir le détail ci-dessous).`)
-      return
-    }
-    setBatchApiErrors([])
-    setBatchSaving(true)
+  const handleExcelGridSubmit = async (payload) => {
+    setExcelSaving(true)
     try {
-      const payload = batchRows.map((r) => ({
-        ...(r.id ? { id: r.id } : {}),
-        filiere_id: parseInt(r.filiere_id, 10),
-        titre: String(r.titre || '').trim(),
-        type: r.type,
-        niveau: r.niveau,
-        niveau_requis: r.niveau_requis,
-        duree: r.duree,
-        ville: r.type === 'presentiel' ? r.ville : null,
-        places: parseInt(r.places || 0, 10),
-        frais_inscription: parseInt(r.frais_inscription || 0, 10),
-        mensualite: parseInt(r.mensualite || 0, 10),
-        duree_mois: parseInt(r.duree_mois || 0, 10),
-        frais_soutenance: parseInt(r.frais_soutenance || 0, 10),
-        autres_frais: parseInt(r.autres_frais || 0, 10),
-        frais_supplementaires: parseFraisSuppJson(r.frais_supplementaires_json),
-        actif: !!r.actif,
-        nombre_photos_preinscription: Math.min(10, Math.max(1, parseInt(r.nombre_photos_preinscription, 10) || 1)),
-      }))
-      const { data } = await axios.put(`/api/etablissements/${etabId}/formations/batch`, { items: payload })
-      await onRefreshFilieres?.()
-      await onRefreshFormations?.()
+      const { data } = await axios.put(`/api/etablissements/${etabId}/formations/batch`, {
+        items: payload,
+      })
       const errs = Array.isArray(data.errors) ? data.errors : []
-      setBatchApiErrors(errs)
       if (errs.length > 0) {
         toast.error(
-          `${data.message || 'Traitement partiel.'} — ${errs.length} ligne(s) en erreur (voir le détail).`,
+          `${data.message || 'Traitement partiel.'} — ${errs.length} ligne(s) en erreur.`,
           { duration: 6000 }
         )
-      } else {
-        toast.success(data.message || 'Modifications par lot enregistrées.')
-        setShowBatchEdit(false)
-        clearSelection()
+        return
       }
+      await onRefreshFilieres?.()
+      await onRefreshFormations?.()
+      toast.success(data.message || (excelGridVariant === 'edit'
+        ? 'Modifications par lot enregistrées.'
+        : 'Formations enregistrées.'))
+      setShowExcelGrid(false)
+      setExcelEditRows([])
+      if (excelGridVariant === 'edit') clearSelection()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Erreur lors de la modification par lot.')
+      toast.error(err.response?.data?.message || 'Erreur lors de l’enregistrement.')
     } finally {
-      setBatchSaving(false)
+      setExcelSaving(false)
     }
   }
 
@@ -899,39 +736,51 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
     }
   }
 
-  const downloadTemplate = () => {
-    const csv = [
-      'titre;type;niveau;niveau_requis;duree;description;ville;places;frais_inscription;prix;mensualite;frais_soutenance;autres_frais;actif',
-      'Licence 1 Genie Civil;presentiel;L1;Baccalaureat;3 ans;Bases du genie civil;Dakar;60;25000;350000;0;0;0;true',
-      'Certification DAO BTP;en_ligne;Certificat;Baccalaureat;6 mois;AutoCAD et dessin technique;;120;15000;180000;30000;0;0;true',
-    ].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.setAttribute('download', 'template-formations-lot.csv')
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    window.URL.revokeObjectURL(url)
+  const downloadTemplate = async (mode) => {
+    const m = mode === 'en_ligne' ? 'en_ligne' : 'presentiel'
+    try {
+      const columns = templateColumnsFromState(loadColumnState(etabId))
+      const { data } = await axios.get(`/api/etablissements/${etabId}/formations/template.xlsx`, {
+        params: { type: m, columns: JSON.stringify(columns) },
+        responseType: 'blob',
+      })
+      const url = window.URL.createObjectURL(new Blob([data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }))
+      const a = document.createElement('a')
+      a.href = url
+      a.setAttribute('download', `template-formations-${m}.xlsx`)
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success(`Template Excel ${m === 'en_ligne' ? 'en ligne' : 'présentiel'} téléchargé.`)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Impossible de télécharger le template Excel.')
+    }
   }
 
   const handleImport = async () => {
     if (!selectedFiliereId) {
-      toast.error('Sélectionnez une filière (en haut) avant l’import en lot.')
+      toast.error('Sélectionnez une filière avant l’import.')
+      return
+    }
+    if (!importMode) {
+      toast.error('Choisissez le mode : présentiel ou en ligne.')
       return
     }
     if (!importFile) {
-      toast.error('Choisissez un fichier CSV.')
+      toast.error('Choisissez un fichier Excel (.xlsx).')
       return
     }
     setImporting(true)
     setImportResult(null)
     try {
+      const columns = templateColumnsFromState(loadColumnState(etabId))
       const fd = new FormData()
       fd.append('file', importFile)
       const { data } = await axios.post(
-        `/api/etablissements/${etabId}/formations/import/${selectedFiliereId}?dry_run=${importDryRun}`,
+        `/api/etablissements/${etabId}/formations/import/${selectedFiliereId}?dry_run=${importDryRun}&type=${importMode}&columns=${encodeURIComponent(JSON.stringify(columns))}`,
         fd
       )
       setImportResult(data)
@@ -943,7 +792,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
     } catch (err) {
       const payload = err.response?.data
       setImportResult(payload || null)
-      toast.error(payload?.message || 'Erreur pendant l’import CSV')
+      toast.error(payload?.message || 'Erreur pendant l’import Excel')
     } finally {
       setImporting(false)
     }
@@ -960,7 +809,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
             Catalogue des formations
           </h2>
           <p className="text-sm text-slate-500 mt-1 max-w-2xl">
-            Filtrez par filière et recherchez par intitulé. Sélectionnez des lignes pour les actions par lot ou importez un fichier CSV.
+            Filtrez par filière et recherchez par intitulé. Sélectionnez des lignes pour les actions par lot ou importez un fichier Excel.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -969,9 +818,19 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
             onClick={() => setShowImport(true)}
             className="btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
             disabled={filieres.length === 0}
-            title={filieres.length === 0 ? 'Créez d’abord une filière' : 'Importer un lot CSV pour la filière sélectionnée'}
+            title={filieres.length === 0 ? 'Créez d’abord une filière' : 'Importer un lot Excel pour la filière sélectionnée'}
           >
-            Import CSV
+            Import Excel
+          </button>
+          <button
+            type="button"
+            onClick={openCreateGrid}
+            className="btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+            disabled={filieres.length === 0}
+            title={filieres.length === 0 ? 'Créez d’abord une filière' : 'Saisir plusieurs formations dans une grille type Excel'}
+          >
+            <FaLayerGroup className="h-3.5 w-3.5" aria-hidden />
+            Ajouter via grille
           </button>
           <button
             type="button"
@@ -1095,9 +954,9 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                   </div>
                   {f.filiere_nom && <p className="text-xs font-semibold text-indigo-700 mb-2 flex items-center gap-1"><FaBook className="h-3 w-3 opacity-80" aria-hidden />{f.filiere_nom}</p>}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-gray-500">
-                    {f.duree && <span>⏱ {f.duree}</span>}
-                    {f.ville && <span>📍 {f.ville}</span>}
-                    {f.places > 0 && <span>👥 {f.places} places</span>}
+                    {(f.duree || f.duree_mois > 0) && (
+                      <span>⏱ {f.duree || dureeLabelFromMois(f.duree_mois)}</span>
+                    )}
                     {f.niveau_requis && <span>📋 {f.niveau_requis}</span>}
                   </div>
                   {/* Tarifs */}
@@ -1106,8 +965,11 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                       { l: 'Inscription', v: f.frais_inscription },
                       { l: 'Mensualité', v: f.mensualite },
                       { l: 'Durée (mois)', v: f.duree_mois },
+                      { l: 'Total mensualités', v: computeTotalMensualites(f.mensualite, f.duree_mois) },
                       { l: 'Scolarité annuelle', v: f.prix },
                       { l: 'Soutenance', v: f.frais_soutenance },
+                      { l: 'Bibliothèque', v: f.frais_bibliotheque },
+                      { l: 'EPI', v: f.frais_epi },
                     ].filter(s => s.v > 0).map(s => (
                       <div key={s.l} className="bg-gray-50 rounded-lg px-2 py-1 text-center">
                         <p className="text-gray-400 text-xs">{s.l}</p>
@@ -1230,24 +1092,26 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                 ) : null}
                 <div>
                   <L>Durée (libellé)</L>
-                  <input className="input-field" value={form.duree} onChange={up('duree')} placeholder="Ex: 3 ans" />
+                  <input
+                    className="input-field bg-gray-50"
+                    value={form.duree || dureeLabelFromMois(form.duree_mois)}
+                    readOnly
+                    placeholder="Calculé depuis le nombre de mois"
+                  />
                 </div>
                 <div>
-                  <L>Durée de paiement (mois)</L>
+                  <L>Nombre de mois *</L>
                   <input
                     className="input-field"
                     type="number"
-                    min="0"
+                    min="1"
                     max="120"
                     value={form.duree_mois}
                     onChange={up('duree_mois')}
-                    placeholder="Ex: 9"
+                    placeholder="Ex: 10"
+                    required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Utilisé pour le calcul : inscription + mensualité × mois.</p>
-                </div>
-                <div>
-                  <L>Places disponibles</L>
-                  <input className="input-field" type="number" min="0" value={form.places} onChange={up('places')} />
+                  <p className="text-xs text-gray-500 mt-1">Total mensualités = mois × mensualité.</p>
                 </div>
                 <div>
                   <L>Photos d’identité (préinscription)</L>
@@ -1261,12 +1125,6 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                   />
                   <p className="text-xs text-gray-500 mt-1">Nombre de photos à fournir pour chaque dossier (1 à 10), selon cette formation.</p>
                 </div>
-                {form.type === 'presentiel' && (
-                  <div>
-                    <L>Ville</L>
-                    <input className="input-field" value={form.ville} onChange={up('ville')} placeholder="Ex: Dakar" />
-                  </div>
-                )}
                 <div className="col-span-2">
                   <L>Description</L>
                   <textarea className="input-field" rows={2} value={form.description} onChange={up('description')} />
@@ -1284,13 +1142,21 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                         { f: 'frais_inscription', l: 'Frais d\'inscription' },
                         { f: 'mensualite', l: 'Mensualité' },
                         { f: 'frais_soutenance', l: 'Frais de soutenance' },
+                        { f: 'frais_bibliotheque', l: 'Bibliothèque' },
+                        { f: 'frais_epi', l: 'EPI' },
                       ].map(({ f, l }) => (
                         <div key={f}>
                           <L>{l}</L>
                           <input className="input-field" type="number" min="0" value={form[f]} onChange={up(f)} placeholder="0" />
                         </div>
                       ))}
-                      <div className="sm:col-span-3">
+                      <div>
+                        <L>Total mensualités (calculé)</L>
+                        <div className="input-field bg-gray-100 text-gray-900 font-semibold">
+                          {fmt(computeTotalMensualites(form.mensualite, form.duree_mois))} FCFA
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2">
                         <L>Scolarité annuelle (calculée)</L>
                         <div className="input-field bg-gray-100 text-gray-900 font-semibold">
                           {fmt(computeScolariteAnnuelle(form.frais_inscription, form.mensualite, form.duree_mois))} FCFA
@@ -1386,33 +1252,65 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         </div>
       )}
 
-      {/* Modal import lot CSV */}
+      {/* Modal import lot Excel */}
       {showImport && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900">Import de formations par lot (CSV)</h3>
+              <h3 className="font-bold text-gray-900">Import de formations par lot (Excel)</h3>
               <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-700 text-2xl">×</button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="text-sm text-gray-700">
-                Filière ciblée:{' '}
-                <strong>
-                  {selectedFiliereId
-                    ? (filieres.find((f) => String(f.id) === String(selectedFiliereId))?.nom || `#${selectedFiliereId}`)
-                    : 'Aucune'}
-                </strong>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <L>Filière ciblée *</L>
+                  <select
+                    className="input-field"
+                    value={filtreFiliere}
+                    onChange={(e) => setFiltreFiliere(e.target.value)}
+                  >
+                    <option value="">— Sélectionner —</option>
+                    {filieres.map((f) => (
+                      <option key={f.id} value={String(f.id)}>{f.nom}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <L>Mode du template *</L>
+                  <div className="flex gap-1 rounded-xl bg-slate-50 p-1 ring-1 ring-slate-200">
+                    {[
+                      { val: 'presentiel', label: 'Présentiel' },
+                      { val: 'en_ligne', label: 'En ligne' },
+                    ].map(({ val, label }) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setImportMode(val)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition ${
+                          importMode === val ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-white'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               {!selectedFiliereId && (
                 <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  Sélectionnez une filière dans le filtre de l’onglet Formations avant de lancer l’import.
+                  Sélectionnez une filière et le mode (présentiel ou en ligne) pour synchroniser l’import.
                 </div>
               )}
 
-              <div className="flex items-center justify-between">
-                <button type="button" onClick={downloadTemplate} className="text-sm text-blue-600 hover:underline">
-                  Télécharger le template CSV
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-3">
+                  <button type="button" onClick={() => downloadTemplate('presentiel')} className="text-sm text-blue-600 hover:underline">
+                    Template Excel présentiel (.xlsx)
+                  </button>
+                  <button type="button" onClick={() => downloadTemplate('en_ligne')} className="text-sm text-emerald-700 hover:underline">
+                    Template Excel en ligne (.xlsx)
+                  </button>
+                </div>
                 <label className="text-sm text-gray-700 flex items-center gap-2">
                   <input type="checkbox" checked={importDryRun} onChange={(e) => setImportDryRun(e.target.checked)} />
                   Mode test (dry-run)
@@ -1421,15 +1319,17 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
 
               <input
                 type="file"
-                accept=".csv,text/csv"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className="input-field"
                 onChange={(e) => setImportFile(e.target.files?.[0] || null)}
               />
 
               <p className="text-xs text-gray-500">
-                Colonnes requises: `titre;type;niveau;niveau_requis;duree;description;ville;places;frais_inscription;prix;mensualite;frais_soutenance;autres_frais;actif`
-                <br />
-                Type accepté: `presentiel`, `en_ligne`, `en ligne`, `fad`, `online`. Pour `en_ligne`, la colonne `ville` peut rester vide.
+                Fichier Excel soigné (pas CSV) : mêmes colonnes que la grille
+                (« Nom de la formation », Niveau, Niveau requis, Nombre de mois, Inscription, Mensualité,
+                Soutenance, Bibliothèque, EPI, Description, Actif).
+                Les titres renommés ou colonnes masquées dans la grille sont répercutés dans le template téléchargé.
+                Total des mensualités = mois × mensualité (calculé automatiquement).
               </p>
 
               {importResult && (
@@ -1456,7 +1356,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                   disabled={importing || !selectedFiliereId}
                   className="btn-primary flex-1 disabled:opacity-40"
                 >
-                  {importing ? 'Traitement...' : (importDryRun ? 'Valider CSV' : 'Importer le lot')}
+                  {importing ? 'Traitement...' : (importDryRun ? 'Valider Excel' : 'Importer le lot')}
                 </button>
               </div>
             </div>
@@ -1464,277 +1364,18 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         </div>
       )}
 
-      {showBatchEdit && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[96rem] max-h-[92vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
-              <div>
-                <h3 className="font-bold text-gray-900 text-lg">Modification par lot des formations</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  {batchRows.length} ligne(s) — forfait annuel = inscription + (mensualité × mois). Frais supplémentaires : JSON tableau, ex.{' '}
-                  <code className="text-[10px] bg-gray-100 px-1 rounded">[{`{"designation":"Kit","montant":50000}`}]</code>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setShowBatchEdit(false); setBatchApiErrors([]) }}
-                className="text-gray-400 hover:text-gray-700 text-2xl leading-none"
-                aria-label="Fermer"
-              >
-                ×
-              </button>
-            </div>
-
-            {batchApiErrors.length > 0 && (
-              <div className="mx-5 mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 flex-shrink-0">
-                <p className="font-semibold mb-2">
-                  {batchApiErrors.length} erreur(s) — corrigez les lignes concernées puis réessayez.
-                </p>
-                <ul className="max-h-28 overflow-y-auto text-xs space-y-1 font-mono">
-                  {batchApiErrors.map((e, k) => (
-                    <li key={k}>
-                      Ligne {(e.index != null ? e.index + 1 : '?')}
-                      {e.id != null ? ` (id ${e.id})` : ''} : {e.message}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="p-4 flex-1 min-h-0 flex flex-col gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs text-gray-500">
-                  En-tête fixe au défilement — défilement horizontal si besoin.
-                </span>
-                <button
-                  type="button"
-                  className="text-xs px-3 py-1.5 rounded-lg border border-emerald-300 text-emerald-800 font-semibold hover:bg-emerald-50"
-                  onClick={addBatchRow}
-                >
-                  + Ajouter une formation
-                </button>
-              </div>
-              <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200">
-                <table className="w-full text-sm min-w-[1280px] border-collapse">
-                  <thead className="sticky top-0 z-10 bg-slate-100 shadow-sm">
-                    <tr className="text-left text-gray-600 text-xs uppercase tracking-wide">
-                      <th className="py-2.5 px-2 w-8 text-center">#</th>
-                      <th className="py-2.5 px-2">Titre *</th>
-                      <th className="py-2.5 px-2">Filière *</th>
-                      <th className="py-2.5 px-2">Type</th>
-                      <th className="py-2.5 px-2">Niveau</th>
-                      <th className="py-2.5 px-2 min-w-[6rem]">Niv. requis</th>
-                      <th className="py-2.5 px-2 min-w-[5rem]">Durée</th>
-                      <th className="py-2.5 px-2">Ville</th>
-                      <th className="py-2.5 px-2 w-14">Pl.</th>
-                      <th className="py-2.5 px-2">Inscr.</th>
-                      <th className="py-2.5 px-2">Mois</th>
-                      <th className="py-2.5 px-2">Mens.</th>
-                      <th className="py-2.5 px-2">Sout.</th>
-                      <th className="py-2.5 px-2">Autres</th>
-                      <th className="py-2.5 px-2 w-12" title="Photos d’identité (préinscription)">Ph.</th>
-                      <th className="py-2.5 px-2 whitespace-nowrap">Forfait annuel</th>
-                      <th className="py-2.5 px-2 min-w-[7rem]">Frais sup. JSON</th>
-                      <th className="py-2.5 px-2 text-center">Actif</th>
-                      <th className="py-2.5 px-2 w-10" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {batchRows.map((r, i) => {
-                      const rowErr = batchApiErrors.some((e) => e.index === i)
-                      return (
-                        <tr
-                          key={r._tmpId || r.id || i}
-                          className={`border-b border-gray-100 ${rowErr ? 'bg-red-50/80' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
-                        >
-                          <td className="py-2 px-2 text-center text-xs text-gray-400">{i + 1}</td>
-                          <td className="py-2 px-2">
-                            <input
-                              className="input-field py-1.5 min-w-[8rem] w-full"
-                              value={r.titre}
-                              onChange={(e) => updateBatchRow(i, { titre: e.target.value })}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <select
-                              className="input-field py-1.5 min-w-[7rem] w-full"
-                              value={r.filiere_id}
-                              onChange={(e) => updateBatchRow(i, { filiere_id: e.target.value })}
-                            >
-                              <option value="">—</option>
-                              {filieres.map((f) => (
-                                <option key={f.id} value={String(f.id)}>{f.nom}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-2 px-2">
-                            <select
-                              className="input-field py-1.5 w-full"
-                              value={r.type}
-                              onChange={(e) => updateBatchRow(i, { type: e.target.value })}
-                            >
-                              <option value="presentiel">Présentiel</option>
-                              <option value="en_ligne">En ligne</option>
-                            </select>
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              className="input-field py-1.5 min-w-[7rem] w-full"
-                              list={`batch-niveaux-${i}`}
-                              value={r.niveau}
-                              onChange={(e) => updateBatchRow(i, { niveau: e.target.value })}
-                              placeholder="Niveau"
-                            />
-                            <datalist id={`batch-niveaux-${i}`}>
-                              {NIVEAUX.map((n) => <option key={n} value={n} />)}
-                            </datalist>
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              className="input-field py-1.5 w-full text-xs"
-                              value={r.niveau_requis}
-                              onChange={(e) => updateBatchRow(i, { niveau_requis: e.target.value })}
-                              placeholder="ex. Bac"
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              className="input-field py-1.5 w-full text-xs"
-                              value={r.duree}
-                              onChange={(e) => updateBatchRow(i, { duree: e.target.value })}
-                              placeholder="ex. 2 ans"
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              className={`input-field py-1.5 w-full min-w-[4rem] ${r.type === 'en_ligne' ? 'opacity-50' : ''}`}
-                              value={r.ville}
-                              disabled={r.type === 'en_ligne'}
-                              onChange={(e) => updateBatchRow(i, { ville: e.target.value })}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              min="0"
-                              className="input-field py-1.5 w-full"
-                              value={r.places}
-                              onChange={(e) => updateBatchRow(i, { places: e.target.value })}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              min="0"
-                              className="input-field py-1.5 w-full min-w-[4.5rem]"
-                              value={r.frais_inscription}
-                              onChange={(e) => updateBatchRow(i, { frais_inscription: e.target.value })}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              min="0"
-                              max="120"
-                              className="input-field py-1.5 w-full min-w-[3rem]"
-                              value={r.duree_mois}
-                              onChange={(e) => updateBatchRow(i, { duree_mois: e.target.value })}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              min="0"
-                              className="input-field py-1.5 w-full min-w-[4.5rem]"
-                              value={r.mensualite}
-                              onChange={(e) => updateBatchRow(i, { mensualite: e.target.value })}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              min="0"
-                              className="input-field py-1.5 w-full min-w-[4rem]"
-                              value={r.frais_soutenance}
-                              onChange={(e) => updateBatchRow(i, { frais_soutenance: e.target.value })}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              min="0"
-                              className="input-field py-1.5 w-full min-w-[4rem]"
-                              value={r.autres_frais}
-                              onChange={(e) => updateBatchRow(i, { autres_frais: e.target.value })}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              min="1"
-                              max="10"
-                              title="Nombre de photos exigées (1–10)"
-                              className="input-field py-1.5 w-full min-w-[2.5rem]"
-                              value={r.nombre_photos_preinscription ?? '1'}
-                              onChange={(e) => updateBatchRow(i, { nombre_photos_preinscription: e.target.value })}
-                            />
-                          </td>
-                          <td className="py-2 px-2 text-xs font-bold text-slate-800 whitespace-nowrap tabular-nums">
-                            {fmt(r.prix)}
-                          </td>
-                          <td className="py-2 px-2 align-top">
-                            <textarea
-                              className="input-field py-1 text-[11px] font-mono w-full min-w-[6rem] min-h-[2.75rem]"
-                              value={r.frais_supplementaires_json}
-                              onChange={(e) => updateBatchRow(i, { frais_supplementaires_json: e.target.value })}
-                              placeholder="[]"
-                              rows={2}
-                            />
-                          </td>
-                          <td className="py-2 px-2 text-center">
-                            <input
-                              type="checkbox"
-                              checked={!!r.actif}
-                              onChange={(e) => updateBatchRow(i, { actif: e.target.checked })}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <button
-                              type="button"
-                              title="Retirer cette ligne"
-                              className="text-red-600 hover:text-red-800 text-lg leading-none px-1"
-                              onClick={() => removeBatchRow(i)}
-                            >
-                              ×
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-100 flex flex-wrap gap-3 flex-shrink-0 bg-gray-50/80">
-              <button
-                type="button"
-                className="btn-secondary flex-1 min-w-[8rem]"
-                onClick={() => { setShowBatchEdit(false); setBatchApiErrors([]) }}
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                className="btn-primary flex-1 min-w-[8rem] disabled:opacity-40"
-                disabled={batchSaving || batchRows.length === 0}
-                onClick={saveBatchEdit}
-              >
-                {batchSaving ? 'Enregistrement…' : 'Valider les modifications'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <FormationExcelGrid
+        open={showExcelGrid}
+        onClose={() => { setShowExcelGrid(false); setExcelEditRows([]) }}
+        etabId={etabId}
+        filieres={filieres}
+        initialFiliereId={filtreFiliere || (filieres[0] ? String(filieres[0].id) : '')}
+        initialType={filtreType === 'en_ligne' ? 'en_ligne' : 'presentiel'}
+        variant={excelGridVariant}
+        initialRows={excelGridVariant === 'edit' ? excelEditRows : null}
+        onSubmit={handleExcelGridSubmit}
+        saving={excelSaving}
+      />
     </div>
   )
 }
@@ -1752,7 +1393,7 @@ const EMPTY_EDIT_FORM = {
   mot_de_passe: '', mot_de_passe_confirmation: '',
 }
 
-function TabMembres({ etabId, membres: init, responsable_id }) {
+export function TabMembres({ etabId, membres: init, responsable_id }) {
   const { user } = useAuth()
   const canCreateStaffAccount = user?.role === 'admin'
   const canDeleteStaffPermanently = user?.role === 'admin'
@@ -2117,8 +1758,7 @@ function TabMembres({ etabId, membres: init, responsable_id }) {
                 <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   <FaExclamationTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" aria-hidden />
                   <p>
-                    Cette personne est le <strong>responsable désigné</strong> de l&apos;établissement. Elle conserve cette fonction
-                    même si vous changez son rôle principal ; pour la lui retirer, passez par l&apos;onglet « Responsable ».
+                    Cette personne est le <strong>responsable désigné</strong>. Si vous changez son rôle, vérifiez l’onglet « Responsable » pour désigner un autre responsable pédagogique.
                   </p>
                 </div>
               )}
@@ -2223,10 +1863,7 @@ function TabResponsable({ etabId, responsable: initResp, membres }) {
   const [selectedId, setSelectedId] = useState(initResp?.id ? String(initResp.id) : '')
   const [saving, setSaving] = useState(false)
 
-  // Tout membre STAFF actif peut être désigné responsable, quel que soit son rôle
-  // principal : la fonction « responsable d'établissement » est une responsabilité
-  // supplémentaire (le désigné garde son rôle et gagne les droits responsable).
-  const eligibles = membres.filter(m => m.actif !== false && m.role !== 'etudiant')
+  const eligibles = membres.filter(m => m.role === 'responsable' && m.actif !== false)
 
   const handleSave = async () => {
     setSaving(true)
@@ -2261,14 +1898,9 @@ function TabResponsable({ etabId, responsable: initResp, membres }) {
 
       <div>
         <p className="font-semibold text-gray-800 mb-3">Désigner un responsable</p>
-        <p className="text-xs text-gray-500 mb-3">
-          Tout membre <strong>staff actif</strong> de l&apos;établissement peut être désigné, quel que soit son rôle
-          (comptable, agent administratif, contrôleur qualité…). Il conserve son rôle actuel et obtient en plus
-          les droits de responsable d&apos;établissement.
-        </p>
         {eligibles.length === 0 ? (
           <div className="p-4 bg-amber-50 rounded-xl text-sm text-amber-700">
-            ⚠ Ajoutez d&apos;abord un membre staff à cet établissement (onglet <strong>Membres</strong>).
+            ⚠ Créez d&apos;abord un membre avec le rôle <strong>Responsable pédagogique</strong>.
           </div>
         ) : (
           <>

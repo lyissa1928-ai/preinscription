@@ -35,6 +35,7 @@ function oneInvoiceHtml(facture) {
   const p2 = eb.couleur_secondaire || '#4338ca';
   const typeRaw = String(facture.type_document || '').toLowerCase();
   const isDef = typeRaw === 'definitive' || typeRaw === 'définitive' || typeRaw === 'def';
+  const isProforma = !isDef;
   const titreDoc = isDef ? 'FACTURE DÉFINITIVE' : 'FACTURE PROFORMA';
   const sousTitre = isDef ? 'Facture définitive' : 'Facture proforma — préinscription';
   const lignes = Array.isArray(facture.lignes) ? facture.lignes : [];
@@ -88,13 +89,16 @@ function oneInvoiceHtml(facture) {
   <div style="padding:24px 36px;font-family:Segoe UI,system-ui,sans-serif;color:#111827;font-size:14px;">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
       <div>
-        <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Destinataire</div>
+        <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">${isProforma ? 'Identité du bénéficiaire' : 'Destinataire'}</div>
         <div style="background:#eff6ff;border:1px solid #dbeafe;border-radius:12px;padding:14px;">
           <div style="font-weight:700;">${esc(et.prenom)} ${esc(et.nom)}</div>
           <div style="font-size:13px;color:#4b5563;margin-top:6px;">
-            ${et.nationalite ? `<div>Nationalité : ${esc(et.nationalite)}</div>` : ''}
+            ${et.email ? `<div>E-mail : ${esc(et.email)}</div>` : ''}
             ${et.telephone ? `<div>Tél : ${esc(et.telephone)}</div>` : ''}
-            ${et.email ? `<div>Email : ${esc(et.email)}</div>` : ''}
+            ${!isProforma && et.nationalite ? `<div>Nationalité : ${esc(et.nationalite)}</div>` : ''}
+            ${isProforma && facture.type_payeur === 'organisation' && facture.payeur?.org_nom
+              ? `<div style="margin-top:8px;font-weight:600;">Destinataire : ${esc(facture.payeur.org_nom)}</div>`
+              : ''}
           </div>
         </div>
       </div>

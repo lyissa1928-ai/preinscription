@@ -223,8 +223,6 @@ export default function FactureView() {
     couleur_secondaire: snap.couleur_secondaire || live?.couleur_secondaire,
   })
 
-  const handlePrint = () => window.print()
-
   const handleDownload = async () => {
     if (!facture) return
     setPdfBusy(true)
@@ -296,9 +294,16 @@ export default function FactureView() {
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(8)
       doc.setTextColor(70, 80, 90)
-      ;[et.email, et.telephone && `Tél. ${et.telephone}`, et.nationalite && `Nationalité : ${et.nationalite}`]
-        .filter(Boolean)
-        .forEach((line) => {
+      const proformaPdf = !isFactureDefinitive(facture.type_document)
+      const contactLines = [
+        et.email,
+        et.telephone && `Tél. ${et.telephone}`,
+        !proformaPdf && et.nationalite && `Nationalité : ${et.nationalite}`,
+        proformaPdf && facture.type_payeur === 'organisation' && facture.payeur?.org_nom
+          ? `Destinataire : ${facture.payeur.org_nom}`
+          : null,
+      ].filter(Boolean)
+      contactLines.forEach((line) => {
           doc.text(String(line), M, y)
           y += 3.6
         })
@@ -435,31 +440,22 @@ export default function FactureView() {
   return (
     <div className="lettre-print-scope min-h-screen bg-slate-200 py-8 px-4">
       <div className="no-print mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3">
-        <Link
-          to={-1}
+        <button
+          type="button"
+          onClick={() => window.history.back()}
           className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           ← Retour
-        </Link>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={pdfBusy}
-            onClick={handleDownload}
-            className="rounded-lg border-2 px-5 py-2.5 text-sm font-bold transition hover:bg-white disabled:opacity-50"
-            style={{ color: primary, borderColor: primary }}
-          >
-            {pdfBusy ? 'Préparation…' : 'Télécharger'}
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-md"
-            style={{ backgroundColor: primary }}
-          >
-            Imprimer
-          </button>
-        </div>
+        </button>
+        <button
+          type="button"
+          disabled={pdfBusy}
+          onClick={handleDownload}
+          className="rounded-lg px-5 py-2.5 text-sm font-bold text-white shadow-md disabled:opacity-50"
+          style={{ backgroundColor: primary }}
+        >
+          {pdfBusy ? 'Préparation…' : 'Télécharger'}
+        </button>
       </div>
 
       <article className="print-page mx-auto max-w-[210mm] overflow-hidden bg-white text-[13px] text-slate-800 shadow-xl">
@@ -504,11 +500,20 @@ export default function FactureView() {
 
         <section className="grid gap-6 px-8 py-5 sm:grid-cols-2">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: primary }}>Bénéficiaire</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: primary }}>
+              {isFactureDefinitive(facture.type_document) ? 'Bénéficiaire' : 'Identité du bénéficiaire'}
+            </p>
             <p className="mt-1.5 text-[15px] font-bold text-slate-900">{prenom} {nom.toUpperCase()}</p>
             {et.email && <p className="mt-1 text-sm text-slate-600">{et.email}</p>}
             {et.telephone && <p className="text-sm text-slate-600">Tél. {et.telephone}</p>}
-            {et.nationalite && <p className="text-sm text-slate-600">Nationalité : {et.nationalite}</p>}
+            {isFactureDefinitive(facture.type_document) && et.nationalite && (
+              <p className="text-sm text-slate-600">Nationalité : {et.nationalite}</p>
+            )}
+            {!isFactureDefinitive(facture.type_document) && facture.type_payeur === 'organisation' && facture.payeur?.org_nom && (
+              <p className="mt-2 text-sm font-semibold text-slate-800">
+                Destinataire : <span style={{ color: primary }}>{facture.payeur.org_nom}</span>
+              </p>
+            )}
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: primary }}>Formation</p>
