@@ -1,0 +1,87 @@
+================================================================================
+  REDÉPLOIEMENT PROD — esebat-digitalservices.com (PROCESS COMPLET)
+  Serveur : Apache2 + PM2 + /var/www/uniportail
+================================================================================
+
+  Connexion SSH :
+    ssh root@VOTRE_IP
+
+  UN SEUL BLOC (copier-coller entier) :
+
+--------------------------------------------------------------------------------
+cd /var/www/uniportail
+
+# Si le script n'existe pas encore, forcer le pull :
+git checkout -- deploy/ frontend/package-lock.json backend/package-lock.json 2>/dev/null || true
+git pull origin main
+chmod +x deploy/redeploy-prod-complet.sh
+
+bash deploy/redeploy-prod-complet.sh
+--------------------------------------------------------------------------------
+
+  Le script fait TOUT dans l'ordre :
+    1. Sauvegarde base + .env + uploads + config Apache
+    2. git pull (débloque package-lock et deploy/)
+    3. Protection skip-worktree (preinscription.json jamais écrasé)
+    4. VITE_BASE_PATH=/ + CORS + config-site.js
+    5. npm install + build frontend
+    6. pm2 restart uniportail-api
+    7. Vhost Apache complet (racine + /api + /uploads)
+    8. Rôle admin_etablissement pour adama.diop@esebat.com
+    9. Tests curl
+
+  APRÈS le script :
+    → Ouvrir https://esebat-digitalservices.com/connexion
+    → Se DÉCONNECTER puis RECONNECTER (obligatoire pour le nouveau rôle)
+    → Menu « Équipe & comptes » doit apparaître
+
+================================================================================
+  VÉRIFICATIONS MANUELLES
+================================================================================
+
+  pm2 list
+  pm2 logs uniportail-api --lines 30
+
+  curl -s https://esebat-digitalservices.com/api/health
+  curl -sI https://esebat-digitalservices.com/ | head -3
+
+  apache2ctl -S | grep esebat
+  apache2ctl configtest
+
+================================================================================
+  MISE À JOUR CODE SEULE (sans tout refaire)
+================================================================================
+
+  cd /var/www/uniportail
+  git checkout -- deploy/ frontend/package-lock.json 2>/dev/null || true
+  git pull origin main
+  UNIPORTAIL_API_PUBLIC_URL="" \
+  UNIPORTAIL_SITE_URL="https://esebat-digitalservices.com" \
+  bash deploy/mise-a-jour-prod.sh
+  bash deploy/activer-apache-esebat.sh
+
+================================================================================
+  ROLLBACK
+================================================================================
+
+  cp /var/backups/uniportail/preinscription-DATE.json \
+     /var/www/uniportail/backend/database/preinscription.json
+  pm2 restart uniportail-api
+  cd /var/www/uniportail && npm run build && systemctl reload apache2
+
+================================================================================
+  DÉPANNAGE
+================================================================================
+
+  Problème                          | Commande
+  ----------------------------------|----------------------------------
+  API ne répond pas                 | pm2 restart uniportail-api
+  Page blanche                      | ls frontend/dist/index.html
+  /api/ 404                         | bash deploy/activer-apache-esebat.sh
+  git pull bloqué                   | git checkout -- deploy/ && git pull
+  Mauvais menu (Resp. au lieu Admin)| reconnecter après redeploy-prod-complet.sh
+  Ancienne app PHP à la racine      | bash deploy/activer-apache-esebat.sh
+
+================================================================================
+FIN
+================================================================================
