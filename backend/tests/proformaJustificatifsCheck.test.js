@@ -20,13 +20,26 @@ describe('demandeProformaJustificatifsComplets', () => {
     )
   })
 
-  it('retourne true si les trois chemins sont renseignés', () => {
+  it('retourne true si les trois chemins sont renseignés (compte candidat)', () => {
     assert.equal(
       demandeProformaJustificatifsComplets({
         justificatifs: {
           diplome: '/uploads/d.pdf',
           releve: '/uploads/r.pdf',
           formation: '/uploads/f.pdf',
+        },
+      }),
+      true
+    )
+  })
+
+  it('retourne true pour demande sans compte (identité + diplôme)', () => {
+    assert.equal(
+      demandeProformaJustificatifsComplets({
+        source: 'public_distant',
+        justificatifs: {
+          identite: '/uploads/id.pdf',
+          diplome: '/uploads/d.pdf',
         },
       }),
       true

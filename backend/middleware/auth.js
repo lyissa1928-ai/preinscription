@@ -61,14 +61,30 @@ const controleurQualiteOnly = roleGuard('controleur_qualite');
 
 const responsableOrAdmin = roleGuard('responsable', 'admin');
 
-/** Décision pédagogique dossiers (accepter / refuser) : admin + responsable (+ fonction). */
-const staffDossierDecision = roleGuard('admin', 'responsable');
+/** Décision pédagogique dossiers (accepter / refuser) : admin + admin étab. + responsable (+ fonction). */
+const staffDossierDecision = roleGuard('admin', 'admin_etablissement', 'responsable');
 
-/** Décision / création proforma : admin + responsable + comptable. */
-const staffProformaDecision = roleGuard('admin', 'responsable', 'comptable');
+/** Lecture demandes proforma : tout le staff établissement (+ admin plateforme). */
+const staffProformaView = roleGuard(
+  'admin',
+  'admin_etablissement',
+  'responsable',
+  'agent_admin',
+  'comptable',
+  'controleur_qualite',
+);
 
-/** Guichet walk-in : admin + responsable + agent administratif. */
-const staffGuichet = roleGuard('admin', 'responsable', 'agent_admin');
+/** Décision / création proforma : admin + staff décisionnel établissement. */
+const staffProformaDecision = roleGuard(
+  'admin',
+  'admin_etablissement',
+  'responsable',
+  'comptable',
+  'agent_admin',
+);
+
+/** Guichet walk-in : admin + staff établissement facturation / accueil. */
+const staffGuichet = roleGuard('admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable');
 
 /** Lecture lettre / attestation officielle. */
 const staffLettreAttestation = roleGuard(
@@ -89,7 +105,7 @@ const staffOnly = roleGuard('admin', 'admin_etablissement', 'responsable', 'agen
 module.exports = {
   authMiddleware,
   adminOnly, adminOrDirecteur, responsableOnly, agentAdminOnly, comptableOnly, controleurQualiteOnly,
-  responsableOrAdmin, staffProformaDecision, staffDossierDecision, staffGuichet, staffLettreAttestation,
+  responsableOrAdmin, staffProformaView, staffProformaDecision, staffDossierDecision, staffGuichet, staffLettreAttestation,
   agentAdminOrAdmin, comptableOrAdmin, directeurOrAdmin,
   controleurQualiteOrAdmin,
   staffOnly,

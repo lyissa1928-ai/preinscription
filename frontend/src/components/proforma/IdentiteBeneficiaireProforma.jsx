@@ -7,6 +7,8 @@ export default function IdentiteBeneficiaireProforma({
   up,
   /** Affiche prénom / nom / e-mail en lecture seule (demande en ligne depuis compte). */
   identityReadOnly = false,
+  /** E-mail obligatoire (demande sans compte). */
+  emailRequired = false,
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -27,11 +29,20 @@ export default function IdentiteBeneficiaireProforma({
         )}
       </div>
       <div>
-        <label className="mb-1 block text-sm font-semibold">E-mail</label>
+        <label className="mb-1 block text-sm font-semibold">
+          E-mail {emailRequired && <span className="text-red-500">*</span>}
+        </label>
         {identityReadOnly ? (
           <p className="input-field bg-slate-50 text-slate-800">{form.email || '—'}</p>
         ) : (
-          <input type="email" className="input-field" value={form.email} onChange={up('email')} />
+          <input
+            type="email"
+            className="input-field"
+            value={form.email}
+            onChange={up('email')}
+            required={emailRequired}
+            placeholder={emailRequired ? 'Pour recevoir la facture proforma' : undefined}
+          />
         )}
       </div>
       <div>

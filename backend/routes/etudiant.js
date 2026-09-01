@@ -68,29 +68,11 @@ const uploadPhotoOnly = multer({
 
 const dossierUploadFields = DOSSIER_UPLOAD_FIELD_NAMES.map((name) => ({ name, maxCount: 1 }));
 
-const proformaJustificatifFields = [
-  { name: 'justificatif_diplome', maxCount: 1 },
-  { name: 'justificatif_releve', maxCount: 1 },
-  { name: 'justificatif_formation', maxCount: 1 },
-];
-
-function cleanupProformaUploads(files) {
-  if (!files) return;
-  Object.values(files).forEach((arr) => {
-    if (arr?.[0]?.path) unlinkQuiet(arr[0].path);
-  });
-}
-
-function persistProformaJustificatif(file, demandeId, kind) {
-  const ext = path.extname(file.originalname || '').toLowerCase();
-  const safe = ['.pdf', '.jpg', '.jpeg', '.png'].includes(ext) ? ext : '.pdf';
-  const dir = path.join(__dirname, '../uploads/proforma-justificatifs');
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const base = `demande-${demandeId}-${kind}${safe}`;
-  const dest = path.join(dir, base);
-  fs.renameSync(file.path, dest);
-  return `proforma-justificatifs/${base}`;
-}
+const {
+  proformaJustificatifFieldsCompte,
+  cleanupProformaUploads,
+  persistProformaJustificatif,
+} = require('../utils/proformaUpload');
 
 const proformaSubmitLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -513,7 +495,7 @@ router.post(
   authMiddleware,
   proformaSubmitLimiter,
   (req, res, next) => {
-    upload.fields(proformaJustificatifFields)(req, res, (err) => {
+    upload.fields(proformaJustificatifFieldsCompte)(req, res, (err) => {
       if (err) {
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(400).json({ message: 'Chaque document est limité à 2 Mo.' });

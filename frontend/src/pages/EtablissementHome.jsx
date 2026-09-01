@@ -132,7 +132,7 @@ export default function EtablissementHome() {
     Promise.all([
       axios.get(`/api/etablissements/${etabId}`),
       axios.get(`/api/formations?etablissement_id=${etabId}`),
-      user.role === 'responsable' || user.role === 'admin'
+      user.role === 'responsable' || user.role === 'admin_etablissement' || user.role === 'admin'
         ? axios.get('/api/responsable/statistiques').catch(() => ({ data: null }))
         : Promise.resolve({ data: null })
     ]).then(([etabRes, formRes, statsRes]) => {
@@ -302,7 +302,7 @@ export default function EtablissementHome() {
         </div>
       )}
 
-      {['responsable', 'comptable', 'agent_admin', 'controleur_qualite'].includes(user?.role) && (
+      {['responsable', 'comptable', 'agent_admin', 'controleur_qualite', 'admin_etablissement'].includes(user?.role) && (
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -330,7 +330,7 @@ export default function EtablissementHome() {
               Voir les listes
             </Link>
           </div>
-          {(user?.role === 'responsable' || user?.role === 'comptable') && (
+          {(user?.role === 'responsable' || user?.role === 'comptable' || user?.role === 'admin_etablissement') && (
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
               <div>
                 <p className="font-bold text-gray-800 text-sm">Rapport Excel établissement</p>
@@ -389,7 +389,7 @@ export default function EtablissementHome() {
               </p>
             )}
           </div>
-          {(user?.role === 'responsable' || user?.fonctions?.includes?.('responsable')) && (
+          {(user?.role === 'responsable' || user?.role === 'admin_etablissement' || user?.fonctions?.includes?.('responsable')) && (
             <Link to="/responsable/gestion-etablissement"
               className="text-sm font-bold px-4 py-2 rounded-xl border-2 transition-all hover:opacity-80 shrink-0 self-start"
               style={{ color: primary, borderColor: primary }}>
@@ -599,25 +599,25 @@ export default function EtablissementHome() {
         const role = user?.role
         const quick = [
           roleLink && { ...roleLink, desc: 'Tableau de bord de votre rôle' },
-          role === 'responsable' && {
-            label: 'Dossiers & acceptation',
+          (role === 'responsable' || role === 'admin_etablissement') && {
+            label: 'Dossiers préinscription',
             path: '/responsable',
             icon: '✅',
-            desc: 'Accepter ou refuser les préinscriptions',
+            desc: 'Accepter ou refuser les dossiers candidats',
           },
-          ['responsable', 'comptable'].includes(role) && {
-            label: 'Préinscriptions à traiter',
+          ['responsable', 'admin_etablissement', 'comptable'].includes(role) && {
+            label: 'Demandes proforma',
             path: '/responsable/demandes-proforma',
             icon: '🧾',
-            desc: 'Demandes en attente d’acceptation',
+            desc: 'Factures demandées par les visiteurs ou candidats',
           },
-          ['responsable', 'agent_admin'].includes(role) && {
-            label: 'Guichet',
+          ['responsable', 'admin_etablissement', 'agent_admin', 'comptable'].includes(role) && {
+            label: 'Guichet / nouvelle facture',
             path: '/responsable/preinscription-guichet',
             icon: '🧾',
-            desc: 'Saisie walk-in',
+            desc: 'Créer une facture proforma ou définitive',
           },
-          role === 'responsable' && {
+          (role === 'responsable' || role === 'admin_etablissement') && {
             label: 'Formations',
             path: '/responsable/gestion-etablissement',
             icon: '📚',
@@ -629,7 +629,7 @@ export default function EtablissementHome() {
             icon: '💬',
             desc: 'Messagerie',
           },
-          ['responsable', 'agent_admin', 'comptable'].includes(role) && {
+          ['responsable', 'agent_admin', 'comptable', 'admin_etablissement'].includes(role) && {
             label: 'Factures',
             path: '/mon-etablissement/factures',
             icon: '📄',

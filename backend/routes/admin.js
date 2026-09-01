@@ -371,24 +371,25 @@ router.put('/demandes-proforma/:id/statut', (req, res) => {
 });
 
 // PUT /api/admin/demandes-proforma/:id/decision — accepter / refuser (même logique que le staff établissement)
-router.put('/demandes-proforma/:id/decision', (req, res) => {
+router.put('/demandes-proforma/:id/decision', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ message: 'Identifiant invalide.' });
   }
   const demande = db.get('demandes_proforma').find({ id }).value();
   if (!demande) return res.status(404).json({ message: 'Demande introuvable.' });
-  const { decision, motif_refus } = req.body;
-  const result = proformaDemandeDecision({
+  const { decision, motif_refus, avec_cachet } = req.body;
+  const result = await proformaDemandeDecision({
     demandeId: id,
     userId: req.user.id,
     decision,
     motif_refus,
+    avec_cachet,
   });
   if (!result.ok) {
     return res.status(result.status).json({ message: result.message });
   }
-  res.json({ message: result.message, demande: result.demande });
+  res.json({ message: result.message, demande: result.demande, email_envoye: result.email_envoye });
 });
 
 // PUT /api/admin/demandes-proforma/:id/revoke-acceptation — retire la facture et remet la demande en attente
@@ -754,7 +755,15 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
         });
       }
     }
-    update.role = nextRole;
+    if (nextRole === 'admin_etablissement' && user.role !== 'admin_etablissement') {
+      const { promotePatchToAdminEtab } = require('../utils/adminEtablissement');
+      Object.assign(update, promotePatchToAdminEtab(user));
+    } else if (user.role === 'admin_etablissement' && nextRole !== 'admin_etablissement') {
+      update.role = nextRole;
+      update.role_before_admin_etab = null;
+    } else {
+      update.role = nextRole;
+    }
     if (nextRole === 'admin') {
       update.etablissement_id = null;
       const needGlobalMat = user.role !== 'admin' || user.etablissement_id != null;
@@ -834,6 +843,11 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
   if (fresh.role === 'admin_etablissement' && fresh.etablissement_id) {
     const { enforceSingleAdminEtablissement } = require('../utils/adminEtablissement');
     enforceSingleAdminEtablissement(fresh.etablissement_id, id);
+  } else if (user.role === 'admin_etablissement' && fresh.role !== 'admin_etablissement' && user.etablissement_id) {
+    const etab = db.get('etablissements').find({ id: user.etablissement_id }).value();
+    if (etab && Number(etab.admin_etablissement_id) === id) {
+      db.get('etablissements').find({ id: user.etablissement_id }).assign({ admin_etablissement_id: null }).write();
+    }
   }
 
   res.json({ message: 'Utilisateur mis à jour.' });

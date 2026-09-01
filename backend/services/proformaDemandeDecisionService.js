@@ -5,6 +5,8 @@ const db = require('../database/db');
 const { buildLignesForfaitAnnuel, getDureeMoisEffectif } = require('../utils/formationTarifs');
 const { demandeProformaJustificatifsComplets } = require('../utils/proformaJustificatifsCheck');
 const { createUserNotification } = require('../utils/notificationService');
+const { sendProformaFactureEmail } = require('../utils/proformaEmail');
+const { dateEcheanceFacture } = require('../utils/factureValidite');
 
 function buildFactureDemandeFromFormation(demande, formation, opts = {}) {
   const tarif = buildLignesForfaitAnnuel(formation);
@@ -34,11 +36,19 @@ function buildFactureDemandeFromFormation(demande, formation, opts = {}) {
     tva: 0,
     montant_ttc: montantHT,
     remise: Number.isFinite(remise) && remise > 0 ? Math.min(remise, tarif.montant_ht) : 0,
-    validite_jusqu_au: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    validite_jusqu_au: dateEcheanceFacture(new Date().toISOString()),
   };
 }
 
-function proformaDemandeDecision({ demandeId, userId, decision, motif_refus }) {
+function parseAvecCachet(value) {
+  if (value === false || value === 0) return false;
+  if (value === true || value === 1) return true;
+  const s = String(value ?? '').trim().toLowerCase();
+  if (s === 'false' || s === '0' || s === 'non' || s === 'sans') return false;
+  return true;
+}
+
+async function proformaDemandeDecision({ demandeId, userId, decision, motif_refus, avec_cachet = true }) {
   const id = parseInt(String(demandeId), 10);
   if (!Number.isFinite(id)) {
     return { ok: false, status: 400, message: 'Identifiant de demande invalide.' };
@@ -55,11 +65,14 @@ function proformaDemandeDecision({ demandeId, userId, decision, motif_refus }) {
   }
 
   if (decision === 'accepter' && !demandeProformaJustificatifsComplets(demande)) {
+    const msgPublic =
+      'Acceptation impossible : pièce d’identité et dernier diplôme requis pour une demande sans compte.';
+    const msgCompte =
+      'Acceptation impossible : les trois justificatifs (diplôme, relevé de notes, document formation) doivent être présents.';
     return {
       ok: false,
       status: 400,
-      message:
-        'Acceptation impossible : les trois justificatifs (diplôme, relevé de notes, document formation) doivent être présents sur la demande.',
+      message: demande.source === 'public_distant' ? msgPublic : msgCompte,
     };
   }
 
@@ -96,12 +109,14 @@ function proformaDemandeDecision({ demandeId, userId, decision, motif_refus }) {
   if (!formation) return { ok: false, status: 404, message: 'Formation introuvable.' };
 
   const facture = buildFactureDemandeFromFormation(demande, formation);
+  const factureAvecCachet = parseAvecCachet(avec_cachet);
 
   db.get('demandes_proforma')
     .find({ id })
     .assign({
       statut: 'acceptee',
       facture,
+      facture_avec_cachet: factureAvecCachet,
       lettre_preinscription: null,
       acceptee_le: new Date().toISOString(),
       acceptee_par: userId,
@@ -121,11 +136,26 @@ function proformaDemandeDecision({ demandeId, userId, decision, motif_refus }) {
   }
 
   const updated = db.get('demandes_proforma').find({ id }).value();
+  let emailEnvoye = false;
+  if (updated.email) {
+    emailEnvoye = await sendProformaFactureEmail(updated);
+  }
+
+  const msgBase =
+    demande.etudiant_id != null
+      ? 'Demande acceptée. La facture proforma est disponible sur l’espace candidat'
+      : 'Demande acceptée. La facture proforma est disponible via le lien public';
+  const msgEmail = emailEnvoye
+    ? ' et un e-mail a été envoyé au candidat.'
+    : updated.email
+      ? ' (e-mail non envoyé : vérifiez la configuration SMTP).'
+      : '.';
+
   return {
     ok: true,
-    message:
-      'Demande acceptée. La facture proforma et l’attestation de préinscription sont disponibles pour le candidat sur son espace (même compte).',
+    message: `${msgBase}${msgEmail}`,
     demande: updated,
+    email_envoye: emailEnvoye,
   };
 }
 

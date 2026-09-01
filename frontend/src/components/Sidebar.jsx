@@ -78,14 +78,19 @@ const MENUS = {
   admin_etablissement: [
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     { label: 'Équipe & comptes', to: '/mon-etablissement/equipe', icon: ICONS.users, exact: true },
+    { label: 'Filières & formations', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
+    { label: 'Dossiers & acceptation', to: '/responsable', icon: ICONS.dossiers },
+    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Guichet / factures', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
+    { label: 'Acceptés par formation', to: '/mon-etablissement/acceptes-par-formation', icon: ICONS.dossiers },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   responsable: [
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     {
-      label: 'Tableau de bord',
+      label: 'Dossiers préinscription',
       to: '/responsable',
       icon: ICONS.dashboard,
       exact: true,
@@ -93,7 +98,7 @@ const MENUS = {
         loc.pathname === '/responsable'
         && new URLSearchParams(loc.search).get('tab') !== 'conditions',
     },
-    { label: 'Préinscriptions à traiter', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
     { label: 'Guichet', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Formations', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
@@ -103,6 +108,7 @@ const MENUS = {
   agent_admin: [
     { label: 'Tableau de bord', to: '/agent-admin', icon: ICONS.dashboard, exact: true },
     { label: 'Guichet', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
+    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
@@ -110,7 +116,7 @@ const MENUS = {
   ],
   comptable: [
     { label: 'Tableau de bord', to: '/comptable', icon: ICONS.dashboard, exact: true },
-    { label: 'Préinscriptions à traiter', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
     { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
@@ -118,6 +124,7 @@ const MENUS = {
   ],
   controleur_qualite: [
     { label: 'Tableau de bord', to: '/qualite', icon: ICONS.dashboard, exact: true },
+    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },

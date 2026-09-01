@@ -183,28 +183,23 @@ apache2ctl configtest
 systemctl reload apache2
 echo "    Apache : OK"
 
-# ─── 8. RÔLE admin établissement (Adama DIOP — aligner prod sur config attendue) ───
-echo ">>> [8/9] Alignement rôle admin établissement (adama.diop@esebat.com)..."
+# ─── 8. MIGRATION DONNÉES + RÔLE ADMIN ÉTABLISSEMENT ───
+echo ">>> [8/9] Migration données (factures 1 an, admin étab.)..."
 cd "$APP_ROOT/backend"
+node scripts/migrate-prod-data.js 2>/dev/null || echo "    (migration ignorée si erreur)"
 node -e "
 const db = require('./database/db');
+const { designateAdminEtablissement } = require('./utils/adminEtablissement');
 const email = 'adama.diop@esebat.com';
 const u = db.get('utilisateurs').find({ email }).value();
-if (!u) { console.log('    Utilisateur absent — ignoré'); process.exit(0); }
-if (u.role !== 'admin_etablissement') {
-  db.get('utilisateurs').find({ id: u.id }).assign({
-    role: 'admin_etablissement',
-    updated_at: new Date().toISOString(),
-  }).write();
-  console.log('    Rôle mis à jour → admin_etablissement');
-} else {
-  console.log('    Rôle déjà admin_etablissement');
-}
+if (!u) { console.log('    Utilisateur adama.diop absent — ignoré'); process.exit(0); }
 const etabId = u.etablissement_id || 1;
-db.get('etablissements').find({ id: etabId }).assign({
-  admin_etablissement_id: u.id,
-  responsable_id: u.id,
-}).write();
+const r = designateAdminEtablissement(etabId, u.id);
+if (r.ok) {
+  console.log('    Admin étab. désigné :', email, '(étab.', etabId + ')');
+} else {
+  console.log('    Designation admin ignorée :', r.message || '');
+}
 " 2>/dev/null || echo "    (ignoré si erreur DB)"
 cd "$APP_ROOT"
 pm2 restart uniportail-api 2>/dev/null || true

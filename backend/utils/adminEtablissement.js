@@ -3,6 +3,29 @@ const { ROLE_ADMIN_ETABLISSEMENT } = require('./staffRoles');
 
 const ROLE_FALLBACK_AFTER_DEMOTE = 'agent_admin';
 
+function demotePatchFromAdminEtab(user) {
+  const restored =
+    user?.role_before_admin_etab && user.role_before_admin_etab !== ROLE_ADMIN_ETABLISSEMENT
+      ? user.role_before_admin_etab
+      : ROLE_FALLBACK_AFTER_DEMOTE;
+  return {
+    role: restored,
+    role_before_admin_etab: null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function promotePatchToAdminEtab(user) {
+  const patch = {
+    role: ROLE_ADMIN_ETABLISSEMENT,
+    updated_at: new Date().toISOString(),
+  };
+  if (user?.role !== ROLE_ADMIN_ETABLISSEMENT) {
+    patch.role_before_admin_etab = user?.role || ROLE_FALLBACK_AFTER_DEMOTE;
+  }
+  return patch;
+}
+
 /**
  * Résout l’administrateur établissement actuel (pointeur ou rôle).
  * @returns {object|null} utilisateur DB
@@ -35,7 +58,7 @@ function findAdminEtablissementUser(etabId) {
 
 /**
  * Désigne (ou retire) l’unique administrateur d’un établissement.
- * L’ancien admin perd automatiquement le rôle (rétrogradé en agent_admin).
+ * L’ancien admin reprend son rôle d’origine (role_before_admin_etab) ou agent_admin par défaut.
  *
  * @param {number} etabId
  * @param {number|null} userId  null = retirer
@@ -50,14 +73,10 @@ function designateAdminEtablissement(etabId, userId) {
   const previousId = previous?.id ?? etab.admin_etablissement_id ?? null;
 
   if (userId == null || userId === '' || userId === 0) {
-    // Retirer
     (db.get('utilisateurs').value() || [])
       .filter((u) => u.role === ROLE_ADMIN_ETABLISSEMENT && Number(u.etablissement_id) === eid)
       .forEach((u) => {
-        db.get('utilisateurs')
-          .find({ id: u.id })
-          .assign({ role: ROLE_FALLBACK_AFTER_DEMOTE, updated_at: new Date().toISOString() })
-          .write();
+        db.get('utilisateurs').find({ id: u.id }).assign(demotePatchFromAdminEtab(u)).write();
       });
     db.get('etablissements').find({ id: eid }).assign({ admin_etablissement_id: null }).write();
     return { ok: true, previous_id: previousId, nouveau_id: null };
@@ -91,7 +110,6 @@ function designateAdminEtablissement(etabId, userId) {
     };
   }
 
-  // Rétrograder tous les autres admin_etablissement de cet établissement
   (db.get('utilisateurs').value() || [])
     .filter(
       (u) =>
@@ -100,29 +118,20 @@ function designateAdminEtablissement(etabId, userId) {
         Number(u.id) !== uid
     )
     .forEach((u) => {
-      db.get('utilisateurs')
-        .find({ id: u.id })
-        .assign({ role: ROLE_FALLBACK_AFTER_DEMOTE, updated_at: new Date().toISOString() })
-        .write();
+      db.get('utilisateurs').find({ id: u.id }).assign(demotePatchFromAdminEtab(u)).write();
     });
 
-  // Nettoyer le pointeur sur d’autres établissements si ce compte y était admin
   (db.get('etablissements').value() || []).forEach((e) => {
     if (e.id !== eid && Number(e.admin_etablissement_id) === uid) {
       db.get('etablissements').find({ id: e.id }).assign({ admin_etablissement_id: null }).write();
     }
   });
-  // Si ce compte était admin_etablissement ailleurs, le rétrograder aussi
-  if (user.role === ROLE_ADMIN_ETABLISSEMENT && Number(user.etablissement_id) !== eid) {
-    // already handled by etab change above
-  }
 
   db.get('utilisateurs')
     .find({ id: uid })
     .assign({
-      role: ROLE_ADMIN_ETABLISSEMENT,
+      ...promotePatchToAdminEtab(user),
       etablissement_id: eid,
-      updated_at: new Date().toISOString(),
     })
     .write();
 
@@ -131,10 +140,6 @@ function designateAdminEtablissement(etabId, userId) {
   return { ok: true, previous_id: previousId, nouveau_id: uid };
 }
 
-/**
- * À appeler après création/promotion d’un membre en admin_etablissement :
- * garantit l’unicité (remplace l’ancien).
- */
 function enforceSingleAdminEtablissement(etabId, newAdminUserId) {
   return designateAdminEtablissement(etabId, newAdminUserId);
 }
@@ -156,5 +161,7 @@ module.exports = {
   designateAdminEtablissement,
   enforceSingleAdminEtablissement,
   pickAdminPublic,
+  demotePatchFromAdminEtab,
+  promotePatchToAdminEtab,
   ROLE_FALLBACK_AFTER_DEMOTE,
 };

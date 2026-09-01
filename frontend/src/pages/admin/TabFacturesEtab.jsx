@@ -91,12 +91,35 @@ export function TabFacturesEtab({ etabId, etabNom }) {
 
   const pdfItems = () => list.filter((f) => selected.has(f.id))
 
+  /** Charge la facture complète (lignes, snapshots) avant export PDF. */
+  const resolveForPdf = async (items) => {
+    const out = []
+    for (const f of items) {
+      if (f.lignes?.length) {
+        out.push(f)
+        continue
+      }
+      if (!f.dossier_id) {
+        out.push(f)
+        continue
+      }
+      try {
+        const { data } = await axios.get(`/api/factures/dossier/${f.dossier_id}`)
+        out.push(data)
+      } catch {
+        out.push(f)
+      }
+    }
+    return out
+  }
+
   const handlePdfSelection = async () => {
     const items = pdfItems()
     if (!items.length) return toast.error('Sélectionnez au moins une facture.')
     setBusy(true)
     try {
-      await downloadFacturesPdfBatch(items, { etabNom })
+      const full = await resolveForPdf(items)
+      await downloadFacturesPdfBatch(full, { etabNom })
       toast.success(`${items.length} PDF généré(s)`)
     } catch (e) {
       toast.error(e.message || 'Export PDF impossible')
@@ -108,7 +131,8 @@ export function TabFacturesEtab({ etabId, etabNom }) {
   const handlePdfOne = async (f) => {
     setBusy(true)
     try {
-      await downloadFacturesPdfBatch([f], { etabNom })
+      const [full] = await resolveForPdf([f])
+      await downloadFacturesPdfBatch([full], { etabNom })
     } catch (e) {
       toast.error(e.message || 'PDF impossible')
     } finally {
@@ -145,7 +169,7 @@ export function TabFacturesEtab({ etabId, etabNom }) {
 
   return (
     <div className="space-y-4">
-      <CreerProformaModal open={creerOpen} onClose={() => setCreerOpen(false)} />
+      <CreerProformaModal open={creerOpen} onClose={() => setCreerOpen(false)} onCreated={load} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-slate-700">

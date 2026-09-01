@@ -2,6 +2,7 @@ const db = require('../database/db');
 const { snapshotFromFormation } = require('../utils/etablissementSnapshot');
 const { buildLignesForfaitAnnuel, getDureeMoisEffectif } = require('../utils/formationTarifs');
 const { isFactureSupprimee } = require('../utils/factureVisibility');
+const { dateEcheanceFacture, syncDateEcheanceFacture } = require('../utils/factureValidite');
 
 function genererNumeroFacture() {
   const year = new Date().getFullYear();
@@ -74,8 +75,9 @@ function syncStoredFactureById(factureId) {
   const formation = dossier?.formation_id ? db.get('formations').find({ id: dossier.formation_id }).value() : null;
   if (!formation) return facture;
   const synced = syncFactureMontantsFromFormation(facture, formation);
-  db.get('factures').find({ id: facture.id }).assign(synced).write();
-  return { ...facture, ...synced };
+  const date_echeance = syncDateEcheanceFacture({ ...facture, ...synced });
+  db.get('factures').find({ id: facture.id }).assign({ ...synced, date_echeance }).write();
+  return { ...facture, ...synced, date_echeance };
 }
 
 function normalizeTypeDocument(value) {
@@ -123,8 +125,9 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
     }
     const current = db.get('factures').find({ id: existing.id }).value();
     const synced = syncFactureMontantsFromFormation(current, formation);
-    db.get('factures').find({ id: existing.id }).assign(synced).write();
-    return { ...current, ...synced, type_document: current.type_document || typeDocOpt || 'proforma' };
+    const date_echeance = syncDateEcheanceFacture({ ...current, ...synced });
+    db.get('factures').find({ id: existing.id }).assign({ ...synced, date_echeance }).write();
+    return { ...current, ...synced, date_echeance, type_document: current.type_document || typeDocOpt || 'proforma' };
   }
 
   const etudiant = dossierRow.etudiant_id
@@ -152,7 +155,7 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
     formation_id: formation.id,
     type_document: typeDocOpt || 'proforma',
     date_emission: new Date().toISOString(),
-    date_echeance: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    date_echeance: dateEcheanceFacture(new Date().toISOString()),
     lignes: mapLignesFacture(tarif),
     lignes_supplementaires: tarif.lignes_supplementaires,
     montant_supplementaires_hors_forfait: tarif.montant_supplementaires,

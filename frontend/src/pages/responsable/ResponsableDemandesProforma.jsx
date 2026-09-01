@@ -6,7 +6,6 @@ import { mediaUrl } from '../../utils/mediaUrl'
 import { useAuth } from '../../context/AuthContext'
 import { actsAsResponsable } from '../../utils/roles'
 import { chatWithStudentUrl } from '../../utils/chatWithStudentUrl'
-import { TabAcceptesParFormation } from '../admin/TabAcceptesParFormation'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n || 0)
 
@@ -17,6 +16,18 @@ function justifUrl(rel) {
 
 const isPending = (s) => s === 'nouvelle' || s === 'en_attente' || s === 'vue'
 
+function sourceLabel(d) {
+  if (d.source === 'public_distant') return { text: 'Visiteur', cls: 'bg-violet-100 text-violet-800' }
+  if (d.etudiant_id) return { text: 'Compte candidat', cls: 'bg-sky-100 text-sky-800' }
+  return { text: 'Demande proforma', cls: 'bg-slate-100 text-slate-700' }
+}
+
+function candidatLabel(d) {
+  if (d.source === 'public_distant') return d.email || '—'
+  const name = `${d.prenom || ''} ${d.nom || ''}`.trim()
+  return name || d.email || '—'
+}
+
 export default function ResponsableDemandesProforma() {
   const { user } = useAuth()
   const canChatterEtudiant = actsAsResponsable(user) && user?.etablissement_id != null
@@ -26,9 +37,10 @@ export default function ResponsableDemandesProforma() {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [motifRefus, setMotifRefus] = useState('')
+  const [avecCachet, setAvecCachet] = useState(true)
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
-  /** a_traiter | acceptations | listes */
+  /** a_traiter | acceptations */
   const [onglet, setOnglet] = useState('a_traiter')
 
   const load = (p = page) => {
@@ -58,6 +70,7 @@ export default function ResponsableDemandesProforma() {
 
   const ouvrirDecision = (d, type) => {
     setMotifRefus('')
+    setAvecCachet(true)
     setModal({ demande: d, type })
   }
 
@@ -73,6 +86,7 @@ export default function ResponsableDemandesProforma() {
       await axios.put(`/api/responsable/demandes-proforma/${demande.id}/decision`, {
         decision: type === 'accepter' ? 'accepter' : 'refuser',
         motif_refus: type === 'refuser' ? motifRefus.trim() : undefined,
+        avec_cachet: type === 'accepter' ? avecCachet : undefined,
       })
       toast.success(type === 'accepter' ? 'Demande acceptée.' : 'Demande refusée.')
       setModal(null)
@@ -125,9 +139,13 @@ export default function ResponsableDemandesProforma() {
     <main className="mx-auto w-full max-w-6xl px-4 py-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-gray-900">Préinscriptions à traiter</h1>
+          <h1 className="text-xl font-black text-gray-900">Demandes de facture proforma</h1>
           <p className="text-sm text-gray-500">
-            Dossiers à traiter, acceptations et listes d’étudiants acceptés par formation et niveau.
+            Demandes de facture (visiteurs sans compte ou candidats) — distinct des dossiers de préinscription (
+            <Link to="/responsable" className="font-semibold text-orange-700 hover:underline">
+              voir les dossiers
+            </Link>
+            ).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -147,8 +165,7 @@ export default function ResponsableDemandesProforma() {
       <div className="mb-4 flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 text-sm font-semibold">
         {[
           { id: 'a_traiter', label: 'À traiter' },
-          { id: 'acceptations', label: 'Acceptations' },
-          { id: 'listes', label: 'Listes acceptés' },
+          { id: 'acceptations', label: 'Factures émises' },
         ].map((t) => (
           <button
             key={t.id}
@@ -161,21 +178,13 @@ export default function ResponsableDemandesProforma() {
         ))}
       </div>
 
-      {onglet === 'listes' ? (
-        user?.etablissement_id ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <TabAcceptesParFormation etabId={user.etablissement_id} />
-          </div>
-        ) : (
-          <p className="text-sm text-slate-500">Aucun établissement rattaché.</p>
-        )
-      ) : loading ? (
+      {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-9 w-9 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
         </div>
       ) : visible.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-white py-12 text-center text-sm text-slate-400">
-          {onglet === 'a_traiter' ? 'Aucune préinscription en attente.' : 'Aucune acceptation pour le moment.'}
+          {onglet === 'a_traiter' ? 'Aucune demande de facture en attente.' : 'Aucune facture proforma émise pour le moment.'}
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -183,7 +192,8 @@ export default function ResponsableDemandesProforma() {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-3 py-2.5 font-semibold">Candidat</th>
+                  <th className="px-3 py-2.5 font-semibold">Demandeur</th>
+                  <th className="px-3 py-2.5 font-semibold">Type</th>
                   <th className="px-3 py-2.5 font-semibold">Formation</th>
                   <th className="px-3 py-2.5 font-semibold">Réf.</th>
                   <th className="px-3 py-2.5 font-semibold">Montant</th>
@@ -199,11 +209,22 @@ export default function ResponsableDemandesProforma() {
                     onClick={() => (d.statut === 'nouvelle' || d.statut === 'en_attente') && marquerVue(d.id)}
                   >
                     <td className="px-3 py-2.5">
-                      <div className="font-semibold text-slate-900">{d.prenom} {d.nom}</div>
+                      <div className="font-semibold text-slate-900">{candidatLabel(d)}</div>
                       <div className="text-xs text-slate-500">
                         {d.type_formation === 'en_ligne' ? 'FAD' : 'Présentiel'}
-                        {d.telephone ? ` · ${d.telephone}` : ''}
+                        {d.source !== 'public_distant' && d.telephone ? ` · ${d.telephone}` : ''}
+                        {d.source === 'public_distant' && d.email ? ` · ${d.email}` : ''}
                       </div>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {(() => {
+                        const src = sourceLabel(d)
+                        return (
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${src.cls}`}>
+                            {src.text}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="max-w-[220px] truncate px-3 py-2.5 text-slate-700" title={d.formation_titre}>
                       {d.formation_titre}
@@ -261,14 +282,26 @@ export default function ResponsableDemandesProforma() {
                           </Link>
                         )}
                         {d.justificatifs && (
-                          <a
-                            href={justifUrl(d.justificatifs.diplome)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600"
-                          >
-                            Docs
-                          </a>
+                          <>
+                            {d.justificatifs.identite && (
+                              <a
+                                href={justifUrl(d.justificatifs.identite)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600"
+                              >
+                                Identité
+                              </a>
+                            )}
+                            <a
+                              href={justifUrl(d.justificatifs.diplome)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600"
+                            >
+                              Diplôme
+                            </a>
+                          </>
                         )}
                       </div>
                     </td>
@@ -300,9 +333,21 @@ export default function ResponsableDemandesProforma() {
               {modal.demande.prenom} {modal.demande.nom} — {modal.demande.formation_titre}
             </p>
             {modal.type === 'accepter' && (
-              <p className="mt-3 text-sm text-emerald-800">
-                Facture et attestation seront disponibles pour le candidat.
-              </p>
+              <>
+                <p className="mt-3 text-sm text-emerald-800">
+                  La facture sera générée et envoyée par e-mail au candidat si une adresse est renseignée.
+                </p>
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 space-y-2 text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="cachet_resp" checked={avecCachet} onChange={() => setAvecCachet(true)} />
+                    Facture avec cachet
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="cachet_resp" checked={!avecCachet} onChange={() => setAvecCachet(false)} />
+                    Facture sans cachet
+                  </label>
+                </div>
+              </>
             )}
             {modal.type === 'refuser' && (
               <textarea

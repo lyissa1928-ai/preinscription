@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
-const { authMiddleware, staffLettreAttestation, staffProformaDecision, staffDossierDecision, staffGuichet } = require('../middleware/auth');
+const { authMiddleware, staffLettreAttestation, staffProformaView, staffProformaDecision, staffDossierDecision, staffGuichet } = require('../middleware/auth');
 const { proformaDemandeDecision, creerProformaPourEtudiant } = require('../services/proformaDemandeDecisionService');
 const { genererOuRecupererFactureDossier } = require('../services/factureService');
 const { snapshotFromEtab, snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
@@ -84,7 +84,7 @@ router.get('/attestation/:dossierId', authMiddleware, staffLettreAttestation, (r
 });
 
 // ─── DEMANDES PROFORMA (staff établissement + admin — avant le guard responsable seul) ─
-router.get('/demandes-proforma', authMiddleware, staffProformaDecision, (req, res) => {
+router.get('/demandes-proforma', authMiddleware, staffProformaView, (req, res) => {
   const { statut, type, page = 1, limit = 15 } = req.query;
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
@@ -110,7 +110,7 @@ router.get('/demandes-proforma', authMiddleware, staffProformaDecision, (req, re
   });
 });
 
-router.put('/demandes-proforma/:id/statut', authMiddleware, staffProformaDecision, (req, res) => {
+router.put('/demandes-proforma/:id/statut', authMiddleware, staffProformaView, (req, res) => {
   const { statut } = req.body;
   if (!['nouvelle', 'vue', 'traitee', 'en_attente'].includes(statut)) {
     return res.status(400).json({
@@ -252,7 +252,7 @@ router.get('/etudiants', authMiddleware, staffProformaDecision, (req, res) => {
   });
 });
 
-router.put('/demandes-proforma/:id/decision', authMiddleware, staffProformaDecision, (req, res) => {
+router.put('/demandes-proforma/:id/decision', authMiddleware, staffProformaDecision, async (req, res) => {
   const id = parseInt(req.params.id);
   const demande = db.get('demandes_proforma').find({ id }).value();
   if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
@@ -260,17 +260,40 @@ router.put('/demandes-proforma/:id/decision', authMiddleware, staffProformaDecis
     return res.status(403).json({ message: 'Cette demande ne concerne pas votre établissement.' });
   }
 
-  const { decision, motif_refus } = req.body;
-  const result = proformaDemandeDecision({
+  const { decision, motif_refus, avec_cachet } = req.body;
+  const result = await proformaDemandeDecision({
     demandeId: id,
     userId: req.user.id,
     decision,
     motif_refus,
+    avec_cachet,
   });
   if (!result.ok) {
     return res.status(result.status).json({ message: result.message });
   }
-  res.json({ message: result.message, demande: result.demande });
+  res.json({ message: result.message, demande: result.demande, email_envoye: result.email_envoye });
+});
+
+// POST /api/responsable/demandes-proforma/:id/envoyer-email — renvoyer le lien facture au candidat
+router.post('/demandes-proforma/:id/envoyer-email', authMiddleware, staffProformaDecision, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const demande = db.get('demandes_proforma').find({ id }).value();
+  if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
+  if (!assertDemandePourResponsable(req, demande)) {
+    return res.status(403).json({ message: 'Cette demande ne concerne pas votre établissement.' });
+  }
+  if (demande.statut !== 'acceptee' || !demande.facture?.numero) {
+    return res.status(400).json({ message: 'La facture proforma doit être générée avant l’envoi par e-mail.' });
+  }
+  if (!demande.email) {
+    return res.status(400).json({ message: 'Aucune adresse e-mail sur cette demande.' });
+  }
+  const { sendProformaFactureEmail } = require('../utils/proformaEmail');
+  const ok = await sendProformaFactureEmail(demande);
+  if (!ok) {
+    return res.status(503).json({ message: 'Envoi impossible (SMTP non configuré ou adresse invalide).' });
+  }
+  res.json({ message: `Facture proforma envoyée à ${demande.email}.` });
 });
 
 router.use(authMiddleware, staffDossierDecision);

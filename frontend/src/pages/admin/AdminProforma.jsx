@@ -27,6 +27,7 @@ const PAYEUR_LABELS = {
 const PAGE_SIZE = 10
 
 const JUSTIF_KEYS = [
+  { key: 'identite', label: 'Pièce d’identité', short: 'Identité' },
   { key: 'diplome', label: 'Diplôme', short: 'Diplôme' },
   { key: 'releve', label: 'Relevé', short: 'Relevé' },
   { key: 'formation', label: 'Formation', short: 'Formation' },
@@ -73,6 +74,7 @@ function peutRetirerFacture(d) {
 // ─── Modale détail ────────────────────────────────────────────────────────────
 function ModalDetail({ demande, onClose, onDecisionDone }) {
   const [motifRefus, setMotifRefus] = useState('')
+  const [avecCachet, setAvecCachet] = useState(true)
   const [saving, setSaving] = useState(false)
   const es = demande.etablissement_snapshot || {}
   const fac = demande.facture || {}
@@ -89,6 +91,7 @@ function ModalDetail({ demande, onClose, onDecisionDone }) {
       await axios.put(`/api/admin/demandes-proforma/${demande.id}/decision`, {
         decision: decision === 'accepter' ? 'accepter' : 'refuser',
         motif_refus: decision === 'refuser' ? String(motifRefus).trim() : undefined,
+        avec_cachet: decision === 'accepter' ? avecCachet : undefined,
       })
       toast.success(decision === 'accepter' ? 'Demande acceptée.' : 'Demande refusée.')
       onDecisionDone()
@@ -268,9 +271,30 @@ function ModalDetail({ demande, onClose, onDecisionDone }) {
           {pending && (
             <div className="border-t border-gray-100 pt-4 space-y-3">
               <p className="text-sm text-gray-700">
-                <strong>Validation requise</strong> : acceptez ou refusez la demande. Le candidat ne pourra télécharger la
-                facture proforma et l’attestation de préinscription qu’après acceptation.
+                <strong>Validation requise</strong> : acceptez pour générer la facture proforma (envoi par e-mail si
+                adresse renseignée) ou refusez la demande.
               </p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 space-y-2">
+                <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Facture générée</p>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="cachet_admin"
+                    checked={avecCachet}
+                    onChange={() => setAvecCachet(true)}
+                  />
+                  Avec cachet de la scolarité
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="cachet_admin"
+                    checked={!avecCachet}
+                    onChange={() => setAvecCachet(false)}
+                  />
+                  Sans cachet
+                </label>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 mb-1">Motif (obligatoire en cas de refus)</label>
                 <textarea

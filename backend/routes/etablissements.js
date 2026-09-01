@@ -31,6 +31,7 @@ const {
   designateAdminEtablissement,
   enforceSingleAdminEtablissement,
   pickAdminPublic,
+  promotePatchToAdminEtab,
 } = require('../utils/adminEtablissement');
 const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
 const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
@@ -1366,12 +1367,19 @@ router.get('/:id/factures', etabFacturesAccess, (req, res) => {
       date_emission: f.date_emission,
       date_echeance: f.date_echeance,
       montant_ttc: f.montant_ttc,
+      montant_total_a_payer: f.montant_total_a_payer,
+      montant_ht: f.montant_ht,
       statut: f.statut,
       dossier_statut,
       attestation_disponible,
       lettre_disponible,
       etudiant_snapshot: f.etudiant_snapshot,
       formation_snapshot: f.formation_snapshot,
+      etablissement_snapshot: f.etablissement_snapshot,
+      lignes: f.lignes,
+      lignes_supplementaires: f.lignes_supplementaires,
+      type_payeur: f.type_payeur,
+      payeur: f.payeur,
       etablissement_id: etabId,
       etablissement_nom: etab.nom,
     };
@@ -2426,7 +2434,14 @@ router.put('/:etabId/membres/:id', etabMembresManageAccess, (req, res) => {
           : 'Vous ne pouvez pas attribuer ce rôle.',
       });
     }
-    updates.role = role;
+    if (role === ROLE_ADMIN_ETABLISSEMENT && user.role !== ROLE_ADMIN_ETABLISSEMENT) {
+      Object.assign(updates, promotePatchToAdminEtab(user));
+    } else if (user.role === ROLE_ADMIN_ETABLISSEMENT && role !== ROLE_ADMIN_ETABLISSEMENT) {
+      updates.role = role;
+      updates.role_before_admin_etab = null;
+    } else {
+      updates.role = role;
+    }
   }
   if (actif !== undefined) updates.actif = !!actif;
   if (prenom !== undefined) updates.prenom = String(prenom).trim();
