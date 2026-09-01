@@ -69,6 +69,13 @@ fi
 
 # ─── 4. Mise à jour du code ───
 echo ">>> 3/7 git fetch + pull ($BRANCH)..."
+# package-lock.json modifié localement (npm install) ne doit pas bloquer le déploiement
+for lockfile in frontend/package-lock.json backend/package-lock.json; do
+  if [[ -f "$lockfile" ]] && ! git diff --quiet HEAD -- "$lockfile" 2>/dev/null; then
+    git checkout -- "$lockfile" 2>/dev/null || true
+    echo "    reset local : $lockfile"
+  fi
+done
 git fetch origin
 git pull origin "$BRANCH"
 
