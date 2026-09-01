@@ -162,7 +162,7 @@ function AppRoutes() {
             </PrivateRoute>
           }
         />
-        <Route path="/attestation-demande/:demandeId" element={<PrivateRoute roles={['etudiant']}><AttestationDemandePreinscription /></PrivateRoute>} />
+        <Route path="/attestation-demande/:demandeId" element={<PrivateRoute roles={['etudiant', 'admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}><AttestationDemandePreinscription /></PrivateRoute>} />
 
         {/* Accueil établissement (staff + étudiants : catalogue sans tarifs pour les étudiants) */}
         <Route path="/mon-etablissement" element={

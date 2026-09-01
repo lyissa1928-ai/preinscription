@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
+import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
 import DocumentDownloadBar from '../components/DocumentDownloadBar'
+import { resolveAffichageCandidat, resolveFormationAffichage } from '../utils/attestationDisplay'
 
 const fmtDate = (d) => {
   if (d == null || d === '') return '—'
@@ -12,18 +14,26 @@ const fmtDate = (d) => {
 
 export default function AttestationDemandePreinscription() {
   const { demandeId } = useParams()
+  const { user, loading: authLoading } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const documentRef = useRef(null)
 
   useEffect(() => {
+    if (authLoading) return
+    setLoading(true)
+    setError(null)
+    const url =
+      user?.role === 'etudiant'
+        ? `/api/etudiant/attestation-demande/${demandeId}`
+        : `/api/responsable/attestation-demande/${demandeId}`
     axios
-      .get(`/api/etudiant/attestation-demande/${demandeId}`)
+      .get(url)
       .then(({ data: d }) => setData(d))
       .catch((err) => setError(err.response?.data?.message || 'Erreur de chargement'))
       .finally(() => setLoading(false))
-  }, [demandeId])
+  }, [demandeId, user?.role, authLoading])
 
   useEffect(() => {
     if (!data?.attestation_extensions?.reference_attestation) return
@@ -45,13 +55,13 @@ export default function AttestationDemandePreinscription() {
     )
   }
 
-  if (error) {
+  if (error || !data?.demande) {
     return (
       <div className="min-h-screen bg-slate-200 flex items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
           <div className="text-5xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Attestation indisponible</h2>
-          <p className="text-gray-500 mb-6">{error}</p>
+          <p className="text-gray-500 mb-6">{error || 'Données incomplètes.'}</p>
           <Link to="/dashboard" className="btn-primary">
             Retour au tableau de bord
           </Link>
@@ -63,11 +73,12 @@ export default function AttestationDemandePreinscription() {
   const {
     demande,
     etudiant,
+    formation,
+    etablissement: etab,
     formation_libelle,
     filiere_libelle,
     niveau_libelle,
     annee_academique,
-    etablissement: etab,
     attestation_extensions: ext = {},
   } = data
 
@@ -77,9 +88,15 @@ export default function AttestationDemandePreinscription() {
   const logoSrc = mediaUrl(etab?.logo_url)
   const refAtt = ext.reference_attestation || `ATT-DEM-${demande?.id || ''}`
 
-  const prenomT = (etudiant?.prenom || '').trim()
-  const nomT = (etudiant?.nom || '').trim()
-  const nomComplet = [prenomT, nomT].filter(Boolean).join(' ') || '—'
+  const { prenom: prenomT, nom: nomT, email: emailT, nomComplet } = resolveAffichageCandidat({ etudiant, demande })
+  const form = resolveFormationAffichage({
+    formation_libelle,
+    filiere_libelle,
+    niveau_libelle,
+    annee_academique,
+    demande,
+    formation,
+  })
 
   const modeFormation =
     demande?.type_formation === 'en_ligne'
@@ -88,7 +105,7 @@ export default function AttestationDemandePreinscription() {
         ? 'Formation présentielle'
         : null
 
-  const texteCorps = `Nous attestons que ${nomComplet} a obtenu une acceptation de préinscription pour la formation désignée ci-dessous pour l’année académique ${annee_academique || '—'}, sous réserve du règlement intégral des frais conformément à la facture proforma émise par l’établissement.`
+  const texteCorps = `Nous attestons que ${nomComplet} a obtenu une acceptation de préinscription pour la formation désignée ci-dessous pour l’année académique ${form.annee_academique}, sous réserve du règlement intégral des frais conformément à la facture proforma émise par l’établissement.`
 
   return (
     <div className="lettre-print-scope min-h-screen bg-slate-200 py-8 px-4">
@@ -146,15 +163,35 @@ export default function AttestationDemandePreinscription() {
 
         <div className="mx-8 border-t border-gray-100" />
 
-        <div className="px-8 py-6 space-y-6 text-gray-800">
-          <div className="rounded-xl border border-gray-100 bg-slate-50/90 px-4 py-3">
-            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">Candidat</h2>
-            <p className="font-semibold text-gray-900">{nomComplet}</p>
-            {etudiant?.email && <p className="text-sm text-gray-600 mt-1">{etudiant.email}</p>}
+        <div className="px-8 py-6 space-y-5 text-gray-800">
+          <div className="space-y-3">
+            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500">Bénéficiaire</h2>
+            <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              <div>
+                <dt className="text-gray-400 text-[11px] uppercase">Prénom(s)</dt>
+                <dd className="font-semibold text-base">{prenomT}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-400 text-[11px] uppercase">Nom</dt>
+                <dd className="font-semibold text-base uppercase">{nomT}</dd>
+              </div>
+              {emailT && (
+                <div className="sm:col-span-2">
+                  <dt className="text-gray-400 text-[11px] uppercase">E-mail</dt>
+                  <dd className="font-medium">{emailT}</dd>
+                </div>
+              )}
+              {demande?.reference && (
+                <div className="sm:col-span-2">
+                  <dt className="text-gray-400 text-[11px] uppercase">Réf. demande</dt>
+                  <dd className="font-mono font-semibold">{demande.reference}</dd>
+                </div>
+              )}
+            </dl>
           </div>
 
           <div className="rounded-xl border border-gray-100 bg-slate-50/90 px-4 py-3">
-            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">Formation concernée</h2>
+            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">Formation demandée</h2>
             <dl className="grid sm:grid-cols-2 gap-3 text-sm">
               {modeFormation && (
                 <div className="sm:col-span-2">
@@ -164,19 +201,19 @@ export default function AttestationDemandePreinscription() {
               )}
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">Filière</dt>
-                <dd className="font-semibold">{filiere_libelle || '—'}</dd>
+                <dd className="font-semibold">{form.filiere_libelle}</dd>
               </div>
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">Intitulé</dt>
-                <dd className="font-semibold">{formation_libelle}</dd>
+                <dd className="font-semibold">{form.formation_libelle}</dd>
               </div>
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">Niveau</dt>
-                <dd className="font-medium">{niveau_libelle}</dd>
+                <dd className="font-medium">{form.niveau_libelle}</dd>
               </div>
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">Année académique</dt>
-                <dd className="font-medium">{annee_academique}</dd>
+                <dd className="font-medium">{form.annee_academique}</dd>
               </div>
             </dl>
           </div>
@@ -188,7 +225,7 @@ export default function AttestationDemandePreinscription() {
             )}
           </div>
 
-          <div className="flex flex-col items-center pt-6 pb-2">
+          <div className="flex flex-col items-center pt-4 pb-1">
             <CachetScolarite cachetUrl={etab?.cachet_url} />
             <p className="text-xs text-gray-400 mt-3">Fait à {etab?.nom || '…'}, le {fmtDate(new Date())}</p>
           </div>

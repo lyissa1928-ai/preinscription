@@ -33,7 +33,11 @@ router.post('/generer/:dossierId', authMiddleware, (req, res) => {
 
   const existed = !!rowBefore;
   const facture = genererOuRecupererFactureDossier(dossierId);
-  if (!facture) return res.status(500).json({ message: 'Impossible de générer la facture' });
+  if (!facture) {
+    return res.status(422).json({
+      message: 'Impossible de générer la facture : dossier ou formation incomplet (vérifiez prénom, nom ou e-mail du bénéficiaire).',
+    });
+  }
   res.status(existed ? 200 : 201).json(facture);
 });
 

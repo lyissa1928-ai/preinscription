@@ -89,19 +89,37 @@ export default function FactureView() {
   const [etabLive, setEtabLive] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [loadError, setLoadError] = useState(null)
   const [pdfBusy, setPdfBusy] = useState(false)
 
   useEffect(() => {
+    setLoading(true)
+    setLoadError(null)
+    setFacture(null)
     axios.get(`/api/factures/dossier/${dossierId}`)
       .then(({ data }) => setFacture(data))
-      .catch(() => {
+      .catch((err) => {
+        const status = err.response?.status
+        const msg = err.response?.data?.message
+        if (status === 403) {
+          setLoadError(msg || 'Accès refusé à cette facture. Reconnectez-vous si votre rôle a récemment changé.')
+          return
+        }
+        if (status === 404 && msg === 'Dossier non trouvé') {
+          setLoadError('Dossier introuvable.')
+          return
+        }
         setGenerating(true)
         axios.post(`/api/factures/generer/${dossierId}`)
           .then(({ data }) => {
             setFacture(data)
             toast.success('Facture générée et enregistrée dans l’historique.')
           })
-          .catch((err) => toast.error(err.response?.data?.message || 'Erreur génération facture'))
+          .catch((genErr) => {
+            const genMsg = genErr.response?.data?.message || 'Erreur génération facture'
+            setLoadError(genMsg)
+            toast.error(genMsg)
+          })
           .finally(() => setGenerating(false))
       })
       .finally(() => setLoading(false))
@@ -345,8 +363,11 @@ export default function FactureView() {
   if (!facture) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500 text-lg mb-4">Facture introuvable</p>
+        <div className="text-center max-w-md px-4">
+          <p className="text-gray-800 text-lg font-semibold mb-2">Facture introuvable</p>
+          {loadError && (
+            <p className="text-gray-500 text-sm mb-4">{loadError}</p>
+          )}
           <Link to="/dashboard" className="btn-primary">Retour</Link>
         </div>
       </div>

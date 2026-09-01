@@ -23,4 +23,46 @@ function resolveCandidatIdentite(dossier, utilisateur = {}) {
   };
 }
 
-module.exports = { resolveCandidatIdentite };
+/** Identité minimale pour émission facture / PDF (tolère dossiers guichet ou visiteurs). */
+function ensureIdentiteFacture(dossier, utilisateur = {}) {
+  const base = resolveCandidatIdentite(dossier, utilisateur);
+  let { prenom, nom, email, telephone, adresse, nationalite } = base;
+
+  if (dossier?.type_payeur === 'organisation' && dossier?.payeur?.org_nom) {
+    if (!nom) nom = String(dossier.payeur.org_nom).trim();
+    if (!prenom) prenom = 'Organisation';
+  }
+
+  if (!prenom && !nom && email) {
+    const local = email.split('@')[0] || '';
+    prenom = local || 'Client';
+    nom = nom || '—';
+  }
+
+  if (!prenom) prenom = '—';
+  if (!nom) nom = '—';
+
+  return {
+    ...base,
+    prenom,
+    nom,
+    email,
+    telephone,
+    adresse,
+    nationalite,
+  };
+}
+
+function buildEtudiantSnapshot(dossier, utilisateur = {}) {
+  const identite = ensureIdentiteFacture(dossier, utilisateur);
+  return {
+    nom: identite.nom,
+    prenom: identite.prenom,
+    email: identite.email,
+    telephone: identite.telephone || dossier?.telephone,
+    adresse: identite.adresse || dossier?.adresse,
+    nationalite: identite.nationalite || dossier?.nationalite,
+  };
+}
+
+module.exports = { resolveCandidatIdentite, ensureIdentiteFacture, buildEtudiantSnapshot };

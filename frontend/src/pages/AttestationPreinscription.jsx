@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
 import DocumentDownloadBar from '../components/DocumentDownloadBar'
+import { resolveAffichageCandidat, resolveFormationAffichage } from '../utils/attestationDisplay'
 
 const fmtDate = (d) => {
   if (d == null || d === '') return '—'
@@ -81,6 +82,7 @@ export default function AttestationPreinscription() {
   const {
     dossier,
     etudiant,
+    formation,
     etablissement: etab,
     formation_libelle,
     filiere_libelle,
@@ -95,12 +97,18 @@ export default function AttestationPreinscription() {
   const logoSrc = mediaUrl(etab?.logo_url)
   const refAtt = ext.reference_attestation || `ATT-${new Date().getFullYear()}-${String(dossier.id).padStart(5, '0')}`
 
-  const prenomT = (etudiant?.prenom || dossier?.prenom || '').trim()
-  const nomT = (etudiant?.nom || dossier?.nom || '').trim()
-  const nomComplet = [prenomT, nomT].filter(Boolean).join(' ') || '—'
-  const nDossier = candidat?.numero_dossier || dossier.numero_dossier
+  const { prenom: prenomT, nom: nomT, email: emailT, nomComplet } = resolveAffichageCandidat({ etudiant, dossier })
+  const form = resolveFormationAffichage({
+    formation_libelle,
+    filiere_libelle,
+    niveau_libelle,
+    annee_academique,
+    dossier,
+    formation,
+  })
+  const nDossier = dossier?.numero_dossier || ext?.numero_dossier || '—'
 
-  const texteCorps = `Nous attestons que ${nomComplet} est admis(e) en ${formation_libelle} pour l’année académique ${annee_academique}, sous réserve des formalités d’inscription définitive.`
+  const texteCorps = `Nous attestons que ${nomComplet} est admis(e) en ${form.formation_libelle} pour l’année académique ${form.annee_academique}, sous réserve des formalités d’inscription définitive.`
 
   return (
     <div className="lettre-print-scope min-h-screen bg-slate-200 py-8 px-4">
@@ -162,12 +170,18 @@ export default function AttestationPreinscription() {
             <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">Prénom(s)</dt>
-                <dd className="font-semibold text-base">{prenomT || '—'}</dd>
+                <dd className="font-semibold text-base">{prenomT}</dd>
               </div>
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">Nom</dt>
-                <dd className="font-semibold text-base uppercase">{nomT || '—'}</dd>
+                <dd className="font-semibold text-base uppercase">{nomT}</dd>
               </div>
+              {emailT && (
+                <div className="sm:col-span-2">
+                  <dt className="text-gray-400 text-[11px] uppercase">E-mail</dt>
+                  <dd className="font-medium">{emailT}</dd>
+                </div>
+              )}
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">N° dossier</dt>
                 <dd className="font-mono font-semibold">{nDossier || '—'}</dd>
@@ -184,19 +198,19 @@ export default function AttestationPreinscription() {
             <dl className="grid sm:grid-cols-2 gap-3 text-sm">
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">Filière</dt>
-                <dd className="font-semibold">{filiere_libelle || '—'}</dd>
+                <dd className="font-semibold">{form.filiere_libelle}</dd>
               </div>
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">Intitulé</dt>
-                <dd className="font-semibold">{formation_libelle}</dd>
+                <dd className="font-semibold">{form.formation_libelle}</dd>
               </div>
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">Niveau</dt>
-                <dd className="font-medium">{niveau_libelle}</dd>
+                <dd className="font-medium">{form.niveau_libelle}</dd>
               </div>
               <div>
                 <dt className="text-gray-400 text-[11px] uppercase">Année académique</dt>
-                <dd className="font-medium">{annee_academique}</dd>
+                <dd className="font-medium">{form.annee_academique}</dd>
               </div>
             </dl>
           </div>

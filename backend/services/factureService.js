@@ -123,6 +123,21 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
     if (typeDocOpt && existing.type_document !== typeDocOpt) {
       db.get('factures').find({ id: existing.id }).assign({ type_document: typeDocOpt }).write();
     }
+    const etudiantExist = dossierRow.etudiant_id
+      ? db.get('utilisateurs').find({ id: dossierRow.etudiant_id }).value()
+      : null;
+    const { buildEtudiantSnapshot } = require('../utils/candidatIdentite');
+    const snapRefresh = buildEtudiantSnapshot(dossierRow, etudiantExist || {});
+    const curSnap = existing.etudiant_snapshot || {};
+    const needSnap =
+      !String(curSnap.prenom || '').trim()
+      || !String(curSnap.nom || '').trim()
+      || (!curSnap.email && snapRefresh.email);
+    if (needSnap) {
+      db.get('factures').find({ id: existing.id }).assign({
+        etudiant_snapshot: { ...curSnap, ...snapRefresh },
+      }).write();
+    }
     const current = db.get('factures').find({ id: existing.id }).value();
     const synced = syncFactureMontantsFromFormation(current, formation);
     const date_echeance = syncDateEcheanceFacture({ ...current, ...synced });
@@ -133,9 +148,8 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
   const etudiant = dossierRow.etudiant_id
     ? db.get('utilisateurs').find({ id: dossierRow.etudiant_id }).value()
     : null;
-  const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
-  const identite = resolveCandidatIdentite(dossierRow, etudiant || {});
-  if (!identite.prenom || !identite.nom) return null;
+  const { buildEtudiantSnapshot } = require('../utils/candidatIdentite');
+  const etudiant_snapshot = buildEtudiantSnapshot(dossierRow, etudiant || {});
 
   const typePayeur = dossierRow.type_payeur === 'organisation' ? 'organisation' : 'etudiant';
   const payeur = typePayeur === 'organisation' && dossierRow.payeur ? dossierRow.payeur : null;
@@ -165,14 +179,7 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
     montant_ttc,
     montant_total_a_payer: montant_ttc + (tarif.montant_supplementaires || 0),
     statut: 'emise',
-    etudiant_snapshot: {
-      nom: identite.nom,
-      prenom: identite.prenom,
-      email: identite.email,
-      telephone: identite.telephone || dossierRow.telephone,
-      adresse: identite.adresse || dossierRow.adresse,
-      nationalite: identite.nationalite || dossierRow.nationalite,
-    },
+    etudiant_snapshot,
     type_payeur: typePayeur,
     payeur,
     formation_snapshot: buildFormationSnapshot(formation, tarif),

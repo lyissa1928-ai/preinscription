@@ -8,7 +8,7 @@ const { snapshotFromEtab, snapshotFromFormation, snapshotFromEtablissementId } =
 const { logAudit } = require('../utils/auditLog');
 const { DOSSIER_STATUSES, canTransitionDossierStatus, requiresRejectionComment } = require('../utils/dossierWorkflow');
 const { createUserNotification } = require('../utils/notificationService');
-const { buildAttestationPayloadForDossier } = require('../utils/buildAttestationPayload');
+const { buildAttestationPayloadForDossier, buildAttestationPayloadForDemandeProforma } = require('../utils/buildAttestationPayload');
 const { canIssueOfficialDocs } = require('../utils/canIssueOfficialDocs');
 const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
 const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
@@ -77,6 +77,21 @@ router.get('/attestation/:dossierId', authMiddleware, staffLettreAttestation, (r
     return res.status(403).json({ message: 'Ce dossier ne concerne pas votre établissement.' });
   }
   const built = buildAttestationPayloadForDossier(id);
+  if (built.error) {
+    return res.status(built.error.status).json({ message: built.error.message });
+  }
+  res.json(built.body);
+});
+
+router.get('/attestation-demande/:demandeId', authMiddleware, staffLettreAttestation, (req, res) => {
+  const id = parseInt(String(req.params.demandeId), 10);
+  if (Number.isNaN(id)) return res.status(400).json({ message: 'Identifiant de demande invalide' });
+  const demande = db.get('demandes_proforma').find({ id }).value();
+  if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
+  if (!assertDemandePourResponsable(req, demande)) {
+    return res.status(403).json({ message: 'Cette demande ne concerne pas votre établissement.' });
+  }
+  const built = buildAttestationPayloadForDemandeProforma(id);
   if (built.error) {
     return res.status(built.error.status).json({ message: built.error.message });
   }

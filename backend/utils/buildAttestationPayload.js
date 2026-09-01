@@ -1,7 +1,7 @@
 const db = require('../database/db');
 const { snapshotFromFormation, snapshotFromEtablissementId } = require('./etablissementSnapshot');
 const { canIssueOfficialDocs } = require('./canIssueOfficialDocs');
-const { resolveCandidatIdentite } = require('./candidatIdentite');
+const { ensureIdentiteFacture } = require('./candidatIdentite');
 const { primaryPhotoDocumentFromList } = require('./preinscriptionDocumentRules');
 
 /**
@@ -24,7 +24,7 @@ function buildAttestationPayloadForDossier(dossierId) {
   }
 
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
-  const identite = resolveCandidatIdentite(dossier, u);
+  const identite = ensureIdentiteFacture(dossier, u);
   const formation = dossier.formation_id
     ? db.get('formations').find({ id: dossier.formation_id }).value()
     : null;
@@ -100,6 +100,15 @@ function buildAttestationPayloadForDemandeProforma(demandeId) {
 
   const uid = demande.etudiant_id != null ? Number(demande.etudiant_id) : null;
   const u = uid ? db.get('utilisateurs').find({ id: uid }).value() || {} : {};
+  const pseudoDossier = {
+    prenom: demande.prenom,
+    nom: demande.nom,
+    email: demande.email,
+    telephone: demande.telephone,
+    type_payeur: demande.type_payeur,
+    payeur: demande.payeur,
+  };
+  const identite = ensureIdentiteFacture(pseudoDossier, u);
   const formation = demande.formation_id
     ? db.get('formations').find({ id: demande.formation_id }).value()
     : null;
@@ -121,9 +130,17 @@ function buildAttestationPayloadForDemandeProforma(demandeId) {
     type: 'demande_proforma',
     demande,
     etudiant: {
-      nom: u.nom || demande.nom,
-      prenom: u.prenom || demande.prenom,
-      email: u.email || demande.email,
+      nom: identite.nom,
+      prenom: identite.prenom,
+      email: identite.email,
+    },
+    candidat: {
+      date_naissance: identite.date_naissance,
+      lieu_naissance: identite.lieu_naissance,
+      nationalite: identite.nationalite,
+      pays_residence: identite.pays_residence,
+      numero_passeport: identite.numero_passeport,
+      sexe: identite.sexe,
     },
     formation,
     filiere_libelle,

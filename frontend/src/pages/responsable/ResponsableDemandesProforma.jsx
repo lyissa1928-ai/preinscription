@@ -264,14 +264,24 @@ export default function ResponsableDemandesProforma() {
                           </>
                         )}
                         {d.statut === 'acceptee' && d.reference && (
-                          <Link
-                            to={`/facture-publique/${d.reference}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-md border border-blue-200 px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50"
-                          >
-                            Facture
-                          </Link>
+                          <>
+                            <Link
+                              to={`/facture-publique/${d.reference}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-md border border-blue-200 px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50"
+                            >
+                              Facture
+                            </Link>
+                            <Link
+                              to={`/attestation-demande/${d.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-md border border-indigo-200 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-50"
+                            >
+                              Attestation
+                            </Link>
+                          </>
                         )}
                         {canChatterEtudiant && d.etudiant_id != null && Number(d.etudiant_id) > 0 && (
                           <Link
