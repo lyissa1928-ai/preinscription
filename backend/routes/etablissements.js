@@ -74,11 +74,11 @@ function etabPedagogieWrite(req, res, next) {
   if (Number(req.user.etablissement_id) !== etabId) {
     return res.status(403).json({ message: 'Vous ne pouvez modifier que les formations de votre établissement.' });
   }
-  if (actsAsResponsable(req.user)) {
+  if (isAdminEtablissement(req.user) || actsAsResponsable(req.user)) {
     return next();
   }
   return res.status(403).json({
-    message: 'Accès réservé à l’administrateur ou au responsable pédagogique de cet établissement.',
+    message: 'Accès réservé à l’administrateur, à l’administrateur d’établissement ou au responsable pédagogique.',
   });
 }
 

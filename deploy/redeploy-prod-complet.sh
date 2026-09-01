@@ -31,21 +31,22 @@ echo ">>> [1/9] Sauvegardes..."
 tar czf "$BACKUP_ROOT/apache-config-$STAMP.tar.gz" /etc/apache2/sites-enabled 2>/dev/null || true
 echo "    OK → $BACKUP_ROOT"
 
-# ─── 2. GIT (débloquer fichiers locaux) ───
+# ─── 2. GIT (débloquer skip-worktree + pull) ───
 echo ">>> [2/9] Mise à jour code GitHub..."
+if [[ -f deploy/debloquer-git-pull-prod.sh ]]; then
+  bash deploy/debloquer-git-pull-prod.sh || true
+else
+  # Fallback si script pas encore présent (premier pull bloqué)
+  [[ -f frontend/public/config-site.js ]] && cp frontend/public/config-site.js "$BACKUP_ROOT/config-site.js.$STAMP"
+  git update-index --no-skip-worktree frontend/public/config-site.js 2>/dev/null || true
+  git restore --source=HEAD --staged --worktree frontend/public/config-site.js 2>/dev/null \
+    || git checkout HEAD -- frontend/public/config-site.js 2>/dev/null || true
+fi
 
-# Skip-worktree sur la base et les .env avant pull (données prod intactes)
 [[ -f backend/database/preinscription.json ]] && \
   git update-index --skip-worktree backend/database/preinscription.json 2>/dev/null || true
 [[ -f backend/.env ]] && git update-index --skip-worktree backend/.env 2>/dev/null || true
 [[ -f frontend/.env.production ]] && git update-index --skip-worktree frontend/.env.production 2>/dev/null || true
-
-# config-site.js : souvent édité à la main en prod → sauvegarde + reset pour débloquer git pull
-if [[ -f frontend/public/config-site.js ]]; then
-  cp frontend/public/config-site.js "$BACKUP_ROOT/config-site.js.$STAMP"
-  git update-index --no-skip-worktree frontend/public/config-site.js 2>/dev/null || true
-  git checkout -- frontend/public/config-site.js 2>/dev/null || true
-fi
 
 git checkout -- deploy/ 2>/dev/null || true
 git checkout -- frontend/package-lock.json backend/package-lock.json 2>/dev/null || true
