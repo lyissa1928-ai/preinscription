@@ -1,0 +1,108 @@
+================================================================================
+prod-esebat-uniportail-seul.txt
+UniPortail = SEULE application sur https://esebat-digitalservices.com
+(Remplace l’ancienne app PHP à la racine et le sous-chemin /uniportail/)
+================================================================================
+
+  Remplacer si besoin :
+    USER_HESTIA=admin
+    APP_ROOT=/var/www/uniportail
+    EMAIL=lyissa1928@gmail.com
+
+================================================================================
+ÉTAPE 0 — Connexion SSH (root ou sudo)
+================================================================================
+
+  ssh USER@IP_DU_VPS
+  sudo -i
+
+================================================================================
+ÉTAPE 1 — Sauvegardes OBLIGATOIRES
+================================================================================
+
+  mkdir -p /var/backups/uniportail
+  cp /var/www/uniportail/backend/database/preinscription.json \
+     /var/backups/uniportail/preinscription-$(date +%Y%m%d-%H%M).json 2>/dev/null || true
+  tar czf /var/backups/uniportail/public_html-esebat-$(date +%Y%m%d-%H%M).tar.gz \
+     -C /home/admin/web/esebat-digitalservices.com public_html 2>/dev/null || true
+
+================================================================================
+ÉTAPE 2 — Code à jour + protection données
+================================================================================
+
+  cd /var/www/uniportail
+  bash deploy/proteger-donnees-prod.sh
+  git fetch origin && git pull origin main
+
+================================================================================
+ÉTAPE 3 — Bascule racine (script automatique)
+================================================================================
+
+  cd /var/www/uniportail
+  chmod +x deploy/configurer-racine-esebat.sh
+  UNIPORTAIL_APP_ROOT=/var/www/uniportail \
+  ESEBAT_DOMAIN=esebat-digitalservices.com \
+  HESTIA_USER=admin \
+  bash deploy/configurer-racine-esebat.sh
+
+  Le script :
+  - archive l’ancien public_html (app PHP)
+  - ne laisse que pm2 « uniportail-api »
+  - build avec VITE_BASE_PATH=/
+  - configure CORS pour esebat-digitalservices.com
+  - installe nginx-esebat-digitalservices.conf si /etc/nginx/conf.d existe
+
+================================================================================
+ÉTAPE 4 — Si le serveur utilise Apache (Hestia sans override nginx)
+================================================================================
+
+  Éditer le vhost SSL du domaine et ajouter le contenu de :
+    deploy/apache-esebat-digitalservices-root.conf.example
+
+  Puis :
+    systemctl reload apache2
+
+  DocumentRoot doit pointer vers :
+    /var/www/uniportail/frontend/dist
+
+================================================================================
+ÉTAPE 5 — Vérifications
+================================================================================
+
+  curl -sI https://esebat-digitalservices.com/ | head -5
+  curl -s https://esebat-digitalservices.com/api/health
+  curl -sI https://esebat-digitalservices.com/uniportail/connexion | head -5
+  # ↑ doit répondre 301 vers /connexion
+
+  Navigateur :
+    https://esebat-digitalservices.com/
+    https://esebat-digitalservices.com/connexion
+    Admin → Formations (grille Excel)
+
+  pm2 list
+  # Seul « uniportail-api » doit tourner pour cette app.
+
+================================================================================
+Mises à jour ultérieures (code uniquement)
+================================================================================
+
+  cd /var/www/uniportail
+  UNIPORTAIL_API_PUBLIC_URL="" \
+  UNIPORTAIL_SITE_URL="https://esebat-digitalservices.com" \
+  bash deploy/mise-a-jour-prod.sh
+
+================================================================================
+Rollback rapide
+================================================================================
+
+  cp /var/backups/uniportail/preinscription-DATE.json \
+     /var/www/uniportail/backend/database/preinscription.json
+  cd /var/www/uniportail && git checkout main && git pull
+  npm run build && pm2 restart uniportail-api
+
+  Restaurer public_html :
+    tar xzf /var/backups/uniportail/public_html-esebat-DATE.tar.gz -C /home/admin/web/esebat-digitalservices.com
+
+================================================================================
+FIN
+================================================================================

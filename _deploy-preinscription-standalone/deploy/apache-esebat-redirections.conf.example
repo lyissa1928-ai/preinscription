@@ -1,0 +1,9 @@
+# OBSOLÈTE — ancien déploiement sous /uniportail/ avec app PHP à la racine.
+# Utiliser à la place :
+#   deploy/apache-esebat-digitalservices-root.conf.example
+#   deploy/nginx-esebat-digitalservices.conf
+#   deploy/configurer-racine-esebat.sh
+#
+# UniPortail est désormais la SEULE app sur esebat-digitalservices.com (racine).
+# Redirection legacy /uniportail/* → /* :
+RedirectMatch 301 ^/uniportail/?(.*)$ /$1
