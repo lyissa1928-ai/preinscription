@@ -3,6 +3,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { DashboardPage, Panel } from '../components/dashboard/DashboardChrome'
+import DonneesBackupPanel from '../components/DonneesBackupPanel'
 
 const ROLE_LABELS = {
   admin: 'Administrateur plateforme',
@@ -170,6 +171,8 @@ export default function ProfilPage() {
           </form>
         </Panel>
       </div>
+
+      <DonneesBackupPanel className="mt-6" />
     </DashboardPage>
   )
 }

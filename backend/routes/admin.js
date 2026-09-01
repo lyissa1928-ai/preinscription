@@ -33,6 +33,8 @@ const {
 } = require('../utils/statsHelpers');
 const { isMaintenanceModeEnabled } = require('../utils/maintenanceMode');
 const { runHealthChecks } = require('../utils/healthCheck');
+const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
+const { filterDossiersAffichables, assertDossierAffichable } = require('../utils/dossierVisibility');
 const { parsePagination, wantsPagination, paginateArray } = require('../utils/pagination');
 
 router.use(authMiddleware);
@@ -154,16 +156,15 @@ router.get('/dossiers', (req, res) => {
 
   let dossiers = db.get('dossiers').value();
 
-  // Joindre avec les utilisateurs
+  // Joindre avec les utilisateurs — exclure dossiers orphelins (compte étudiant supprimé)
   const utilisateurs = db.get('utilisateurs').value();
+  dossiers = filterDossiersAffichables(dossiers, utilisateurs);
   dossiers = dossiers.map(d => {
     const u = utilisateurs.find(u => u.id === d.etudiant_id) || {};
+    const identite = resolveCandidatIdentite(d, u);
     return {
       ...d,
-      nom: u.nom,
-      prenom: u.prenom,
-      email: u.email,
-      matricule: u.matricule || null,
+      ...identite,
     };
   });
 
@@ -195,19 +196,35 @@ router.get('/dossiers/:id', (req, res) => {
   const dossier = db.get('dossiers').find({ id }).value();
   if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
 
+  const utilisateurs = db.get('utilisateurs').value();
+  const vis = assertDossierAffichable(dossier, utilisateurs);
+  if (!vis.ok) return res.status(vis.status).json({ message: vis.message });
+
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
   const documents = db.get('documents').filter({ dossier_id: id }).value();
+  const identite = resolveCandidatIdentite(dossier, u);
+  const formation = db.get('formations').find({ id: dossier.formation_id }).value() || null;
+  const etablissement = dossier.etablissement_id
+    ? db.get('etablissements').find({ id: dossier.etablissement_id }).value() || null
+    : null;
+  const { genererOuRecupererFactureDossier } = require('../services/factureService');
+  const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
+  const factureRow = db.get('factures').find({ dossier_id: id }).value() || null;
+  const facture =
+    (isDossierAcceptePourLettre(dossier.statut) && dossier.formation_id)
+      ? genererOuRecupererFactureDossier(id)
+      : (factureRow ? genererOuRecupererFactureDossier(id) : null);
 
   res.json({
     dossier: {
       ...dossier,
-      nom: u.nom,
-      prenom: u.prenom,
-      email: u.email,
-      matricule: u.matricule || null,
-      date_inscription: u.created_at,
+      ...identite,
+      date_inscription: u.created_at || dossier.created_at || null,
+      etablissement_nom: etablissement?.nom || null,
     },
-    documents
+    documents,
+    formation,
+    facture,
   });
 });
 

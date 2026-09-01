@@ -49,7 +49,7 @@ export default function StaffEtabEquipe() {
             Créez et gérez les comptes staff de votre établissement. Toutes vos actions sont enregistrées dans le journal d’audit visible par l’administrateur plateforme.
           </p>
         </header>
-        <div className="card overflow-hidden border-slate-200/80 shadow-md p-5 md:p-8">
+        <div className="card overflow-hidden border-slate-200/80 shadow-md p-5 md:p-8 space-y-8">
           <TabMembres etabId={etab.id} membres={etab.membres || []} responsable_id={etab.responsable_id} />
         </div>
       </div>

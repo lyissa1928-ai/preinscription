@@ -31,6 +31,7 @@ const { canIssueOfficialDocs } = require('../utils/canIssueOfficialDocs');
 const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
 const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
 const { genererOuRecupererFactureDossier } = require('../services/factureService');
+const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
 const { getDureeMoisEffectif } = require('../utils/formationTarifs');
 
 const uploadsStudentDir = path.join(__dirname, '../uploads');
@@ -349,9 +350,25 @@ router.post(
 function packDossierPayload(dossier) {
   const documents = db.get('documents').filter({ dossier_id: dossier.id }).value();
   const formation = db.get('formations').find({ id: dossier.formation_id }).value();
-  const factureRow = db.get('factures').find({ dossier_id: dossier.id }).value() || null;
-  const facture = factureRow ? genererOuRecupererFactureDossier(dossier.id) : null;
-  return { dossier, documents, formation, facture };
+  const accepte = isDossierAcceptePourLettre(dossier.statut);
+  let facture = null;
+  if (accepte && dossier.formation_id) {
+    facture = genererOuRecupererFactureDossier(dossier.id);
+  } else {
+    const factureRow = db.get('factures').find({ dossier_id: dossier.id }).value() || null;
+    if (factureRow) facture = genererOuRecupererFactureDossier(dossier.id);
+  }
+  return {
+    dossier,
+    documents,
+    formation,
+    facture,
+    documents_officiels: {
+      facture: accepte,
+      attestation: accepte,
+      lettre: canIssueLettrePreinscription(dossier),
+    },
+  };
 }
 
 // GET /api/etudiant/dossiers — toutes les candidatures de l'étudiant (plusieurs formations possibles)

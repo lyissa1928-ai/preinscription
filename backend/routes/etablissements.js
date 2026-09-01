@@ -2528,4 +2528,39 @@ router.post('/:etabId/membres/:id/supprimer-definitif', adminOnly, (req, res) =>
   res.json({ message: 'Compte supprimé définitivement.' });
 });
 
+const {
+  exportEtablissementData,
+  restoreEtablissementData,
+} = require('../utils/userDataExport');
+
+// GET /api/etablissements/:id/donnees/export — sauvegarde JSON de l'établissement
+router.get('/:id/donnees/export', etabMembresManageAccess, (req, res) => {
+  const etabId = parseInt(req.params.id, 10);
+  const data = exportEtablissementData(etabId);
+  if (!data) return res.status(404).json({ message: 'Établissement introuvable.' });
+  logAudit(req, 'export_donnees_etablissement', 'etablissement', etabId, {
+    scope: 'etablissement',
+    etablissement_id: etabId,
+  });
+  return res.json(data);
+});
+
+// POST /api/etablissements/:id/donnees/restore — fusion additive
+router.post('/:id/donnees/restore', etabMembresManageAccess, (req, res) => {
+  const etabId = parseInt(req.params.id, 10);
+  if (!req.body?.confirm) {
+    return res.status(400).json({ message: 'Confirmation requise (confirm: true).' });
+  }
+  try {
+    const { preBackup, stats } = restoreEtablissementData(etabId, req.body.payload, req);
+    return res.json({
+      message: 'Restauration terminée. Les enregistrements ont été fusionnés par identifiant.',
+      pre_backup: preBackup,
+      stats,
+    });
+  } catch (e) {
+    return res.status(400).json({ message: e.message });
+  }
+});
+
 module.exports = router;

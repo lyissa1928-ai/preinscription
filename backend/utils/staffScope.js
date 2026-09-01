@@ -10,6 +10,7 @@ const {
   demandeAppartientAEtablissement,
   buildFormationsMap,
 } = require('./etablissementScope');
+const { filterDossiersAffichables, assertDossierAffichable } = require('./dossierVisibility');
 
 function getScopeContext(user) {
   const formations = db.get('formations').value() || [];
@@ -20,9 +21,11 @@ function getScopeContext(user) {
 }
 
 function filterDossiersForUser(user, dossiers) {
+  const utilisateurs = db.get('utilisateurs').value() || [];
+  let list = filterDossiersAffichables(dossiers, utilisateurs);
   const { etabId, formationsById } = getScopeContext(user);
-  if (!etabId) return dossiers || [];
-  return (dossiers || []).filter((d) => dossierAppartientAEtablissement(d, etabId, formationsById));
+  if (!etabId) return list;
+  return list.filter((d) => dossierAppartientAEtablissement(d, etabId, formationsById));
 }
 
 function filterDemandesForUser(user, demandes) {
@@ -41,6 +44,8 @@ function assertDossierForUser(user, dossier) {
   if (!dossier) {
     return { ok: false, status: 404, message: 'Dossier non trouvé' };
   }
+  const vis = assertDossierAffichable(dossier, db.get('utilisateurs').value());
+  if (!vis.ok) return vis;
   if (user?.role === 'admin') return { ok: true };
   const { etabId, formationsById } = getScopeContext(user);
   if (!etabId) {

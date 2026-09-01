@@ -1119,4 +1119,53 @@ router.put('/mot-de-passe', authMiddleware, (req, res) => {
   return res.json({ message: 'Mot de passe mis à jour. Reconnectez-vous sur les autres appareils si besoin.' });
 });
 
+const {
+  exportForUser,
+  getBackupEndpointsForUser,
+  restoreUserProfileData,
+} = require('../utils/userDataExport');
+const { logAudit } = require('../utils/auditLog');
+
+// GET /api/auth/mes-donnees/manifest — périmètre export/restauration selon le rôle
+router.get('/mes-donnees/manifest', authMiddleware, (req, res) => {
+  return res.json(getBackupEndpointsForUser(req.user));
+});
+
+// GET /api/auth/mes-donnees/export — export JSON (étudiant, staff, hors admin plateforme)
+router.get('/mes-donnees/export', authMiddleware, (req, res) => {
+  if (req.user.role === 'admin') {
+    return res.status(400).json({
+      message: 'Utilisez Maintenance ou GET /api/admin/backup/export pour une sauvegarde complète.',
+    });
+  }
+  const data = exportForUser(req.user);
+  if (!data) return res.status(404).json({ message: 'Rien à exporter.' });
+  logAudit(req, 'export_donnees_utilisateur', 'utilisateur', req.user.id, {
+    export_type: data._exportType,
+    scope: req.user.role,
+  });
+  return res.json(data);
+});
+
+// POST /api/auth/mes-donnees/restore — restauration profil (étudiant / staff)
+router.post('/mes-donnees/restore', authMiddleware, (req, res) => {
+  if (req.user.role === 'admin' || req.user.role === 'admin_etablissement') {
+    return res.status(400).json({
+      message: 'Utilisez la restauration établissement depuis la page Équipe ou Maintenance.',
+    });
+  }
+  if (!req.body?.confirm) {
+    return res.status(400).json({ message: 'Confirmation requise (confirm: true).' });
+  }
+  try {
+    const result = restoreUserProfileData(req.user, req.body.payload);
+    logAudit(req, 'restauration_profil_utilisateur', 'utilisateur', req.user.id, {
+      pre_backup: result.preBackup,
+    });
+    return res.json({ message: result.message, pre_backup: result.preBackup });
+  } catch (e) {
+    return res.status(400).json({ message: e.message });
+  }
+});
+
 module.exports = router;

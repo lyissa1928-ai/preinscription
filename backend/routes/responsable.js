@@ -12,6 +12,7 @@ const { buildAttestationPayloadForDossier } = require('../utils/buildAttestation
 const { canIssueOfficialDocs } = require('../utils/canIssueOfficialDocs');
 const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
 const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
+const { filterDossiersAffichables, assertDossierAffichable } = require('../utils/dossierVisibility');
 const { primaryPhotoDocumentFromList } = require('../utils/preinscriptionDocumentRules');
 
 // ─── Lettres / attestations (staff établissement, même périmètre que facture dossier) ─
@@ -320,6 +321,7 @@ router.get('/dossiers', (req, res) => {
 
   let dossiers = db.get('dossiers').value();
   const utilisateurs = db.get('utilisateurs').value();
+  dossiers = filterDossiersAffichables(dossiers, utilisateurs);
 
   if (formationIds !== null) {
     dossiers = dossiers.filter(d => dossierAppartientAEtablissement(d, req.user.etablissement_id));
@@ -327,7 +329,8 @@ router.get('/dossiers', (req, res) => {
 
   dossiers = dossiers.map(d => {
     const u = utilisateurs.find(u => u.id === d.etudiant_id) || {};
-    return { ...d, nom: u.nom, prenom: u.prenom, email: u.email };
+    const identite = resolveCandidatIdentite(d, u);
+    return { ...d, ...identite };
   });
 
   if (type === 'fad' || type === 'en_ligne') {
@@ -462,17 +465,22 @@ router.get('/dossiers/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const dossier = db.get('dossiers').find({ id }).value();
   if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
+  const vis = assertDossierAffichable(dossier, db.get('utilisateurs').value());
+  if (!vis.ok) return res.status(vis.status).json({ message: vis.message });
   if (!assertDossierPourResponsable(req, dossier)) {
     return res.status(403).json({ message: 'Ce dossier ne concerne pas votre établissement.' });
   }
 
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
-  const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
   const identite = resolveCandidatIdentite(dossier, u);
   const documents = db.get('documents').filter({ dossier_id: id }).value();
   const formation = db.get('formations').find({ id: dossier.formation_id }).value();
   const factureRow = db.get('factures').find({ dossier_id: id }).value() || null;
-  const facture = factureRow ? genererOuRecupererFactureDossier(id) : null;
+  const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
+  const facture =
+    (isDossierAcceptePourLettre(dossier.statut) && dossier.formation_id)
+      ? genererOuRecupererFactureDossier(id)
+      : (factureRow ? genererOuRecupererFactureDossier(id) : null);
 
   res.json({
     dossier: {

@@ -47,3 +47,16 @@ Au démarrage du serveur, `utils/schemaMigrations.js` applique les migrations ma
 | v2 | `nombre_photos_preinscription`, `actif` par défaut |
 
 Les champs historiques (`ville`, `places`, `autres_frais`, etc.) sont **conservés**. Pour ajouter une migration : créer une entrée dans `MIGRATIONS` avec `version` incrémentée et une fonction `up(db)` additive uniquement.
+
+## Sauvegarde et restauration par rôle
+
+| Rôle | Export | Restauration | Contenu principal |
+|------|--------|--------------|-------------------|
+| **Admin plateforme** | `GET /api/admin/backup/export` (page Maintenance / Profil) | Manuelle sur serveur (remplacer `preinscription.json` après backup) | Base complète |
+| **Admin établissement** | `GET /api/etablissements/:id/donnees/export` (page Équipe) | `POST …/donnees/restore` — fusion par identifiant, backup auto avant | Fiche étab., filières, formations, conditions, staff (sans MDP), dossiers, factures |
+| **Étudiant** | `GET /api/auth/mes-donnees/export` (Mon profil) | Profil uniquement (nom, contact) | Dossiers, documents (métadonnées), factures |
+| **Staff** (resp., agent, etc.) | `GET /api/auth/mes-donnees/export` | Profil uniquement | Identité du compte |
+
+**Non exporté** : mots de passe, tokens, fichiers uploadés (PDF/images — copie séparée du dossier `uploads/` en production).
+
+**Mises à jour sans perte** : au démarrage, `schemaMigrations.js` + backup `pre-migrate-*` ; au déploiement prod, `deploy/redeploy-prod-complet.sh` crée aussi une sauvegarde. Le fichier prod `preinscription.json` est protégé (`skip-worktree`) pour ne pas être écrasé par un `git pull`.

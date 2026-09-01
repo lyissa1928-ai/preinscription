@@ -775,38 +775,75 @@ export default function EtudiantDashboard() {
                       </td>
                     </tr>
                   ) : (
-                    dossiersSorted.map((row) => {
-                      const { dossier, formation } = row
-                      const ld = labelDossierStatut(dossier.statut)
-                      return (
-                        <tr
-                          key={dossier.id}
-                          className="border-b border-slate-100 hover:bg-blue-50/40 cursor-pointer transition-colors"
-                          onClick={() => setModal({ type: 'dossier', payload: row })}
-                        >
-                          <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">{dossier.numero_dossier}</td>
-                          <td className="px-4 py-3 font-medium text-slate-900 max-w-[200px] truncate" title={formation?.titre}>
-                            {formation?.titre || '—'}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{fmtDate(dossier.created_at)}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex text-xs font-bold px-2.5 py-1 rounded-full ring-1 ${ld.cls}`}>{ld.label}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              className="text-xs font-bold text-blue-700 hover:underline"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setModal({ type: 'dossier', payload: row })
-                              }}
-                            >
-                              Voir le détail
-                            </button>
+                dossiersSorted.map((row) => {
+                  const { dossier, formation } = row
+                  const ld = labelDossierStatut(dossier.statut)
+                  const accepted = isDossierAcceptePourDocuments(dossier.statut)
+                  const showLettre = canShowLettrePreinscription(dossier, inferIsForeignerFromNationalite)
+                  return (
+                    <Fragment key={dossier.id}>
+                      <tr
+                        className="border-b border-slate-100 hover:bg-blue-50/40 cursor-pointer transition-colors"
+                        onClick={() => setModal({ type: 'dossier', payload: row })}
+                      >
+                        <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">{dossier.numero_dossier}</td>
+                        <td className="px-4 py-3 font-medium text-slate-900 max-w-[200px] truncate" title={formation?.titre}>
+                          {formation?.titre || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{fmtDate(dossier.created_at)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex text-xs font-bold px-2.5 py-1 rounded-full ring-1 ${ld.cls}`}>{ld.label}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            className="text-xs font-bold text-blue-700 hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setModal({ type: 'dossier', payload: row })
+                            }}
+                          >
+                            Voir le détail
+                          </button>
+                        </td>
+                      </tr>
+                      {accepted && (
+                        <tr className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50/90 to-teal-50/40">
+                          <td colSpan={5} className="px-4 py-3">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                              <span className="text-xs font-bold text-emerald-900 shrink-0">Documents disponibles :</span>
+                              <div className="flex flex-wrap gap-2">
+                                <Link
+                                  to={`/facture/${dossier.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700"
+                                >
+                                  Facture proforma
+                                </Link>
+                                <Link
+                                  to={`/attestation/${dossier.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700"
+                                >
+                                  Attestation
+                                </Link>
+                                {showLettre && (
+                                  <Link
+                                    to={`/lettre/${dossier.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
+                                  >
+                                    Lettre de préinscription
+                                  </Link>
+                                )}
+                              </div>
+                            </div>
                           </td>
                         </tr>
-                      )
-                    })
+                      )}
+                    </Fragment>
+                  )
+                })
                   )}
                 </tbody>
               </table>

@@ -28,6 +28,13 @@ import PreinscriptionConditionsBlock from '../../components/PreinscriptionCondit
 import FormationExcelGrid from '../../components/FormationExcelGrid'
 import { computeScolariteAnnuelle, computeTotalMensualites, dureeLabelFromMois } from '../../lib/formationTarifs'
 import { loadColumnState, templateColumnsFromState, formationToGridRow } from '../../lib/formationGridSchema'
+import DonneesBackupPanel from '../../components/DonneesBackupPanel'
+import {
+  canCreateStaffAccount as userCanCreateStaff,
+  creatableRoleOptions,
+  canManageMembre,
+  roleLabel,
+} from '../../utils/staffMembresPermissions'
 
 const fmt = n => new Intl.NumberFormat('fr-FR').format(n || 0)
 
@@ -46,13 +53,8 @@ const TYPES_ETAB = [
   { val: 'btp',     label: '🏗️ BTP / Génie Civil' },
   { val: 'gestion', label: '📊 Commerce / Informatique / Administration' },
 ]
-const ROLES_STAFF = [
-  { val: 'responsable', label: 'Responsable pédagogique' },
-  { val: 'agent_admin', label: 'Agent administratif' },
-  { val: 'comptable', label: 'Comptable' },
-  { val: 'controleur_qualite', label: 'Contrôleur qualité' },
-]
 const ROLE_COLORS = {
+  admin_etablissement: 'bg-indigo-100 text-indigo-800',
   responsable: 'bg-teal-100 text-teal-700', agent_admin: 'bg-orange-100 text-orange-700',
   comptable: 'bg-violet-100 text-violet-700',
   controleur_qualite: 'bg-cyan-100 text-cyan-800',
@@ -1395,8 +1397,14 @@ const EMPTY_EDIT_FORM = {
 
 export function TabMembres({ etabId, membres: init, responsable_id }) {
   const { user } = useAuth()
-  const canCreateStaffAccount = user?.role === 'admin'
-  const canDeleteStaffPermanently = user?.role === 'admin'
+  const isPlatformAdmin = user?.role === 'admin'
+  const canCreateStaffAccount = userCanCreateStaff(user)
+  const canDeleteStaffPermanently = isPlatformAdmin
+  const roleOptions = useMemo(() => creatableRoleOptions(user), [user])
+  const roleOptionsAll = useMemo(
+    () => [...roleOptions, { val: 'admin_etablissement', label: 'Administrateur établissement' }],
+    [roleOptions],
+  )
   const [membres, setMembres] = useState(init || [])
   const [q, setQ] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -1553,7 +1561,12 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
             </div>
             <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Membres du staff</h2>
             <p className="mt-1 max-w-xl text-sm text-slate-300">
-              Gérez les rôles, l’identité et l’état des comptes. Les étudiants ne sont pas listés ici.
+              Gérez les rôles, l’identité et l’état des comptes staff. Les étudiants ne sont pas listés ici.
+              {user?.role === 'admin_etablissement' && (
+                <span className="mt-1 block text-cyan-100/90">
+                  Vous pouvez créer, modifier et désactiver les comptes staff de votre établissement.
+                </span>
+              )}
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
               <span className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-1.5 text-sm font-medium ring-1 ring-white/10">
@@ -1600,10 +1613,23 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-200 to-slate-100 text-3xl shadow-inner">👥</div>
           <p className="font-semibold text-slate-700">Aucun membre rattaché</p>
           <p className="mt-1 text-sm text-slate-500">Créez un premier compte pour cet établissement.</p>
+          {canCreateStaffAccount && (
+            <button
+              type="button"
+              onClick={() => { setShowForm(true); setForm(EMPTY_MEMBRE_FORM) }}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white hover:bg-cyan-700"
+            >
+              <FaPlus className="h-4 w-4" aria-hidden />
+              Ajouter un membre
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map(m => (
+          {filtered.map(m => {
+            const manageable = canManageMembre(user, m)
+            const isSelf = Number(user?.id) === Number(m.id)
+            return (
             <div
               key={m.id}
               className={`group relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md ${
@@ -1631,7 +1657,7 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
                   )}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className={`text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${ROLE_COLORS[m.role] || 'bg-gray-100 text-gray-600'}`}>
-                      {ROLES_STAFF.find(r => r.val === m.role)?.label || m.role}
+                      {roleLabel(m.role, roleOptionsAll)}
                     </span>
                     {m.id === responsable_id && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
@@ -1648,6 +1674,11 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                {isSelf && user?.role === 'admin_etablissement' && (
+                  <p className="w-full text-xs text-slate-500">Votre propre compte ne peut pas être modifié ici.</p>
+                )}
+                {manageable && (
+                  <>
                 <button
                   type="button"
                   onClick={() => openEdit(m)}
@@ -1675,6 +1706,8 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
                     Réactiver
                   </button>
                 )}
+                  </>
+                )}
                 {canDeleteStaffPermanently && (
                   <button
                     type="button"
@@ -1688,7 +1721,8 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
                 )}
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -1729,7 +1763,7 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
               <div>
                 <L>Rôle *</L>
                 <select className="input-field" value={form.role} onChange={up('role')} required>
-                  {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
+                  {roleOptions.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
@@ -1775,7 +1809,9 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
               <div>
                 <L>Rôle *</L>
                 <select className="input-field" value={editForm.role} onChange={upEdit('role')} required>
-                  {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
+                  {(roleOptions.some(r => r.val === editForm.role) ? roleOptions : [...roleOptions, { val: editForm.role, label: roleLabel(editForm.role, roleOptionsAll) }]).map(r => (
+                    <option key={r.val} value={r.val}>{r.label}</option>
+                  ))}
                 </select>
               </div>
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
@@ -1851,10 +1887,13 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
           </form>
         </div>
       )}
+
+      {(user?.role === 'admin_etablissement' || user?.role === 'admin') && (
+        <DonneesBackupPanel className="mt-2" />
+      )}
     </div>
   )
 }
-
 // ═══════════════════════════════════════════════════════════════════════
 // Onglet 5 — Responsable
 // ═══════════════════════════════════════════════════════════════════════
