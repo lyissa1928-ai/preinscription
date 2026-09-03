@@ -243,12 +243,6 @@ export default function Register() {
   const goPrev = () => setStep((x) => Math.max(1, x - 1))
 
   const submitRegistration = async () => {
-    if (import.meta.env.PROD && !useRecaptcha) {
-      toast.error(
-        'Inscription indisponible : configurez reCAPTCHA (VITE_RECAPTCHA_SITE_KEY au build ou config-site.js sur le serveur).',
-      )
-      return
-    }
     if (useRecaptcha && !recaptchaToken) {
       toast.error('Veuillez cocher « Je ne suis pas un robot » (reCAPTCHA) avant de créer votre compte.')
       return
@@ -328,7 +322,7 @@ export default function Register() {
 
   const currentStepMeta = STEPS[Math.min(STEPS.length, Math.max(1, step)) - 1]
 
-  const captchaBlocked = (useRecaptcha && !recaptchaToken) || (import.meta.env.PROD && !useRecaptcha)
+  const captchaBlocked = useRecaptcha && !recaptchaToken
 
   return (
     <div className="min-h-screen relative overflow-hidden px-3 sm:px-5 py-6 md:py-10">
@@ -818,16 +812,6 @@ export default function Register() {
                           </div>
                           <p className="text-xs text-slate-500 mt-2 text-center">Protection contre les inscriptions automatisées.</p>
                         </div>
-                      )}
-
-                      {!useRecaptcha && import.meta.env.PROD && (
-                        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                          Configuration manquante : définissez la clé site <strong>reCAPTCHA</strong> — variable{' '}
-                          <code className="font-mono">VITE_RECAPTCHA_SITE_KEY</code> au build, ou champ{' '}
-                          <code className="font-mono">recaptcha</code> dans <code className="font-mono">public/config-site.js</code>{' '}
-                          puis <strong>rebuild</strong> du frontend, ou éditez <code className="font-mono">dist/config-site.js</code> après
-                          déploiement sans rebuild.
-                        </p>
                       )}
                     </>
                   )}

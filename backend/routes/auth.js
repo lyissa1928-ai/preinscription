@@ -242,10 +242,8 @@ router.post('/inscription', inscriptionLimiter, async (req, res) => {
         return res.status(400).json({ message: 'reCAPTCHA invalide ou expiré. Cochez à nouveau la case et réessayez.' });
       }
     } else {
-      logSecurityEvent(req, 'inscription_captcha_not_configured', { endpoint: '/api/auth/inscription' }, 'error');
-      return res.status(503).json({
-        message: 'Inscription temporairement indisponible (reCAPTCHA non configuré sur le serveur).',
-      });
+      // Pas de clés Google → inscription autorisée (honeypot + rate-limit restent actifs)
+      logSecurityEvent(req, 'inscription_captcha_skipped_not_configured', { endpoint: '/api/auth/inscription' }, 'info');
     }
   }
 

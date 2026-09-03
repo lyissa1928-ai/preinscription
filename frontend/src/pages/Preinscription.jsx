@@ -317,11 +317,9 @@ export default function Preinscription() {
   }
 
   const recaptchaConfigured = Boolean(recaptchaSiteKey)
-  const prodNoRecaptcha = import.meta.env.PROD && !recaptchaConfigured
   const canSubmit =
     areRequiredFilesPresent(files, niveauKey, form.nationalite, nombrePhotosFormation) &&
-    (!recaptchaConfigured || !!recaptchaToken) &&
-    !prodNoRecaptcha
+    (!recaptchaConfigured || !!recaptchaToken)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -925,12 +923,6 @@ export default function Preinscription() {
                     </div>
                   </div>
                 )}
-                {!recaptchaSiteKey && import.meta.env.PROD && (
-                  <p className="mt-4 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                    En production, définissez <code className="font-mono">VITE_RECAPTCHA_SITE_KEY</code> ou{' '}
-                    <code className="font-mono">config-site.js</code> (clé <code className="font-mono">recaptcha</code>).
-                  </p>
-                )}
               </div>
 
               {/* Récapitulatif */}
@@ -1014,9 +1006,7 @@ export default function Preinscription() {
               <div className="flex flex-col items-end gap-2">
                 {!canSubmit && (
                   <p className="text-xs text-red-600 font-medium text-right max-w-xs">
-                    {prodNoRecaptcha
-                      ? 'En production, la clé site reCAPTCHA doit être configurée côté build ou serveur.'
-                      : 'Fournissez toutes les pièces obligatoires et validez le reCAPTCHA si affiché.'}
+                    Fournissez toutes les pièces obligatoires{recaptchaConfigured ? ' et validez le reCAPTCHA' : ''}.
                   </p>
                 )}
                 <button

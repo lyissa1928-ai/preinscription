@@ -159,11 +159,11 @@ router.post(
     const useEnterprise = recaptchaEnterpriseConfigured();
     const recSecret = recaptchaSecret();
     const recToken = String(req.body?.recaptcha_token || '').trim();
-    if (!recToken) {
-      logSecurityEvent(req, 'recaptcha_missing_token', { endpoint: '/api/etudiant/dossier' }, 'warning');
-      return abortUploads(400, { message: 'reCAPTCHA requis.' });
-    }
     if (useEnterprise || recSecret) {
+      if (!recToken) {
+        logSecurityEvent(req, 'recaptcha_missing_token', { endpoint: '/api/etudiant/dossier' }, 'warning');
+        return abortUploads(400, { message: 'reCAPTCHA requis.' });
+      }
       const recResult = useEnterprise
         ? await verifyRecaptchaEnterpriseWithDetails(recToken)
         : await verifyRecaptchaTokenWithDetails(recToken, getClientIp(req), recSecret);
@@ -176,10 +176,7 @@ router.post(
         return abortUploads(400, { message: 'reCAPTCHA invalide ou expiré. Réessayez.' });
       }
     } else {
-      logSecurityEvent(req, 'dossier_captcha_not_configured', { endpoint: '/api/etudiant/dossier' }, 'error');
-      return abortUploads(503, {
-        message: 'Soumission temporairement indisponible (reCAPTCHA non configuré sur le serveur).',
-      });
+      logSecurityEvent(req, 'dossier_captcha_skipped_not_configured', { endpoint: '/api/etudiant/dossier' }, 'info');
     }
   }
 
