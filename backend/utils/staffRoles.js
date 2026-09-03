@@ -5,6 +5,7 @@ const STAFF_ROLES = [
   'admin',
   ROLE_ADMIN_ETABLISSEMENT,
   'responsable',
+  'responsable_fad',
   'agent_admin',
   'comptable',
   'controleur_qualite',
@@ -17,7 +18,13 @@ const ETAB_STAFF_ROLES = STAFF_ROLES.filter((r) => r !== 'admin');
 const ROLES_CREATABLE_PLATFORM = [...STAFF_ROLES];
 
 /** Création par l’administrateur établissement (pas d’autre admin étab.). */
-const ROLES_CREATABLE_ETAB_ADMIN = ['responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+const ROLES_CREATABLE_ETAB_ADMIN = [
+  'responsable',
+  'responsable_fad',
+  'agent_admin',
+  'comptable',
+  'controleur_qualite',
+];
 
 function isPlatformAdmin(user) {
   return user?.role === 'admin';

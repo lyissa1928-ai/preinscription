@@ -4,6 +4,7 @@ export const ROLES_STAFF_LABELS = {
   admin: 'Administrateur plateforme',
   admin_etablissement: 'Administrateur établissement',
   responsable: 'Responsable pédagogique',
+  responsable_fad: 'Responsable FAD',
   agent_admin: 'Agent administratif',
   comptable: 'Comptable',
   controleur_qualite: 'Contrôleur qualité',
@@ -29,7 +30,7 @@ export function rolesCreatablesForActor(user, allStaffRoles) {
   }
   if (isAdminEtablissement(user)) {
     return allStaffRoles.filter((r) =>
-      ['responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(r.val)
+      ['responsable', 'responsable_fad', 'agent_admin', 'comptable', 'controleur_qualite'].includes(r.val)
     )
   }
   return []

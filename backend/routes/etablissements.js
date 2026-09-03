@@ -90,7 +90,7 @@ function etabFacturesAccess(req, res, next) {
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
   }
-  const roles = ['responsable', 'comptable', 'agent_admin', 'controleur_qualite', 'admin_etablissement'];
+  const roles = ['responsable', 'responsable_fad', 'comptable', 'agent_admin', 'controleur_qualite', 'admin_etablissement'];
   if (
     (roles.includes(req.user.role) || actsAsResponsable(req.user)) &&
     Number(req.user.etablissement_id) === etabId

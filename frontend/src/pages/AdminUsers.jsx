@@ -188,7 +188,7 @@ export default function AdminUsers() {
     if (
       editForm.role !== 'admin' &&
       editForm.role !== 'etudiant' &&
-      ['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(editForm.role) &&
+      ['admin_etablissement', 'responsable', 'responsable_fad', 'agent_admin', 'comptable', 'controleur_qualite'].includes(editForm.role) &&
       !editForm.etablissement_id
     ) {
       toast.error('Indiquez un établissement pour ce rôle.')

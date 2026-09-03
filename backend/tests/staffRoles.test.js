@@ -30,7 +30,10 @@ describe('staffRoles — admin_etablissement', () => {
   it('rôles créables par admin établissement', () => {
     const u = { id: 10, role: 'admin_etablissement', etablissement_id: 5 };
     const roles = rolesCreatablesMembres(u);
-    assert.deepEqual(roles.sort(), ['agent_admin', 'comptable', 'controleur_qualite', 'responsable'].sort());
+    assert.deepEqual(
+      roles.sort(),
+      ['agent_admin', 'comptable', 'controleur_qualite', 'responsable', 'responsable_fad'].sort(),
+    );
     assert.equal(roles.includes('admin_etablissement'), false);
   });
 

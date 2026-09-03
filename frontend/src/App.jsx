@@ -118,7 +118,7 @@ function AppRoutes() {
           : <Landing />
       } />
       <Route path="/accueil" element={
-        user && ['responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'admin_etablissement', 'admin'].includes(user.role)
+        user && ['responsable', 'responsable_fad', 'agent_admin', 'comptable', 'controleur_qualite', 'admin_etablissement', 'admin'].includes(user.role)
           ? <Navigate to={homeRedirect()} replace />
           : <Landing />
       } />
@@ -176,17 +176,17 @@ function AppRoutes() {
           </PrivateRoute>
         } />
         <Route path="/mon-etablissement/factures" element={
-          <PrivateRoute roles={['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}>
+          <PrivateRoute roles={['admin_etablissement', 'responsable', 'responsable_fad', 'agent_admin', 'comptable', 'controleur_qualite']}>
             <StaffFacturesEtab />
           </PrivateRoute>
         } />
         <Route path="/mon-etablissement/acceptes-par-formation" element={
-          <PrivateRoute roles={['admin_etablissement', 'responsable', 'agent_admin', 'comptable']}>
+          <PrivateRoute roles={['admin_etablissement', 'responsable', 'responsable_fad', 'agent_admin', 'comptable']}>
             <StaffAcceptesParFormation />
           </PrivateRoute>
         } />
         <Route path="/mon-etablissement/documents-chat" element={
-          <PrivateRoute roles={['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}>
+          <PrivateRoute roles={['admin_etablissement', 'responsable', 'responsable_fad', 'agent_admin', 'comptable', 'controleur_qualite']}>
             <StaffChatDocuments />
           </PrivateRoute>
         } />

@@ -36,6 +36,11 @@ const { runHealthChecks } = require('../utils/healthCheck');
 const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
 const { filterDossiersAffichables, assertDossierAffichable } = require('../utils/dossierVisibility');
 const { parsePagination, wantsPagination, paginateArray } = require('../utils/pagination');
+const { STAFF_ROLES: STAFF_ROLES_CANON } = require('../utils/staffRoles');
+
+const ROLES_STAFF_ADMIN = [...STAFF_ROLES_CANON];
+const ROLES_VALIDES_ADMIN = [...STAFF_ROLES_CANON, 'etudiant'];
+const ROLES_ETAB_RATTACHEMENT = STAFF_ROLES_CANON.filter((r) => r !== 'admin');
 
 router.use(authMiddleware);
 router.use((req, res, next) => {
@@ -479,7 +484,7 @@ router.post('/demandes-proforma/delete-batch', adminSensitiveLimiter, (req, res)
 router.get('/utilisateurs', (req, res) => {
   const { role = 'all', page, limit, search = '', etablissement_id = '' } = req.query;
   const dossiers = db.get('dossiers').value();
-  const STAFF_ROLES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const STAFF_ROLES = ROLES_STAFF_ADMIN;
 
   let utilisateurs = db.get('utilisateurs').value();
   if (role === 'etudiant') {
@@ -616,7 +621,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     prenom, nom, email, mot_de_passe, mot_de_passe_confirmation,
     role, etablissement_id, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_STAFF = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const ROLES_STAFF = ROLES_STAFF_ADMIN;
 
   if (!prenom || !nom || !email || !mot_de_passe || !role || !telephone) {
     return res.status(400).json({
@@ -718,7 +723,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     nom, prenom, email, role, actif, etablissement_id, mot_de_passe,
     matricule, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_VALIDES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'etudiant'];
+  const ROLES_VALIDES = ROLES_VALIDES_ADMIN;
   const update = { updated_at: new Date().toISOString(), updated_by: req.user.id };
   let matriculeRegenerated = false;
 
@@ -776,7 +781,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     }
     if (
       nextRole !== 'admin' &&
-      ['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(nextRole) &&
+      ROLES_ETAB_RATTACHEMENT.includes(nextRole) &&
       user.role === 'admin' &&
       etablissement_id === undefined
     ) {
@@ -808,7 +813,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
         matriculeRegenerated = true;
       }
     } else {
-      if (['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(effectiveRoleAfter)) {
+      if (ROLES_ETAB_RATTACHEMENT.includes(effectiveRoleAfter)) {
         return res.status(400).json({
           message: 'L\'établissement est obligatoire pour ce rôle.',
         });
@@ -911,7 +916,7 @@ router.get('/statistiques-globales', (req, res) => {
   const demandes = db.get('demandes_proforma').value();
   const etablissements = db.get('etablissements').value();
   const formations = db.get('formations').value();
-  const STAFF_ROLES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const STAFF_ROLES = ROLES_STAFF_ADMIN;
 
   const parRole = {};
   STAFF_ROLES.forEach(r => { parRole[r] = utilisateurs.filter(u => u.role === r).length; });

@@ -1283,12 +1283,12 @@
       "source": "staff",
       "creee_par": 11,
       "commentaire_admin": "Préinscription guichet — documents générables immédiatement.",
-      "date_acceptation": "2026-09-03T13:38:07.503Z",
+      "date_acceptation": "2026-09-03T16:26:07.414Z",
       "lettre_generee": true,
       "created_at": "2026-08-19T16:22:33.213Z",
-      "updated_at": "2026-09-03T13:38:07.503Z",
+      "updated_at": "2026-09-03T16:26:07.414Z",
       "traite_par": 11,
-      "traite_le": "2026-09-03T13:38:07.503Z"
+      "traite_le": "2026-09-03T16:26:07.414Z"
     },
     {
       "id": 12,
@@ -5456,7 +5456,9 @@
         "duree_cycle": null,
         "ville": null,
         "mensualite": 110000,
-        "frais_inscription": 215000
+        "frais_inscription": 215000,
+        "description": "Formation professionnelle en électromécanique et systèmes automatisés.",
+        "debouches": null
       },
       "etablissement_snapshot": {
         "nom": "ESEBAT",
@@ -5478,85 +5480,11 @@
         "signataire_nom": "",
         "signataire_fonction": "La direction"
       },
-      "created_at": "2026-09-03T13:37:59.772Z"
+      "created_at": "2026-09-03T13:37:59.772Z",
+      "annee_academique": "2025-2026"
     }
   ],
   "demandes_proforma": [
-    {
-      "id": 14,
-      "reference": "DEM-2026-00014",
-      "etudiant_id": null,
-      "prenom": "Awa",
-      "nom": "Diop",
-      "email": "",
-      "telephone": "778889900",
-      "niveau": null,
-      "type_formation": "presentiel",
-      "formation_id": 4,
-      "etablissement_id": 1,
-      "formation_titre": "Diplôme de Technicien Génie Civil - Bâtiment",
-      "formation_description": "Formation technique en génie civil et bâtiment.",
-      "formation_ville": "Dakar",
-      "formation_niveau_requis": "BFEM/BEP",
-      "formation_mensualite": 40000,
-      "formation_duree_mois": 9,
-      "details": null,
-      "type_payeur": "etudiant",
-      "payeur": null,
-      "etablissement_snapshot": {
-        "nom": "ESEBAT",
-        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
-        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
-        "couleur_primaire": "#e5742a",
-        "couleur_secondaire": "#e5742a",
-        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
-        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
-        "email_contact": "esebat@esebat.com",
-        "site_web": "esebat.com",
-        "ninea": "41591422V2",
-        "rc": " SN-DKR2010",
-        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
-        "compte_bancaire": "SN094-01001-100011244001-37",
-        "banque": "ECOBANK",
-        "iban": "",
-        "swift": "ECOCSNDAXXX",
-        "signataire_nom": "",
-        "signataire_fonction": "La direction"
-      },
-      "justificatifs": null,
-      "statut": "acceptee",
-      "facture": {
-        "numero": "FACT-PUB-2026-00014",
-        "lignes": [
-          {
-            "designation": "Frais d'inscription — Diplôme de Technicien Génie Civil - Bâtiment",
-            "montant": 160000
-          },
-          {
-            "designation": "Mensualités (9 mois × 40 000 FCFA) — Diplôme de Technicien Génie Civil - Bâtiment",
-            "montant": 360000
-          }
-        ],
-        "lignes_frais_supplementaires": [
-          {
-            "designation": "Abonnement Bibliotheque + Pack EPI",
-            "montant": 30000,
-            "hors_forfait_annuel": true
-          }
-        ],
-        "montant_supplementaires_hors_forfait": 30000,
-        "montant_ht": 520000,
-        "tva": 0,
-        "montant_ttc": 520000,
-        "remise": 0,
-        "validite_jusqu_au": "2027-08-12T13:54:49.918Z"
-      },
-      "source": "staff",
-      "creee_par": 1,
-      "created_at": "2026-08-12T13:54:49.918Z",
-      "acceptee_le": "2026-08-12T13:54:49.918Z",
-      "acceptee_par": 1
-    },
     {
       "id": 16,
       "reference": "DEM-2026-00016",
@@ -5631,6 +5559,81 @@
       "created_at": "2026-08-12T14:58:21.984Z",
       "acceptee_le": "2026-08-12T14:58:21.984Z",
       "acceptee_par": 11
+    },
+    {
+      "id": 14,
+      "reference": "DEM-2026-00014",
+      "etudiant_id": null,
+      "prenom": "Awa",
+      "nom": "Diop",
+      "email": "",
+      "telephone": "778889900",
+      "niveau": null,
+      "type_formation": "presentiel",
+      "formation_id": 4,
+      "etablissement_id": 1,
+      "formation_titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+      "formation_description": "Formation technique en génie civil et bâtiment.",
+      "formation_ville": "Dakar",
+      "formation_niveau_requis": "BFEM/BEP",
+      "formation_mensualite": 40000,
+      "formation_duree_mois": 9,
+      "details": null,
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "justificatifs": null,
+      "statut": "acceptee",
+      "facture": {
+        "numero": "FACT-PUB-2026-00014",
+        "lignes": [
+          {
+            "designation": "Frais d'inscription — Diplôme de Technicien Génie Civil - Bâtiment",
+            "montant": 160000
+          },
+          {
+            "designation": "Mensualités (9 mois × 40 000 FCFA) — Diplôme de Technicien Génie Civil - Bâtiment",
+            "montant": 360000
+          }
+        ],
+        "lignes_frais_supplementaires": [
+          {
+            "designation": "Abonnement Bibliotheque + Pack EPI",
+            "montant": 30000,
+            "hors_forfait_annuel": true
+          }
+        ],
+        "montant_supplementaires_hors_forfait": 30000,
+        "montant_ht": 520000,
+        "tva": 0,
+        "montant_ttc": 520000,
+        "remise": 0,
+        "validite_jusqu_au": "2027-08-12T13:54:49.918Z"
+      },
+      "source": "staff",
+      "creee_par": 1,
+      "created_at": "2026-08-12T13:54:49.918Z",
+      "acceptee_le": "2026-08-12T13:54:49.918Z",
+      "acceptee_par": 1
     }
   ],
   "_nextId": {
@@ -5642,8 +5645,8 @@
     "documents": 33,
     "factures": 25,
     "demandes_proforma": 17,
-    "audit_logs": 54,
-    "notifications": 11,
+    "audit_logs": 56,
+    "notifications": 13,
     "security_events": 51,
     "conditions_admission": 3,
     "chatbot_logs": 79
@@ -6643,6 +6646,48 @@
         "visible_admin": true
       },
       "created_at": "2026-09-03T13:38:07.518Z"
+    },
+    {
+      "id": 54,
+      "action": "update_status",
+      "entity": "dossier",
+      "entity_id": 11,
+      "user_id": 11,
+      "user_role": "responsable",
+      "etablissement_id": 1,
+      "method": "PUT",
+      "path": "/api/responsable/dossiers/11/statut",
+      "ip": "::1",
+      "details": {
+        "from": "accepte",
+        "to": "accepte",
+        "motif_rejet": null,
+        "actor_role": "responsable",
+        "actor_id": 11,
+        "visible_admin": true
+      },
+      "created_at": "2026-09-03T16:25:43.333Z"
+    },
+    {
+      "id": 55,
+      "action": "update_status",
+      "entity": "dossier",
+      "entity_id": 11,
+      "user_id": 11,
+      "user_role": "responsable",
+      "etablissement_id": 1,
+      "method": "PUT",
+      "path": "/api/responsable/dossiers/11/statut",
+      "ip": "::1",
+      "details": {
+        "from": "accepte",
+        "to": "accepte",
+        "motif_rejet": null,
+        "actor_role": "responsable",
+        "actor_id": 11,
+        "visible_admin": true
+      },
+      "created_at": "2026-09-03T16:26:07.431Z"
     }
   ],
   "notifications": [
@@ -6690,6 +6735,36 @@
       },
       "read_at": null,
       "created_at": "2026-09-03T13:38:07.510Z"
+    },
+    {
+      "id": 11,
+      "user_id": 18,
+      "type": "dossier_statut",
+      "title": "Décision sur votre dossier",
+      "message": "Le dossier PREINSC-2026-16871 est maintenant: accepté.",
+      "link": "/dashboard",
+      "meta": {
+        "dossier_id": 11,
+        "numero_dossier": "PREINSC-2026-16871",
+        "statut": "accepte"
+      },
+      "read_at": null,
+      "created_at": "2026-09-03T16:25:43.325Z"
+    },
+    {
+      "id": 12,
+      "user_id": 18,
+      "type": "dossier_statut",
+      "title": "Décision sur votre dossier",
+      "message": "Le dossier PREINSC-2026-16871 est maintenant: accepté.",
+      "link": "/dashboard",
+      "meta": {
+        "dossier_id": 11,
+        "numero_dossier": "PREINSC-2026-16871",
+        "statut": "accepte"
+      },
+      "read_at": null,
+      "created_at": "2026-09-03T16:26:07.422Z"
     }
   ],
   "security_events": [
