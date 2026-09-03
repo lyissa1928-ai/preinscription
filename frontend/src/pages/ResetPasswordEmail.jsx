@@ -7,11 +7,23 @@ import { FaEye, FaEyeSlash, FaGraduationCap } from 'react-icons/fa'
 import AuthCinematicBackground from '../components/AuthCinematicBackground'
 import { validatePasswordPolicy } from '@/lib/inscriptionValidation'
 
+function destForRole(role) {
+  if (role === 'admin') return '/admin'
+  if (role === 'admin_etablissement') return '/mon-etablissement'
+  if (role === 'controleur_qualite') return '/qualite'
+  if (role === 'responsable' || role === 'responsable_fad') return '/responsable'
+  if (role === 'agent_admin') return '/agent-admin'
+  if (role === 'comptable') return '/comptable'
+  return '/dashboard'
+}
+
 export default function ResetPasswordEmail() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { login } = useAuth()
   const token = searchParams.get('token')?.trim() || ''
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
   const [pwd, setPwd] = useState('')
   const [confirm, setConfirm] = useState('')
   const [show, setShow] = useState(false)
@@ -19,8 +31,8 @@ export default function ResetPasswordEmail() {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!token) {
-      toast.error('Lien invalide.')
+    if (!token && (!email.trim() || !code.trim())) {
+      toast.error('Indiquez votre e-mail et le code reçu.')
       return
     }
     if (pwd !== confirm) {
@@ -35,40 +47,18 @@ export default function ResetPasswordEmail() {
     setLoading(true)
     try {
       const { data } = await axios.post('/api/auth/reinitialiser-mot-de-passe-email', {
-        token,
+        ...(token ? { token } : { email: email.trim().toLowerCase(), code: code.trim() }),
         nouveau_mot_de_passe: pwd,
         confirmation: confirm,
       })
       login(data.token, data.utilisateur, data.refresh_token)
       toast.success(data.message || 'Mot de passe mis à jour.')
-      const role = data.utilisateur?.role
-      const dest =
-        role === 'admin'
-          ? '/admin'
-          : role === 'controleur_qualite'
-              ? '/qualite'
-              : ['responsable', 'agent_admin', 'comptable'].includes(role)
-                ? '/mon-etablissement'
-                : '/dashboard'
-      navigate(dest, { replace: true })
+      navigate(destForRole(data.utilisateur?.role), { replace: true })
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Lien invalide ou expiré.')
+      toast.error(err.response?.data?.message || 'Code invalide ou expiré.')
     } finally {
       setLoading(false)
     }
-  }
-
-  if (!token) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <p className="text-slate-700">
-          Lien incomplet.{' '}
-          <Link to="/mot-de-passe-oublie-email" className="text-blue-600 underline">
-            Demander un nouvel e-mail
-          </Link>
-        </p>
-      </div>
-    )
   }
 
   return (
@@ -81,10 +71,34 @@ export default function ResetPasswordEmail() {
           </div>
           <h1 className="text-xl font-bold text-slate-900 mb-2">Choisissez un nouveau mot de passe</h1>
           <form onSubmit={submit} className="space-y-4 mt-6">
+            {!token && (
+              <>
+                <div>
+                  <label className="label-field" htmlFor="rp-email">E-mail du compte</label>
+                  <input
+                    id="rp-email"
+                    type="email"
+                    className="input-field"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label-field" htmlFor="rp-code">Code reçu par e-mail</label>
+                  <input
+                    id="rp-code"
+                    className="input-field tracking-[0.35em] text-center text-lg font-semibold"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    maxLength={6}
+                    required
+                  />
+                </div>
+              </>
+            )}
             <div>
-              <label className="label-field" htmlFor="np1">
-                Nouveau mot de passe
-              </label>
+              <label className="label-field" htmlFor="np1">Nouveau mot de passe</label>
               <div className="relative">
                 <input
                   id="np1"
@@ -106,9 +120,7 @@ export default function ResetPasswordEmail() {
               </div>
             </div>
             <div>
-              <label className="label-field" htmlFor="np2">
-                Confirmation
-              </label>
+              <label className="label-field" htmlFor="np2">Confirmation</label>
               <input
                 id="np2"
                 type={show ? 'text' : 'password'}
@@ -124,9 +136,12 @@ export default function ResetPasswordEmail() {
             </button>
           </form>
           <p className="mt-4 text-center text-sm">
-            <Link to="/connexion" className="text-slate-600 hover:underline">
-              ← Connexion
+            <Link to="/mot-de-passe-oublie-email" className="text-blue-600 hover:underline">
+              Demander un nouveau code
             </Link>
+          </p>
+          <p className="mt-2 text-center text-sm">
+            <Link to="/connexion" className="text-slate-600 hover:underline">← Connexion</Link>
           </p>
         </div>
       </div>

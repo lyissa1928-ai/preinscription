@@ -50,6 +50,13 @@ const {
   publicAppUrl,
   isSmtpConfigured,
 } = require('../utils/mail');
+const {
+  findUserByEmail,
+  issuePasswordResetCode,
+  consumeValidResetCode,
+  invalidateResetCode,
+  sendResetCodeEmail,
+} = require('../utils/passwordResetCode');
 
 function newSecureToken() {
   return crypto.randomBytes(32).toString('hex');
@@ -593,7 +600,7 @@ router.get('/me', (req, res) => {
 router.post('/reinitialiser-mot-de-passe-matricule', resetPwdLimiter, async (req, res) => {
   const generic = {
     message:
-      'Si un compte étudiant existe avec ce matricule, un e-mail de réinitialisation vient d’être envoyé à l’adresse associée au compte.',
+      'Si un compte étudiant existe avec ce matricule, un code de réinitialisation vient d’être envoyé à l’adresse e-mail du compte (valable 15 minutes, usage unique).',
   };
 
   const m = normalizeMatricule(req.body?.matricule);
@@ -616,28 +623,8 @@ router.post('/reinitialiser-mot-de-passe-matricule', resetPwdLimiter, async (req
     return res.json(generic);
   }
 
-  const tok = newSecureToken();
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    password_reset_token: tok,
-    password_reset_expires: Date.now() + 60 * 60 * 1000,
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const url = `${publicAppUrl()}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(tok)}`;
-  await sendMail({
-    to: user.email,
-    subject: 'Réinitialisation de votre mot de passe — UniPortail',
-    text:
-      `Bonjour ${user.prenom},\n\n` +
-      `Une réinitialisation de mot de passe a été demandée avec votre matricule (${user.matricule}).\n` +
-      `Pour choisir un nouveau mot de passe, ouvrez ce lien (valide 1 h) :\n${url}\n\n` +
-      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.`,
-    html:
-      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
-      `<p>Une réinitialisation de mot de passe a été demandée avec votre matricule (${escapeHtml(user.matricule)}).</p>` +
-      `<p><a href="${url}">Choisir un nouveau mot de passe</a> (lien valide 1 h)</p>` +
-      `<p style="font-size:12px;color:#64748b;">Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>`,
-  });
+  const issued = issuePasswordResetCode(user);
+  await sendResetCodeEmail(user, issued.code);
 
   logSecurityEvent(req, 'auth_reset_matricule_email_sent', { user_id: user.id }, 'info');
   res.json(generic);
@@ -717,52 +704,61 @@ router.post('/renvoyer-email-verification', resendVerifyLimiter, async (req, res
   });
 });
 
-// POST /api/auth/mot-de-passe-oublie-email — envoi lien (étudiants)
+// POST /api/auth/mot-de-passe-oublie-email — envoi d’un code à usage unique
 router.post('/mot-de-passe-oublie-email', forgotEmailLimiter, async (req, res) => {
   const emailNorm = normalizeEmail(String(req.body?.email || ''));
   const generic = {
     message:
-      'Si un compte étudiant existe avec cette adresse, un e-mail de réinitialisation vient d’être envoyé.',
+      'Si un compte existe avec cette adresse, un code de réinitialisation vient d’être envoyé. Il est valable 15 minutes et ne peut être utilisé qu’une seule fois.',
   };
-  if (!passwordResetEmailEnabled() || !emailNorm) {
-    return res.json(generic);
+  if (!emailNorm) {
+    return res.status(400).json({ message: 'Indiquez l’adresse e-mail de votre compte.' });
+  }
+  if (!passwordResetEmailEnabled()) {
+    return res.status(503).json({
+      code: 'EMAIL_RESET_DISABLED',
+      message: 'L’envoi d’e-mails n’est pas disponible pour le moment. Contactez votre établissement.',
+    });
   }
 
-  const user = db.get('utilisateurs').find({ email: emailNorm }).value();
-  if (!user || user.role !== 'etudiant' || user.actif === false) {
-    return res.json(generic);
+  const user = findUserByEmail(emailNorm);
+  if (user && user.actif !== false && user.email) {
+    const issued = issuePasswordResetCode(user);
+    await sendResetCodeEmail(user, issued.code);
   }
-
-  const tok = newSecureToken();
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    password_reset_token: tok,
-    password_reset_expires: Date.now() + 60 * 60 * 1000,
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const url = `${publicAppUrl()}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(tok)}`;
-  await sendMail({
-    to: emailNorm,
-    subject: 'Réinitialisation de votre mot de passe — UniPortail',
-    text:
-      `Bonjour ${user.prenom},\n\n` +
-      `Pour choisir un nouveau mot de passe, ouvrez ce lien (valide 1 h) :\n${url}\n\n` +
-      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.`,
-    html:
-      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
-      `<p><a href="${url}">Choisir un nouveau mot de passe</a> (lien valide 1 h)</p>` +
-      `<p style="font-size:12px;color:#64748b;">Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>`,
-  });
 
   res.json(generic);
 });
 
-// POST /api/auth/reinitialiser-mot-de-passe-email
+function applyNewPasswordAndLogin(req, res, user, nouveau_mot_de_passe) {
+  const hash = bcrypt.hashSync(nouveau_mot_de_passe, 10);
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    mot_de_passe: hash,
+    password_reset_token: null,
+    password_reset_code_hash: null,
+    password_reset_expires: null,
+    must_change_password: false,
+    password_changed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).write();
+  invalidateResetCode(user.id);
+  const updated = db.get('utilisateurs').find({ id: user.id }).value();
+  clearAccountLockOnSuccess(user.id);
+  revokeAllRefreshTokensForUser(updated.id);
+  return res.json({
+    message: 'Mot de passe mis à jour. Vous êtes connecté.',
+    ...buildAuthTokensResponse(updated, req),
+  });
+}
+
+// POST /api/auth/reinitialiser-mot-de-passe-email — code (ou ancien lien token)
 router.post('/reinitialiser-mot-de-passe-email', resetEmailApplyLimiter, (req, res) => {
   const token = String(req.body?.token || '').trim();
+  const emailNorm = normalizeEmail(String(req.body?.email || ''));
+  const codeRaw = String(req.body?.code || '').replace(/\s/g, '');
   const { nouveau_mot_de_passe, confirmation } = req.body;
-  if (!token || !nouveau_mot_de_passe || !confirmation) {
-    return res.status(400).json({ message: 'Token, nouveau mot de passe et confirmation requis.' });
+  if (!nouveau_mot_de_passe || !confirmation) {
+    return res.status(400).json({ message: 'Nouveau mot de passe et confirmation requis.' });
   }
   if (nouveau_mot_de_passe !== confirmation) {
     return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
@@ -772,32 +768,30 @@ router.post('/reinitialiser-mot-de-passe-email', resetEmailApplyLimiter, (req, r
     return res.status(400).json({ message: vp.message, code: 'PASSWORD_POLICY' });
   }
 
+  if (emailNorm && codeRaw) {
+    const checked = consumeValidResetCode(emailNorm, codeRaw);
+    if (!checked.ok) {
+      logSecurityEvent(req, 'auth_reset_email_bad_code', { code: checked.code }, 'warning');
+      return res.status(400).json({ code: checked.code, message: checked.message });
+    }
+    return applyNewPasswordAndLogin(req, res, checked.user, nouveau_mot_de_passe);
+  }
+
+  if (!token) {
+    return res.status(400).json({
+      message: 'Saisissez l’e-mail du compte et le code reçu, puis le nouveau mot de passe.',
+    });
+  }
+
   const user = (db.get('utilisateurs').value() || []).find((u) => u.password_reset_token === token);
-  if (!user || user.role !== 'etudiant') {
+  if (!user) {
     logSecurityEvent(req, 'auth_reset_email_bad_token', {}, 'warning');
-    return res.status(400).json({ message: 'Lien invalide ou expiré.' });
+    return res.status(400).json({ message: 'Code ou lien invalide.' });
   }
   if (!user.password_reset_expires || Date.now() > user.password_reset_expires) {
-    return res.status(400).json({ message: 'Lien expiré. Demandez une nouvelle réinitialisation.' });
+    return res.status(400).json({ code: 'EXPIRED', message: 'Ce code a expiré. Demandez un nouveau code.' });
   }
-
-  const hash = bcrypt.hashSync(nouveau_mot_de_passe, 10);
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    mot_de_passe: hash,
-    password_reset_token: null,
-    password_reset_expires: null,
-    must_change_password: false,
-    password_changed_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const updated = db.get('utilisateurs').find({ id: user.id }).value();
-  clearAccountLockOnSuccess(user.id);
-  revokeAllRefreshTokensForUser(updated.id);
-  res.json({
-    message: 'Mot de passe mis à jour. Vous êtes connecté.',
-    ...buildAuthTokensResponse(updated, req),
-  });
+  return applyNewPasswordAndLogin(req, res, user, nouveau_mot_de_passe);
 });
 
 // GET /api/auth/options-public — pour le front (affichage liens)
@@ -834,18 +828,9 @@ router.post('/verifier-email', async (req, res) => {
 
   const updated = db.get('utilisateurs').find({ id: user.id }).value();
   clearAccountLockOnSuccess(user.id);
-  const { token: jwt } = signPayload({
-    id: updated.id,
-    email: updated.email,
-    role: updated.role,
-    nom: updated.nom,
-    prenom: updated.prenom,
-    etablissement_id: updated.etablissement_id || null,
-  });
   res.json({
     message: 'Adresse e-mail confirmée. Vous êtes connecté.',
-    token: jwt,
-    utilisateur: buildPublicUserPayload(updated, req),
+    ...buildAuthTokensResponse(updated, req),
   });
 });
 
@@ -889,106 +874,6 @@ router.post('/renvoyer-email-verification', resendVerifyLimiter, async (req, res
 
   res.json({
     message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
-  });
-});
-
-// POST /api/auth/mot-de-passe-oublie-email — envoi lien (étudiants)
-router.post('/mot-de-passe-oublie-email', forgotEmailLimiter, async (req, res) => {
-  const emailNorm = normalizeEmail(String(req.body?.email || ''));
-  const generic = {
-    message:
-      'Si un compte étudiant existe avec cette adresse, un e-mail de réinitialisation vient d’être envoyé.',
-  };
-  if (!passwordResetEmailEnabled() || !emailNorm) {
-    return res.json(generic);
-  }
-
-  const user = db.get('utilisateurs').find({ email: emailNorm }).value();
-  if (!user || user.role !== 'etudiant' || user.actif === false) {
-    return res.json(generic);
-  }
-
-  const tok = newSecureToken();
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    password_reset_token: tok,
-    password_reset_expires: Date.now() + 60 * 60 * 1000,
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const url = `${publicAppUrl()}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(tok)}`;
-  await sendMail({
-    to: emailNorm,
-    subject: 'Réinitialisation de votre mot de passe — UniPortail',
-    text:
-      `Bonjour ${user.prenom},\n\n` +
-      `Pour choisir un nouveau mot de passe, ouvrez ce lien (valide 1 h) :\n${url}\n\n` +
-      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.`,
-    html:
-      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
-      `<p><a href="${url}">Choisir un nouveau mot de passe</a> (lien valide 1 h)</p>` +
-      `<p style="font-size:12px;color:#64748b;">Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>`,
-  });
-
-  res.json(generic);
-});
-
-// POST /api/auth/reinitialiser-mot-de-passe-email
-router.post('/reinitialiser-mot-de-passe-email', (req, res) => {
-  const token = String(req.body?.token || '').trim();
-  const { nouveau_mot_de_passe, confirmation } = req.body;
-  if (!token || !nouveau_mot_de_passe || !confirmation) {
-    return res.status(400).json({ message: 'Token, nouveau mot de passe et confirmation requis.' });
-  }
-  if (nouveau_mot_de_passe !== confirmation) {
-    return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
-  }
-  const vp = validatePasswordPolicy(nouveau_mot_de_passe);
-  if (!vp.ok) {
-    return res.status(400).json({ message: vp.message, code: 'PASSWORD_POLICY' });
-  }
-
-  const user = (db.get('utilisateurs').value() || []).find((u) => u.password_reset_token === token);
-  if (!user || user.role !== 'etudiant') {
-    logSecurityEvent(req, 'auth_reset_email_bad_token', {}, 'warning');
-    return res.status(400).json({ message: 'Lien invalide ou expiré.' });
-  }
-  if (!user.password_reset_expires || Date.now() > user.password_reset_expires) {
-    return res.status(400).json({ message: 'Lien expiré. Demandez une nouvelle réinitialisation.' });
-  }
-
-  const hash = bcrypt.hashSync(nouveau_mot_de_passe, 10);
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    mot_de_passe: hash,
-    password_reset_token: null,
-    password_reset_expires: null,
-    must_change_password: false,
-    password_changed_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const updated = db.get('utilisateurs').find({ id: user.id }).value();
-  clearAccountLockOnSuccess(user.id);
-  const { token: jwt } = signPayload({
-    id: updated.id,
-    email: updated.email,
-    role: updated.role,
-    nom: updated.nom,
-    prenom: updated.prenom,
-    etablissement_id: updated.etablissement_id || null,
-  });
-  res.json({
-    message: 'Mot de passe mis à jour. Vous êtes connecté.',
-    token: jwt,
-    utilisateur: buildPublicUserPayload(updated, req),
-  });
-});
-
-// GET /api/auth/options-public — pour le front (affichage liens)
-router.get('/options-public', (req, res) => {
-  res.json({
-    email_verification_enabled: emailVerificationEnabled(),
-    password_reset_email_enabled: passwordResetEmailEnabled(),
-    smtp_configured: isSmtpConfigured(),
   });
 });
 

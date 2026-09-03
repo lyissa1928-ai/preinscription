@@ -5,7 +5,7 @@ const db = require('../database/db');
 const { buildLignesForfaitAnnuel, getDureeMoisEffectif } = require('../utils/formationTarifs');
 const { demandeProformaJustificatifsComplets } = require('../utils/proformaJustificatifsCheck');
 const { createUserNotification } = require('../utils/notificationService');
-const { sendProformaFactureEmail } = require('../utils/proformaEmail');
+const { notifyProformaDecision } = require('../utils/transactionalEmail');
 const { dateEcheanceFacture } = require('../utils/factureValidite');
 
 function buildFactureDemandeFromFormation(demande, formation, opts = {}) {
@@ -104,6 +104,7 @@ async function proformaDemandeDecision({ demandeId, userId, decision, motif_refu
     }
 
     const updated = db.get('demandes_proforma').find({ id }).value();
+    await notifyProformaDecision(updated, 'refusee');
     return { ok: true, message: 'Demande refusée.', demande: updated };
   }
 
@@ -138,10 +139,7 @@ async function proformaDemandeDecision({ demandeId, userId, decision, motif_refu
   }
 
   const updated = db.get('demandes_proforma').find({ id }).value();
-  let emailEnvoye = false;
-  if (updated.email) {
-    emailEnvoye = await sendProformaFactureEmail(updated);
-  }
+  const emailEnvoye = await notifyProformaDecision(updated, 'acceptee');
 
   const msgBase =
     demande.etudiant_id != null
@@ -166,7 +164,7 @@ async function proformaDemandeDecision({ demandeId, userId, decision, motif_refu
  * Mode principal : saisie libre (personne qui se présente) — pas de compte requis.
  * Mode facultatif : etudiant_id pour lier un compte existant.
  */
-function creerProformaPourEtudiant({
+async function creerProformaPourEtudiant({
   staffUser,
   etudiantId,
   formationId,
@@ -281,6 +279,8 @@ function creerProformaPourEtudiant({
       meta: { demande_id: id, reference, statut: 'acceptee' },
     });
   }
+
+  await notifyProformaDecision(demande, 'generee');
 
   return {
     ok: true,

@@ -48,7 +48,7 @@ export default function ResetPasswordMatricule() {
             Mot de passe oublié
           </h1>
           <p className="text-blue-100/95 text-sm mt-2 max-w-sm mx-auto [text-shadow:0_1px_6px_rgba(0,0,0,0.4)]">
-            Indiquez votre matricule : un lien de réinitialisation sera envoyé à l’adresse
+            Indiquez votre matricule : un code de réinitialisation sera envoyé à l’adresse
             e-mail associée à votre compte.
           </p>
         </div>
@@ -61,8 +61,8 @@ export default function ResetPasswordMatricule() {
               </div>
               <h2 className="text-lg font-bold text-slate-800">Vérifiez votre boîte mail</h2>
               <p className="text-sm text-slate-600">
-                Si un compte étudiant existe avec ce matricule, un e-mail de réinitialisation
-                vient d’être envoyé à l’adresse associée au compte. Le lien est valable 1 heure.
+                Si un compte étudiant existe avec ce matricule, un code de réinitialisation
+                vient d’être envoyé à l’adresse du compte. Il est valable 15 minutes et à usage unique.
               </p>
               <p className="text-xs text-slate-500">
                 Pensez à vérifier le dossier spam. Vous n’avez plus accès à cette adresse ?{' '}
@@ -73,7 +73,10 @@ export default function ResetPasswordMatricule() {
                   Écrire au support
                 </a>
               </p>
-              <Link to="/connexion" className="btn-primary inline-flex h-11 items-center px-6">
+              <Link to="/mot-de-passe-oublie-email" className="btn-primary inline-flex h-11 items-center px-6">
+                Saisir le code reçu
+              </Link>
+              <Link to="/connexion" className="block text-sm font-semibold text-blue-700 hover:underline">
                 Retour à la connexion
               </Link>
             </div>

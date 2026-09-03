@@ -10,6 +10,7 @@ const SENSITIVE_USER_KEYS = [
   'refresh_token',
   'reset_token',
   'password_reset_token',
+  'password_reset_code_hash',
   'password_reset_expires',
 ];
 

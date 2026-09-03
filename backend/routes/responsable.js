@@ -8,6 +8,7 @@ const { snapshotFromEtab, snapshotFromFormation, snapshotFromEtablissementId } =
 const { logAudit } = require('../utils/auditLog');
 const { DOSSIER_STATUSES, canTransitionDossierStatus, requiresRejectionComment } = require('../utils/dossierWorkflow');
 const { createUserNotification } = require('../utils/notificationService');
+const { notifyDossierStatutChange, notifyFactureDossierGeneree } = require('../utils/transactionalEmail');
 const { buildAttestationPayloadForDossier, buildAttestationPayloadForDemandeProforma } = require('../utils/buildAttestationPayload');
 const { canIssueOfficialDocs } = require('../utils/canIssueOfficialDocs');
 const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
@@ -146,7 +147,7 @@ router.put('/demandes-proforma/:id/statut', authMiddleware, staffProformaView, (
 });
 
 // POST /api/responsable/demandes-proforma/creer — proforma (responsable, comptable, admin)
-router.post('/demandes-proforma/creer', authMiddleware, staffProformaDecision, (req, res) => {
+router.post('/demandes-proforma/creer', authMiddleware, staffProformaDecision, async (req, res) => {
   const {
     etudiant_id,
     formation_id,
@@ -156,7 +157,7 @@ router.post('/demandes-proforma/creer', authMiddleware, staffProformaDecision, (
     email,
     remise,
   } = req.body || {};
-  const result = creerProformaPourEtudiant({
+  const result = await creerProformaPourEtudiant({
     staffUser: req.user,
     etudiantId: etudiant_id,
     formationId: formation_id,
@@ -303,8 +304,8 @@ router.post('/demandes-proforma/:id/envoyer-email', authMiddleware, staffProform
   if (!demande.email) {
     return res.status(400).json({ message: 'Aucune adresse e-mail sur cette demande.' });
   }
-  const { sendProformaFactureEmail } = require('../utils/proformaEmail');
-  const ok = await sendProformaFactureEmail(demande);
+  const { notifyProformaDecision } = require('../utils/transactionalEmail');
+  const ok = await notifyProformaDecision(demande, 'acceptee');
   if (!ok) {
     return res.status(503).json({ message: 'Envoi impossible (SMTP non configuré ou adresse invalide).' });
   }
@@ -566,7 +567,7 @@ router.get('/dossiers/:id', (req, res) => {
   });
 });
 
-router.put('/dossiers/:id/statut', (req, res) => {
+router.put('/dossiers/:id/statut', async (req, res) => {
   const { statut, motif_rejet } = req.body;
   if (!statut || !DOSSIER_STATUSES.includes(statut)) {
     return res.status(400).json({ message: 'Statut invalide.' });
@@ -614,6 +615,9 @@ router.put('/dossiers/:id/statut', (req, res) => {
       meta: { dossier_id: dossier.id, numero_dossier: dossier.numero_dossier, statut },
     });
   }
+  const dossierAfter = { ...dossier, ...updateData };
+  await notifyDossierStatutChange(dossierAfter, statut);
+
   logAudit(req, 'update_status', 'dossier', id, {
     from: dossier.statut,
     to: statut,
@@ -626,6 +630,18 @@ router.put('/dossiers/:id/statut', (req, res) => {
   let facture = null;
   if (statut === 'accepte') {
     facture = genererOuRecupererFactureDossier(id);
+    if (facture) {
+      await notifyFactureDossierGeneree(dossierAfter, facture);
+      if (dossier.etudiant_id) {
+        createUserNotification(dossier.etudiant_id, {
+          type: 'facture',
+          title: 'Facture proforma disponible',
+          message: `La facture ${facture.numero} a été générée pour le dossier ${dossier.numero_dossier}.`,
+          link: `/facture/${id}`,
+          meta: { dossier_id: id, facture_id: facture.id, numero: facture.numero },
+        });
+      }
+    }
   }
 
   res.json({

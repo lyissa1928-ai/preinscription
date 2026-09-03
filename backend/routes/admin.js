@@ -20,6 +20,7 @@ const { createBackup, DB_PATH, BACKUP_DIR } = require('../utils/dbBackup');
 const { logAudit } = require('../utils/auditLog');
 const { DOSSIER_STATUSES, canTransitionDossierStatus, requiresRejectionComment } = require('../utils/dossierWorkflow');
 const { createUserNotification } = require('../utils/notificationService');
+const { notifyDossierStatutChange, notifyFactureDossierGeneree } = require('../utils/transactionalEmail');
 const { rateLimit, getClientIp } = require('../utils/rateLimit');
 const { retentionConfigFromEnv, runMaintenancePrune } = require('../utils/maintenance');
 const { getRuntimeMetricsSnapshot } = require('../utils/runtimeMetrics');
@@ -270,7 +271,7 @@ router.get('/dossiers/:id', (req, res) => {
 });
 
 // PUT /api/admin/dossiers/:id/statut
-router.put('/dossiers/:id/statut', (req, res) => {
+router.put('/dossiers/:id/statut', async (req, res) => {
   const { statut, commentaire } = req.body;
   if (!statut || !DOSSIER_STATUSES.includes(statut)) return res.status(400).json({ message: 'Statut invalide' });
 
@@ -303,6 +304,13 @@ router.put('/dossiers/:id/statut', (req, res) => {
       link: '/dashboard',
       meta: { dossier_id: dossier.id, numero_dossier: dossier.numero_dossier, statut },
     });
+  }
+  const dossierAfter = { ...dossier, statut, commentaire_admin: commentaire || null };
+  await notifyDossierStatutChange(dossierAfter, statut);
+  if (statut === 'accepte') {
+    const { genererOuRecupererFactureDossier } = require('../services/factureService');
+    const facture = genererOuRecupererFactureDossier(id);
+    if (facture) await notifyFactureDossierGeneree(dossierAfter, facture);
   }
   logAudit(req, 'update_status', 'dossier', id, {
     from: dossier.statut,

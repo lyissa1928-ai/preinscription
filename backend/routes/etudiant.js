@@ -311,6 +311,9 @@ router.post(
   };
   db.get('dossiers').push(dossier).write();
 
+  const { notifyDossierStatutChange } = require('../utils/transactionalEmail');
+  await notifyDossierStatutChange(dossier, 'en_attente');
+
   for (const [type, meta] of Object.entries(securedByField)) {
     const docId = db.nextId('documents');
     db.get('documents')

@@ -103,7 +103,7 @@ export default function MesAccesEtudiant() {
             </div>
             <ul className="space-y-2">
               <li>
-                <ActionLink to="/mot-de-passe-oublie-email">Recevoir un lien de réinitialisation par e-mail</ActionLink>
+                <ActionLink to="/mot-de-passe-oublie-email">Recevoir un code de réinitialisation par e-mail</ActionLink>
               </li>
               <li>
                 <ActionLink to="/mot-de-passe-oublie-matricule">Définir un nouveau mot de passe avec mon matricule</ActionLink>

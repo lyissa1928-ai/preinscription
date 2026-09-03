@@ -32,7 +32,7 @@ export default function MotDePasseOublie() {
           to: '/mot-de-passe-oublie-email',
           icon: FaEnvelope,
           title: 'Par e-mail',
-          desc: 'Recevoir un lien de réinitialisation sur votre boîte mail.',
+          desc: 'Recevoir un code temporaire sur votre boîte mail.',
         }]
       : []),
   ]
