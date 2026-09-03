@@ -76,7 +76,7 @@ export default function Login() {
       let dest = role === 'admin' ? '/admin'
         : role === 'admin_etablissement' ? '/mon-etablissement/equipe'
         : role === 'controleur_qualite' ? '/qualite'
-        : ['responsable', 'responsable_fad', 'agent_admin', 'comptable'].includes(role) ? '/mon-etablissement'
+        : ['responsable', 'responsable_fad', 'agent_fad', 'agent_admin', 'comptable'].includes(role) ? '/mon-etablissement'
         : '/dashboard'
       const nextUrl =
         sanitizeNextPath(searchParams.get('next') || searchParams.get('redirect')) ||

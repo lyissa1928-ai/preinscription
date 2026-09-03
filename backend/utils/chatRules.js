@@ -10,6 +10,8 @@
 const STAFF_ROLES = new Set([
   'admin_etablissement',
   'responsable',
+  'responsable_fad',
+  'agent_fad',
   'agent_admin',
   'comptable',
   'controleur_qualite',

@@ -1087,4 +1087,24 @@ router.delete('/site-config/favicon', adminSensitiveLimiter, (req, res) => {
   });
 });
 
+// ─── Rapports hebdomadaires Directeur (1 .xlsx / établissement) ─────────────
+router.get('/rapports-hebdomadaires', (req, res) => {
+  const list = (db.get('rapports_hebdomadaires').value() || []).slice().reverse().slice(0, 26);
+  res.json(list);
+});
+
+router.post('/rapports-hebdomadaires/generer', adminSensitiveLimiter, async (req, res) => {
+  try {
+    const { generateWeeklyRapportsForAllEtabs } = require('../utils/weeklyRapportExcel');
+    const meta = await generateWeeklyRapportsForAllEtabs(new Date());
+    logAudit(req, 'rapport_hebdo_genere', 'system', null, {
+      files: meta.files?.length || 0,
+      errors: meta.errors?.length || 0,
+    });
+    res.status(201).json(meta);
+  } catch (e) {
+    res.status(500).json({ message: e.message || 'Échec génération des rapports.' });
+  }
+});
+
 module.exports = router;

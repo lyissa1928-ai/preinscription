@@ -122,8 +122,6 @@ export default function Register() {
     adresse: '',
     mot_de_passe: '',
     confirm: '',
-    /** Optionnel : formation visée (récap uniquement — non envoyé à l’API) */
-    formation_id: '',
   })
   const [step, setStep] = useState(1)
   const [schoolUi, setSchoolUi] = useState(initialSchoolUi)
@@ -313,11 +311,6 @@ export default function Register() {
 
   const selectedEtab = etablissements.find((e) => String(e.id) === String(form.etablissement_id))
 
-  const formationRecap = useMemo(() => {
-    if (!form.formation_id) return null
-    return schoolUi.catalogue.find((f) => String(f.id) === String(form.formation_id)) || null
-  }, [form.formation_id, schoolUi.catalogue])
-
   const etabHeroImage = useMemo(() => resolveEtabHeroImage(selectedEtab?.nom), [selectedEtab?.nom])
 
   const currentStepMeta = STEPS[Math.min(STEPS.length, Math.max(1, step)) - 1]
@@ -373,13 +366,6 @@ export default function Register() {
               >
                 <p className="text-[10px] font-bold uppercase tracking-wider text-white/65">Rattachement choisi</p>
                 <p className="text-white font-semibold text-sm mt-1 leading-snug">{selectedEtab.nom}</p>
-                {formationRecap && (
-                  <p className="text-white/90 text-xs mt-2 leading-snug border-t border-white/20 pt-2">
-                    <span className="text-white/60 font-semibold uppercase text-[10px]">Orientation</span>
-                    <br />
-                    <span className="font-medium">{formationRecap.titre}</span>
-                  </p>
-                )}
               </div>
             )}
           </div>
@@ -426,7 +412,7 @@ export default function Register() {
                   </div>
                   {step === 2 && (
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-700 bg-blue-100/90 px-2 py-1 rounded-md shrink-0">
-                      {schoolUi.phase === 'done' ? 'Récap' : 'Parcours'}
+                      Établissement
                     </span>
                   )}
                 </div>
@@ -561,10 +547,6 @@ export default function Register() {
                     <RegisterSchoolFlow
                       form={form}
                       setForm={setForm}
-                      schoolUi={schoolUi}
-                      setSchoolUi={setSchoolUi}
-                      schoolCatalogueEtabRef={schoolCatalogueEtabRef}
-                      etablissements={etablissements}
                       etablissementsFiltres={etablissementsFiltres}
                       etabSearch={etabSearch}
                       setEtabSearch={setEtabSearch}
@@ -748,12 +730,6 @@ export default function Register() {
                           <li>
                             <span className="text-slate-400">Établissement :</span> {selectedEtab?.nom || '—'}
                           </li>
-                          {formationRecap && (
-                            <li>
-                              <span className="text-slate-400">Formation visée :</span>{' '}
-                              <span className="font-medium text-slate-800">{formationRecap.titre}</span>
-                            </li>
-                          )}
                           <li>
                             <span className="text-slate-400">E-mail :</span> {form.email}
                           </li>

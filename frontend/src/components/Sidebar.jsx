@@ -63,7 +63,9 @@ const MENUS = {
     { label: 'Demandes proforma', to: '/admin/proforma', icon: ICONS.demandesListe },
     { label: 'Établissements', to: '/admin/etablissements', icon: ICONS.etablissements },
     { label: 'Utilisateurs', to: '/admin/utilisateurs', icon: ICONS.users },
+    { label: 'Niveaux d’étude', to: '/admin/niveaux-etude', icon: ICONS.pedago },
     { label: 'Factures', to: '/admin/factures-etablissement', icon: ICONS.finance },
+    { label: 'Rapports hebdo', to: '/admin/rapports-hebdo', icon: ICONS.stats },
     {
       label: 'Conditions d’admission',
       to: '/admin?tab=conditions',
@@ -106,6 +108,24 @@ const MENUS = {
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   responsable_fad: [
+    { label: 'Mon établissement (FAD)', to: '/mon-etablissement', icon: ICONS.etablissements },
+    {
+      label: 'Dossiers FAD',
+      to: '/responsable',
+      icon: ICONS.dashboard,
+      exact: true,
+      isActive: (loc) =>
+        loc.pathname === '/responsable'
+        && new URLSearchParams(loc.search).get('tab') !== 'conditions',
+    },
+    { label: 'Demandes proforma FAD', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Guichet FAD', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
+    { label: 'Agents FAD', to: '/responsable/agents-fad', icon: ICONS.users },
+    { label: 'Messages', to: '/chat', icon: ICONS.chat },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
+    { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
+  ],
+  agent_fad: [
     { label: 'Mon établissement (FAD)', to: '/mon-etablissement', icon: ICONS.etablissements },
     {
       label: 'Dossiers FAD',
@@ -161,6 +181,7 @@ const ROLE_CONFIG = {
   admin_etablissement: { label: 'Admin. établissement', color: 'from-blue-700 to-blue-900', badge: 'bg-blue-500' },
   responsable: { label: 'Resp. Pédagogique', color: 'from-teal-700 to-teal-900',    badge: 'bg-teal-500' },
   responsable_fad: { label: 'Responsable FAD', color: 'from-indigo-700 to-indigo-900', badge: 'bg-indigo-500' },
+  agent_fad: { label: 'Agent FAD', color: 'from-sky-700 to-indigo-900', badge: 'bg-sky-500' },
   agent_admin: { label: 'Agent Administratif',color: 'from-orange-600 to-orange-800',badge: 'bg-orange-500' },
   comptable:   { label: 'Comptable',          color: 'from-violet-700 to-violet-900',badge: 'bg-violet-500' },
   controleur_qualite: { label: 'Contrôleur qualité', color: 'from-cyan-800 to-slate-900', badge: 'bg-cyan-600' },

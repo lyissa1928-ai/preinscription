@@ -8,6 +8,8 @@ import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
 import { titreTypeDocument, isFactureDefinitive } from '../utils/factureTypeDocument'
 import { buildDisplayRows } from '../utils/factureDisplayRows'
+import { useAuth } from '../context/AuthContext'
+import { getRoleHome, useSmartBack } from '../utils/smartBack'
 const fmtDate = (d) => {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -85,6 +87,9 @@ function headerContactLines(eb) {
 
 export default function FactureView() {
   const { dossierId } = useParams()
+  const { user } = useAuth()
+  const home = getRoleHome(user?.role)
+  const smartBack = useSmartBack(home)
   const [facture, setFacture] = useState(null)
   const [etabLive, setEtabLive] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -368,7 +373,7 @@ export default function FactureView() {
           {loadError && (
             <p className="text-gray-500 text-sm mb-4">{loadError}</p>
           )}
-          <Link to="/dashboard" className="btn-primary">Retour</Link>
+          <Link to={home} className="btn-primary">Retour</Link>
         </div>
       </div>
     )
@@ -389,7 +394,7 @@ export default function FactureView() {
       <div className="no-print mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3">
         <button
           type="button"
-          onClick={() => window.history.back()}
+          onClick={smartBack}
           className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           ← Retour

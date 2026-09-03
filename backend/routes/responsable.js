@@ -106,11 +106,13 @@ router.get('/demandes-proforma', authMiddleware, staffProformaView, (req, res) =
   const limitNum = parseInt(limit);
 
   let demandes = db.get('demandes_proforma').value();
-  const formationIds = getEtabFormationIds(req) || [];
+  const formationIds = getEtabFadFormationIds(req) || [];
   const etabId = req.user.role === 'admin' ? null : req.user.etablissement_id;
   if (etabId) {
     demandes = demandes.filter((d) => demandeAppartientAEtablissement(d, etabId, formationIds));
   }
+  const { filterDemandesParModaliteRole } = require('../utils/fadRoles');
+  demandes = filterDemandesParModaliteRole(req.user, demandes);
 
   if (statut) demandes = demandes.filter((d) => d.statut === statut);
   if (type) demandes = demandes.filter((d) => d.type_formation === type);
@@ -325,19 +327,19 @@ const {
   buildFormationsMap,
 } = require('../utils/etablissementScope');
 
-/** Pour responsable_fad : uniquement les formations FAD. */
+/** Pour responsable_fad / agent_fad : uniquement les formations FAD. */
 function getEtabFadFormationIds(req) {
   if (req.user.role === 'admin') return null;
   const formations = db.get('formations').value();
-  if (req.user.role === 'responsable_fad') {
+  if (req.user.role === 'responsable_fad' || req.user.role === 'agent_fad') {
     return getFadFormationIdsForEtab(formations, req.user.etablissement_id);
   }
   return getFormationIdsForEtab(formations, req.user.etablissement_id);
 }
 
-/** Vérifie accès dossier pour responsable_fad : dossier FAD + établissement. */
+/** Vérifie accès dossier pour staff FAD : dossier FAD + établissement. */
 function assertDossierAccessFad(req, dossier) {
-  if (req.user.role !== 'responsable_fad') return true;
+  if (req.user.role !== 'responsable_fad' && req.user.role !== 'agent_fad') return true;
   return dossierEstFad(dossier);
 }
 
@@ -355,8 +357,13 @@ function dossierAppartientAEtablissement(dossier, etabId) {
 function assertDossierPourResponsable(req, dossier) {
   if (req.user.role === 'admin') return true;
   if (!dossierAppartientAEtablissement(dossier, req.user.etablissement_id)) return false;
-  // responsable_fad ne voit que les dossiers FAD
+  // Staff FAD : dossiers FAD uniquement
   if (!assertDossierAccessFad(req, dossier)) return false;
+  // Staff présentiel : exclure FAD
+  const { isFadOnlyUser, userPeutVoirDossierParModalite } = require('../utils/fadRoles');
+  if (!isFadOnlyUser(req.user) && req.user.role !== 'admin_etablissement') {
+    if (!userPeutVoirDossierParModalite(req.user, dossier)) return false;
+  }
   return true;
 }
 
@@ -366,8 +373,10 @@ function demandeAppartientAEtablissement(demande, etabId, formationIds) {
 
 function assertDemandePourResponsable(req, demande) {
   if (req.user.role === 'admin') return true;
-  const fIds = getEtabFormationIds(req) || [];
-  return demandeAppartientAEtablissement(demande, req.user.etablissement_id, fIds);
+  const fIds = getEtabFadFormationIds(req) || [];
+  if (!demandeAppartientAEtablissement(demande, req.user.etablissement_id, fIds)) return false;
+  const { userPeutVoirDemandeParModalite } = require('../utils/fadRoles');
+  return userPeutVoirDemandeParModalite(req.user, demande);
 }
 
 // ─── DOSSIERS ────────────────────────────────────────────────────────────────
@@ -378,7 +387,8 @@ router.get('/dossiers', (req, res) => {
   const limitNum = parseInt(limit);
 
   const formationIds = getEtabFadFormationIds(req);
-  const isFadOnly = req.user.role === 'responsable_fad';
+  const isFadOnly = req.user.role === 'responsable_fad' || req.user.role === 'agent_fad';
+  const { filterDossiersParModaliteRole } = require('../utils/fadRoles');
 
   let dossiers = db.get('dossiers').value();
   const utilisateurs = db.get('utilisateurs').value();
@@ -387,10 +397,8 @@ router.get('/dossiers', (req, res) => {
   if (formationIds !== null) {
     dossiers = dossiers.filter(d => dossierAppartientAEtablissement(d, req.user.etablissement_id));
   }
-  // responsable_fad : dossiers FAD uniquement
-  if (isFadOnly) {
-    dossiers = dossiers.filter(d => d.type_formation === 'en_ligne');
-  }
+  // Périmètre FAD / présentiel selon le rôle
+  dossiers = filterDossiersParModaliteRole(req.user, dossiers);
 
   dossiers = dossiers.map(d => {
     const u = utilisateurs.find(u => u.id === d.etudiant_id) || {};

@@ -19,7 +19,10 @@ import { useAuth } from '../context/AuthContext'
 
 const DASHBOARD_BY_ROLE = {
   admin: '/admin',
+  admin_etablissement: '/mon-etablissement',
   responsable: '/responsable',
+  responsable_fad: '/responsable',
+  agent_fad: '/responsable',
   agent_admin: '/agent-admin',
   comptable: '/comptable',
   controleur_qualite: '/qualite',

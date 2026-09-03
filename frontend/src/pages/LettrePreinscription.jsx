@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
 import DocumentDownloadBar from '../components/DocumentDownloadBar'
+import { getRoleHome } from '../utils/smartBack'
 
 const fmtDate = (d) => {
   if (!d) return '—'
@@ -67,7 +68,7 @@ export default function LettrePreinscription() {
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <h2 className="text-lg font-bold text-slate-900">Lettre indisponible</h2>
           <p className="mt-2 text-sm text-slate-500">{error || 'Données incomplètes.'}</p>
-          <Link to="/dashboard" className="btn-primary mt-6 inline-block">Retour</Link>
+          <Link to={getRoleHome(user?.role)} className="btn-primary mt-6 inline-block">Retour</Link>
         </div>
       </div>
     )
@@ -104,6 +105,7 @@ export default function LettrePreinscription() {
         documentRef={documentRef}
         filename={`${refLettre}.pdf`}
         primaryColor={primary}
+        backFallback={getRoleHome(user?.role)}
       />
       <article
         ref={documentRef}

@@ -9,7 +9,7 @@ const { createBackup } = require('./dbBackup');
 const { getDureeMoisEffectif, computePrixAnnuel, normalizeFraisSupplementaires } = require('./formationTarifs');
 
 /** Version cible de l’application actuelle. */
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 function toNonNegInt(v, fallback = 0) {
   if (v === undefined || v === null || v === '') return fallback;
@@ -137,6 +137,17 @@ function migrateSiteConfigV3(db) {
   return { site_config_created: false };
 }
 
+/** v4 — Niveaux d'étude dynamiques + collection rapports hebdomadaires. */
+function migrateNiveauxEtudeV4(db) {
+  const { seedDefaultNiveaux, ensureNiveauxCollection } = require('./niveauxEtude');
+  ensureNiveauxCollection(db);
+  const seed = seedDefaultNiveaux(db);
+  if (!Array.isArray(db.get('rapports_hebdomadaires').value())) {
+    db.set('rapports_hebdomadaires', []).write();
+  }
+  return { niveaux_seeded: seed.seeded, niveaux_total: seed.total };
+}
+
 const MIGRATIONS = [
   {
     version: 1,
@@ -155,6 +166,12 @@ const MIGRATIONS = [
     id: '2026_09_site_config',
     description: 'Ajoute site_config (favicon plateforme, nom affiché).',
     up: migrateSiteConfigV3,
+  },
+  {
+    version: 4,
+    id: '2026_09_niveaux_etude_rapports',
+    description: 'Seed niveaux d’étude dynamiques + méta rapports hebdomadaires.',
+    up: migrateNiveauxEtudeV4,
   },
 ];
 

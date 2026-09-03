@@ -83,6 +83,31 @@ function resolvePublicContacts(etablissementId) {
     }
   }
 
+  // Toujours résoudre emails Responsable / Responsable FAD depuis la DB (chatbot)
+  let responsableEmail = null;
+  let responsableFadEmail = null;
+  if (eid != null) {
+    const users = db.get('utilisateurs').value() || [];
+    if (etab?.responsable_id) {
+      const u = users.find((x) => Number(x.id) === Number(etab.responsable_id) && x.actif !== false);
+      if (u?.email) {
+        responsableEmail = staffPublicFromUser(u, 'Responsable d’établissement');
+      }
+    }
+    if (!responsableEmail) {
+      const resp = users.find(
+        (u) => u.role === 'responsable' && Number(u.etablissement_id) === eid && u.actif !== false,
+      );
+      if (resp) responsableEmail = staffPublicFromUser(resp, 'Responsable d’établissement');
+    }
+    const fadResps = users.filter(
+      (u) => u.role === 'responsable_fad' && Number(u.etablissement_id) === eid && u.actif !== false,
+    );
+    if (fadResps[0]) {
+      responsableFadEmail = staffPublicFromUser(fadResps[0], 'Responsable FAD');
+    }
+  }
+
   const scolarite =
     scolariteCfg ||
     (etabPublic
@@ -95,6 +120,8 @@ function resolvePublicContacts(etablissementId) {
     finance: financeCfg || scolarite,
     etablissement: responsableEtab || scolarite,
     etablissement_public: etabPublic,
+    responsable: responsableEmail || responsableEtab || null,
+    responsable_fad: responsableFadEmail || null,
     expose_staff_contacts: !!cfg.expose_staff_contacts,
   };
 }

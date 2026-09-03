@@ -90,7 +90,7 @@ function etabFacturesAccess(req, res, next) {
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
   }
-  const roles = ['responsable', 'responsable_fad', 'comptable', 'agent_admin', 'controleur_qualite', 'admin_etablissement'];
+  const roles = ['responsable', 'responsable_fad', 'agent_fad', 'comptable', 'agent_admin', 'controleur_qualite', 'admin_etablissement'];
   if (
     (roles.includes(req.user.role) || actsAsResponsable(req.user)) &&
     Number(req.user.etablissement_id) === etabId
@@ -113,7 +113,7 @@ function etabMembresManageAccess(req, res, next) {
   }
   if (canManageEtabMembres(req.user, etabId)) return next();
   return res.status(403).json({
-    message: 'Accès réservé à l’administrateur plateforme ou à l’administrateur de cet établissement.',
+    message: 'Accès réservé à l’administrateur plateforme, à l’administrateur d’établissement ou au Responsable FAD (agents FAD).',
   });
 }
 
@@ -1699,6 +1699,16 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
   } = req.body;
 
   if (!titre || !type || !filiere_id) return res.status(400).json({ message: 'Titre, type et filière obligatoires.' });
+  if (!niveau || String(niveau).trim() === '') {
+    return res.status(400).json({ message: 'Le niveau d’étude est obligatoire.' });
+  }
+  const { isNiveauActifValide, normalizeNiveauLibelle } = require('../utils/niveauxEtude');
+  if (!isNiveauActifValide(db, niveau)) {
+    return res.status(400).json({
+      message: 'Niveau d’étude invalide ou désactivé. Choisissez un niveau dans la liste administrateur.',
+    });
+  }
+  const niveauNorm = normalizeNiveauLibelle(db, niveau);
   const normalizedType = normalizeFormationType(type);
   if (!['presentiel', 'en_ligne'].includes(normalizedType)) return res.status(400).json({ message: 'Type invalide.' });
 
@@ -1727,7 +1737,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
   const id = db.nextId('formations');
   let formation = {
     id, etablissement_id, filiere_id: fid,
-    titre: String(titre).trim(), type: normalizedType, niveau: niveau || '',
+    titre: String(titre).trim(), type: normalizedType, niveau: niveauNorm,
     niveau_requis: niveau_requis || '',
     duree: duree || '',
     duree_mois: dureeMoisN,
@@ -2154,6 +2164,18 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
       return res.status(400).json({ message: 'Type invalide.' });
     }
   }
+  if (updates.niveau !== undefined) {
+    if (!String(updates.niveau || '').trim()) {
+      return res.status(400).json({ message: 'Le niveau d’étude est obligatoire.' });
+    }
+    const { isNiveauActifValide, normalizeNiveauLibelle } = require('../utils/niveauxEtude');
+    if (!isNiveauActifValide(db, updates.niveau)) {
+      return res.status(400).json({
+        message: 'Niveau d’étude invalide ou désactivé.',
+      });
+    }
+    updates.niveau = normalizeNiveauLibelle(db, updates.niveau);
+  }
   const numericFields = ['places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'duree_mois'];
   for (const f of numericFields) {
     if (updates[f] !== undefined && !isNonNegativeInt(updates[f])) {
@@ -2284,7 +2306,7 @@ router.delete('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
 // GET /api/etablissements/:id/membres
 router.get('/:id/membres', etabMembresManageAccess, (req, res) => {
   const etablissement_id = parseInt(req.params.id);
-  const membres = db.get('utilisateurs')
+  let membres = db.get('utilisateurs')
     .filter((u) => u.etablissement_id === etablissement_id && isEtabStaffMember(u))
     .map(u => ({
       id: u.id,
@@ -2299,6 +2321,10 @@ router.get('/:id/membres', etabMembresManageAccess, (req, res) => {
       created_at: u.created_at,
     }))
     .value();
+  // Responsable FAD : uniquement les Agents FAD
+  if (req.user.role === 'responsable_fad') {
+    membres = membres.filter((m) => m.role === 'agent_fad');
+  }
   res.json(membres);
 });
 

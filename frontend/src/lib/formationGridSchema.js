@@ -15,10 +15,12 @@ export const FORMATION_DATA_COLUMNS = [
   },
   {
     key: 'niveau',
-    label: 'Niveau',
+    label: 'Niveau d’étude',
+    required: true,
     type: 'text',
     width: 'min-w-[7rem]',
-    aliases: ['niveau'],
+    help: 'Niveau dynamique (BT, BTS, L1, L2…). Géré dans Admin → Niveaux d’étude.',
+    aliases: ['niveau', 'niveau etude', "niveau d'etude", 'niveau d’étude'],
   },
   {
     key: 'niveau_requis',

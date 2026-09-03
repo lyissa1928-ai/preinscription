@@ -6,6 +6,7 @@ import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
 import DocumentDownloadBar from '../components/DocumentDownloadBar'
 import { resolveAffichageCandidat, resolveFormationAffichage } from '../utils/attestationDisplay'
+import { getRoleHome } from '../utils/smartBack'
 
 const fmtDate = (d) => {
   if (d == null || d === '') return '—'
@@ -62,7 +63,7 @@ export default function AttestationDemandePreinscription() {
           <div className="text-5xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Attestation indisponible</h2>
           <p className="text-gray-500 mb-6">{error || 'Données incomplètes.'}</p>
-          <Link to="/dashboard" className="btn-primary">
+          <Link to={getRoleHome(user?.role)} className="btn-primary">
             Retour au tableau de bord
           </Link>
         </div>
@@ -113,7 +114,7 @@ export default function AttestationDemandePreinscription() {
         documentRef={documentRef}
         filename={`${refAtt}.pdf`}
         primaryColor={primary}
-        backHref="/dashboard"
+        backFallback={getRoleHome(user?.role)}
         className="mx-auto mb-5 flex max-w-3xl flex-wrap items-center justify-between gap-3"
       />
 

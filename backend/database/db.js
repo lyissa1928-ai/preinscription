@@ -53,6 +53,7 @@ db.defaults({
   dossiers: [],
   documents: [],
   formations: [],
+  niveaux_etude: [],
   factures: [],
   demandes_proforma: [],
   notifications: [],
@@ -61,6 +62,7 @@ db.defaults({
   conditions_admission: [],
   chatbot_logs: [],
   chatbot_config: [],
+  rapports_hebdomadaires: [],
   site_config: {
     platform_name: 'Préinscription Universitaire',
     favicon_url: null,
@@ -73,6 +75,7 @@ db.defaults({
     etablissements: 1,
     filieres: 1,
     formations: 1,
+    niveaux_etude: 1,
     utilisateurs: 1,
     dossiers: 1,
     documents: 1,

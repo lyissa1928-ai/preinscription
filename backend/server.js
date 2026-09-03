@@ -22,6 +22,7 @@ const { recordRequest, getRuntimeMetricsSnapshot } = require('./utils/runtimeMet
 const { runHealthChecks } = require('./utils/healthCheck');
 const { maintenanceGate } = require('./middleware/maintenanceGate');
 const { startAutoBackupScheduler } = require('./utils/autoBackupScheduler');
+const { startWeeklyRapportScheduler } = require('./utils/weeklyRapportScheduler');
 const { isMaintenanceModeEnabled } = require('./utils/maintenanceMode');
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -124,6 +125,8 @@ app.use('/api/comptable', require('./routes/comptable'));       // Comptable / F
 app.use('/api/qualite', require('./routes/qualite'));          // Contrôleur qualité
 app.use('/api/etablissements', require('./routes/etablissements'));
 app.use('/api/formations', require('./routes/formations'));
+app.use('/api/niveaux-etude', require('./routes/niveauxEtude'));
+app.use('/api/responsable-fad', require('./routes/responsableFadAgents'));
 app.use('/api/factures', require('./routes/factures'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/chatbot', require('./routes/chatbot')); // Orientation IA (RAG) — distinct du chat humain
@@ -203,6 +206,7 @@ initChatSocket(server, { allowedCorsOrigins });
 server.listen(PORT, () => {
   console.log(`🚀 Serveur : http://localhost:${PORT}`);
   startAutoBackupScheduler();
+  startWeeklyRapportScheduler();
   if (isMaintenanceModeEnabled()) {
     console.warn('[MAINTENANCE] Mode maintenance actif (MAINTENANCE_MODE)');
   }

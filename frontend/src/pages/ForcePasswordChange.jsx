@@ -58,7 +58,7 @@ export default function ForcePasswordChange() {
         ? '/admin'
         : user.role === 'controleur_qualite'
             ? '/qualite'
-            : ['responsable', 'agent_admin', 'comptable'].includes(user.role)
+            : ['responsable', 'responsable_fad', 'agent_fad', 'agent_admin', 'comptable', 'admin_etablissement'].includes(user.role)
               ? '/mon-etablissement'
               : '/dashboard'
     return <Navigate to={dest} replace />
@@ -102,7 +102,7 @@ export default function ForcePasswordChange() {
           ? '/admin'
           : user.role === 'controleur_qualite'
               ? '/qualite'
-              : ['responsable', 'agent_admin', 'comptable'].includes(user.role)
+              : ['responsable', 'responsable_fad', 'agent_fad', 'agent_admin', 'comptable', 'admin_etablissement'].includes(user.role)
                 ? '/mon-etablissement'
                 : '/dashboard'
       navigate(dest, { replace: true })

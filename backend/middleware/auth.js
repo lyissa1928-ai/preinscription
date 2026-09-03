@@ -62,7 +62,13 @@ const controleurQualiteOnly = roleGuard('controleur_qualite');
 const responsableOrAdmin = roleGuard('responsable', 'admin');
 
 /** Décision pédagogique dossiers (accepter / refuser) : admin + admin étab. + responsable (+ FAD). */
-const staffDossierDecision = roleGuard('admin', 'admin_etablissement', 'responsable', 'responsable_fad');
+const staffDossierDecision = roleGuard(
+  'admin',
+  'admin_etablissement',
+  'responsable',
+  'responsable_fad',
+  'agent_fad',
+);
 
 /** Lecture demandes proforma : tout le staff établissement (+ admin plateforme). */
 const staffProformaView = roleGuard(
@@ -70,6 +76,7 @@ const staffProformaView = roleGuard(
   'admin_etablissement',
   'responsable',
   'responsable_fad',
+  'agent_fad',
   'agent_admin',
   'comptable',
   'controleur_qualite',
@@ -81,12 +88,21 @@ const staffProformaDecision = roleGuard(
   'admin_etablissement',
   'responsable',
   'responsable_fad',
+  'agent_fad',
   'comptable',
   'agent_admin',
 );
 
 /** Guichet walk-in : admin + staff établissement facturation / accueil. */
-const staffGuichet = roleGuard('admin', 'admin_etablissement', 'responsable', 'responsable_fad', 'agent_admin', 'comptable');
+const staffGuichet = roleGuard(
+  'admin',
+  'admin_etablissement',
+  'responsable',
+  'responsable_fad',
+  'agent_fad',
+  'agent_admin',
+  'comptable',
+);
 
 /** Lecture lettre / attestation officielle. */
 const staffLettreAttestation = roleGuard(
@@ -94,16 +110,26 @@ const staffLettreAttestation = roleGuard(
   'admin_etablissement',
   'responsable',
   'responsable_fad',
+  'agent_fad',
   'agent_admin',
   'comptable',
-  'controleur_qualite'
+  'controleur_qualite',
 );
 
 const agentAdminOrAdmin = roleGuard('agent_admin', 'admin');
 const comptableOrAdmin = roleGuard('comptable', 'admin');
 const directeurOrAdmin = adminOnly;
 const controleurQualiteOrAdmin = roleGuard('controleur_qualite', 'admin');
-const staffOnly = roleGuard('admin', 'admin_etablissement', 'responsable', 'responsable_fad', 'agent_admin', 'comptable', 'controleur_qualite');
+const staffOnly = roleGuard(
+  'admin',
+  'admin_etablissement',
+  'responsable',
+  'responsable_fad',
+  'agent_fad',
+  'agent_admin',
+  'comptable',
+  'controleur_qualite',
+);
 
 module.exports = {
   authMiddleware,

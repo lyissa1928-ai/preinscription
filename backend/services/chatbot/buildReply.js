@@ -13,19 +13,23 @@ function formatContactBlock(contact, title) {
   return lines.join('\n');
 }
 
-function formatFormationCard(f, index) {
+function formatFormationCard(f, index, { contacts } = {}) {
   const n = index != null ? `${index + 1}. ` : '';
   const lines = [`**${n}${f.titre}**`];
   if (f.niveau) lines.push(`• Niveau : ${f.niveau}`);
-  if (f.filiere_nom) lines.push(`• Filière : ${f.filiere_nom}`);
   if (f.duree) lines.push(`• Durée : ${f.duree}`);
-  if (f.type_label) lines.push(`• Modalités : ${f.type_label}`);
+  if (f.type_label) lines.push(`• Modalité : ${f.type_label}`);
   if (f.etablissement_nom) lines.push(`• Établissement : ${f.etablissement_nom}`);
-  if (f.niveau_requis) lines.push(`• Admission (niveau requis) : ${f.niveau_requis}`);
-  if (f.prix_label) lines.push(`• Tarif indiqué : ${f.prix_label}`);
-  if (f.frais_inscription_label) lines.push(`• Frais d’inscription : ${f.frais_inscription_label}`);
-  if (f.mensualite_label) lines.push(`• Mensualité : ${f.mensualite_label}`);
-  if (f.description) lines.push(`• Description : ${f.description}`);
+  const frais = f.prix_label || f.frais_inscription_label;
+  if (frais) lines.push(`• Frais : ${frais}`);
+  if (f.niveau_requis) lines.push(`• Admission : ${f.niveau_requis}`);
+  // Contacts dynamiques (jamais en dur)
+  if (contacts?.responsable?.email) {
+    lines.push(`• E-mail responsable : ${contacts.responsable.email}`);
+  }
+  if (f.type === 'en_ligne' && contacts?.responsable_fad?.email) {
+    lines.push(`• E-mail Responsable FAD : ${contacts.responsable_fad.email}`);
+  }
   return lines.join('\n');
 }
 
@@ -230,7 +234,7 @@ function buildReply({
     const sco = contacts.scolarite;
     const parts = [];
     if (formations[0]) {
-      parts.push(`Voici les informations du catalogue pour **${formations[0].titre}** :`, '', formatFormationCard(formations[0]), '');
+      parts.push(`Voici les informations du catalogue pour **${formations[0].titre}** :`, '', formatFormationCard(formations[0], null, { contacts }), '');
     }
     parts.push(
       'Pour toute question complémentaire, contactez uniquement la scolarité.',
@@ -254,7 +258,7 @@ function buildReply({
     const parts = [
       `Voici les données du catalogue pour **${f.titre}** :`,
       '',
-      formatFormationCard(f),
+      formatFormationCard(f, null, { contacts }),
     ];
     return {
       reply: parts.join('\n'),
@@ -306,7 +310,7 @@ function buildReply({
     const parts = [
       `Concernant **${f.titre}**, voici uniquement ce qui figure dans la base :`,
       '',
-      formatFormationCard(f),
+      formatFormationCard(f, null, { contacts }),
     ];
     if (!f.description) {
       parts.push('', 'Aucune fiche débouchés n’est enregistrée pour cette formation.');
@@ -353,7 +357,7 @@ function buildReply({
                 .slice(0, 6)
                 .map((f) => `• **${f.titre}** — ${f.duree || 'durée non renseignée'}`),
             ]
-          : formations.slice(0, 3).map((f) => formatFormationCard(f));
+          : formations.slice(0, 3).map((f) => formatFormationCard(f, null, { contacts }));
 
     return {
       reply: parts.join('\n'),
@@ -401,7 +405,7 @@ function buildReply({
     parts.push('\n_Plusieurs établissements sont concernés — chaque formation indique clairement le sien._');
   }
   formations.slice(0, 5).forEach((f, i) => {
-    parts.push('\n' + formatFormationCard(f, i));
+    parts.push('\n' + formatFormationCard(f, i, { contacts }));
   });
 
   if (domains[0]?.id === 'cybersecurite' && !formations.some((f) => /cyber/i.test(f.titre))) {

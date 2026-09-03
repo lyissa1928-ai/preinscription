@@ -9,6 +9,8 @@ const ROLE_LABELS = {
   admin: 'Administrateur plateforme',
   admin_etablissement: 'Administrateur établissement',
   responsable: 'Responsable pédagogique',
+  responsable_fad: 'Responsable FAD',
+  agent_fad: 'Agent FAD',
   agent_admin: 'Agent administratif',
   comptable: 'Comptable',
   controleur_qualite: 'Contrôleur qualité',

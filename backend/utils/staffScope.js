@@ -11,6 +11,13 @@ const {
   buildFormationsMap,
 } = require('./etablissementScope');
 const { filterDossiersAffichables, assertDossierAffichable } = require('./dossierVisibility');
+const {
+  filterDossiersParModaliteRole,
+  filterDemandesParModaliteRole,
+  userPeutVoirDossierParModalite,
+  userPeutVoirDemandeParModalite,
+  userPeutGererFormation,
+} = require('./fadRoles');
 
 function getScopeContext(user) {
   const formations = db.get('formations').value() || [];
@@ -24,20 +31,28 @@ function filterDossiersForUser(user, dossiers) {
   const utilisateurs = db.get('utilisateurs').value() || [];
   let list = filterDossiersAffichables(dossiers, utilisateurs);
   const { etabId, formationsById } = getScopeContext(user);
-  if (!etabId) return list;
-  return list.filter((d) => dossierAppartientAEtablissement(d, etabId, formationsById));
+  if (etabId) {
+    list = list.filter((d) => dossierAppartientAEtablissement(d, etabId, formationsById));
+  }
+  return filterDossiersParModaliteRole(user, list);
 }
 
 function filterDemandesForUser(user, demandes) {
   const { etabId, formationIds } = getScopeContext(user);
-  if (!etabId) return demandes || [];
-  return (demandes || []).filter((d) => demandeAppartientAEtablissement(d, etabId, formationIds));
+  let list = demandes || [];
+  if (etabId) {
+    list = list.filter((d) => demandeAppartientAEtablissement(d, etabId, formationIds));
+  }
+  return filterDemandesParModaliteRole(user, list);
 }
 
 function filterFormationsForUser(user, formations) {
   const { etabId } = getScopeContext(user);
-  if (!etabId) return formations || [];
-  return (formations || []).filter((f) => f.etablissement_id === etabId);
+  let list = formations || [];
+  if (etabId) {
+    list = list.filter((f) => Number(f.etablissement_id) === Number(etabId));
+  }
+  return list.filter((f) => userPeutGererFormation(user, f));
 }
 
 function assertDossierForUser(user, dossier) {
@@ -54,6 +69,9 @@ function assertDossierForUser(user, dossier) {
   if (!dossierAppartientAEtablissement(dossier, etabId, formationsById)) {
     return { ok: false, status: 403, message: 'Ce dossier ne concerne pas votre établissement.' };
   }
+  if (!userPeutVoirDossierParModalite(user, dossier)) {
+    return { ok: false, status: 403, message: 'Accès réservé au périmètre FAD / présentiel de votre rôle.' };
+  }
   return { ok: true };
 }
 
@@ -68,6 +86,9 @@ function assertDemandeForUser(user, demande) {
   }
   if (!demandeAppartientAEtablissement(demande, etabId, formationIds)) {
     return { ok: false, status: 403, message: 'Cette demande ne concerne pas votre établissement.' };
+  }
+  if (!userPeutVoirDemandeParModalite(user, demande)) {
+    return { ok: false, status: 403, message: 'Accès réservé au périmètre FAD / présentiel de votre rôle.' };
   }
   return { ok: true };
 }

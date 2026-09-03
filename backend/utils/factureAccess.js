@@ -4,6 +4,8 @@
 const STAFF_ETAB_FACTURE_ROLES = [
   'admin_etablissement',
   'responsable',
+  'responsable_fad',
+  'agent_fad',
   'comptable',
   'agent_admin',
   'controleur_qualite',

@@ -32,7 +32,7 @@ describe('staffRoles — admin_etablissement', () => {
     const roles = rolesCreatablesMembres(u);
     assert.deepEqual(
       roles.sort(),
-      ['agent_admin', 'comptable', 'controleur_qualite', 'responsable', 'responsable_fad'].sort(),
+      ['agent_admin', 'agent_fad', 'comptable', 'controleur_qualite', 'responsable', 'responsable_fad'].sort(),
     );
     assert.equal(roles.includes('admin_etablissement'), false);
   });

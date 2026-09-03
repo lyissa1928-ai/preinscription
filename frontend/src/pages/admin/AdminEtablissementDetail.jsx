@@ -56,7 +56,10 @@ const TYPES_ETAB = [
 ]
 const ROLE_COLORS = {
   admin_etablissement: 'bg-indigo-100 text-indigo-800',
-  responsable: 'bg-teal-100 text-teal-700', agent_admin: 'bg-orange-100 text-orange-700',
+  responsable: 'bg-teal-100 text-teal-700',
+  responsable_fad: 'bg-indigo-100 text-indigo-700',
+  agent_fad: 'bg-sky-100 text-sky-800',
+  agent_admin: 'bg-orange-100 text-orange-700',
   comptable: 'bg-violet-100 text-violet-700',
   controleur_qualite: 'bg-cyan-100 text-cyan-800',
 }
@@ -65,6 +68,7 @@ const ROLE_LABELS = {
   admin_etablissement: 'Administrateur établissement',
   responsable: 'Responsable pédagogique',
   responsable_fad: 'Responsable FAD',
+  agent_fad: 'Agent FAD',
   agent_admin: 'Agent administratif',
   comptable: 'Comptable',
   controleur_qualite: 'Contrôleur qualité',
@@ -491,17 +495,18 @@ export function TabFilieres({ etabId, filieres: init, onFiliereChange }) {
 // ═══════════════════════════════════════════════════════════════════════
 // Onglet 3 — Formations
 // ═══════════════════════════════════════════════════════════════════════
-const NIVEAUX = ['Terminale / Bac', 'Bac+1 / Licence 1', 'Bac+2 / Licence 2', 'Licence 3', 'Master 1', 'Master 2', 'Doctorat', 'Autre']
 
 export function TabFormations({ etabId, formations: init, filieres, onRefreshFilieres, onRefreshFormations }) {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const [formations, setFormations] = useState(() => (Array.isArray(init) ? init : []))
+  const [niveaux, setNiveaux] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [editing, setEditing] = useState(null)
   const [filtreFiliere, setFiltreFiliere] = useState('')
   const [filtreType, setFiltreType] = useState('')
+  const [filtreNiveau, setFiltreNiveau] = useState('')
   const [searchText, setSearchText] = useState('')
   const [importFile, setImportFile] = useState(null)
   const [importing, setImporting] = useState(false)
@@ -528,6 +533,13 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
   useEffect(() => {
     if (init !== undefined) setFormations(Array.isArray(init) ? init : [])
   }, [init])
+
+  useEffect(() => {
+    axios
+      .get('/api/niveaux-etude')
+      .then(({ data }) => setNiveaux(Array.isArray(data) ? data : []))
+      .catch(() => setNiveaux([]))
+  }, [])
 
   const up = f => e => setForm(p => ({ ...p, [f]: e.target.value }))
 
@@ -662,7 +674,8 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
   const affichees = formations.filter((f) => {
     const byFiliere = !filtreFiliere || String(f.filiere_id) === filtreFiliere
     const byType = !filtreType || f.type === filtreType
-    if (!searchNorm) return byFiliere && byType
+    const byNiveau = !filtreNiveau || String(f.niveau || '') === filtreNiveau
+    if (!searchNorm) return byFiliere && byType && byNiveau
     const haystack = [
       f.titre,
       f.niveau,
@@ -670,7 +683,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       f.filiere_nom,
       f.type === 'en_ligne' ? 'fad' : 'presentiel',
     ].filter(Boolean).join(' ').toLowerCase()
-    return byFiliere && byType && haystack.includes(searchNorm)
+    return byFiliere && byType && byNiveau && haystack.includes(searchNorm)
   })
 
   const afficheesIds = affichees.map((f) => f.id)
@@ -916,6 +929,16 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
               <option value="presentiel">Présentiel</option>
               <option value="en_ligne">À distance (FAD)</option>
             </select>
+            <select
+              className="input-field min-w-[160px] rounded-xl border-slate-200 bg-white py-2 text-sm shadow-sm"
+              value={filtreNiveau}
+              onChange={(e) => setFiltreNiveau(e.target.value)}
+            >
+              <option value="">Tous les niveaux</option>
+              {niveaux.map((n) => (
+                <option key={n.id || n.libelle} value={n.libelle}>{n.libelle}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -935,13 +958,13 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         </div>
       )}
 
-      {(filtreFiliere || filtreType || searchNorm) && (
+      {(filtreFiliere || filtreType || filtreNiveau || searchNorm) && (
         <div className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-center gap-2">
-          Filtre actif : {searchNorm ? 'recherche' : ''}{searchNorm && (filtreFiliere || filtreType) ? ' + ' : ''}{filtreFiliere ? 'filière' : ''}{filtreFiliere && filtreType ? ' + ' : ''}{filtreType ? 'type' : ''}
+          Filtre actif
           <button
             type="button"
             className="underline"
-            onClick={() => { setFiltreFiliere(''); setFiltreType(''); setSearchText('') }}
+            onClick={() => { setFiltreFiliere(''); setFiltreType(''); setFiltreNiveau(''); setSearchText('') }}
           >
             Afficher tout
           </button>
@@ -1114,10 +1137,12 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                   </select>
                 </div>
                 <div>
-                  <L>Niveau</L>
-                  <select className="input-field" value={form.niveau} onChange={up('niveau')}>
+                  <L>Niveau *</L>
+                  <select className="input-field" value={form.niveau} onChange={up('niveau')} required>
                     <option value="">-- Sélectionner --</option>
-                    {NIVEAUX.map(n => <option key={n} value={n}>{n}</option>)}
+                    {niveaux.map((n) => (
+                      <option key={n.id || n.libelle} value={n.libelle}>{n.libelle}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
