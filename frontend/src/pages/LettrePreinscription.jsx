@@ -35,7 +35,7 @@ export default function LettrePreinscription() {
         const msg = err.response?.data?.message
         if (msg) setError(msg)
         else if (err.code === 'ERR_NETWORK') {
-          setError('Impossible de joindre l'API.')
+          setError("Impossible de joindre l'API.")
         } else setError(err.message || 'Erreur de chargement')
       })
       .finally(() => setLoading(false))
