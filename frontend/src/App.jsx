@@ -198,7 +198,7 @@ function AppRoutes() {
         <Route path="/responsable" element={<PrivateRoute roles={['responsable', 'responsable_fad', 'agent_fad', 'admin', 'admin_etablissement']}><ResponsableDashboard /></PrivateRoute>} />
         <Route path="/responsable/dossier/:id" element={<PrivateRoute roles={['responsable', 'responsable_fad', 'agent_fad', 'admin', 'admin_etablissement']}><ResponsableDossier /></PrivateRoute>} />
         <Route path="/responsable/gestion-etablissement" element={
-          <PrivateRoute roles={['responsable', 'admin_etablissement']}>
+          <PrivateRoute roles={['responsable', 'responsable_fad', 'agent_fad', 'admin', 'admin_etablissement']}>
             <ResponsableGestionEtab />
           </PrivateRoute>
         } />

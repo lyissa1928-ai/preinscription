@@ -81,22 +81,51 @@ function normalizeFraisSupplementaires(raw) {
 }
 
 /**
- * Liste complète des frais sup. (bibliothèque, EPI, soutenance, tableau, legacy).
+ * Libellés de champs tarifaires personnalisables (formation.libelles_champs).
+ * Jamais de libellé générique imposé en facture si le responsable a configuré le sien.
+ */
+function labelChamp(formation, key, fallback) {
+  const map = formation?.libelles_champs && typeof formation.libelles_champs === 'object'
+    ? formation.libelles_champs
+    : {};
+  const custom = map[key];
+  if (custom != null && String(custom).trim() !== '') return String(custom).trim();
+  return fallback;
+}
+
+/**
+ * Liste complète des frais hors forfait (bibliothèque, EPI, soutenance, tableau libre).
+ * Les désignations viennent des libellés configurés ou du champ `designation` saisi.
  */
 function getFraisSupplementairesEffectifs(formation) {
   const dedicated = [];
   const bib = parseInt(formation?.frais_bibliotheque, 10) || 0;
   const epi = parseInt(formation?.frais_epi, 10) || 0;
   const sout = parseInt(formation?.frais_soutenance, 10) || 0;
-  if (bib > 0) dedicated.push({ designation: 'Bibliothèque', montant: bib });
-  if (epi > 0) dedicated.push({ designation: 'EPI', montant: epi });
-  if (sout > 0) dedicated.push({ designation: 'Frais de soutenance', montant: sout });
+  if (bib > 0) {
+    dedicated.push({
+      designation: labelChamp(formation, 'frais_bibliotheque', 'Bibliothèque'),
+      montant: bib,
+    });
+  }
+  if (epi > 0) {
+    dedicated.push({
+      designation: labelChamp(formation, 'frais_epi', 'EPI'),
+      montant: epi,
+    });
+  }
+  if (sout > 0) {
+    dedicated.push({
+      designation: labelChamp(formation, 'frais_soutenance', 'Frais de soutenance'),
+      montant: sout,
+    });
+  }
 
   const n = normalizeFraisSupplementaires(formation?.frais_supplementaires);
   const merged = [...dedicated];
   n.forEach((x) => {
     const des = String(x.designation || '').toLowerCase();
-    // Éviter doublons si déjà en champs dédiés
+    // Éviter doublons si déjà en champs dédiés (libellés par défaut ou custom proches)
     if (['bibliothèque', 'bibliotheque', 'epi', 'frais de soutenance', 'soutenance'].includes(des)) {
       return;
     }
@@ -105,7 +134,11 @@ function getFraisSupplementairesEffectifs(formation) {
   if (merged.length > 0) return merged;
   const legacy = parseInt(formation?.autres_frais, 10) || 0;
   if (legacy > 0) {
-    return [{ designation: 'Autres frais (legacy)', montant: legacy }];
+    // Dernier recours : utiliser un libellé custom si fourni, sinon la désignation stockée
+    return [{
+      designation: labelChamp(formation, 'autres_frais', formation?.autres_frais_libelle || 'Autres frais'),
+      montant: legacy,
+    }];
   }
   return [];
 }
@@ -122,11 +155,14 @@ function buildLignesForfaitAnnuel(formation) {
 
   const lignes = [];
   if (fi > 0) {
-    lignes.push({ designation: "Frais d'inscription", montant: fi });
+    lignes.push({
+      designation: labelChamp(formation, 'frais_inscription', "Frais d'inscription"),
+      montant: fi,
+    });
   }
   if (mois > 0 && men > 0) {
     lignes.push({
-      designation: 'Mensualité',
+      designation: labelChamp(formation, 'mensualite', 'Mensualité'),
       montant: men,
       kind: 'mensualite_unitaire',
       duree_mois: mois,
@@ -134,12 +170,15 @@ function buildLignesForfaitAnnuel(formation) {
     });
   } else if (partMensualites > 0) {
     lignes.push({
-      designation: 'Scolarité',
+      designation: labelChamp(formation, 'scolarite', 'Scolarité'),
       montant: partMensualites,
     });
   }
   if (lignes.length === 0) {
-    lignes.push({ designation: 'Forfait formation', montant: montant_ht });
+    lignes.push({
+      designation: labelChamp(formation, 'forfait', 'Forfait formation'),
+      montant: montant_ht,
+    });
   }
 
   const supp = getFraisSupplementairesEffectifs(formation);
@@ -194,4 +233,5 @@ module.exports = {
   mergeFactureProformaFromFormation,
   withPrixAnnuelComputed,
   parseDureeMoisFromText,
+  labelChamp,
 };

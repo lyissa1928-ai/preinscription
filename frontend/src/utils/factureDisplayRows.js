@@ -1,19 +1,25 @@
-/** Lignes facture : mensualité, inscription, frais complémentaires. */
+/** Lignes facture : conserve les libellés configurés sur la formation (jamais de libellé générique imposé). */
 export function buildDisplayRows(facture, fo = {}) {
   const lignes = facture?.lignes || []
   const moisFromLigne = Number(lignes.find((l) => Number(l.duree_mois) > 0)?.duree_mois) || 0
   const mois = Number(fo.duree_mois) > 0 ? Number(fo.duree_mois) : moisFromLigne
   const unitMen = Number(fo.mensualite) || 0
+  const labels = fo.libelles_champs && typeof fo.libelles_champs === 'object' ? fo.libelles_champs : {}
+  const labelOf = (key, fallback) => {
+    const v = labels[key]
+    return v != null && String(v).trim() !== '' ? String(v).trim() : fallback
+  }
   const rows = []
   let mensualiteAjoutee = false
 
-  const pushMensualiteRows = (unit) => {
+  const pushMensualiteRows = (unit, designationBase) => {
     const u = Number(unit) || 0
     if (u <= 0) return
-    rows.push({ designation: 'Mensualité', montant: u, isUnitMensualite: true })
+    const base = designationBase || labelOf('mensualite', 'Mensualité')
+    rows.push({ designation: base, montant: u, isUnitMensualite: true })
     if (mois > 0) {
       rows.push({
-        designation: `Total mensualités (${mois} mois)`,
+        designation: `Total ${base.toLowerCase()} (${mois} mois)`,
         montant: mois * u,
         isTotalMensualites: true,
       })
@@ -30,12 +36,12 @@ export function buildDisplayRows(facture, fo = {}) {
         Number(l.montant_unitaire ?? fo.mensualite ?? l.prix_unitaire) ||
         unitMen ||
         (mois > 0 && Number(l.total) > 0 ? Math.round(Number(l.total) / mois) : 0)
-      pushMensualiteRows(unit || unitMen)
+      pushMensualiteRows(unit || unitMen, desc && !/^total /i.test(desc) ? desc : undefined)
       continue
     }
-    if (/inscription/i.test(desc)) {
+    if (kind === 'inscription' || (/inscription/i.test(desc) && !l.hors_forfait_annuel)) {
       rows.push({
-        designation: "Frais d'inscription",
+        designation: desc || labelOf('frais_inscription', "Frais d'inscription"),
         montant: Number(l.total ?? l.montant) || Number(fo.frais_inscription) || 0,
       })
       continue
@@ -44,14 +50,17 @@ export function buildDisplayRows(facture, fo = {}) {
       if (!mensualiteAjoutee) {
         const total = Number(l.total ?? l.montant) || 0
         const unit = unitMen || (mois > 0 ? Math.round(total / mois) : 0)
-        pushMensualiteRows(unit)
+        pushMensualiteRows(unit, desc)
       }
       continue
     }
-    rows.push({ designation: desc || 'Frais', montant: Number(l.total ?? l.montant) || 0 })
+    rows.push({ designation: desc || '—', montant: Number(l.total ?? l.montant) || 0 })
   }
   if (!rows.some((r) => /inscription/i.test(r.designation)) && Number(fo.frais_inscription) > 0) {
-    rows.unshift({ designation: "Frais d'inscription", montant: Number(fo.frais_inscription) })
+    rows.unshift({
+      designation: labelOf('frais_inscription', "Frais d'inscription"),
+      montant: Number(fo.frais_inscription),
+    })
   }
   if (!mensualiteAjoutee && unitMen > 0) pushMensualiteRows(unitMen)
 

@@ -61,7 +61,7 @@ function formationAvecPrixRecalcule(formation) {
 }
 
 /**
- * Admin, ou responsable (rôle / fonction désignée) de l’établissement :id / :etabId.
+ * Admin, responsable présentiel, ou responsable/agent FAD (écriture limitée FAD).
  * Journalisé (audit) pour l’administrateur.
  * Important : préférer :etabId quand la route a aussi :id (id formation), sinon parseInt('batch') → NaN.
  */
@@ -76,11 +76,30 @@ function etabPedagogieWrite(req, res, next) {
     return res.status(403).json({ message: 'Vous ne pouvez modifier que les formations de votre établissement.' });
   }
   if (isAdminEtablissement(req.user) || actsAsResponsable(req.user)) {
+    req.pedagogieScope = 'presentiel'; // responsable présentiel : pas de FAD
+    return next();
+  }
+  if (req.user.role === 'responsable_fad' || req.user.role === 'agent_fad') {
+    req.pedagogieScope = 'fad';
     return next();
   }
   return res.status(403).json({
-    message: 'Accès réservé à l’administrateur, à l’administrateur d’établissement ou au responsable pédagogique.',
+    message: 'Accès réservé à l’administrateur, à l’administrateur d’établissement ou au responsable (présentiel / FAD).',
   });
+}
+
+/** Bloque écriture hors périmètre FAD / présentiel. */
+function assertFormationTypeForWriter(req, type) {
+  const scope = req.pedagogieScope;
+  if (!scope || req.user.role === 'admin' || isAdminEtablissement(req.user)) return null;
+  const t = type === 'en_ligne' ? 'en_ligne' : 'presentiel';
+  if (scope === 'fad' && t !== 'en_ligne') {
+    return 'Le staff FAD ne peut gérer que les formations à distance (en ligne).';
+  }
+  if (scope === 'presentiel' && t === 'en_ligne') {
+    return 'Le responsable présentiel ne peut pas gérer les formations FAD.';
+  }
+  return null;
 }
 
 /** Liste / export / suppression factures : admin ou staff rattaché à l’établissement. */
@@ -1676,10 +1695,24 @@ router.delete('/:etabId/filieres/:id', etabPedagogieWrite, (req, res) => {
 // GET /api/etablissements/:id/formations
 router.get('/:id/formations', (req, res) => {
   const etablissement_id = parseInt(req.params.id);
-  const formations = (db.get('formations').value() || []).filter((f) => f.etablissement_id === etablissement_id).map((f) => {
+  let formations = (db.get('formations').value() || []).filter((f) => f.etablissement_id === etablissement_id).map((f) => {
     const filiere = db.get('filieres').find({ id: f.filiere_id }).value();
     return { ...f, filiere_nom: filiere?.nom || null };
   });
+  // Filtre modalité si staff authentifié (FAD vs présentiel)
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const { verifyAccessToken } = require('../utils/jwtHelpers');
+      const decoded = verifyAccessToken(authHeader.split(' ')[1]);
+      const u = db.get('utilisateurs').find({ id: decoded.id }).value();
+      if (u && (u.role === 'responsable_fad' || u.role === 'agent_fad')) {
+        formations = formations.filter((f) => f.type === 'en_ligne');
+      } else if (u && (u.role === 'responsable' || actsAsResponsable(u)) && u.role !== 'admin' && u.role !== 'admin_etablissement') {
+        formations = formations.filter((f) => f.type !== 'en_ligne');
+      }
+    }
+  } catch { /* public catalogue : pas de filtre rôle */ }
   res.json(formations);
 });
 
@@ -1696,6 +1729,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     duree_mois, frais_supplementaires,
     frais_bibliotheque, frais_epi,
     nombre_photos_preinscription,
+    libelles_champs,
   } = req.body;
 
   if (!titre || !type || !filiere_id) return res.status(400).json({ message: 'Titre, type et filière obligatoires.' });
@@ -1711,6 +1745,8 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
   const niveauNorm = normalizeNiveauLibelle(db, niveau);
   const normalizedType = normalizeFormationType(type);
   if (!['presentiel', 'en_ligne'].includes(normalizedType)) return res.status(400).json({ message: 'Type invalide.' });
+  const scopeErr = assertFormationTypeForWriter(req, normalizedType);
+  if (scopeErr) return res.status(403).json({ message: scopeErr });
 
   const fid = parseInt(filiere_id);
   const filiere = db.get('filieres').find({ id: fid, etablissement_id }).value();
@@ -1752,6 +1788,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     frais_epi: fraisEpiN,
     autres_frais: autresFraisN,
     frais_supplementaires: fraisSupp,
+    libelles_champs: libelles_champs && typeof libelles_champs === 'object' ? libelles_champs : {},
     nombre_photos_preinscription: nPhotos,
     actif: true,
     created_at: new Date().toISOString()
@@ -2138,13 +2175,17 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
     'description', 'debouches', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
     'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
-    'frais_bibliotheque', 'frais_epi',
+    'frais_bibliotheque', 'frais_epi', 'libelles_champs',
   ];
   const updates = {};
   fields.forEach(f => {
     if (req.body[f] === undefined) return;
     if (f === 'frais_supplementaires') {
       updates[f] = normalizeFraisSupplementaires(req.body[f]);
+      return;
+    }
+    if (f === 'libelles_champs') {
+      updates[f] = req.body[f] && typeof req.body[f] === 'object' ? req.body[f] : {};
       return;
     }
     if (f === 'duree_mois') {
@@ -2163,6 +2204,11 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
     if (!['presentiel', 'en_ligne'].includes(updates.type)) {
       return res.status(400).json({ message: 'Type invalide.' });
     }
+  }
+  {
+    const effectiveType = updates.type !== undefined ? updates.type : formation.type;
+    const scopeErr = assertFormationTypeForWriter(req, effectiveType);
+    if (scopeErr) return res.status(403).json({ message: scopeErr });
   }
   if (updates.niveau !== undefined) {
     if (!String(updates.niveau || '').trim()) {

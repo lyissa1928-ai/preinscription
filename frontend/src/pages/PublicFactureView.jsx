@@ -316,7 +316,7 @@ async function generatePDF(data) {
 
   if (br.supplementaires.length > 0) {
     doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(146, 64, 14)
-    doc.text('Frais complémentaires (hors forfait annuel — non inclus dans le total ci-dessus)', M, y)
+    doc.text('Autres postes (libellés de la formation)', M, y)
     y += 4.5
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(55, 50, 45)
     br.supplementaires.forEach((s) => {
@@ -728,15 +728,8 @@ export default function PublicFactureView() {
           </div>
         </div>
 
-        {/* ── Frais complémentaires (hors forfait, si montants connus) ───── */}
         {br.supplementaires.length > 0 && (
           <div className="px-8 mb-6">
-            <p className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-2">
-              Frais complémentaires
-            </p>
-            <p className="text-[11px] text-amber-900/80 mb-3">
-              Non inclus dans le total TTC ci-dessus — à régler selon modalités indiquées.
-            </p>
             <div className="rounded-xl border border-amber-200 bg-amber-50/80 divide-y divide-amber-100">
               {br.supplementaires.map((s, idx) => (
                 <div key={idx} className="flex items-start justify-between gap-4 px-4 py-3">

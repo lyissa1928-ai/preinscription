@@ -499,29 +499,33 @@ export function TabFilieres({ etabId, filieres: init, onFiliereChange }) {
 export function TabFormations({ etabId, formations: init, filieres, onRefreshFilieres, onRefreshFormations }) {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
+  const isFadStaff = user?.role === 'responsable_fad' || user?.role === 'agent_fad'
+  const isPresentielStaff = user?.role === 'responsable'
+  const lockedType = isFadStaff ? 'en_ligne' : isPresentielStaff ? 'presentiel' : null
   const [formations, setFormations] = useState(() => (Array.isArray(init) ? init : []))
   const [niveaux, setNiveaux] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [editing, setEditing] = useState(null)
   const [filtreFiliere, setFiltreFiliere] = useState('')
-  const [filtreType, setFiltreType] = useState('')
+  const [filtreType, setFiltreType] = useState(lockedType || '')
   const [filtreNiveau, setFiltreNiveau] = useState('')
   const [searchText, setSearchText] = useState('')
   const [importFile, setImportFile] = useState(null)
   const [importing, setImporting] = useState(false)
   const [importDryRun, setImportDryRun] = useState(true)
   const [importResult, setImportResult] = useState(null)
-  const [importMode, setImportMode] = useState('presentiel') // presentiel | en_ligne
+  const [importMode, setImportMode] = useState(lockedType || 'presentiel') // presentiel | en_ligne
   const [showExcelGrid, setShowExcelGrid] = useState(false)
   const [excelGridVariant, setExcelGridVariant] = useState('create') // create | edit
   const [excelEditRows, setExcelEditRows] = useState([])
   const [excelSaving, setExcelSaving] = useState(false)
   const EMPTY = {
-    filiere_id: '', titre: '', type: 'presentiel', niveau: '', niveau_requis: '', duree: '', description: '', debouches: '',
+    filiere_id: '', titre: '', type: lockedType || 'presentiel', niveau: '', niveau_requis: '', duree: '', description: '', debouches: '',
     frais_inscription: '', mensualite: '', duree_mois: '', frais_soutenance: '',
     frais_bibliotheque: '', frais_epi: '', autres_frais: '0',
     frais_supplementaires: [],
+    libelles_champs: {},
     nombre_photos_preinscription: '1',
   }
   const [form, setForm] = useState(EMPTY)
@@ -583,7 +587,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       const body = {
         filiere_id: form.filiere_id,
         titre: form.titre,
-        type: form.type,
+        type: lockedType || form.type,
         niveau: form.niveau,
         niveau_requis: form.niveau_requis,
         duree: form.duree || dureeLabelFromMois(form.duree_mois),
@@ -1131,9 +1135,19 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                 </div>
                 <div>
                   <L>Mode *</L>
-                  <select className="input-field" value={form.type} onChange={up('type')}>
-                    <option value="presentiel">🏫 Présentiel</option>
-                    <option value="en_ligne">🌐 Formation à distance (FAD)</option>
+                  <select
+                    className="input-field"
+                    value={lockedType || form.type}
+                    onChange={up('type')}
+                    disabled={!!lockedType}
+                    required
+                  >
+                    {(!lockedType || lockedType === 'presentiel') && (
+                      <option value="presentiel">🏫 Présentiel</option>
+                    )}
+                    {(!lockedType || lockedType === 'en_ligne') && (
+                      <option value="en_ligne">🌐 Formation à distance (FAD)</option>
+                    )}
                   </select>
                 </div>
                 <div>
@@ -1232,7 +1246,10 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                       </div>
                     </div>
                     <div className="border-t border-blue-100 pt-3 mt-2">
-                      <p className="text-sm font-semibold text-blue-900 mb-2">Frais supplémentaires (hors forfait annuel)</p>
+                      <p className="text-sm font-semibold text-blue-900 mb-2">Autres postes tarifaires (désignation libre)</p>
+                      <p className="text-xs text-blue-800/80 mb-2">
+                        Chaque ligne porte le libellé que vous choisissez — repris tel quel sur les factures (aucun titre générique).
+                      </p>
                       <div className="space-y-2">
                         {(form.frais_supplementaires || []).map((row, idx) => (
                           <div key={idx} className="flex flex-wrap gap-2 items-end">

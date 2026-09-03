@@ -289,6 +289,11 @@ export default function FormationExcelGrid({
         return
       }
     }
+    const libellesFromCols = Object.fromEntries(
+      columns
+        .filter((c) => ['frais_inscription', 'mensualite', 'frais_soutenance', 'frais_bibliotheque', 'frais_epi', 'autres_frais'].includes(c.key))
+        .map((c) => [c.key, c.label]),
+    )
     const payload = filled.map((r) => {
       const mois = parseInt(r.duree_mois, 10) || 0
       const rowType = r.type === 'en_ligne' ? 'en_ligne' : (isEdit ? (r.type || 'presentiel') : mode)
@@ -309,8 +314,12 @@ export default function FormationExcelGrid({
         frais_soutenance: parseInt(r.frais_soutenance, 10) || 0,
         frais_bibliotheque: parseInt(r.frais_bibliotheque, 10) || 0,
         frais_epi: parseInt(r.frais_epi, 10) || 0,
-        autres_frais: 0,
-        frais_supplementaires: [],
+        autres_frais: parseInt(r.autres_frais, 10) || 0,
+        frais_supplementaires: Array.isArray(r.frais_supplementaires) ? r.frais_supplementaires : undefined,
+        libelles_champs: {
+          ...libellesFromCols,
+          ...(r.libelles_champs && typeof r.libelles_champs === 'object' ? r.libelles_champs : {}),
+        },
         actif: String(r.actif ?? 'true').toLowerCase() !== 'false',
         nombre_photos_preinscription: 1,
       }

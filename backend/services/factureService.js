@@ -32,6 +32,7 @@ function buildFormationSnapshot(formation, tarif) {
     ville: formation.ville || null,
     mensualite: formation.mensualite,
     frais_inscription: formation.frais_inscription,
+    libelles_champs: formation.libelles_champs || null,
     description: formation.description || null,
     debouches: formation.debouches || null,
   };

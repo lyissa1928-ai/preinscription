@@ -56,9 +56,13 @@ export default function StaffPreinscriptionGuichet() {
   const natureFacture = normalizeTypeDocument(searchParams.get('nature'))
   const isProforma = !isFactureDefinitive(natureFacture)
   const isAdmin = user?.role === 'admin'
+  const isFadStaff = user?.role === 'responsable_fad' || user?.role === 'agent_fad'
+  const isPresentielStaff = user?.role === 'responsable'
   const [etablissements, setEtablissements] = useState([])
   const [etabId, setEtabId] = useState(isAdmin ? '' : user?.etablissement_id ?? '')
-  const [modeFormation, setModeFormation] = useState('') // presentiel | en_ligne
+  const [modeFormation, setModeFormation] = useState(
+    isFadStaff ? 'en_ligne' : isPresentielStaff ? 'presentiel' : '',
+  ) // presentiel | en_ligne
   const [allFormations, setAllFormations] = useState([])
   const [niveauFilter, setNiveauFilter] = useState('')
   const [formationId, setFormationId] = useState('')
@@ -77,21 +81,27 @@ export default function StaffPreinscriptionGuichet() {
   useEffect(() => {
     if (!etabId) {
       setAllFormations([])
-      setModeFormation('')
+      if (!isFadStaff && !isPresentielStaff) setModeFormation('')
       setNiveauFilter('')
       setFormationId('')
       setTarif(null)
       return
     }
+    if (isFadStaff) setModeFormation('en_ligne')
+    else if (isPresentielStaff) setModeFormation('presentiel')
     axios
       .get(`/api/formations?etablissement_id=${etabId}`)
-      .then(({ data }) => setAllFormations((data || []).filter((f) => f.actif !== false)))
+      .then(({ data }) => {
+        let list = (data || []).filter((f) => f.actif !== false)
+        if (isFadStaff) list = list.filter((f) => f.type === 'en_ligne')
+        else if (isPresentielStaff) list = list.filter((f) => f.type !== 'en_ligne')
+        setAllFormations(list)
+      })
       .catch(() => setAllFormations([]))
-    setModeFormation('')
     setNiveauFilter('')
     setFormationId('')
     setTarif(null)
-  }, [etabId])
+  }, [etabId, isFadStaff, isPresentielStaff])
 
   const formationsDuMode = useMemo(() => {
     if (!modeFormation) return []
@@ -268,11 +278,14 @@ export default function StaffPreinscriptionGuichet() {
             </p>
           )}
           <div>
-            <p className="mb-2 text-sm font-semibold text-slate-800">Choisissez le mode *</p>
+            <p className="mb-2 text-sm font-semibold text-slate-800">
+              {isFadStaff ? 'Mode FAD (formations à distance uniquement)' : isPresentielStaff ? 'Mode présentiel' : 'Choisissez le mode *'}
+            </p>
             <div className="grid gap-3 sm:grid-cols-2">
+              {!isFadStaff && (
               <button
                 type="button"
-                disabled={!etabId}
+                disabled={!etabId || isPresentielStaff}
                 onClick={() => setModeFormation('presentiel')}
                 className={`rounded-xl border-2 px-4 py-4 text-left transition ${
                   modeFormation === 'presentiel'
@@ -283,9 +296,11 @@ export default function StaffPreinscriptionGuichet() {
                 <span className="block text-base font-bold text-slate-900">Formation en présentiel</span>
                 <span className="mt-1 block text-xs text-slate-500">Cours sur site</span>
               </button>
+              )}
+              {!isPresentielStaff && (
               <button
                 type="button"
-                disabled={!etabId}
+                disabled={!etabId || isFadStaff}
                 onClick={() => setModeFormation('en_ligne')}
                 className={`rounded-xl border-2 px-4 py-4 text-left transition ${
                   modeFormation === 'en_ligne'
@@ -296,6 +311,7 @@ export default function StaffPreinscriptionGuichet() {
                 <span className="block text-base font-bold text-slate-900">Formation en ligne</span>
                 <span className="mt-1 block text-xs text-slate-500">Formation à distance (FAD)</span>
               </button>
+              )}
             </div>
           </div>
         </Panel>

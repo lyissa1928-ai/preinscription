@@ -52,7 +52,6 @@ function oneInvoiceHtml(facture) {
     .join('');
 
   if (lignesSupp.length > 0) {
-    rows += `<tr><td colspan="3" style="padding:10px 16px;font-size:11px;font-style:italic;background:#fffbeb;color:#92400e;border-top:1px solid #fde68a;">Frais complémentaires (hors forfait annuel — non inclus dans le total TTC ci-dessous)</td></tr>`;
     lignesSupp.forEach((l, j) => {
       const desc = l.designation || '';
       const tot = l.montant != null ? l.montant : 0;
