@@ -237,7 +237,7 @@ function AppRoutes() {
         path="/chat"
         element={
           <PrivateRoute
-            roles={['etudiant', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite']}
+            roles={['etudiant', 'admin_etablissement', 'responsable', 'responsable_fad', 'agent_admin', 'comptable', 'controleur_qualite']}
           >
             <AuthenticatedLayout />
           </PrivateRoute>
