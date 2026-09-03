@@ -1690,7 +1690,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
   const {
-    filiere_id, titre, type, niveau, niveau_requis, duree, description,
+    filiere_id, titre, type, niveau, niveau_requis, duree, description, debouches,
     ville, places,
     frais_inscription, mensualite, frais_soutenance, autres_frais,
     duree_mois, frais_supplementaires,
@@ -1732,6 +1732,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     duree: duree || '',
     duree_mois: dureeMoisN,
     description: description || '',
+    debouches: debouches || '',
     ville: null,
     places: 0,
     frais_inscription: fraisInscriptionN,
@@ -1854,6 +1855,7 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
     const niveau = String(data.niveau || '').trim();
     const niveau_requis = String(data.niveau_requis || '').trim();
     const description = String(data.description || '').trim();
+    const debouches = String(data.debouches || '').trim();
     const duree_mois = toInt(data.duree_mois, 0);
     const frais_inscription = toInt(data.frais_inscription, 0);
     const mensualite = toInt(data.mensualite, 0);
@@ -1887,6 +1889,7 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
       duree: duree_mois > 0 ? (duree_mois === 12 ? '12 mois (1 an)' : `${duree_mois} mois`) : '',
       duree_mois: duree_mois || 0,
       description,
+      debouches,
       ville: null,
       places: 0,
       frais_inscription,
@@ -1955,7 +1958,7 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
 
   const allowed = new Set([
     'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree',
-    'description', 'ville', 'places',
+    'description', 'debouches', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
     'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
     'frais_bibliotheque', 'frais_epi',
@@ -2122,7 +2125,7 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
 
   const fields = [
     'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree',
-    'description', 'ville', 'places',
+    'description', 'debouches', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
     'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
     'frais_bibliotheque', 'frais_epi',

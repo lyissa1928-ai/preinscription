@@ -39,8 +39,30 @@ function buildFormationsMap(formations) {
   return m;
 }
 
+/**
+ * Filtre les IDs de formations FAD uniquement pour le rôle responsable_fad.
+ * Un responsable_fad n'a accès qu'aux formations en_ligne de son établissement.
+ */
+function getFadFormationIdsForEtab(formations, etabId) {
+  if (!etabId) return null;
+  return (formations || [])
+    .filter((f) => f.etablissement_id === etabId && f.type === 'en_ligne')
+    .map((f) => f.id);
+}
+
+/**
+ * Vérifie que le dossier/demande est FAD (formation en_ligne) pour le responsable_fad.
+ */
+function dossierEstFad(dossier) {
+  if (!dossier) return false;
+  if (dossier.type_formation) return dossier.type_formation === 'en_ligne';
+  return false;
+}
+
 module.exports = {
   getFormationIdsForEtab,
+  getFadFormationIdsForEtab,
+  dossierEstFad,
   dossierAppartientAEtablissement,
   demandeAppartientAEtablissement,
   buildFormationsMap,

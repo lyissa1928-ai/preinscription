@@ -64,6 +64,7 @@ const ROLE_COLORS = {
 const ROLE_LABELS = {
   admin_etablissement: 'Administrateur établissement',
   responsable: 'Responsable pédagogique',
+  responsable_fad: 'Responsable FAD',
   agent_admin: 'Agent administratif',
   comptable: 'Comptable',
   controleur_qualite: 'Contrôleur qualité',
@@ -512,7 +513,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
   const [excelEditRows, setExcelEditRows] = useState([])
   const [excelSaving, setExcelSaving] = useState(false)
   const EMPTY = {
-    filiere_id: '', titre: '', type: 'presentiel', niveau: '', niveau_requis: '', duree: '', description: '',
+    filiere_id: '', titre: '', type: 'presentiel', niveau: '', niveau_requis: '', duree: '', description: '', debouches: '',
     frais_inscription: '', mensualite: '', duree_mois: '', frais_soutenance: '',
     frais_bibliotheque: '', frais_epi: '', autres_frais: '0',
     frais_supplementaires: [],
@@ -549,6 +550,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       niveau_requis: f.niveau_requis || '',
       duree: f.duree || '',
       description: f.description || '',
+      debouches: f.debouches || '',
       frais_inscription: String(f.frais_inscription || ''),
       mensualite: String(f.mensualite || ''),
       duree_mois: String(f.duree_mois ?? ''),
@@ -574,6 +576,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         niveau_requis: form.niveau_requis,
         duree: form.duree || dureeLabelFromMois(form.duree_mois),
         description: form.description,
+        debouches: form.debouches || '',
         ville: null,
         places: 0,
         frais_inscription: parseInt(form.frais_inscription, 10) || 0,
@@ -1163,7 +1166,11 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                 </div>
                 <div className="col-span-2">
                   <L>Description</L>
-                  <textarea className="input-field" rows={2} value={form.description} onChange={up('description')} />
+                  <textarea className="input-field" rows={2} value={form.description} onChange={up('description')} placeholder="Présentation de la formation (contenu pédagogique, objectifs…)" />
+                </div>
+                <div className="col-span-2">
+                  <L>Débouchés professionnels</L>
+                  <textarea className="input-field" rows={2} value={form.debouches || ''} onChange={up('debouches')} placeholder="Métiers et secteurs accessibles après la formation…" />
                 </div>
 
                 {/* Tarification */}

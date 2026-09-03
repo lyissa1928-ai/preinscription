@@ -9,6 +9,7 @@ const ROLES_STAFF = [
   { val: 'admin', label: 'Administrateur (plateforme)' },
   { val: 'admin_etablissement', label: 'Administrateur établissement' },
   { val: 'responsable', label: 'Responsable pédagogique' },
+  { val: 'responsable_fad', label: 'Responsable FAD (formations à distance)' },
   { val: 'agent_admin', label: 'Agent administratif' },
   { val: 'comptable', label: 'Comptable / Finance' },
   { val: 'controleur_qualite', label: 'Contrôleur qualité' },
@@ -18,6 +19,7 @@ const ROLE_COLORS = {
   admin:       'bg-red-100 text-red-700',
   admin_etablissement: 'bg-blue-100 text-blue-800',
   responsable: 'bg-teal-100 text-teal-700',
+  responsable_fad: 'bg-indigo-100 text-indigo-700',
   agent_admin: 'bg-orange-100 text-orange-700',
   comptable:   'bg-purple-100 text-purple-700',
   controleur_qualite: 'bg-cyan-100 text-cyan-800',
@@ -25,6 +27,7 @@ const ROLE_COLORS = {
 }
 const ROLE_LABELS = {
   admin: 'Administrateur', admin_etablissement: 'Admin. établissement', responsable: 'Resp. Pédagogique',
+  responsable_fad: 'Responsable FAD',
   agent_admin: 'Agent Administratif', comptable: 'Comptable',
   controleur_qualite: 'Contrôleur qualité', etudiant: 'Étudiant'
 }

@@ -27,8 +27,10 @@ function buildFactureDemandeFromFormation(demande, formation, opts = {}) {
     demande.facture?.numero && !String(demande.facture.numero).includes('undefined')
       ? demande.facture.numero
       : `FACT-PUB-${year}-${String(demande.id).padStart(5, '0')}`;
+  const annee_academique = demande.annee_academique || `${year}-${year + 1}`;
   return {
     numero,
+    annee_academique,
     lignes,
     lignes_frais_supplementaires: tarif.lignes_supplementaires,
     montant_supplementaires_hors_forfait: tarif.montant_supplementaires,

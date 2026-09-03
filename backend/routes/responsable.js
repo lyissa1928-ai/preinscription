@@ -317,10 +317,28 @@ router.use(authMiddleware, staffDossierDecision);
 
 const {
   getFormationIdsForEtab,
+  getFadFormationIdsForEtab,
+  dossierEstFad,
   dossierAppartientAEtablissement: dossierScope,
   demandeAppartientAEtablissement: demandeScope,
   buildFormationsMap,
 } = require('../utils/etablissementScope');
+
+/** Pour responsable_fad : uniquement les formations FAD. */
+function getEtabFadFormationIds(req) {
+  if (req.user.role === 'admin') return null;
+  const formations = db.get('formations').value();
+  if (req.user.role === 'responsable_fad') {
+    return getFadFormationIdsForEtab(formations, req.user.etablissement_id);
+  }
+  return getFormationIdsForEtab(formations, req.user.etablissement_id);
+}
+
+/** Vérifie accès dossier pour responsable_fad : dossier FAD + établissement. */
+function assertDossierAccessFad(req, dossier) {
+  if (req.user.role !== 'responsable_fad') return true;
+  return dossierEstFad(dossier);
+}
 
 function getEtabFormationIds(req) {
   const etabId = req.user.role === 'admin' ? null : req.user.etablissement_id;
@@ -335,7 +353,10 @@ function dossierAppartientAEtablissement(dossier, etabId) {
 
 function assertDossierPourResponsable(req, dossier) {
   if (req.user.role === 'admin') return true;
-  return dossierAppartientAEtablissement(dossier, req.user.etablissement_id);
+  if (!dossierAppartientAEtablissement(dossier, req.user.etablissement_id)) return false;
+  // responsable_fad ne voit que les dossiers FAD
+  if (!assertDossierAccessFad(req, dossier)) return false;
+  return true;
 }
 
 function demandeAppartientAEtablissement(demande, etabId, formationIds) {
@@ -355,7 +376,8 @@ router.get('/dossiers', (req, res) => {
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
 
-  const formationIds = getEtabFormationIds(req);
+  const formationIds = getEtabFadFormationIds(req);
+  const isFadOnly = req.user.role === 'responsable_fad';
 
   let dossiers = db.get('dossiers').value();
   const utilisateurs = db.get('utilisateurs').value();
@@ -363,6 +385,10 @@ router.get('/dossiers', (req, res) => {
 
   if (formationIds !== null) {
     dossiers = dossiers.filter(d => dossierAppartientAEtablissement(d, req.user.etablissement_id));
+  }
+  // responsable_fad : dossiers FAD uniquement
+  if (isFadOnly) {
+    dossiers = dossiers.filter(d => d.type_formation === 'en_ligne');
   }
 
   dossiers = dossiers.map(d => {
@@ -373,7 +399,7 @@ router.get('/dossiers', (req, res) => {
 
   if (type === 'fad' || type === 'en_ligne') {
     dossiers = dossiers.filter(d => d.type_formation === 'en_ligne');
-  } else if (type === 'presentiel') {
+  } else if (type === 'presentiel' && !isFadOnly) {
     dossiers = dossiers.filter(d => d.type_formation === 'presentiel');
   }
   if (statut) dossiers = dossiers.filter(d => d.statut === statut);

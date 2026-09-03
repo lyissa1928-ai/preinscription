@@ -1,6 +1,7 @@
 /** Aligné sur backend/utils/staffRoles.js — permissions UI gestion membres. */
 const ROLES_GERABLES_PAR_ADMIN_ETAB = [
   'responsable',
+  'responsable_fad',
   'agent_admin',
   'comptable',
   'controleur_qualite',
@@ -13,6 +14,7 @@ export function canCreateStaffAccount(user) {
 export function creatableRoleOptions(user) {
   const base = [
     { val: 'responsable', label: 'Responsable pédagogique' },
+    { val: 'responsable_fad', label: 'Responsable FAD (formations à distance)' },
     { val: 'agent_admin', label: 'Agent administratif' },
     { val: 'comptable', label: 'Comptable' },
     { val: 'controleur_qualite', label: 'Contrôleur qualité' },

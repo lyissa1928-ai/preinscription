@@ -24,7 +24,8 @@
       "iban": "",
       "swift": "ECOCSNDAXXX",
       "signataire_nom": "",
-      "signataire_fonction": "La direction"
+      "signataire_fonction": "La direction",
+      "admin_etablissement_id": null
     },
     {
       "id": 2,
@@ -45,7 +46,8 @@
       "compte_bancaire": "",
       "responsable_id": null,
       "actif": true,
-      "created_at": "2026-03-24T14:59:27.505Z"
+      "created_at": "2026-03-24T14:59:27.505Z",
+      "admin_etablissement_id": null
     },
     {
       "id": 3,
@@ -71,7 +73,8 @@
       "iban": "",
       "swift": "",
       "signataire_nom": "MAMADOU DIOP",
-      "signataire_fonction": "DIRECTEUR"
+      "signataire_fonction": "DIRECTEUR",
+      "admin_etablissement_id": null
     }
   ],
   "filieres": [
@@ -1280,12 +1283,12 @@
       "source": "staff",
       "creee_par": 11,
       "commentaire_admin": "Préinscription guichet — documents générables immédiatement.",
-      "date_acceptation": "2026-08-21T11:02:38.386Z",
+      "date_acceptation": "2026-09-03T13:38:07.503Z",
       "lettre_generee": true,
       "created_at": "2026-08-19T16:22:33.213Z",
-      "updated_at": "2026-08-21T11:02:38.386Z",
+      "updated_at": "2026-09-03T13:38:07.503Z",
       "traite_par": 11,
-      "traite_le": "2026-08-21T11:02:38.386Z"
+      "traite_le": "2026-09-03T13:38:07.503Z"
     },
     {
       "id": 12,
@@ -1476,6 +1479,168 @@
       "lettre_generee": true,
       "created_at": "2026-08-21T13:51:19.838Z",
       "updated_at": "2026-08-21T13:51:19.838Z"
+    },
+    {
+      "id": 17,
+      "etudiant_id": null,
+      "numero_dossier": "PREINSC-2026-12274",
+      "formation_id": 4,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "Diplôme de Technicien Génie Civil - Bâtiment",
+      "niveau": "BFEM/BEP",
+      "formation_niveau_cible": "BT",
+      "document_rule_profile": "generic",
+      "annee_academique": "2025-2026",
+      "prenom": "Moussa",
+      "nom": "Ba",
+      "email": "moussa.guichet.1788254284449@test.sn",
+      "sexe": "M",
+      "date_naissance": "2001-05-05",
+      "lieu_naissance": "Saint-Louis",
+      "nationalite": "Sénégalaise",
+      "pays_residence": null,
+      "telephone": "7754284449",
+      "adresse": "Dakar",
+      "type_piece": null,
+      "numero_piece": null,
+      "numero_passeport": null,
+      "dernier_diplome": "Baccalauréat",
+      "etablissement_origine": "Lycée",
+      "mention": null,
+      "annee_obtention": 2021,
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 1,
+      "commentaire_admin": "Facture proforma guichet — saisie allégée.",
+      "date_acceptation": "2026-09-01T09:18:04.450Z",
+      "lettre_generee": true,
+      "created_at": "2026-09-01T09:18:04.450Z",
+      "updated_at": "2026-09-01T09:18:04.450Z"
+    },
+    {
+      "id": 18,
+      "etudiant_id": null,
+      "numero_dossier": "PREINSC-2026-96933",
+      "formation_id": 4,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "Diplôme de Technicien Génie Civil - Bâtiment",
+      "niveau": "BFEM/BEP",
+      "formation_niveau_cible": "BT",
+      "document_rule_profile": "generic",
+      "annee_academique": "2026-2027",
+      "prenom": "Awa",
+      "nom": "Sow",
+      "email": "awa.proforma.1788254284490@test.sn",
+      "sexe": null,
+      "date_naissance": null,
+      "lieu_naissance": null,
+      "nationalite": null,
+      "pays_residence": null,
+      "telephone": "7742844901",
+      "adresse": null,
+      "type_piece": null,
+      "numero_piece": null,
+      "numero_passeport": null,
+      "dernier_diplome": null,
+      "etablissement_origine": null,
+      "mention": null,
+      "annee_obtention": null,
+      "type_payeur": "organisation",
+      "payeur": {
+        "org_nom": "Ministère du Travail"
+      },
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 1,
+      "commentaire_admin": "Facture proforma guichet — saisie allégée.",
+      "date_acceptation": "2026-09-01T09:18:04.490Z",
+      "lettre_generee": true,
+      "created_at": "2026-09-01T09:18:04.490Z",
+      "updated_at": "2026-09-01T09:18:04.490Z"
+    },
+    {
+      "id": 19,
+      "etudiant_id": null,
+      "numero_dossier": "PREINSC-2026-33309",
+      "formation_id": 4,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "Diplôme de Technicien Génie Civil - Bâtiment",
+      "niveau": "BFEM/BEP",
+      "formation_niveau_cible": "BT",
+      "document_rule_profile": "generic",
+      "annee_academique": "2025-2026",
+      "prenom": "Fatou",
+      "nom": "Ndiaye",
+      "email": "",
+      "sexe": null,
+      "date_naissance": "1999-02-02",
+      "lieu_naissance": "Thiès",
+      "nationalite": "Sénégalaise",
+      "pays_residence": null,
+      "telephone": "7654284521",
+      "adresse": "Thiès",
+      "type_piece": null,
+      "numero_piece": null,
+      "numero_passeport": null,
+      "dernier_diplome": "Baccalauréat",
+      "etablissement_origine": "Lycée",
+      "mention": null,
+      "annee_obtention": 2019,
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 1,
+      "commentaire_admin": "Facture proforma guichet — saisie allégée.",
+      "date_acceptation": "2026-09-01T09:18:04.521Z",
+      "lettre_generee": true,
+      "created_at": "2026-09-01T09:18:04.521Z",
+      "updated_at": "2026-09-01T09:18:04.521Z"
+    },
+    {
+      "id": 20,
+      "etudiant_id": null,
+      "numero_dossier": "PREINSC-2026-39305",
+      "formation_id": 16,
+      "etablissement_id": 1,
+      "type_formation": "presentiel",
+      "filiere": "Licence 3 Electrotechnique",
+      "niveau": "Bac+2",
+      "formation_niveau_cible": "Licence 3",
+      "document_rule_profile": "l3",
+      "annee_academique": "2025-2026",
+      "prenom": "TAFIMA",
+      "nom": "LY",
+      "email": "i@j.com",
+      "sexe": null,
+      "date_naissance": null,
+      "lieu_naissance": null,
+      "nationalite": null,
+      "pays_residence": null,
+      "telephone": "778093903",
+      "adresse": null,
+      "type_piece": null,
+      "numero_piece": null,
+      "numero_passeport": null,
+      "dernier_diplome": null,
+      "etablissement_origine": null,
+      "mention": null,
+      "annee_obtention": null,
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "statut": "accepte",
+      "source": "staff",
+      "creee_par": 11,
+      "commentaire_admin": "Facture proforma guichet — saisie allégée.",
+      "date_acceptation": "2026-09-01T13:02:25.701Z",
+      "lettre_generee": true,
+      "created_at": "2026-09-01T13:02:25.701Z",
+      "updated_at": "2026-09-01T13:02:25.701Z"
     }
   ],
   "documents": [
@@ -1763,7 +1928,9 @@
           "montant": 30000
         }
       ],
-      "nombre_photos_preinscription": 1
+      "nombre_photos_preinscription": 1,
+      "frais_bibliotheque": 0,
+      "frais_epi": 0
     },
     {
       "id": 5,
@@ -1778,12 +1945,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 200000,
-      "prix": 740000,
+      "prix": 1640000,
       "mensualite": 60000,
       "frais_soutenance": null,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:25:00.402Z"
+      "created_at": "2026-03-24T16:25:00.402Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 24,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 6,
@@ -1798,12 +1975,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1135000,
+      "prix": 1220000,
       "mensualite": 85000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:25:00.403Z"
+      "created_at": "2026-03-24T16:25:00.403Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 7,
@@ -1818,12 +2005,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 185000,
-      "prix": 1185000,
+      "prix": 1385000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:25:00.404Z"
+      "created_at": "2026-03-24T16:25:00.404Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 8,
@@ -1838,12 +2035,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 1500000,
+      "prix": 1620000,
       "mensualite": 120000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:25:00.405Z"
+      "created_at": "2026-03-24T16:25:00.405Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 9,
@@ -1858,12 +2065,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 160000,
-      "prix": 520000,
+      "prix": 1600000,
       "mensualite": 40000,
       "frais_soutenance": 0,
       "autres_frais": 30000,
       "actif": true,
-      "created_at": "2026-03-24T16:30:29.722Z"
+      "created_at": "2026-03-24T16:30:29.722Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 36,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 30000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 10,
@@ -1878,12 +2095,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 740000,
+      "prix": 1640000,
       "mensualite": 60000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:30:29.723Z"
+      "created_at": "2026-03-24T16:30:29.723Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 24,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 11,
@@ -1904,14 +2131,16 @@
       "autres_frais": 45000,
       "actif": true,
       "created_at": "2026-03-24T16:30:29.725Z",
-      "duree_mois": 0,
+      "duree_mois": 11,
       "frais_supplementaires": [
         {
           "designation": "BIBLIOTHQUE ET EPI",
           "montant": 45000
         }
       ],
-      "nombre_photos_preinscription": 1
+      "nombre_photos_preinscription": 1,
+      "frais_bibliotheque": 0,
+      "frais_epi": 0
     },
     {
       "id": 12,
@@ -1926,12 +2155,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 185000,
-      "prix": 1185000,
+      "prix": 1385000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:30:29.727Z"
+      "created_at": "2026-03-24T16:30:29.727Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 13,
@@ -1946,12 +2185,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 1500000,
+      "prix": 1620000,
       "mensualite": 120000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:30:29.728Z"
+      "created_at": "2026-03-24T16:30:29.728Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 14,
@@ -1966,12 +2215,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 160000,
-      "prix": 520000,
+      "prix": 1600000,
       "mensualite": 40000,
       "frais_soutenance": 0,
       "autres_frais": 30000,
       "actif": true,
-      "created_at": "2026-03-24T16:32:12.616Z"
+      "created_at": "2026-03-24T16:32:12.616Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 36,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 30000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 15,
@@ -1986,12 +2245,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 740000,
+      "prix": 1640000,
       "mensualite": 60000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:32:12.623Z"
+      "created_at": "2026-03-24T16:32:12.623Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 24,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 16,
@@ -2006,12 +2275,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1135000,
+      "prix": 1220000,
       "mensualite": 85000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:32:12.626Z"
+      "created_at": "2026-03-24T16:32:12.626Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 17,
@@ -2026,12 +2305,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 185000,
-      "prix": 1185000,
+      "prix": 1385000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:32:12.630Z"
+      "created_at": "2026-03-24T16:32:12.630Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 18,
@@ -2046,12 +2335,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 1500000,
+      "prix": 1620000,
       "mensualite": 120000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:32:12.634Z"
+      "created_at": "2026-03-24T16:32:12.634Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 19,
@@ -2066,12 +2365,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1135000,
+      "prix": 1220000,
       "mensualite": 85000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:34:29.241Z"
+      "created_at": "2026-03-24T16:34:29.241Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 20,
@@ -2086,12 +2395,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 185000,
-      "prix": 1185000,
+      "prix": 1385000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:34:29.243Z"
+      "created_at": "2026-03-24T16:34:29.243Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 21,
@@ -2106,12 +2425,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 1500000,
+      "prix": 1620000,
       "mensualite": 120000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:34:29.245Z"
+      "created_at": "2026-03-24T16:34:29.245Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 22,
@@ -2126,12 +2455,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 740000,
+      "prix": 1640000,
       "mensualite": 60000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:35:33.037Z"
+      "created_at": "2026-03-24T16:35:33.037Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 24,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 23,
@@ -2146,12 +2485,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1135000,
+      "prix": 1220000,
       "mensualite": 85000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:35:33.039Z"
+      "created_at": "2026-03-24T16:35:33.039Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 24,
@@ -2166,12 +2515,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 185000,
-      "prix": 1185000,
+      "prix": 1385000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:35:33.040Z"
+      "created_at": "2026-03-24T16:35:33.040Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 25,
@@ -2186,12 +2545,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 1500000,
+      "prix": 1620000,
       "mensualite": 120000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:35:33.042Z"
+      "created_at": "2026-03-24T16:35:33.042Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 26,
@@ -2206,12 +2575,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1300000,
+      "prix": 1520000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:36:28.701Z"
+      "created_at": "2026-03-24T16:36:28.701Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 27,
@@ -2226,12 +2605,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1630000,
+      "prix": 1760000,
       "mensualite": 130000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:36:28.708Z"
+      "created_at": "2026-03-24T16:36:28.708Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 28,
@@ -2246,12 +2635,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1300000,
+      "prix": 1520000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:37:21.612Z"
+      "created_at": "2026-03-24T16:37:21.612Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 29,
@@ -2266,12 +2665,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1630000,
+      "prix": 1760000,
       "mensualite": 130000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:37:21.615Z"
+      "created_at": "2026-03-24T16:37:21.615Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 30,
@@ -2286,12 +2695,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 220000,
-      "prix": 805000,
+      "prix": 1780000,
       "mensualite": 65000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:38:15.963Z"
+      "created_at": "2026-03-24T16:38:15.963Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 24,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 31,
@@ -2306,12 +2725,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1245000,
+      "prix": 1340000,
       "mensualite": 95000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:38:15.966Z"
+      "created_at": "2026-03-24T16:38:15.966Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 32,
@@ -2326,12 +2755,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1300000,
+      "prix": 1520000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:38:15.969Z"
+      "created_at": "2026-03-24T16:38:15.969Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 33,
@@ -2346,12 +2785,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1630000,
+      "prix": 1760000,
       "mensualite": 130000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:38:15.972Z"
+      "created_at": "2026-03-24T16:38:15.972Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 34,
@@ -2366,12 +2815,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 740000,
+      "prix": 1640000,
       "mensualite": 60000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:41:12.016Z"
+      "created_at": "2026-03-24T16:41:12.016Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 24,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 35,
@@ -2386,12 +2845,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 200000,
-      "prix": 1135000,
+      "prix": 1220000,
       "mensualite": 85000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:41:12.020Z"
+      "created_at": "2026-03-24T16:41:12.020Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 36,
@@ -2406,12 +2875,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 185000,
-      "prix": 1185000,
+      "prix": 1385000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:41:12.023Z"
+      "created_at": "2026-03-24T16:41:12.023Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 37,
@@ -2426,12 +2905,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 1500000,
+      "prix": 1620000,
       "mensualite": 120000,
       "frais_soutenance": 0,
       "autres_frais": 45000,
       "actif": true,
-      "created_at": "2026-03-24T16:41:12.027Z"
+      "created_at": "2026-03-24T16:41:12.027Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 38,
@@ -2446,12 +2935,17 @@
       "ville": "Dakar",
       "places": 60,
       "frais_inscription": 25000,
-      "prix": 350000,
+      "prix": 25000,
       "mensualite": 0,
       "frais_soutenance": 0,
       "autres_frais": 0,
       "actif": true,
-      "created_at": "2026-03-25T14:20:26.263Z"
+      "created_at": "2026-03-25T14:20:26.263Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 36,
+      "frais_supplementaires": [],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 41,
@@ -2466,12 +2960,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 315000,
-      "prix": 1515000,
+      "prix": 1525000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:36:10.000Z"
+      "created_at": "2026-03-25T14:36:10.000Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 42,
@@ -2486,12 +2990,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1215000,
+      "prix": 1315000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:36:10.004Z"
+      "created_at": "2026-03-25T14:36:10.004Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 43,
@@ -2506,12 +3020,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1615000,
+      "prix": 1755000,
       "mensualite": 140000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:36:10.009Z"
+      "created_at": "2026-03-25T14:36:10.009Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 45,
@@ -2526,12 +3050,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1415000,
+      "prix": 1425000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:38:48.159Z"
+      "created_at": "2026-03-25T14:38:48.159Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 46,
@@ -2546,12 +3080,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1215000,
+      "prix": 1315000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:38:48.162Z"
+      "created_at": "2026-03-25T14:38:48.162Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 47,
@@ -2566,12 +3110,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1615000,
+      "prix": 1755000,
       "mensualite": 140000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:38:48.167Z"
+      "created_at": "2026-03-25T14:38:48.167Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 49,
@@ -2586,12 +3140,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1415000,
+      "prix": 1425000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:41:03.176Z"
+      "created_at": "2026-03-25T14:41:03.176Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 50,
@@ -2606,12 +3170,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1215000,
+      "prix": 1315000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:41:03.190Z"
+      "created_at": "2026-03-25T14:41:03.190Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 51,
@@ -2626,12 +3200,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1615000,
+      "prix": 1755000,
       "mensualite": 140000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:41:03.211Z"
+      "created_at": "2026-03-25T14:41:03.211Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 53,
@@ -2646,12 +3230,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1415000,
+      "prix": 1425000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:43:31.892Z"
+      "created_at": "2026-03-25T14:43:31.892Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 54,
@@ -2666,12 +3260,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1215000,
+      "prix": 1315000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:43:31.907Z"
+      "created_at": "2026-03-25T14:43:31.907Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 55,
@@ -2686,12 +3290,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1615000,
+      "prix": 1755000,
       "mensualite": 140000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:43:31.928Z"
+      "created_at": "2026-03-25T14:43:31.928Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 57,
@@ -2706,12 +3320,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1415000,
+      "prix": 1425000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:45:29.272Z"
+      "created_at": "2026-03-25T14:45:29.272Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 58,
@@ -2726,12 +3350,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1215000,
+      "prix": 1315000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:45:29.278Z"
+      "created_at": "2026-03-25T14:45:29.278Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 59,
@@ -2746,12 +3380,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1615000,
+      "prix": 1755000,
       "mensualite": 140000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:45:29.285Z"
+      "created_at": "2026-03-25T14:45:29.285Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 61,
@@ -2766,12 +3410,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1415000,
+      "prix": 1425000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:46:51.477Z"
+      "created_at": "2026-03-25T14:46:51.477Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 62,
@@ -2786,12 +3440,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1215000,
+      "prix": 1315000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:46:51.484Z"
+      "created_at": "2026-03-25T14:46:51.484Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 63,
@@ -2806,12 +3470,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1615000,
+      "prix": 1755000,
       "mensualite": 140000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:46:51.492Z"
+      "created_at": "2026-03-25T14:46:51.492Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 65,
@@ -2826,12 +3500,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1415000,
+      "prix": 1425000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:49:31.961Z"
+      "created_at": "2026-03-25T14:49:31.961Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 66,
@@ -2846,12 +3530,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1215000,
+      "prix": 1315000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:49:31.966Z"
+      "created_at": "2026-03-25T14:49:31.966Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 67,
@@ -2866,12 +3560,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1615000,
+      "prix": 1755000,
       "mensualite": 140000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:49:31.971Z"
+      "created_at": "2026-03-25T14:49:31.971Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 69,
@@ -2886,12 +3590,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1415000,
+      "prix": 1425000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:51:05.957Z"
+      "created_at": "2026-03-25T14:51:05.957Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 70,
@@ -2906,12 +3620,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1215000,
+      "prix": 1315000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:51:05.961Z"
+      "created_at": "2026-03-25T14:51:05.961Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 71,
@@ -2926,12 +3650,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1615000,
+      "prix": 1755000,
       "mensualite": 140000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:51:05.966Z"
+      "created_at": "2026-03-25T14:51:05.966Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 73,
@@ -2946,12 +3680,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1415000,
+      "prix": 1425000,
       "mensualite": 110000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:52:36.342Z"
+      "created_at": "2026-03-25T14:52:36.342Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 74,
@@ -2966,12 +3710,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1215000,
+      "prix": 1315000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:52:36.346Z"
+      "created_at": "2026-03-25T14:52:36.346Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 75,
@@ -2986,12 +3740,22 @@
       "ville": null,
       "places": 0,
       "frais_inscription": 215000,
-      "prix": 1615000,
+      "prix": 1755000,
       "mensualite": 140000,
       "frais_soutenance": 0,
       "autres_frais": 20000,
       "actif": true,
-      "created_at": "2026-03-25T14:52:36.352Z"
+      "created_at": "2026-03-25T14:52:36.352Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 11,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 80,
@@ -3011,7 +3775,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:21:17.436Z"
+      "created_at": "2026-03-25T15:21:17.436Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 81,
@@ -3031,7 +3805,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:21:17.439Z"
+      "created_at": "2026-03-25T15:21:17.439Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 82,
@@ -3046,12 +3830,17 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 0,
+      "prix": 980000,
       "mensualite": 80000,
       "frais_soutenance": 150000,
       "autres_frais": 0,
       "actif": true,
-      "created_at": "2026-03-25T15:21:17.442Z"
+      "created_at": "2026-03-25T15:21:17.442Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 10,
+      "frais_supplementaires": [],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 86,
@@ -3071,7 +3860,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:23:17.722Z"
+      "created_at": "2026-03-25T15:23:17.722Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 87,
@@ -3091,7 +3890,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:23:17.724Z"
+      "created_at": "2026-03-25T15:23:17.724Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 88,
@@ -3106,12 +3915,17 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 0,
+      "prix": 980000,
       "mensualite": 80000,
       "frais_soutenance": 150000,
       "autres_frais": 0,
       "actif": true,
-      "created_at": "2026-03-25T15:23:17.728Z"
+      "created_at": "2026-03-25T15:23:17.728Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 10,
+      "frais_supplementaires": [],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 89,
@@ -3131,7 +3945,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:24:56.054Z"
+      "created_at": "2026-03-25T15:24:56.054Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 90,
@@ -3151,7 +3975,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:24:56.061Z"
+      "created_at": "2026-03-25T15:24:56.061Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 91,
@@ -3166,12 +4000,17 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 0,
+      "prix": 980000,
       "mensualite": 80000,
       "frais_soutenance": 150000,
       "autres_frais": 0,
       "actif": true,
-      "created_at": "2026-03-25T15:24:56.076Z"
+      "created_at": "2026-03-25T15:24:56.076Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 10,
+      "frais_supplementaires": [],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 92,
@@ -3186,12 +4025,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 1080000,
+      "prix": 1980000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:24:56.080Z"
+      "created_at": "2026-03-25T15:24:56.080Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 18,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 93,
@@ -3211,7 +4060,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:26:20.278Z"
+      "created_at": "2026-03-25T15:26:20.278Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 94,
@@ -3231,7 +4090,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:26:20.284Z"
+      "created_at": "2026-03-25T15:26:20.284Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 95,
@@ -3246,12 +4115,17 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 0,
+      "prix": 980000,
       "mensualite": 80000,
       "frais_soutenance": 150000,
       "autres_frais": 0,
       "actif": true,
-      "created_at": "2026-03-25T15:26:20.292Z"
+      "created_at": "2026-03-25T15:26:20.292Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 10,
+      "frais_supplementaires": [],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 96,
@@ -3271,7 +4145,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:31:55.425Z"
+      "created_at": "2026-03-25T15:31:55.425Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 97,
@@ -3291,7 +4175,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:31:55.428Z"
+      "created_at": "2026-03-25T15:31:55.428Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 98,
@@ -3306,12 +4200,17 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 0,
+      "prix": 980000,
       "mensualite": 80000,
       "frais_soutenance": 150000,
       "autres_frais": 0,
       "actif": true,
-      "created_at": "2026-03-25T15:31:55.433Z"
+      "created_at": "2026-03-25T15:31:55.433Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 10,
+      "frais_supplementaires": [],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 99,
@@ -3331,7 +4230,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:34:40.076Z"
+      "created_at": "2026-03-25T15:34:40.076Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 100,
@@ -3351,7 +4260,17 @@
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:34:40.079Z"
+      "created_at": "2026-03-25T15:34:40.079Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 9,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 101,
@@ -3366,12 +4285,17 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 0,
+      "prix": 980000,
       "mensualite": 80000,
       "frais_soutenance": 150000,
       "autres_frais": 0,
       "actif": true,
-      "created_at": "2026-03-25T15:34:40.081Z"
+      "created_at": "2026-03-25T15:34:40.081Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 10,
+      "frais_supplementaires": [],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 102,
@@ -3386,12 +4310,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 180000,
-      "prix": 1080000,
+      "prix": 1980000,
       "mensualite": 100000,
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:34:40.083Z"
+      "created_at": "2026-03-25T15:34:40.083Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 18,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 104,
@@ -3406,12 +4340,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 160000,
-      "prix": null,
+      "prix": 760000,
       "mensualite": 50000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:55:52.450Z"
+      "created_at": "2026-03-25T15:55:52.450Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 105,
@@ -3426,12 +4370,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 130000,
-      "prix": null,
+      "prix": 730000,
       "mensualite": 50000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:55:52.453Z"
+      "created_at": "2026-03-25T15:55:52.453Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 106,
@@ -3446,12 +4400,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 130000,
-      "prix": null,
+      "prix": 730000,
       "mensualite": 50000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:55:52.457Z"
+      "created_at": "2026-03-25T15:55:52.457Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 107,
@@ -3466,12 +4430,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 160000,
-      "prix": null,
+      "prix": 760000,
       "mensualite": 50000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:57:45.026Z"
+      "created_at": "2026-03-25T15:57:45.026Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 108,
@@ -3486,12 +4460,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 130000,
-      "prix": null,
+      "prix": 730000,
       "mensualite": 50000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:57:45.032Z"
+      "created_at": "2026-03-25T15:57:45.032Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 109,
@@ -3506,12 +4490,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 130000,
-      "prix": null,
+      "prix": 730000,
       "mensualite": 50000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:57:45.039Z"
+      "created_at": "2026-03-25T15:57:45.039Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 110,
@@ -3526,12 +4520,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 170000,
-      "prix": 0,
+      "prix": 890000,
       "mensualite": 60000,
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:59:22.747Z"
+      "created_at": "2026-03-25T15:59:22.747Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 111,
@@ -3546,12 +4550,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 130000,
-      "prix": 0,
+      "prix": 850000,
       "mensualite": 60000,
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T15:59:22.755Z"
+      "created_at": "2026-03-25T15:59:22.755Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 112,
@@ -3566,12 +4580,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 150000,
-      "prix": null,
+      "prix": 690000,
       "mensualite": 45000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T16:01:55.665Z"
+      "created_at": "2026-03-25T16:01:55.665Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 113,
@@ -3586,12 +4610,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 120000,
-      "prix": null,
+      "prix": 660000,
       "mensualite": 45000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T16:01:55.706Z"
+      "created_at": "2026-03-25T16:01:55.706Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 114,
@@ -3606,12 +4640,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 120000,
-      "prix": null,
+      "prix": 660000,
       "mensualite": 45000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": false,
-      "created_at": "2026-03-25T16:01:55.711Z"
+      "created_at": "2026-03-25T16:01:55.711Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 115,
@@ -3626,12 +4670,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 120000,
-      "prix": null,
+      "prix": 600000,
       "mensualite": 40000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T16:03:13.879Z"
+      "created_at": "2026-03-25T16:03:13.879Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 116,
@@ -3646,12 +4700,22 @@
       "ville": "Dakar",
       "places": null,
       "frais_inscription": 100000,
-      "prix": null,
+      "prix": 580000,
       "mensualite": 40000,
       "frais_soutenance": null,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-03-25T16:03:13.884Z"
+      "created_at": "2026-03-25T16:03:13.884Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 117,
@@ -3666,12 +4730,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 100000,
-      "prix": 0,
+      "prix": 600000,
       "mensualite": 50000,
       "frais_soutenance": 0,
       "autres_frais": 30000,
       "actif": true,
-      "created_at": "2026-03-25T16:05:18.193Z"
+      "created_at": "2026-03-25T16:05:18.193Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 10,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 30000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 118,
@@ -3686,12 +4760,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 100000,
-      "prix": 0,
+      "prix": 600000,
       "mensualite": 50000,
       "frais_soutenance": 0,
       "autres_frais": 30000,
       "actif": true,
-      "created_at": "2026-03-25T16:07:03.247Z"
+      "created_at": "2026-03-25T16:07:03.247Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 10,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 30000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 119,
@@ -3706,12 +4790,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 100000,
-      "prix": 0,
+      "prix": 700000,
       "mensualite": 50000,
       "frais_soutenance": 0,
       "autres_frais": 30000,
       "actif": true,
-      "created_at": "2026-03-25T16:09:38.693Z"
+      "created_at": "2026-03-25T16:09:38.693Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 30000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 120,
@@ -3726,12 +4820,22 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 100000,
-      "prix": 0,
+      "prix": 600000,
       "mensualite": 50000,
       "frais_soutenance": 0,
       "autres_frais": 30000,
       "actif": true,
-      "created_at": "2026-03-25T16:11:11.134Z"
+      "created_at": "2026-03-25T16:11:11.134Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 10,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 30000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     },
     {
       "id": 121,
@@ -3746,15 +4850,637 @@
       "ville": "Dakar",
       "places": 0,
       "frais_inscription": 130000,
-      "prix": 0,
+      "prix": 850000,
       "mensualite": 60000,
       "frais_soutenance": 0,
       "autres_frais": 60000,
       "actif": true,
-      "created_at": "2026-04-01T12:00:00.000Z"
+      "created_at": "2026-04-01T12:00:00.000Z",
+      "frais_bibliotheque": 0,
+      "frais_epi": 0,
+      "duree_mois": 12,
+      "frais_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 60000
+        }
+      ],
+      "nombre_photos_preinscription": 1
     }
   ],
-  "factures": [],
+  "factures": [
+    {
+      "id": 18,
+      "numero": "FP-2026-78047",
+      "dossier_id": 17,
+      "etudiant_id": null,
+      "formation_id": 4,
+      "type_document": "proforma",
+      "date_emission": "2026-09-01T09:18:04.480Z",
+      "date_echeance": "2027-09-01T09:18:04.480Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 160000,
+          "total": 160000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 40000,
+          "total": 360000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 9,
+          "montant_unitaire": 40000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Abonnement Bibliotheque + Pack EPI",
+          "montant": 30000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 30000,
+      "montant_ht": 520000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 520000,
+      "montant_total_a_payer": 550000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "Ba",
+        "prenom": "Moussa",
+        "email": "moussa.guichet.1788254284449@test.sn",
+        "telephone": "7754284449",
+        "adresse": "Dakar",
+        "nationalite": "Sénégalaise"
+      },
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "formation_snapshot": {
+        "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+        "type": "presentiel",
+        "niveau": "BT",
+        "niveau_requis": "BFEM/BEP",
+        "duree": "3 ans",
+        "duree_mois": 9,
+        "duree_formation": "9 mois",
+        "duree_cycle": null,
+        "ville": "Dakar",
+        "mensualite": 40000,
+        "frais_inscription": 160000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-09-01T09:18:04.481Z"
+    },
+    {
+      "id": 19,
+      "numero": "FP-2026-56894",
+      "dossier_id": 18,
+      "etudiant_id": null,
+      "formation_id": 4,
+      "type_document": "proforma",
+      "date_emission": "2026-09-01T09:18:04.512Z",
+      "date_echeance": "2027-09-01T09:18:04.512Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 160000,
+          "total": 160000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 40000,
+          "total": 360000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 9,
+          "montant_unitaire": 40000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Abonnement Bibliotheque + Pack EPI",
+          "montant": 30000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 30000,
+      "montant_ht": 520000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 520000,
+      "montant_total_a_payer": 550000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "Sow",
+        "prenom": "Awa",
+        "email": "awa.proforma.1788254284490@test.sn",
+        "telephone": "7742844901",
+        "adresse": null,
+        "nationalite": null
+      },
+      "type_payeur": "organisation",
+      "payeur": {
+        "org_nom": "Ministère du Travail"
+      },
+      "formation_snapshot": {
+        "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+        "type": "presentiel",
+        "niveau": "BT",
+        "niveau_requis": "BFEM/BEP",
+        "duree": "3 ans",
+        "duree_mois": 9,
+        "duree_formation": "9 mois",
+        "duree_cycle": null,
+        "ville": "Dakar",
+        "mensualite": 40000,
+        "frais_inscription": 160000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-09-01T09:18:04.512Z"
+    },
+    {
+      "id": 20,
+      "numero": "FP-2026-86198",
+      "dossier_id": 19,
+      "etudiant_id": null,
+      "formation_id": 4,
+      "type_document": "proforma",
+      "date_emission": "2026-09-01T09:18:04.552Z",
+      "date_echeance": "2027-09-01T09:18:04.552Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 160000,
+          "total": 160000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 40000,
+          "total": 360000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 9,
+          "montant_unitaire": 40000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Abonnement Bibliotheque + Pack EPI",
+          "montant": 30000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 30000,
+      "montant_ht": 520000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 520000,
+      "montant_total_a_payer": 550000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "Ndiaye",
+        "prenom": "Fatou",
+        "email": "",
+        "telephone": "7654284521",
+        "adresse": "Thiès",
+        "nationalite": "Sénégalaise"
+      },
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "formation_snapshot": {
+        "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+        "type": "presentiel",
+        "niveau": "BT",
+        "niveau_requis": "BFEM/BEP",
+        "duree": "3 ans",
+        "duree_mois": 9,
+        "duree_formation": "9 mois",
+        "duree_cycle": null,
+        "ville": "Dakar",
+        "mensualite": 40000,
+        "frais_inscription": 160000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-09-01T09:18:04.553Z"
+    },
+    {
+      "id": 21,
+      "numero": "FP-2026-95976",
+      "dossier_id": 14,
+      "etudiant_id": 18,
+      "formation_id": 16,
+      "type_document": "proforma",
+      "date_emission": "2026-09-01T09:40:57.375Z",
+      "date_echeance": "2027-09-01T09:40:57.375Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 200000,
+          "total": 200000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 85000,
+          "total": 1020000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 12,
+          "montant_unitaire": 85000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 45000,
+      "montant_ht": 1220000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 1220000,
+      "montant_total_a_payer": 1265000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "cdfceda",
+        "prenom": "dffev",
+        "email": "abdoulayecheikhou.ly@ucad.edu.sn",
+        "telephone": "777654444",
+        "adresse": "BGRHRTEH",
+        "nationalite": "DFFGGH"
+      },
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "formation_snapshot": {
+        "titre": "Licence 3 Electrotechnique",
+        "type": "presentiel",
+        "niveau": "Licence 3",
+        "niveau_requis": "Bac+2",
+        "duree": "1 an",
+        "duree_mois": 12,
+        "duree_formation": "12 mois",
+        "duree_cycle": null,
+        "ville": "Dakar",
+        "mensualite": 85000,
+        "frais_inscription": 200000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-09-01T09:40:57.375Z"
+    },
+    {
+      "id": 22,
+      "numero": "FP-2026-70077",
+      "dossier_id": 20,
+      "etudiant_id": null,
+      "formation_id": 16,
+      "type_document": "proforma",
+      "date_emission": "2026-09-01T13:02:25.750Z",
+      "date_echeance": "2027-09-01T13:02:25.750Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 200000,
+          "total": 200000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 85000,
+          "total": 1020000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 12,
+          "montant_unitaire": 85000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 45000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 45000,
+      "montant_ht": 1220000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 1220000,
+      "montant_total_a_payer": 1265000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "LY",
+        "prenom": "TAFIMA",
+        "email": "i@j.com",
+        "telephone": "778093903",
+        "adresse": null,
+        "nationalite": null
+      },
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "formation_snapshot": {
+        "titre": "Licence 3 Electrotechnique",
+        "type": "presentiel",
+        "niveau": "Licence 3",
+        "niveau_requis": "Bac+2",
+        "duree": "1 an",
+        "duree_mois": 12,
+        "duree_formation": "12 mois",
+        "duree_cycle": null,
+        "ville": "Dakar",
+        "mensualite": 85000,
+        "frais_inscription": 200000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-09-01T13:02:25.750Z"
+    },
+    {
+      "id": 23,
+      "numero": "FP-2026-62482",
+      "dossier_id": 9,
+      "etudiant_id": null,
+      "formation_id": 4,
+      "type_document": "proforma",
+      "date_emission": "2026-09-01T13:10:05.180Z",
+      "date_echeance": "2027-09-01T13:10:05.180Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 160000,
+          "total": 160000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 40000,
+          "total": 360000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 9,
+          "montant_unitaire": 40000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Abonnement Bibliotheque + Pack EPI",
+          "montant": 30000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 30000,
+      "montant_ht": 520000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 520000,
+      "montant_total_a_payer": 550000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "Ba",
+        "prenom": "Moussa",
+        "email": "moussa.guichet.1787156328856@test.sn",
+        "telephone": "7756328856",
+        "adresse": "Dakar",
+        "nationalite": "Sénégalaise"
+      },
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "formation_snapshot": {
+        "titre": "Diplôme de Technicien Génie Civil - Bâtiment",
+        "type": "presentiel",
+        "niveau": "BT",
+        "niveau_requis": "BFEM/BEP",
+        "duree": "3 ans",
+        "duree_mois": 9,
+        "duree_formation": "9 mois",
+        "duree_cycle": null,
+        "ville": "Dakar",
+        "mensualite": 40000,
+        "frais_inscription": 160000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-09-01T13:10:05.180Z"
+    },
+    {
+      "id": 24,
+      "numero": "FP-2026-70571",
+      "dossier_id": 11,
+      "etudiant_id": 18,
+      "formation_id": 45,
+      "type_document": "proforma",
+      "date_emission": "2026-09-03T13:37:59.771Z",
+      "date_echeance": "2027-09-03T13:37:59.771Z",
+      "lignes": [
+        {
+          "description": "Frais d'inscription",
+          "quantite": 1,
+          "prix_unitaire": 215000,
+          "total": 215000,
+          "kind": null,
+          "duree_mois": null
+        },
+        {
+          "description": "Mensualité",
+          "quantite": 1,
+          "prix_unitaire": 110000,
+          "total": 1210000,
+          "kind": "mensualite_unitaire",
+          "duree_mois": 11,
+          "montant_unitaire": 110000
+        }
+      ],
+      "lignes_supplementaires": [
+        {
+          "designation": "Autres frais",
+          "montant": 20000,
+          "hors_forfait_annuel": true
+        }
+      ],
+      "montant_supplementaires_hors_forfait": 20000,
+      "montant_ht": 1425000,
+      "tva_taux": 0,
+      "montant_tva": 0,
+      "montant_ttc": 1425000,
+      "montant_total_a_payer": 1445000,
+      "statut": "emise",
+      "etudiant_snapshot": {
+        "nom": "cdcs",
+        "prenom": "dcqs",
+        "email": "abdoulayecheikhou.ly@ucad.edu.sn",
+        "telephone": "89877877878987",
+        "adresse": "DSZCM%ZEDM%",
+        "nationalite": "DDXZ"
+      },
+      "type_payeur": "etudiant",
+      "payeur": null,
+      "formation_snapshot": {
+        "titre": "Licence 3 Électromécanique et Systèmes Automatisés",
+        "type": "en_ligne",
+        "niveau": "Licence 3",
+        "niveau_requis": "Bac+2",
+        "duree": "11 mois",
+        "duree_mois": 11,
+        "duree_formation": "11 mois",
+        "duree_cycle": null,
+        "ville": null,
+        "mensualite": 110000,
+        "frais_inscription": 215000
+      },
+      "etablissement_snapshot": {
+        "nom": "ESEBAT",
+        "logo_url": "/uploads/etablissements/1774367348780-logo.jpg",
+        "cachet_url": "/uploads/etablissements/1774883718214-cachet.jpg",
+        "couleur_primaire": "#e5742a",
+        "couleur_secondaire": "#e5742a",
+        "adresse": "Point E-Boulevard Sud - PE43 - BP 6071 CP 11522 Dakar Etoile, Sénégal",
+        "telephone": "33 825 36 74 — 77 401 78 60 — 78 523 15 77",
+        "email_contact": "esebat@esebat.com",
+        "site_web": "esebat.com",
+        "ninea": "41591422V2",
+        "rc": " SN-DKR2010",
+        "arrete": "N°002049/MFPAA/SG/DFP-RepSEN/Ensup-priv/HA/048-2018",
+        "compte_bancaire": "SN094-01001-100011244001-37",
+        "banque": "ECOBANK",
+        "iban": "",
+        "swift": "ECOCSNDAXXX",
+        "signataire_nom": "",
+        "signataire_fonction": "La direction"
+      },
+      "created_at": "2026-09-03T13:37:59.772Z"
+    }
+  ],
   "demandes_proforma": [
     {
       "id": 14,
@@ -3823,7 +5549,7 @@
         "tva": 0,
         "montant_ttc": 520000,
         "remise": 0,
-        "validite_jusqu_au": "2026-09-11T13:54:49.963Z"
+        "validite_jusqu_au": "2027-08-12T13:54:49.918Z"
       },
       "source": "staff",
       "creee_par": 1,
@@ -3898,7 +5624,7 @@
         "tva": 0,
         "montant_ttc": 1620000,
         "remise": 0,
-        "validite_jusqu_au": "2026-09-11T14:58:21.985Z"
+        "validite_jusqu_au": "2027-08-12T14:58:21.984Z"
       },
       "source": "staff",
       "creee_par": 11,
@@ -3912,15 +5638,15 @@
     "filieres": 25,
     "formations": 122,
     "utilisateurs": 31,
-    "dossiers": 17,
+    "dossiers": 21,
     "documents": 33,
-    "factures": 18,
+    "factures": 25,
     "demandes_proforma": 17,
-    "audit_logs": 52,
-    "notifications": 10,
-    "security_events": 49,
+    "audit_logs": 54,
+    "notifications": 11,
+    "security_events": 51,
     "conditions_admission": 3,
-    "chatbot_logs": 65
+    "chatbot_logs": 79
   },
   "audit_logs": [
     {
@@ -4877,6 +6603,46 @@
         ]
       },
       "created_at": "2026-08-26T12:14:24.738Z"
+    },
+    {
+      "id": 52,
+      "action": "create",
+      "entity": "dossier",
+      "entity_id": 20,
+      "user_id": 11,
+      "user_role": "responsable",
+      "etablissement_id": 1,
+      "method": "POST",
+      "path": "/api/responsable/dossiers/guichet",
+      "ip": "::1",
+      "details": {
+        "numero_dossier": "PREINSC-2026-39305",
+        "source": "staff_guichet",
+        "reused": false,
+        "facture_id": 22
+      },
+      "created_at": "2026-09-01T13:02:25.775Z"
+    },
+    {
+      "id": 53,
+      "action": "update_status",
+      "entity": "dossier",
+      "entity_id": 11,
+      "user_id": 11,
+      "user_role": "responsable",
+      "etablissement_id": 1,
+      "method": "PUT",
+      "path": "/api/responsable/dossiers/11/statut",
+      "ip": "::1",
+      "details": {
+        "from": "accepte",
+        "to": "accepte",
+        "motif_rejet": null,
+        "actor_role": "responsable",
+        "actor_id": 11,
+        "visible_admin": true
+      },
+      "created_at": "2026-09-03T13:38:07.518Z"
     }
   ],
   "notifications": [
@@ -4909,6 +6675,21 @@
       },
       "read_at": null,
       "created_at": "2026-08-21T11:02:38.391Z"
+    },
+    {
+      "id": 10,
+      "user_id": 18,
+      "type": "dossier_statut",
+      "title": "Décision sur votre dossier",
+      "message": "Le dossier PREINSC-2026-16871 est maintenant: accepté.",
+      "link": "/dashboard",
+      "meta": {
+        "dossier_id": 11,
+        "numero_dossier": "PREINSC-2026-16871",
+        "statut": "accepte"
+      },
+      "read_at": null,
+      "created_at": "2026-09-03T13:38:07.510Z"
     }
   ],
   "security_events": [
@@ -5607,6 +7388,34 @@
         "backend": "memory"
       },
       "created_at": "2026-08-11T23:14:01.611Z"
+    },
+    {
+      "id": 49,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "samba.ndiaye@esebat.com"
+      },
+      "created_at": "2026-09-01T13:37:32.187Z"
+    },
+    {
+      "id": 50,
+      "type": "auth_login_failed",
+      "severity": "warning",
+      "user_id": null,
+      "user_role": null,
+      "method": "POST",
+      "path": "/api/auth/connexion",
+      "ip": "::1",
+      "details": {
+        "email": "adama.sarr@esebat.com"
+      },
+      "created_at": "2026-09-01T13:37:53.997Z"
     }
   ],
   "conditions_admission": [
@@ -6672,6 +8481,234 @@
       "no_match": false,
       "off_topic": false,
       "ip_hash": "::1"
+    },
+    {
+      "id": 65,
+      "created_at": "2026-09-01T09:18:03.954Z",
+      "session_id": "test-info-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelles sont vos formations en informatique ?",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 66,
+      "created_at": "2026-09-01T09:18:03.993Z",
+      "session_id": "test-astro-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Avez-vous une licence en astronautique ?",
+      "intent": "list_formations",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 67,
+      "created_at": "2026-09-01T09:18:04.039Z",
+      "session_id": "test-off-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quelle est la capitale du Japon ?",
+      "intent": "off_topic",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": true,
+      "ip_hash": null
+    },
+    {
+      "id": 68,
+      "created_at": "2026-09-01T09:18:04.106Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je cherche une formation en informatique",
+      "intent": "recommend",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 69,
+      "created_at": "2026-09-01T09:18:04.142Z",
+      "session_id": "test-ctx-duree",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Et combien de temps dure cette formation ?",
+      "intent": "fees",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 70,
+      "created_at": "2026-09-01T09:18:04.179Z",
+      "session_id": "test-cyber-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je veux faire de la cybersécurité. Quelle formation ?",
+      "intent": "recommend",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 71,
+      "created_at": "2026-09-01T09:18:04.231Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "formations informatique",
+      "intent": "list_formations",
+      "formation_ids": [
+        80,
+        81,
+        82
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 72,
+      "created_at": "2026-09-01T09:18:04.270Z",
+      "session_id": "test-careers-1",
+      "etablissement_id": 2,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Quels sont les débouchés de cette formation ?",
+      "intent": "careers",
+      "formation_ids": [
+        80
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": null
+    },
+    {
+      "id": 73,
+      "created_at": "2026-09-01T10:33:07.862Z",
+      "session_id": "anon-1788258787725-gq55p9",
+      "etablissement_id": 1,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je cherche une formation",
+      "intent": "recommend",
+      "formation_ids": [],
+      "no_match": true,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 74,
+      "created_at": "2026-09-01T12:01:53.149Z",
+      "session_id": "anon-1788264113057-9cpaim",
+      "etablissement_id": null,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Je voudrais une facture proforma",
+      "intent": "proforma",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 75,
+      "created_at": "2026-09-01T12:01:59.261Z",
+      "session_id": "anon-1788264113057-9cpaim",
+      "etablissement_id": null,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Voir les formations",
+      "intent": "list_formations",
+      "formation_ids": [
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 76,
+      "created_at": "2026-09-01T12:02:06.302Z",
+      "session_id": "anon-1788264113057-9cpaim",
+      "etablissement_id": null,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Facture proforma",
+      "intent": "proforma",
+      "formation_ids": [],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 77,
+      "created_at": "2026-09-01T12:02:11.533Z",
+      "session_id": "anon-1788264113057-9cpaim",
+      "etablissement_id": null,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "Voir les formations",
+      "intent": "list_formations",
+      "formation_ids": [
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
+    },
+    {
+      "id": 78,
+      "created_at": "2026-09-01T12:02:17.534Z",
+      "session_id": "anon-1788264113057-9cpaim",
+      "etablissement_id": null,
+      "user_id": null,
+      "role": "anonyme",
+      "message_preview": "La première m’intéresse",
+      "intent": "select_ordinal",
+      "formation_ids": [
+        4
+      ],
+      "no_match": false,
+      "off_topic": false,
+      "ip_hash": "::1"
     }
   ],
   "chatbot_config": [
@@ -6790,5 +8827,44 @@
       "faqs": [],
       "updated_at": null
     }
-  ]
+  ],
+  "_schemaVersion": 3,
+  "_migrations": [
+    {
+      "version": 1,
+      "id": "2026_08_formations_tarifs_continuity",
+      "description": "Ajoute Bibliothèque / EPI / duree_mois et recalcule le forfait sans perte de données.",
+      "applied_at": "2026-09-01T09:14:12.354Z",
+      "result": {
+        "formations_updated": 21
+      },
+      "backup": "C:\\Users\\lyiss\\Desktop\\projet IA\\PREINSCRIPTION MULTIPLATEFORME\\preinscription-univ\\backend\\database\\backups\\preinscription-pre-migrate-v0-to-v2-20260901-091411.json"
+    },
+    {
+      "version": 2,
+      "id": "2026_08_formations_photos_actif",
+      "description": "Normalise photos préinscription et statut actif sur les formations existantes.",
+      "applied_at": "2026-09-01T09:14:13.063Z",
+      "result": {
+        "formations_updated": 98
+      },
+      "backup": "C:\\Users\\lyiss\\Desktop\\projet IA\\PREINSCRIPTION MULTIPLATEFORME\\preinscription-univ\\backend\\database\\backups\\preinscription-pre-migrate-v0-to-v2-20260901-091411.json"
+    },
+    {
+      "version": 3,
+      "id": "2026_09_site_config",
+      "description": "Ajoute site_config (favicon plateforme, nom affiché).",
+      "applied_at": "2026-09-01T09:29:22.025Z",
+      "result": {
+        "site_config_created": false
+      },
+      "backup": "C:\\Users\\lyiss\\Desktop\\projet IA\\PREINSCRIPTION MULTIPLATEFORME\\preinscription-univ\\backend\\database\\backups\\preinscription-pre-migrate-v2-to-v3-20260901-092922.json"
+    }
+  ],
+  "site_config": {
+    "platform_name": "Préinscription Universitaire",
+    "favicon_url": null,
+    "platform_logo_url": null,
+    "updated_at": null
+  }
 }

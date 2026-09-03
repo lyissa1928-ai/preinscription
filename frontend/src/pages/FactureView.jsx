@@ -472,6 +472,11 @@ export default function FactureView() {
                 (fo.duree_formation || fo.duree) && `Durée : ${fo.duree_formation || fo.duree}`,
               ].filter(Boolean).join(' · ')}
             </p>
+            {(facture.annee_academique || fo.annee_academique) && (
+              <p className="mt-1 text-xs font-semibold text-slate-700">
+                Année académique : {facture.annee_academique || fo.annee_academique}
+              </p>
+            )}
           </div>
         </section>
 

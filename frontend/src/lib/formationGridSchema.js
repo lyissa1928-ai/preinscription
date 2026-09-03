@@ -75,8 +75,17 @@ export const FORMATION_DATA_COLUMNS = [
     key: 'description',
     label: 'Description',
     type: 'text',
-    width: 'min-w-[8rem]',
+    width: 'min-w-[10rem]',
     aliases: ['description'],
+    help: 'Présentation de la formation (contenu pédagogique, objectifs, etc.)',
+  },
+  {
+    key: 'debouches',
+    label: 'Débouchés professionnels',
+    type: 'text',
+    width: 'min-w-[10rem]',
+    aliases: ['debouches', 'débouchés', 'debouches professionnels', 'débouchés professionnels', 'emplois', 'metiers'],
+    help: 'Métiers et secteurs accessibles après la formation.',
   },
   {
     key: 'actif',
@@ -204,6 +213,7 @@ export function emptyGridRow(filiereId, type) {
     frais_bibliotheque: '',
     frais_epi: '',
     description: '',
+    debouches: '',
     actif: 'true',
   }
 }
@@ -225,6 +235,7 @@ export function formationToGridRow(f) {
     frais_bibliotheque: String(f?.frais_bibliotheque ?? ''),
     frais_epi: String(f?.frais_epi ?? ''),
     description: f?.description || '',
+    debouches: f?.debouches || '',
     actif: f?.actif === false ? 'false' : 'true',
   }
 }

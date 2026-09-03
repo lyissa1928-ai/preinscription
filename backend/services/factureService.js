@@ -32,6 +32,8 @@ function buildFormationSnapshot(formation, tarif) {
     ville: formation.ville || null,
     mensualite: formation.mensualite,
     frais_inscription: formation.frais_inscription,
+    description: formation.description || null,
+    debouches: formation.debouches || null,
   };
 }
 
@@ -141,8 +143,9 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
     const current = db.get('factures').find({ id: existing.id }).value();
     const synced = syncFactureMontantsFromFormation(current, formation);
     const date_echeance = syncDateEcheanceFacture({ ...current, ...synced });
-    db.get('factures').find({ id: existing.id }).assign({ ...synced, date_echeance }).write();
-    return { ...current, ...synced, date_echeance, type_document: current.type_document || typeDocOpt || 'proforma' };
+    const anneeSync = current.annee_academique || dossierRow.annee_academique || null;
+    db.get('factures').find({ id: existing.id }).assign({ ...synced, date_echeance, annee_academique: anneeSync }).write();
+    return { ...current, ...synced, date_echeance, annee_academique: anneeSync, type_document: current.type_document || typeDocOpt || 'proforma' };
   }
 
   const etudiant = dossierRow.etudiant_id
@@ -160,6 +163,8 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
   const montant_tva = Math.round(montant_ht * tva_taux);
   const montant_ttc = montant_ht + montant_tva;
 
+  const annee_academique = dossierRow.annee_academique || null;
+
   const fid = db.nextId('factures');
   const facture = {
     id: fid,
@@ -167,6 +172,7 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
     dossier_id: id,
     etudiant_id: dossierRow.etudiant_id,
     formation_id: formation.id,
+    annee_academique,
     type_document: typeDocOpt || 'proforma',
     date_emission: new Date().toISOString(),
     date_echeance: dateEcheanceFacture(new Date().toISOString()),
