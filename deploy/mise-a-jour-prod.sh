@@ -69,6 +69,14 @@ fi
 
 # ─── 4. Mise à jour du code ───
 echo ">>> 3/7 git fetch + pull ($BRANCH)..."
+# skip-worktree ne suffit pas si origin modifie aussi preinscription.json :
+# Git refuse le merge (« local changes would be overwritten »).
+# On aligne le fichier sur HEAD uniquement pour le pull ; TMP_DB / backup conservent la prod.
+if [[ -f "$DB_FILE" ]]; then
+  git update-index --no-skip-worktree "$DB_FILE" 2>/dev/null || true
+  git checkout -- "$DB_FILE" 2>/dev/null || true
+  echo "    preinscription.json aligné sur HEAD (copie prod conservée)"
+fi
 # package-lock.json modifié localement (npm install) ne doit pas bloquer le déploiement
 # config-site.js : souvent édité localement → reset si nécessaire avant pull
 if [[ -f frontend/public/config-site.js ]] && ! git diff --quiet HEAD -- frontend/public/config-site.js 2>/dev/null; then
@@ -86,22 +94,12 @@ done
 git fetch origin
 git pull origin "$BRANCH"
 
-# ─── 5. Restaurer la base si git l'a écrasée ───
-echo ">>> 4/7 Vérification de la base de données..."
+# ─── 5. Toujours remettre la base prod (jamais celle du dépôt Git) ───
+echo ">>> 4/7 Restauration de la base de données prod..."
 if [[ -n "$TMP_DB" && -f "$TMP_DB" ]]; then
-  NEED_RESTORE=0
-  if [[ ! -f "$DB_FILE" ]]; then
-    NEED_RESTORE=1
-  elif ! cmp -s "$TMP_DB" "$DB_FILE" 2>/dev/null; then
-    # Si le fichier a changé après pull, restaurer la prod
-    NEED_RESTORE=1
-  fi
-  if [[ "$NEED_RESTORE" -eq 1 ]]; then
-    cp "$TMP_DB" "$DB_FILE"
-    echo "    Base restaurée depuis la sauvegarde pré-pull."
-  else
-    echo "    Base inchangée (skip-worktree actif)."
-  fi
+  cp "$TMP_DB" "$DB_FILE"
+  git update-index --skip-worktree "$DB_FILE" 2>/dev/null || true
+  echo "    Base prod restaurée (aucune donnée perdue)."
   rm -f "$TMP_DB"
 fi
 
