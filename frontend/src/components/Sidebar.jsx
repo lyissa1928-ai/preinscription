@@ -77,6 +77,20 @@ const MENUS = {
     { label: 'Maintenance', to: '/admin/maintenance', icon: ICONS.settings },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
+  directeur: [
+    {
+      label: 'Tableau de bord',
+      to: '/admin',
+      icon: ICONS.dashboard,
+      exact: true,
+    },
+    { label: 'Établissements', to: '/admin/etablissements', icon: ICONS.etablissements },
+    { label: 'Dossiers', to: '/admin/dossiers', icon: ICONS.dossiers },
+    { label: 'Demandes proforma', to: '/admin/proforma', icon: ICONS.demandesListe },
+    { label: 'Factures', to: '/admin/factures-etablissement', icon: ICONS.finance },
+    { label: 'Rapports hebdo', to: '/admin/rapports-hebdo', icon: ICONS.stats },
+    { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
+  ],
   admin_etablissement: [
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     { label: 'Équipe & comptes', to: '/mon-etablissement/equipe', icon: ICONS.users, exact: true },
@@ -86,6 +100,7 @@ const MENUS = {
     { label: 'Guichet / factures', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
     { label: 'Acceptés par formation', to: '/mon-etablissement/acceptes-par-formation', icon: ICONS.dossiers },
+    { label: 'Rapports hebdo', to: '/mon-etablissement/rapports-hebdo', icon: ICONS.stats },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
@@ -180,6 +195,7 @@ const MENUS = {
 
 const ROLE_CONFIG = {
   admin:       { label: 'Administrateur',     color: 'from-purple-700 to-purple-900', badge: 'bg-purple-500' },
+  directeur:   { label: 'Directeur',          color: 'from-slate-700 to-indigo-900', badge: 'bg-indigo-500' },
   admin_etablissement: { label: 'Admin. établissement', color: 'from-blue-700 to-blue-900', badge: 'bg-blue-500' },
   responsable: { label: 'Resp. Pédagogique', color: 'from-teal-700 to-teal-900',    badge: 'bg-teal-500' },
   responsable_fad: { label: 'Responsable FAD', color: 'from-indigo-700 to-indigo-900', badge: 'bg-indigo-500' },

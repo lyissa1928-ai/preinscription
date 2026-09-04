@@ -65,9 +65,8 @@ function creerDossierGuichet({ staffUser, body }) {
   const isProformaGuichet = typeDoc === 'proforma';
 
   if (!isProformaGuichet) {
+    // Date / lieu de naissance : facultatifs même pour une préinscription guichet.
     const required = [
-      'date_naissance',
-      'lieu_naissance',
       'nationalite',
       'adresse',
       'dernier_diplome',

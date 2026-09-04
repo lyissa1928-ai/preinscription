@@ -7,6 +7,7 @@ import { mediaUrl } from '../utils/mediaUrl'
 
 const ROLES_STAFF = [
   { val: 'admin', label: 'Administrateur (plateforme)' },
+  { val: 'directeur', label: 'Directeur — vision tous établissements' },
   { val: 'admin_etablissement', label: 'Administrateur établissement' },
   { val: 'responsable', label: 'Responsable pédagogique' },
   { val: 'responsable_fad', label: 'Responsable FAD (formations à distance)' },
@@ -18,6 +19,7 @@ const ROLES_STAFF = [
 
 const ROLE_COLORS = {
   admin:       'bg-red-100 text-red-700',
+  directeur:   'bg-indigo-100 text-indigo-800',
   admin_etablissement: 'bg-blue-100 text-blue-800',
   responsable: 'bg-teal-100 text-teal-700',
   responsable_fad: 'bg-indigo-100 text-indigo-700',
@@ -28,7 +30,7 @@ const ROLE_COLORS = {
   etudiant:    'bg-gray-100 text-gray-700'
 }
 const ROLE_LABELS = {
-  admin: 'Administrateur', admin_etablissement: 'Admin. établissement', responsable: 'Resp. Pédagogique',
+  admin: 'Administrateur', directeur: 'Directeur', admin_etablissement: 'Admin. établissement', responsable: 'Resp. Pédagogique',
   responsable_fad: 'Responsable FAD',
   agent_fad: 'Agent FAD',
   agent_admin: 'Agent Administratif', comptable: 'Comptable',
@@ -44,7 +46,7 @@ function RoleBadge({ role }) {
 }
 
 const EMPTY_FORM = {
-  prenom: '', nom: '', email: '', telephone: '', adresse: '',
+  prenom: '', nom: '', email: '', telephone: '', adresse: '', service: '',
   mot_de_passe: '', mot_de_passe_confirmation: '', role: 'responsable', etablissement_id: '',
 }
 
@@ -157,7 +159,7 @@ export default function AdminUsers() {
       toast.error('Les mots de passe ne correspondent pas.')
       return
     }
-    if (createForm.role !== 'admin' && !createForm.etablissement_id) {
+    if (createForm.role !== 'admin' && createForm.role !== 'directeur' && !createForm.etablissement_id) {
       toast.error('Sélectionnez un établissement pour ce rôle.')
       return
     }
@@ -165,7 +167,7 @@ export default function AdminUsers() {
     try {
       const { data } = await axios.post('/api/admin/utilisateurs', {
         ...createForm,
-        etablissement_id: createForm.role === 'admin' ? null : createForm.etablissement_id,
+        etablissement_id: (createForm.role === 'admin' || createForm.role === 'directeur') ? null : createForm.etablissement_id,
       })
       const mat = data.utilisateur?.matricule
       toast.success(mat ? `Compte créé. Matricule : ${mat}` : 'Compte créé.')
@@ -190,6 +192,7 @@ export default function AdminUsers() {
     e.preventDefault()
     if (
       editForm.role !== 'admin' &&
+      editForm.role !== 'directeur' &&
       editForm.role !== 'etudiant' &&
       ['admin_etablissement', 'responsable', 'responsable_fad', 'agent_fad', 'agent_admin', 'comptable', 'controleur_qualite'].includes(editForm.role) &&
       !editForm.etablissement_id
@@ -200,7 +203,7 @@ export default function AdminUsers() {
     setEditSaving(true)
     try {
       const payload = { ...editForm }
-      if (payload.role === 'admin') payload.etablissement_id = null
+      if (payload.role === 'admin' || payload.role === 'directeur') payload.etablissement_id = null
       if (!payload.mot_de_passe) delete payload.mot_de_passe
       await axios.put(`/api/admin/utilisateurs/${editUser.id}`, payload)
       const etabChanged = String(editForm.etablissement_id || '') !== String(editUser.etablissement_id || '')
@@ -289,14 +292,14 @@ export default function AdminUsers() {
   const upCreate = (f) => (e) => {
     const v = e.target.value
     setCreateForm((p) => {
-      if (f === 'role' && v === 'admin') return { ...p, role: v, etablissement_id: '' }
+      if (f === 'role' && (v === 'admin' || v === 'directeur')) return { ...p, role: v, etablissement_id: '' }
       return { ...p, [f]: v }
     })
   }
   const upEdit = (f) => (e) => {
     const v = e.target.value
     setEditForm((p) => {
-      if (f === 'role' && v === 'admin') return { ...p, role: v, etablissement_id: '' }
+      if (f === 'role' && (v === 'admin' || v === 'directeur')) return { ...p, role: v, etablissement_id: '' }
       return { ...p, [f]: v }
     })
   }
@@ -340,6 +343,7 @@ export default function AdminUsers() {
           <div className="flex flex-wrap gap-2">
             {[
               { val: 'staff', label: '👥 Staff' },
+              { val: 'directeur', label: '🏛️ Directeur' },
               { val: 'etudiant', label: '🎓 Étudiants' },
               { val: 'all', label: '📋 Tous' }
             ].map(f => (
@@ -506,9 +510,9 @@ export default function AdminUsers() {
               <Field label="Nom" required><input className="input-field" value={createForm.nom} onChange={upCreate('nom')} required /></Field>
             </div>
             <p className="text-xs text-gray-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-              {createForm.role === 'admin' ? (
+              {createForm.role === 'admin' || createForm.role === 'directeur' ? (
                 <>
-                  Le <strong>matricule</strong> sera du type <span className="font-mono">DIR001</span> (administrateur global, sans rattachement à un établissement).
+                  Le <strong>matricule</strong> sera du type <span className="font-mono">DIR001</span> (compte global, sans rattachement à un établissement).
                 </>
               ) : (
                 <>
@@ -518,10 +522,13 @@ export default function AdminUsers() {
               )}
             </p>
             <Field label="Email" required><input type="email" className="input-field" value={createForm.email} onChange={upCreate('email')} required /></Field>
-            <Field label="Téléphone" required note="unique (8 chiffres min., espaces et + ignorés)">
-              <input type="tel" className="input-field" value={createForm.telephone} onChange={upCreate('telephone')} required />
+            <Field label="Téléphone" note="optionnel à la création — unique s’il est renseigné">
+              <input type="tel" className="input-field" value={createForm.telephone} onChange={upCreate('telephone')} />
             </Field>
-            <Field label="Adresse" note="recommandé">
+            <Field label="Service / fonction" note="optionnel">
+              <input className="input-field" value={createForm.service || ''} onChange={upCreate('service')} placeholder="Ex. Direction, Scolarité…" />
+            </Field>
+            <Field label="Adresse" note="optionnel — complété à l’activation si besoin">
               <input className="input-field" value={createForm.adresse} onChange={upCreate('adresse')} placeholder="Optionnel" />
             </Field>
             <Field label="Mot de passe" required><input type="password" className="input-field" value={createForm.mot_de_passe} onChange={upCreate('mot_de_passe')} required minLength={6} /></Field>
@@ -529,18 +536,25 @@ export default function AdminUsers() {
               <input type="password" className="input-field" value={createForm.mot_de_passe_confirmation} onChange={upCreate('mot_de_passe_confirmation')} required minLength={6} />
             </Field>
             <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-              Le compte sera créé avec un mot de passe provisoire : l’utilisateur devra le changer à la première connexion.
+              Première connexion : changement de mot de passe, puis complétion du profil (date de naissance, photo). Pas de date de naissance à saisir ici.
             </p>
             <Field label="Rôle" required>
               <select className="input-field" value={createForm.role} onChange={upCreate('role')} required>
                 {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
               </select>
+              <p className="mt-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2.5 py-1.5">
+                Le profil <strong>Directeur</strong> est dans cette liste (2ᵉ option) : vision globale multi-établissements, sans rattachement à une école.
+              </p>
             </Field>
-            {createForm.role === 'admin' ? (
+            {createForm.role === 'admin' || createForm.role === 'directeur' ? (
               <div className="rounded-xl border border-blue-100 bg-blue-50/90 px-3 py-3 text-sm text-blue-900">
-                <p className="font-semibold">Administrateur — plateforme</p>
+                <p className="font-semibold">
+                  {createForm.role === 'directeur' ? 'Directeur — vision globale' : 'Administrateur — plateforme'}
+                </p>
                 <p className="text-xs text-blue-800/90 mt-1 leading-relaxed">
-                  Aucun établissement à choisir : accès global à la configuration, aux comptes et aux données métier. Vous pouvez créer d’autres administrateurs ; le dernier compte admin actif ne peut pas être supprimé ni retiré de son rôle.
+                  {createForm.role === 'directeur'
+                    ? 'Aucun établissement à choisir : consultation multi-établissements et rapports hebdomadaires consolidés.'
+                    : 'Aucun établissement à choisir : accès global à la configuration, aux comptes et aux données métier.'}
                 </p>
               </div>
             ) : (
@@ -591,11 +605,11 @@ export default function AdminUsers() {
                 {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
               </select>
             </Field>
-            {editForm.role === 'admin' ? (
+            {editForm.role === 'admin' || editForm.role === 'directeur' ? (
               <div className="rounded-xl border border-blue-100 bg-blue-50/90 px-3 py-3 text-sm text-blue-900">
                 <p className="font-semibold">Rattachement établissement</p>
                 <p className="text-xs text-blue-800/90 mt-1">
-                  Compte administrateur global : <strong>aucun établissement</strong>. Pour rattacher ce compte à une école, changez le rôle vers Responsable, Agent ou Comptable puis choisissez l’établissement.
+                  Compte global ({editForm.role === 'directeur' ? 'Directeur' : 'administrateur'}) : <strong>aucun établissement</strong>.
                 </p>
               </div>
             ) : (

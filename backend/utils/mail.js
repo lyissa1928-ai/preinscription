@@ -48,7 +48,7 @@ function getTransporter() {
 /**
  * @returns {Promise<boolean>} true si envoyé
  */
-async function sendMail({ to, subject, text, html }) {
+async function sendMail({ to, subject, text, html, attachments }) {
   const t = getTransporter();
   if (!t) {
     console.warn('[mail] SMTP non configuré — e-mail non envoyé.');
@@ -62,6 +62,7 @@ async function sendMail({ to, subject, text, html }) {
       subject,
       text,
       html: html || text,
+      attachments: Array.isArray(attachments) ? attachments : undefined,
     });
     return true;
   } catch (e) {

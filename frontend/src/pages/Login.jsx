@@ -72,8 +72,12 @@ export default function Login() {
         navigate('/changer-mot-de-passe-obligatoire', { replace: true })
         return
       }
+      if (u.must_complete_profile) {
+        navigate('/completer-profil-staff', { replace: true })
+        return
+      }
       const role = u.role
-      let dest = role === 'admin' ? '/admin'
+      let dest = role === 'admin' || role === 'directeur' ? '/admin'
         : role === 'admin_etablissement' ? '/mon-etablissement/equipe'
         : role === 'controleur_qualite' ? '/qualite'
         : ['responsable', 'responsable_fad', 'agent_fad', 'agent_admin', 'comptable'].includes(role) ? '/mon-etablissement'

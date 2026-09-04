@@ -51,6 +51,8 @@ function parseDureeMoisFromText(duree) {
  * Total annuel (forfait scolarité) = inscription + mensualités sur la durée.
  */
 function computePrixAnnuel(formation) {
+  const fromEl = buildLignesFromElementsFacturation(formation);
+  if (fromEl) return Math.max(0, fromEl.montant_ht);
   const fi = parseInt(formation?.frais_inscription, 10) || 0;
   const men = parseInt(formation?.mensualite, 10) || 0;
   const mois = getDureeMoisEffectif(formation);
@@ -78,6 +80,34 @@ function normalizeFraisSupplementaires(raw) {
       montant: Math.max(0, parseInt(x?.montant, 10) || 0),
     }))
     .filter((x) => x.designation && x.montant > 0);
+}
+
+/**
+ * Normalise les éléments de facturation libres (libellé exact, ordre, actif).
+ */
+function normalizeElementsFacturation(raw) {
+  if (raw == null) return [];
+  let list = raw;
+  if (typeof raw === 'string') {
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((x, idx) => ({
+      id: String(x?.id || `el-${idx}-${Date.now()}`),
+      libelle: String(x?.libelle || x?.designation || '').trim(),
+      type: String(x?.type || 'fixe'),
+      montant: Math.max(0, parseInt(String(x?.montant ?? ''), 10) || 0),
+      quantite: x?.quantite != null && x.quantite !== '' ? Math.max(0, parseInt(String(x.quantite), 10) || 0) : null,
+      actif: x?.actif !== false,
+      ordre: x?.ordre != null ? Number(x.ordre) : idx,
+      hors_forfait: x?.hors_forfait === true || x?.type === 'hors_forfait',
+    }))
+    .filter((x) => x.libelle);
 }
 
 /**
@@ -144,9 +174,84 @@ function getFraisSupplementairesEffectifs(formation) {
 }
 
 /**
+ * Éléments de facturation configurables (libellés libres, ordre, actif).
+ * Si présents et non vides, ils remplacent la structure tarifaire « legacy ».
+ * @returns {null|{ montant_ht, lignes, lignes_supplementaires, montant_supplementaires, duree_mois }}
+ */
+function buildLignesFromElementsFacturation(formation) {
+  const raw = formation?.elements_facturation;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+
+  const mois = getDureeMoisEffectif(formation);
+  const elements = raw
+    .map((e, idx) => ({
+      id: e?.id || `el-${idx}`,
+      libelle: String(e?.libelle || '').trim(),
+      type: String(e?.type || 'fixe'),
+      montant: Math.max(0, parseInt(String(e?.montant ?? ''), 10) || 0),
+      quantite: e?.quantite != null ? Math.max(0, parseInt(String(e.quantite), 10) || 0) : null,
+      actif: e?.actif !== false,
+      ordre: e?.ordre != null ? Number(e.ordre) : idx,
+      hors_forfait: e?.hors_forfait === true || e?.type === 'hors_forfait',
+    }))
+    .filter((e) => e.libelle && e.actif)
+    .sort((a, b) => a.ordre - b.ordre);
+
+  if (elements.length === 0) return null;
+
+  const lignes = [];
+  const lignes_supplementaires = [];
+  let montant_ht = 0;
+
+  for (const el of elements) {
+    if (el.type === 'mensualite' || el.type === 'mensualites') {
+      const qte = el.quantite > 0 ? el.quantite : mois;
+      if (el.montant <= 0) continue;
+      lignes.push({
+        designation: el.libelle,
+        montant: el.montant,
+        kind: 'mensualite_unitaire',
+        duree_mois: qte,
+        total_mensualites: el.montant * qte,
+      });
+      montant_ht += el.montant * qte;
+      continue;
+    }
+    if (el.hors_forfait || el.type === 'hors_forfait') {
+      if (el.montant <= 0) continue;
+      lignes_supplementaires.push({
+        designation: el.libelle,
+        montant: el.montant,
+        hors_forfait_annuel: true,
+      });
+      continue;
+    }
+    // fixe / inscription / autres — libellé exact conservé
+    if (el.montant <= 0) continue;
+    lignes.push({
+      designation: el.libelle,
+      montant: el.montant,
+      kind: el.type === 'inscription' ? 'inscription' : undefined,
+    });
+    montant_ht += el.montant;
+  }
+
+  return {
+    montant_ht,
+    lignes,
+    lignes_supplementaires,
+    montant_supplementaires: lignes_supplementaires.reduce((a, b) => a + b.montant, 0),
+    duree_mois: mois,
+  };
+}
+
+/**
  * Détail des lignes pour facture / proforma (forfait annuel uniquement dans montant_ht).
  */
 function buildLignesForfaitAnnuel(formation) {
+  const fromElements = buildLignesFromElementsFacturation(formation);
+  if (fromElements) return fromElements;
+
   const fi = parseInt(formation?.frais_inscription, 10) || 0;
   const men = parseInt(formation?.mensualite, 10) || 0;
   const mois = getDureeMoisEffectif(formation);
@@ -158,6 +263,7 @@ function buildLignesForfaitAnnuel(formation) {
     lignes.push({
       designation: labelChamp(formation, 'frais_inscription', "Frais d'inscription"),
       montant: fi,
+      kind: 'inscription',
     });
   }
   if (mois > 0 && men > 0) {
@@ -228,7 +334,9 @@ module.exports = {
   getDureeMoisEffectif,
   computePrixAnnuel,
   normalizeFraisSupplementaires,
+  normalizeElementsFacturation,
   getFraisSupplementairesEffectifs,
+  buildLignesFromElementsFacturation,
   buildLignesForfaitAnnuel,
   mergeFactureProformaFromFormation,
   withPrixAnnuelComputed,

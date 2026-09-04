@@ -1,8 +1,12 @@
 /** Rôle « administrateur établissement » — gestion du staff de son établissement uniquement. */
 const ROLE_ADMIN_ETABLISSEMENT = 'admin_etablissement';
 
+/** Directeur : vision globale multi-établissements (sans rattachement étab.). */
+const ROLE_DIRECTEUR = 'directeur';
+
 const STAFF_ROLES = [
   'admin',
+  ROLE_DIRECTEUR,
   ROLE_ADMIN_ETABLISSEMENT,
   'responsable',
   'responsable_fad',
@@ -12,8 +16,8 @@ const STAFF_ROLES = [
   'controleur_qualite',
 ];
 
-/** Comptes staff rattachés à un établissement (hors admin global). */
-const ETAB_STAFF_ROLES = STAFF_ROLES.filter((r) => r !== 'admin');
+/** Comptes staff rattachés à un établissement (hors admin / directeur globaux). */
+const ETAB_STAFF_ROLES = STAFF_ROLES.filter((r) => r !== 'admin' && r !== ROLE_DIRECTEUR);
 
 /** Création par l’admin plateforme (tous rôles staff). */
 const ROLES_CREATABLE_PLATFORM = [...STAFF_ROLES];
@@ -33,6 +37,15 @@ const ROLES_CREATABLE_RESPONSABLE_FAD = ['agent_fad'];
 
 function isPlatformAdmin(user) {
   return user?.role === 'admin';
+}
+
+function isDirecteur(user) {
+  return user?.role === ROLE_DIRECTEUR;
+}
+
+/** Admin plateforme ou Directeur (vue globale). */
+function isPlatformGlobal(user) {
+  return isPlatformAdmin(user) || isDirecteur(user);
 }
 
 function isAdminEtablissement(user) {
@@ -60,7 +73,9 @@ function canManageEtabMembres(user, etabId) {
 }
 
 function rolesCreatablesMembres(user) {
-  if (isPlatformAdmin(user)) return ROLES_CREATABLE_PLATFORM.filter((r) => r !== 'admin');
+  if (isPlatformAdmin(user)) {
+    return ROLES_CREATABLE_PLATFORM.filter((r) => r !== 'admin' && r !== ROLE_DIRECTEUR);
+  }
   if (isAdminEtablissement(user)) return ROLES_CREATABLE_ETAB_ADMIN;
   if (isResponsableFad(user)) return ROLES_CREATABLE_RESPONSABLE_FAD;
   return [];
@@ -89,12 +104,15 @@ function canManageTargetMembre(actor, targetUser, etab) {
 
 module.exports = {
   ROLE_ADMIN_ETABLISSEMENT,
+  ROLE_DIRECTEUR,
   STAFF_ROLES,
   ETAB_STAFF_ROLES,
   ROLES_CREATABLE_PLATFORM,
   ROLES_CREATABLE_ETAB_ADMIN,
   ROLES_CREATABLE_RESPONSABLE_FAD,
   isPlatformAdmin,
+  isDirecteur,
+  isPlatformGlobal,
   isAdminEtablissement,
   isResponsableFad,
   isEtabScopedStaff,

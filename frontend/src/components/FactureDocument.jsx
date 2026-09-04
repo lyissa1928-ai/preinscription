@@ -159,7 +159,7 @@ export default function FactureDocument({
                   className={`py-2 pr-3 ${
                     r.isTotalMensualites
                       ? 'font-semibold text-slate-900'
-                      : r.isUnitMensualite
+                      : r.isUnitMensualite || r.isQuantite
                         ? 'text-slate-500'
                         : 'text-slate-800'
                   }`}
@@ -170,12 +170,12 @@ export default function FactureDocument({
                   className={`py-2 text-right tabular-nums ${
                     r.isTotalMensualites
                       ? 'font-bold text-slate-900'
-                      : r.isUnitMensualite
+                      : r.isUnitMensualite || r.isQuantite
                         ? 'text-slate-500'
                         : 'font-medium text-slate-900'
                   }`}
                 >
-                  {fmt(r.montant)}
+                  {r.isQuantite ? String(r.montant) : fmt(r.montant)}
                 </td>
               </tr>
             ))}

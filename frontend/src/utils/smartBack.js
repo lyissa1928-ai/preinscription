@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 export function getRoleHome(role) {
   switch (role) {
     case 'admin':
+    case 'directeur':
       return '/admin'
     case 'admin_etablissement':
       return '/mon-etablissement'

@@ -6,6 +6,7 @@ import { FaGraduationCap, FaEye, FaEyeSlash, FaInfoCircle, FaShieldAlt } from 'r
 import { useAuth } from '../context/AuthContext'
 import AuthCinematicBackground from '../components/AuthCinematicBackground'
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter'
+import { getRoleHome } from '../utils/smartBack'
 
 const MIN_LEN = 6
 
@@ -53,15 +54,10 @@ export default function ForcePasswordChange() {
   if (!user) return <Navigate to="/connexion" replace />
 
   if (!user.must_change_password) {
-    const dest =
-      user.role === 'admin'
-        ? '/admin'
-        : user.role === 'controleur_qualite'
-            ? '/qualite'
-            : ['responsable', 'responsable_fad', 'agent_fad', 'agent_admin', 'comptable', 'admin_etablissement'].includes(user.role)
-              ? '/mon-etablissement'
-              : '/dashboard'
-    return <Navigate to={dest} replace />
+    if (user.must_complete_profile) {
+      return <Navigate to="/completer-profil-staff" replace />
+    }
+    return <Navigate to={getRoleHome(user.role)} replace />
   }
 
   const validate = () => {
@@ -97,15 +93,12 @@ export default function ForcePasswordChange() {
         await refreshUser()
       }
       toast.success('Mot de passe mis à jour')
-      const dest =
-        user.role === 'admin'
-          ? '/admin'
-          : user.role === 'controleur_qualite'
-              ? '/qualite'
-              : ['responsable', 'responsable_fad', 'agent_fad', 'agent_admin', 'comptable', 'admin_etablissement'].includes(user.role)
-                ? '/mon-etablissement'
-                : '/dashboard'
-      navigate(dest, { replace: true })
+      const nextUser = data.utilisateur || user
+      if (nextUser?.must_complete_profile) {
+        navigate('/completer-profil-staff', { replace: true })
+      } else {
+        navigate(getRoleHome(nextUser?.role || user.role), { replace: true })
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'Erreur lors du changement de mot de passe.'
       setServerError(msg)

@@ -166,6 +166,7 @@ function buildPublicUserPayload(user, req) {
   const etab = user.etablissement_id
     ? db.get('etablissements').find({ id: user.etablissement_id }).value()
     : null;
+  const { staffNeedsProfileCompletion } = require('../utils/staffProfile');
   return {
     id: user.id,
     nom: user.nom,
@@ -182,6 +183,9 @@ function buildPublicUserPayload(user, req) {
     etablissement_logo: publicAssetUrl(req, etab?.logo_url) || null,
     etablissement: buildPublicEtablissementPayload(etab, req),
     must_change_password: user.must_change_password === true,
+    must_complete_profile: staffNeedsProfileCompletion(user),
+    photo_url: publicAssetUrl(req, user.photo_url) || null,
+    service: user.service || user.fonction || '',
   };
 }
 
@@ -195,6 +199,7 @@ function buildMeResponse(user, req) {
     date_naissance: user.date_naissance ?? null,
     email_verified_at: user.email_verified_at || null,
     actif: user.actif !== false,
+    fonction: user.fonction || user.service || '',
   };
 }
 
@@ -448,10 +453,20 @@ router.post('/connexion', loginLimiter, (req, res) => {
   clearLoginLockout(req, emailNorm);
   clearAccountLockOnSuccess(user.id);
 
-  res.json({
+  const payload = {
     message: 'Connexion réussie',
     ...buildAuthTokensResponse(user, req),
+  };
+
+  // Alerte de connexion (notif + e-mail) — ne bloque pas la réponse
+  setImmediate(() => {
+    try {
+      const { notifySuccessfulLogin } = require('../utils/loginAlert');
+      notifySuccessfulLogin(user, req).catch(() => {});
+    } catch { /* ignore */ }
   });
+
+  res.json(payload);
 });
 
 // POST /api/auth/refresh — renouvellement access token (refresh token rotatif)
@@ -554,9 +569,12 @@ router.post('/changer-mot-de-passe-obligatoire', authMiddleware, (req, res) => {
   }
 
   const hash = bcrypt.hashSync(nouveau_mot_de_passe, 10);
+  const { staffNeedsProfileCompletion } = require('../utils/staffProfile');
+  const afterPwd = { ...user, must_change_password: false };
   db.get('utilisateurs').find({ id: user.id }).assign({
     mot_de_passe: hash,
     must_change_password: false,
+    must_complete_profile: staffNeedsProfileCompletion(afterPwd) || user.must_complete_profile === true,
     password_changed_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).write();
@@ -942,6 +960,8 @@ router.put('/profil', authMiddleware, (req, res) => {
   const telephone = trimStr(req.body?.telephone);
   const adresse = trimStr(req.body?.adresse);
   const date_naissance = req.body?.date_naissance != null ? String(req.body.date_naissance).trim() || null : undefined;
+  const service = req.body?.service != null ? String(req.body.service).trim() : undefined;
+  const fonction = req.body?.fonction != null ? String(req.body.fonction).trim() : undefined;
 
   if (!prenom || !nom) {
     return res.status(400).json({ message: 'Prénom et nom sont obligatoires.' });
@@ -961,12 +981,148 @@ router.put('/profil', authMiddleware, (req, res) => {
     updated_at: new Date().toISOString(),
   };
   if (date_naissance !== undefined) patch.date_naissance = date_naissance;
+  if (service !== undefined) patch.service = service;
+  if (fonction !== undefined) patch.fonction = fonction;
+
+  const { staffNeedsProfileCompletion } = require('../utils/staffProfile');
+  const merged = { ...user, ...patch };
+  if (!staffNeedsProfileCompletion(merged)) {
+    patch.must_complete_profile = false;
+  }
 
   db.get('utilisateurs').find({ id: user.id }).assign(patch).write();
   const updated = db.get('utilisateurs').find({ id: user.id }).value();
   return res.json({
     message: 'Profil mis à jour.',
     utilisateur: buildMeResponse(updated, req),
+  });
+});
+
+// ─── Activation : complétion profil staff (naissance + photo) ────────────────
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+
+const profilePhotoDir = path.join(__dirname, '..', 'uploads', 'profils');
+if (!fs.existsSync(profilePhotoDir)) fs.mkdirSync(profilePhotoDir, { recursive: true });
+
+const profilePhotoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, profilePhotoDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+      const safe = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext) ? ext : '.jpg';
+      cb(null, `u${req.user.id}-${Date.now()}${safe}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!String(file.mimetype || '').startsWith('image/')) {
+      return cb(new Error('Fichier image requis.'));
+    }
+    cb(null, true);
+  },
+});
+
+// POST /api/auth/completer-profil-staff — première activation
+router.post('/completer-profil-staff', authMiddleware, (req, res) => {
+  const { staffNeedsProfileCompletion, isStaffRole } = require('../utils/staffProfile');
+  const user = db.get('utilisateurs').find({ id: req.user.id }).value();
+  if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+  if (!isStaffRole(user.role)) {
+    return res.status(400).json({ message: 'Réservé aux comptes staff.' });
+  }
+  if (user.must_change_password === true) {
+    return res.status(403).json({
+      code: 'MUST_CHANGE_PASSWORD',
+      message: 'Changez d’abord votre mot de passe.',
+    });
+  }
+
+  const date_naissance = String(req.body?.date_naissance || '').trim();
+  if (!date_naissance) {
+    return res.status(400).json({ message: 'La date de naissance est obligatoire pour activer le compte.' });
+  }
+  const telephone = trimStr(req.body?.telephone);
+  const adresse = trimStr(req.body?.adresse);
+  const service = trimStr(req.body?.service || req.body?.fonction);
+
+  if (telephone) {
+    const telNorm = normalizeTelephoneForUniqueness(telephone);
+    if (telNorm.length < 8) {
+      return res.status(400).json({ message: 'Téléphone invalide.' });
+    }
+    if (telephoneTaken(telNorm, user.id)) {
+      return res.status(409).json({ message: 'Ce numéro de téléphone est déjà utilisé.' });
+    }
+  }
+
+  const patch = {
+    date_naissance,
+    telephone: telephone || user.telephone || '',
+    adresse: adresse || user.adresse || '',
+    service: service || user.service || '',
+    fonction: service || user.fonction || '',
+    updated_at: new Date().toISOString(),
+  };
+
+  // Photo optionnelle si déjà uploadée via /photo, sinon exigée si absente
+  const hasPhoto = Boolean(user.photo_url);
+  if (!hasPhoto && req.body?.require_photo !== '0' && req.body?.require_photo !== false) {
+    // Autoriser la validation sans photo uniquement si photo_url déjà présent ;
+    // sinon on laisse must_complete_profile tant que photo manquante.
+  }
+
+  const merged = { ...user, ...patch };
+  const stillNeeds = !merged.date_naissance || !String(merged.date_naissance).trim() || !merged.photo_url;
+  patch.must_complete_profile = stillNeeds;
+
+  db.get('utilisateurs').find({ id: user.id }).assign(patch).write();
+  const updated = db.get('utilisateurs').find({ id: user.id }).value();
+
+  if (stillNeeds && !updated.photo_url) {
+    return res.json({
+      message: 'Informations enregistrées. Ajoutez encore votre photo de profil pour finaliser l’activation.',
+      need_photo: true,
+      utilisateur: buildMeResponse(updated, req),
+      ...buildAuthTokensResponse(updated, req),
+    });
+  }
+
+  db.get('utilisateurs').find({ id: user.id }).assign({ must_complete_profile: false }).write();
+  const finalUser = db.get('utilisateurs').find({ id: user.id }).value();
+  return res.json({
+    message: 'Profil complété. Bienvenue sur la plateforme.',
+    utilisateur: buildMeResponse(finalUser, req),
+    ...buildAuthTokensResponse(finalUser, req),
+  });
+});
+
+// POST /api/auth/completer-profil-staff/photo
+router.post('/completer-profil-staff/photo', authMiddleware, (req, res) => {
+  profilePhotoUpload.single('photo')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ message: err.message || 'Upload impossible.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: 'Fichier photo requis (champ « photo »).' });
+    }
+    const user = db.get('utilisateurs').find({ id: req.user.id }).value();
+    if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+
+    const rel = `/uploads/profils/${req.file.filename}`;
+    const hasBirth = user.date_naissance && String(user.date_naissance).trim();
+    db.get('utilisateurs').find({ id: user.id }).assign({
+      photo_url: rel,
+      must_complete_profile: !hasBirth,
+      updated_at: new Date().toISOString(),
+    }).write();
+    const updated = db.get('utilisateurs').find({ id: user.id }).value();
+    return res.json({
+      message: 'Photo de profil enregistrée.',
+      photo_url: publicAssetUrl(req, rel),
+      utilisateur: buildMeResponse(updated, req),
+    });
   });
 });
 

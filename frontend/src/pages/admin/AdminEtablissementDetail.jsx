@@ -526,7 +526,14 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
     frais_inscription: '', mensualite: '', duree_mois: '', frais_soutenance: '',
     frais_bibliotheque: '', frais_epi: '', autres_frais: '0',
     frais_supplementaires: [],
-    libelles_champs: {},
+    libelles_champs: {
+      frais_inscription: "Frais d'inscription",
+      mensualite: 'Mensualité',
+      frais_soutenance: 'Frais de soutenance',
+      frais_bibliotheque: 'Bibliothèque',
+      frais_epi: 'EPI',
+    },
+    elements_facturation: [],
     nombre_photos_preinscription: '1',
   }
   const [form, setForm] = useState(EMPTY)
@@ -576,6 +583,26 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       frais_epi: String(f.frais_epi || ''),
       autres_frais: String(f.autres_frais || '0'),
       frais_supplementaires: supp.length ? supp : [],
+      libelles_champs: {
+        frais_inscription: "Frais d'inscription",
+        mensualite: 'Mensualité',
+        frais_soutenance: 'Frais de soutenance',
+        frais_bibliotheque: 'Bibliothèque',
+        frais_epi: 'EPI',
+        ...(f.libelles_champs && typeof f.libelles_champs === 'object' ? f.libelles_champs : {}),
+      },
+      elements_facturation: Array.isArray(f.elements_facturation)
+        ? f.elements_facturation.map((el, i) => ({
+            id: el.id || `el-${i}`,
+            libelle: el.libelle || '',
+            type: el.type || 'fixe',
+            montant: String(el.montant ?? ''),
+            quantite: el.quantite != null ? String(el.quantite) : '',
+            actif: el.actif !== false,
+            ordre: el.ordre != null ? Number(el.ordre) : i,
+            hors_forfait: el.hors_forfait === true,
+          }))
+        : [],
       nombre_photos_preinscription: String(f.nombre_photos_preinscription ?? 1),
     })
     setShowForm(true)
@@ -600,6 +627,19 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         mensualite: parseInt(form.mensualite, 10) || 0,
         duree_mois: parseInt(form.duree_mois, 10) || 0,
         frais_supplementaires: normalizeFraisSuppFromForm(form.frais_supplementaires),
+        libelles_champs: form.libelles_champs && typeof form.libelles_champs === 'object' ? form.libelles_champs : {},
+        elements_facturation: (form.elements_facturation || [])
+          .map((el, i) => ({
+            id: el.id || `el-${i}`,
+            libelle: String(el.libelle || '').trim(),
+            type: el.type || 'fixe',
+            montant: parseInt(el.montant, 10) || 0,
+            quantite: el.quantite !== '' && el.quantite != null ? parseInt(el.quantite, 10) || 0 : null,
+            actif: el.actif !== false,
+            ordre: el.ordre != null ? Number(el.ordre) : i,
+            hors_forfait: el.hors_forfait === true || el.type === 'hors_forfait',
+          }))
+          .filter((el) => el.libelle),
         frais_soutenance: parseInt(form.frais_soutenance, 10) || 0,
         frais_bibliotheque: parseInt(form.frais_bibliotheque, 10) || 0,
         frais_epi: parseInt(form.frais_epi, 10) || 0,
@@ -1222,14 +1262,27 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {[
-                        { f: 'frais_inscription', l: 'Frais d\'inscription' },
-                        { f: 'mensualite', l: 'Mensualité' },
-                        { f: 'frais_soutenance', l: 'Frais de soutenance' },
-                        { f: 'frais_bibliotheque', l: 'Bibliothèque' },
-                        { f: 'frais_epi', l: 'EPI' },
-                      ].map(({ f, l }) => (
+                        { f: 'frais_inscription', l: 'Frais d\'inscription', lk: 'frais_inscription' },
+                        { f: 'mensualite', l: 'Mensualité', lk: 'mensualite' },
+                        { f: 'frais_soutenance', l: 'Frais de soutenance', lk: 'frais_soutenance' },
+                        { f: 'frais_bibliotheque', l: 'Bibliothèque', lk: 'frais_bibliotheque' },
+                        { f: 'frais_epi', l: 'EPI', lk: 'frais_epi' },
+                      ].map(({ f, l, lk }) => (
                         <div key={f}>
-                          <L>{l}</L>
+                          <L>Libellé facture</L>
+                          <input
+                            className="input-field mb-1 text-xs"
+                            value={(form.libelles_champs || {})[lk] || l}
+                            onChange={(e) => {
+                              const v = e.target.value
+                              setForm((p) => ({
+                                ...p,
+                                libelles_champs: { ...(p.libelles_champs || {}), [lk]: v },
+                              }))
+                            }}
+                            placeholder={l}
+                          />
+                          <L>Montant ({l})</L>
                           <input className="input-field" type="number" min="0" value={form[f]} onChange={up(f)} placeholder="0" />
                         </div>
                       ))}
@@ -1244,6 +1297,150 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                         <div className="input-field bg-gray-100 text-gray-900 font-semibold">
                           {fmt(computeScolariteAnnuelle(form.frais_inscription, form.mensualite, form.duree_mois))} FCFA
                         </div>
+                      </div>
+                    </div>
+                    <div className="border-t border-blue-100 pt-3 mt-2">
+                      <p className="text-sm font-semibold text-blue-900 mb-1">Éléments de facturation personnalisés</p>
+                      <p className="text-xs text-blue-800/80 mb-2">
+                        Structure libre par formation : créez, renommez, ordonnez, activez/désactivez.
+                        Si au moins un élément actif est défini, la facture utilise exclusivement ces libellés (calcul automatique du total).
+                      </p>
+                      <div className="space-y-2">
+                        {(form.elements_facturation || []).map((el, idx) => (
+                          <div key={el.id || idx} className="rounded-lg border border-blue-100 bg-white/70 p-2 space-y-2">
+                            <div className="flex flex-wrap gap-2 items-end">
+                              <div className="flex-1 min-w-[140px]">
+                                <L>Libellé exact (facture)</L>
+                                <input
+                                  className="input-field py-1.5"
+                                  value={el.libelle}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    setForm((p) => ({
+                                      ...p,
+                                      elements_facturation: (p.elements_facturation || []).map((r, i) =>
+                                        i === idx ? { ...r, libelle: v } : r
+                                      ),
+                                    }))
+                                  }}
+                                  placeholder="Ex: Frais de laboratoire"
+                                />
+                              </div>
+                              <div className="w-28">
+                                <L>Type</L>
+                                <select
+                                  className="input-field py-1.5"
+                                  value={el.type}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    setForm((p) => ({
+                                      ...p,
+                                      elements_facturation: (p.elements_facturation || []).map((r, i) =>
+                                        i === idx ? { ...r, type: v, hors_forfait: v === 'hors_forfait' } : r
+                                      ),
+                                    }))
+                                  }}
+                                >
+                                  <option value="fixe">Montant fixe</option>
+                                  <option value="inscription">Inscription</option>
+                                  <option value="mensualite">Mensualité × nb mois</option>
+                                  <option value="hors_forfait">Hors forfait</option>
+                                </select>
+                              </div>
+                              <div className="w-28">
+                                <L>Montant</L>
+                                <input
+                                  className="input-field py-1.5"
+                                  type="number"
+                                  min="0"
+                                  value={el.montant}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    setForm((p) => ({
+                                      ...p,
+                                      elements_facturation: (p.elements_facturation || []).map((r, i) =>
+                                        i === idx ? { ...r, montant: v } : r
+                                      ),
+                                    }))
+                                  }}
+                                />
+                              </div>
+                              {el.type === 'mensualite' && (
+                                <div className="w-24">
+                                  <L>Nb mois</L>
+                                  <input
+                                    className="input-field py-1.5"
+                                    type="number"
+                                    min="0"
+                                    value={el.quantite}
+                                    placeholder="auto"
+                                    onChange={(e) => {
+                                      const v = e.target.value
+                                      setForm((p) => ({
+                                        ...p,
+                                        elements_facturation: (p.elements_facturation || []).map((r, i) =>
+                                          i === idx ? { ...r, quantite: v } : r
+                                        ),
+                                      }))
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              <label className="flex items-center gap-1 text-xs text-slate-700 mb-1">
+                                <input
+                                  type="checkbox"
+                                  checked={el.actif !== false}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked
+                                    setForm((p) => ({
+                                      ...p,
+                                      elements_facturation: (p.elements_facturation || []).map((r, i) =>
+                                        i === idx ? { ...r, actif: checked } : r
+                                      ),
+                                    }))
+                                  }}
+                                />
+                                Actif
+                              </label>
+                              <button
+                                type="button"
+                                className="text-xs text-red-600 mb-1"
+                                onClick={() =>
+                                  setForm((p) => ({
+                                    ...p,
+                                    elements_facturation: (p.elements_facturation || []).filter((_, i) => i !== idx),
+                                  }))
+                                }
+                              >
+                                Retirer
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="text-sm text-blue-700 hover:underline"
+                          onClick={() =>
+                            setForm((p) => ({
+                              ...p,
+                              elements_facturation: [
+                                ...(p.elements_facturation || []),
+                                {
+                                  id: `el-${Date.now()}`,
+                                  libelle: '',
+                                  type: 'fixe',
+                                  montant: '',
+                                  quantite: '',
+                                  actif: true,
+                                  ordre: (p.elements_facturation || []).length,
+                                  hors_forfait: false,
+                                },
+                              ],
+                            }))
+                          }
+                        >
+                          + Ajouter un élément de facturation
+                        </button>
                       </div>
                     </div>
                     <div className="border-t border-blue-100 pt-3 mt-2">
@@ -1470,7 +1667,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
 // Onglet 4 — Membres
 // ═══════════════════════════════════════════════════════════════════════
 const EMPTY_MEMBRE_FORM = {
-  prenom: '', nom: '', email: '', telephone: '', adresse: '', date_naissance: '',
+  prenom: '', nom: '', email: '', telephone: '', adresse: '', service: '',
   mot_de_passe: '', mot_de_passe_confirmation: '', role: 'responsable',
 }
 
@@ -1541,18 +1738,14 @@ export function TabMembres({ etabId, membres: init, responsable_id, admin_etabli
       toast.error('Les mots de passe ne correspondent pas.')
       return
     }
-    if (!form.date_naissance?.trim()) {
-      toast.error('La date de naissance est obligatoire.')
-      return
-    }
     setSaving(true)
     try {
       const { data } = await axios.post(`/api/etablissements/${etabId}/membres`, form)
       setMembres(prev => [...prev, { ...data, actif: data.actif !== false, created_at: new Date().toISOString() }])
       toast.success(
         data.matricule
-          ? `Membre créé — matricule ${data.matricule}. Changement de mot de passe obligatoire à la première connexion.`
-          : 'Membre créé. Il devra changer son mot de passe à la première connexion.'
+          ? `Membre créé — matricule ${data.matricule}. Première connexion : mot de passe puis complétion du profil.`
+          : 'Membre créé. Il devra changer son mot de passe puis compléter son profil.'
       )
       setShowForm(false)
       setForm(EMPTY_MEMBRE_FORM)
@@ -1836,20 +2029,21 @@ export function TabMembres({ etabId, membres: init, responsable_id, admin_etabli
                 <div><L>Nom *</L><input className="input-field" value={form.nom} onChange={up('nom')} required /></div>
               </div>
               <p className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                Le <strong>matricule</strong> est généré automatiquement (préfixe lié à l’établissement).
+                Le <strong>matricule</strong> est généré automatiquement. La date de naissance et la photo seront
+                demandées au membre lors de la <strong>première activation</strong> du compte.
               </p>
-              <div><L>Date de naissance *</L><input className="input-field" type="date" value={form.date_naissance} onChange={up('date_naissance')} required /></div>
               <div><L>Email *</L><input className="input-field" type="email" value={form.email} onChange={up('email')} required /></div>
               <div>
-                <L>Téléphone *</L>
-                <input className="input-field" type="tel" value={form.telephone} onChange={up('telephone')} required />
-                <p className="mt-1 text-xs text-slate-500">Unique sur toute la plateforme.</p>
+                <L>Téléphone</L>
+                <input className="input-field" type="tel" value={form.telephone} onChange={up('telephone')} />
+                <p className="mt-1 text-xs text-slate-500">Optionnel à la création — unique s’il est renseigné.</p>
               </div>
+              <div><L>Service / fonction</L><input className="input-field" value={form.service} onChange={up('service')} placeholder="Optionnel" /></div>
               <div><L>Adresse</L><input className="input-field" value={form.adresse} onChange={up('adresse')} placeholder="Optionnel" /></div>
               <div><L>Mot de passe *</L><input className="input-field" type="password" value={form.mot_de_passe} onChange={up('mot_de_passe')} required minLength={6} /></div>
               <div><L>Confirmer *</L><input className="input-field" type="password" value={form.mot_de_passe_confirmation} onChange={up('mot_de_passe_confirmation')} required minLength={6} /></div>
               <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                Première connexion : changement de mot de passe obligatoire.
+                Première connexion : changement de mot de passe, puis complétion du profil (naissance, photo).
               </p>
               <div>
                 <L>Rôle *</L>

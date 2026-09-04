@@ -7,6 +7,7 @@ import DonneesBackupPanel from '../components/DonneesBackupPanel'
 
 const ROLE_LABELS = {
   admin: 'Administrateur plateforme',
+  directeur: 'Directeur',
   admin_etablissement: 'Administrateur établissement',
   responsable: 'Responsable pédagogique',
   responsable_fad: 'Responsable FAD',

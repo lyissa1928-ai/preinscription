@@ -1,6 +1,7 @@
 /**
  * Identité du bénéficiaire — formulaire proforma unifié (tous établissements).
  * Champs : prénom, nom, e-mail, téléphone, destinataire (personnel ou organisation).
+ * Date / lieu de naissance : facultatifs (saisie possible, non bloquante).
  */
 export default function IdentiteBeneficiaireProforma({
   form,
@@ -27,6 +28,26 @@ export default function IdentiteBeneficiaireProforma({
         ) : (
           <input className="input-field" value={form.nom} onChange={up('nom')} required />
         )}
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-semibold">Date de naissance</label>
+        <input
+          type="date"
+          className="input-field"
+          value={form.date_naissance || ''}
+          onChange={up('date_naissance')}
+        />
+        <p className="mt-1 text-xs text-slate-500">Facultatif</p>
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-semibold">Lieu de naissance</label>
+        <input
+          className="input-field"
+          value={form.lieu_naissance || ''}
+          onChange={up('lieu_naissance')}
+          placeholder="Ex. Dakar"
+        />
+        <p className="mt-1 text-xs text-slate-500">Facultatif</p>
       </div>
       <div>
         <label className="mb-1 block text-sm font-semibold">

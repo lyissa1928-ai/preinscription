@@ -19,6 +19,12 @@ export function buildDisplayRows(facture, fo = {}) {
     rows.push({ designation: base, montant: u, isUnitMensualite: true })
     if (mois > 0) {
       rows.push({
+        designation: labelOf('nombre_mensualites', 'Nombre de mensualités'),
+        montant: mois,
+        isQuantite: true,
+        hideMontantCurrency: true,
+      })
+      rows.push({
         designation: `Total ${base.toLowerCase()} (${mois} mois)`,
         montant: mois * u,
         isTotalMensualites: true,
@@ -77,7 +83,9 @@ export function buildDisplayRows(facture, fo = {}) {
   }
 
   const fromSnapshot = Number(facture?.montant_total_a_payer) || Number(facture?.montant_ttc) || 0
-  const recomputed = rows.filter((r) => !r.isUnitMensualite).reduce((a, b) => a + (Number(b.montant) || 0), 0)
+  const recomputed = rows
+    .filter((r) => !r.isUnitMensualite && !r.isQuantite)
+    .reduce((a, b) => a + (Number(b.montant) || 0), 0)
 
   return { rows, totalAPayer: fromSnapshot > 0 ? fromSnapshot : recomputed, supplementaires }
 }

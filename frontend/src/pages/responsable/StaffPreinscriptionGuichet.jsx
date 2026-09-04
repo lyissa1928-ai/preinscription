@@ -396,12 +396,14 @@ export default function StaffPreinscriptionGuichet() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold">Date de naissance *</label>
+              <label className="mb-1 block text-sm font-semibold">Date de naissance</label>
               <input type="date" className="input-field" value={form.date_naissance} onChange={up('date_naissance')} />
+              <p className="mt-1 text-xs text-slate-500">Facultatif</p>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold">Lieu de naissance *</label>
+              <label className="mb-1 block text-sm font-semibold">Lieu de naissance</label>
               <input className="input-field" value={form.lieu_naissance} onChange={up('lieu_naissance')} />
+              <p className="mt-1 text-xs text-slate-500">Facultatif</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold">Nationalité *</label>

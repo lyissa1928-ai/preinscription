@@ -14,7 +14,7 @@ const { publicAssetUrl } = require('../utils/publicAssetUrl');
 const { logAudit } = require('../utils/auditLog');
 const { verifyDiskFile, unlinkQuiet } = require('../utils/verifyUploadedFile');
 const { optionalClamScanFile } = require('../utils/optionalClamScan');
-const { computePrixAnnuel, normalizeFraisSupplementaires } = require('../utils/formationTarifs');
+const { computePrixAnnuel, normalizeFraisSupplementaires, normalizeElementsFacturation } = require('../utils/formationTarifs');
 const { syncStoredFactureById } = require('../services/factureService');
 const { isFactureSupprimee } = require('../utils/factureVisibility');
 const { stripEtabSensitiveFields } = require('../utils/etablissementSanitize');
@@ -104,7 +104,7 @@ function assertFormationTypeForWriter(req, type) {
 
 /** Liste / export / suppression factures : admin ou staff rattaché à l’établissement. */
 function etabFacturesAccess(req, res, next) {
-  if (req.user.role === 'admin') return next();
+  if (req.user.role === 'admin' || req.user.role === 'directeur') return next();
   const etabId = parseInt(req.params.id, 10);
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
@@ -1412,14 +1412,36 @@ router.get('/:id/factures', etabFacturesAccess, (req, res) => {
   });
 });
 
+// GET /api/etablissements/:id/rapports-hebdomadaires — admin étab. / admin / directeur
+router.get('/:id/rapports-hebdomadaires', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const etab = db.get('etablissements').find({ id }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  const role = req.user.role;
+  const ok =
+    role === 'admin' ||
+    role === 'directeur' ||
+    (role === ROLE_ADMIN_ETABLISSEMENT && Number(req.user.etablissement_id) === id);
+  if (!ok) return res.status(403).json({ message: 'Accès refusé.' });
+
+  const list = (db.get('rapports_hebdomadaires').value() || []).slice().reverse().slice(0, 26);
+  const filtered = list.map((batch) => ({
+    ...batch,
+    files: (batch.files || []).filter((f) => Number(f.etablissement_id) === id),
+    directeur_compare: role === 'admin' || role === 'directeur' ? batch.directeur_compare : undefined,
+  })).filter((b) => (b.files || []).length > 0 || b.directeur_compare);
+
+  res.json(filtered);
+});
+
 // GET /api/etablissements/:id — détail complet
 router.get('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
-  // Admin : tous les établissements ; autres rôles : uniquement leur rattachement
-  const accesTousEtabs = req.user.role === 'admin';
+  // Admin / Directeur : tous les établissements ; autres rôles : uniquement leur rattachement
+  const accesTousEtabs = req.user.role === 'admin' || req.user.role === 'directeur';
   if (!accesTousEtabs && Number(req.user.etablissement_id) !== id) {
     return res.status(403).json({ message: 'Accès refusé.' });
   }
@@ -1730,6 +1752,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     frais_bibliotheque, frais_epi,
     nombre_photos_preinscription,
     libelles_champs,
+    elements_facturation,
   } = req.body;
 
   if (!titre || !type || !filiere_id) return res.status(400).json({ message: 'Titre, type et filière obligatoires.' });
@@ -1761,6 +1784,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
   const autresFraisN = parseInt(autres_frais, 10) || 0;
   const dureeMoisN = parseDureeMoisInput(duree_mois);
   const fraisSupp = normalizeFraisSupplementaires(frais_supplementaires);
+  const elementsFact = normalizeElementsFacturation(elements_facturation);
   if (![placesN, fraisInscriptionN, mensualiteN, fraisSoutenanceN, fraisBibN, fraisEpiN, autresFraisN].every(isNonNegativeInt)) {
     return res.status(400).json({ message: 'Les champs numériques doivent être des entiers positifs ou nuls.' });
   }
@@ -1789,6 +1813,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     autres_frais: autresFraisN,
     frais_supplementaires: fraisSupp,
     libelles_champs: libelles_champs && typeof libelles_champs === 'object' ? libelles_champs : {},
+    elements_facturation: elementsFact,
     nombre_photos_preinscription: nPhotos,
     actif: true,
     created_at: new Date().toISOString()
@@ -2175,13 +2200,17 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
     'description', 'debouches', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
     'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
-    'frais_bibliotheque', 'frais_epi', 'libelles_champs',
+    'frais_bibliotheque', 'frais_epi', 'libelles_champs', 'elements_facturation',
   ];
   const updates = {};
   fields.forEach(f => {
     if (req.body[f] === undefined) return;
     if (f === 'frais_supplementaires') {
       updates[f] = normalizeFraisSupplementaires(req.body[f]);
+      return;
+    }
+    if (f === 'elements_facturation') {
+      updates[f] = normalizeElementsFacturation(req.body[f]);
       return;
     }
     if (f === 'libelles_champs') {
@@ -2382,11 +2411,11 @@ router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
 
   const {
     prenom, nom, email, mot_de_passe, mot_de_passe_confirmation, role,
-    date_naissance, telephone, adresse,
+    date_naissance, telephone, adresse, service, fonction,
   } = req.body;
-  if (!prenom || !nom || !email || !mot_de_passe || !role || !date_naissance || !telephone) {
+  if (!prenom || !nom || !email || !mot_de_passe || !role) {
     return res.status(400).json({
-      message: 'Champs obligatoires : prénom, nom, email, date de naissance, téléphone, mot de passe, rôle.',
+      message: 'Champs obligatoires : prénom, nom, email, mot de passe, rôle.',
     });
   }
   if (mot_de_passe !== mot_de_passe_confirmation) {
@@ -2410,17 +2439,20 @@ router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
   const exist = db.get('utilisateurs').find({ email: emailNorm }).value();
   if (exist) return res.status(400).json({ message: 'Email déjà utilisé.' });
 
-  const telTrim = String(telephone).trim();
-  const telNorm = normalizeTelephoneForUniqueness(telTrim);
-  if (telNorm.length < 8) {
-    return res.status(400).json({
-      message: 'Numéro de téléphone invalide ou trop court (minimum 8 chiffres).',
-    });
-  }
-  if (telephoneTaken(telNorm, null)) {
-    return res.status(409).json({ message: 'Ce numéro de téléphone est déjà associé à un autre compte.' });
+  const telTrim = telephone != null && String(telephone).trim() ? String(telephone).trim() : '';
+  if (telTrim) {
+    const telNorm = normalizeTelephoneForUniqueness(telTrim);
+    if (telNorm.length < 8) {
+      return res.status(400).json({
+        message: 'Numéro de téléphone invalide ou trop court (minimum 8 chiffres).',
+      });
+    }
+    if (telephoneTaken(telNorm, null)) {
+      return res.status(409).json({ message: 'Ce numéro de téléphone est déjà associé à un autre compte.' });
+    }
   }
 
+  const serviceVal = String(service || fonction || '').trim();
   const hash = bcrypt.hashSync(mot_de_passe, 10);
   const id = db.nextId('utilisateurs');
   const user = {
@@ -2432,11 +2464,15 @@ router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
     date_naissance: date_naissance ? String(date_naissance).trim() : null,
     telephone: telTrim,
     adresse: adresse ? String(adresse).trim() : '',
+    service: serviceVal || '',
+    fonction: serviceVal || '',
     mot_de_passe: hash,
     role,
     etablissement_id,
     actif: true,
     must_change_password: true,
+    must_complete_profile: true,
+    photo_url: null,
     login_attempts: 0,
     is_locked: false,
     lock_until: null,

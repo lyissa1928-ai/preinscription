@@ -37,20 +37,33 @@ const { runHealthChecks } = require('../utils/healthCheck');
 const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
 const { filterDossiersAffichables, assertDossierAffichable } = require('../utils/dossierVisibility');
 const { parsePagination, wantsPagination, paginateArray } = require('../utils/pagination');
-const { STAFF_ROLES: STAFF_ROLES_CANON } = require('../utils/staffRoles');
+const { STAFF_ROLES: STAFF_ROLES_CANON, ROLE_DIRECTEUR } = require('../utils/staffRoles');
 
 const ROLES_STAFF_ADMIN = [...STAFF_ROLES_CANON];
 const ROLES_VALIDES_ADMIN = [...STAFF_ROLES_CANON, 'etudiant'];
-const ROLES_ETAB_RATTACHEMENT = STAFF_ROLES_CANON.filter((r) => r !== 'admin');
+const ROLES_ETAB_RATTACHEMENT = STAFF_ROLES_CANON.filter((r) => r !== 'admin' && r !== ROLE_DIRECTEUR);
 
 router.use(authMiddleware);
 router.use((req, res, next) => {
   const path = (req.path || '').split('?')[0];
-  // Création de compte staff : admin uniquement.
+  const role = req.user?.role;
+
+  if (role === 'admin') return next();
+
+  if (role === 'directeur') {
+    // Directeur : consultation globale + génération / lecture des rapports hebdo.
+    const allowedWrite =
+      (req.method === 'POST' && path === '/rapports-hebdomadaires/generer');
+    if (req.method === 'GET' || allowedWrite) return next();
+    return res.status(403).json({
+      message: 'Le profil Directeur est limité à la consultation et aux rapports hebdomadaires.',
+    });
+  }
+
+  // Création / suppression comptes : admin uniquement (déjà couvert ci-dessus).
   if (req.method === 'POST' && path === '/utilisateurs') {
     return adminOnly(req, res, next);
   }
-  // Suppression définitive d’un compte : réservée aux administrateurs (via routes sensibles).
   if (req.method === 'DELETE' && /\/utilisateurs\/\d+\/supprimer$/.test(path)) {
     return adminOnly(req, res, next);
   }
@@ -499,6 +512,8 @@ router.get('/utilisateurs', (req, res) => {
     utilisateurs = utilisateurs.filter(u => u.role === 'etudiant');
   } else if (role === 'staff') {
     utilisateurs = utilisateurs.filter(u => STAFF_ROLES.includes(u.role));
+  } else if (role && role !== 'all' && STAFF_ROLES.includes(role)) {
+    utilisateurs = utilisateurs.filter(u => u.role === role);
   }
   if (etablissement_id && etablissement_id !== 'all') {
     utilisateurs = utilisateurs.filter((u) => String(u.etablissement_id || '') === String(etablissement_id));
@@ -627,13 +642,13 @@ router.post('/utilisateurs/:id/reinitialiser-mot-de-passe', adminSensitiveLimite
 router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   const {
     prenom, nom, email, mot_de_passe, mot_de_passe_confirmation,
-    role, etablissement_id, date_naissance, telephone, adresse,
+    role, etablissement_id, date_naissance, telephone, adresse, service, fonction,
   } = req.body;
   const ROLES_STAFF = ROLES_STAFF_ADMIN;
 
-  if (!prenom || !nom || !email || !mot_de_passe || !role || !telephone) {
+  if (!prenom || !nom || !email || !mot_de_passe || !role) {
     return res.status(400).json({
-      message: 'Champs obligatoires : prénom, nom, email, téléphone, mot de passe, rôle.',
+      message: 'Champs obligatoires : prénom, nom, email, mot de passe, rôle.',
     });
   }
   if (mot_de_passe !== mot_de_passe_confirmation) {
@@ -643,10 +658,10 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     return res.status(400).json({ message: 'Rôle invalide.' });
   }
 
-  const isAdminGlobal = role === 'admin';
+  const isGlobalRole = role === 'admin' || role === ROLE_DIRECTEUR;
   let etabIdForUser = null;
   let etab = null;
-  if (!isAdminGlobal) {
+  if (!isGlobalRole) {
     if (!etablissement_id) {
       return res.status(400).json({ message: 'L\'établissement est obligatoire pour ce rôle staff.' });
     }
@@ -663,7 +678,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   if (mot_de_passe.length < 6) {
     return res.status(400).json({ message: 'Mot de passe trop court (min 6 caractères).' });
   }
-  const gen = isAdminGlobal
+  const gen = isGlobalRole
     ? generateNextMatriculeGlobalAdmin()
     : generateNextMatriculeForEtablissement(etabIdForUser);
   if (gen.error) return res.status(400).json({ message: gen.error });
@@ -672,39 +687,49 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   const exist = db.get('utilisateurs').find({ email: emailNorm }).value();
   if (exist) return res.status(409).json({ message: 'Un compte avec cet email existe déjà.' });
 
-  const telTrim = String(telephone).trim();
-  const telNorm = normalizeTelephoneForUniqueness(telTrim);
-  if (telNorm.length < 8) {
-    return res.status(400).json({
-      message: 'Numéro de téléphone invalide ou trop court (minimum 8 chiffres).',
-    });
-  }
-  if (telephoneTaken(telNorm, null)) {
-    return res.status(409).json({ message: 'Ce numéro de téléphone est déjà associé à un autre compte.' });
+  const telTrim = telephone != null && String(telephone).trim() ? String(telephone).trim() : '';
+  if (telTrim) {
+    const telNorm = normalizeTelephoneForUniqueness(telTrim);
+    if (telNorm.length < 8) {
+      return res.status(400).json({
+        message: 'Numéro de téléphone invalide ou trop court (minimum 8 chiffres).',
+      });
+    }
+    if (telephoneTaken(telNorm, null)) {
+      return res.status(409).json({ message: 'Ce numéro de téléphone est déjà associé à un autre compte.' });
+    }
   }
 
   const hash = bcrypt.hashSync(mot_de_passe, 10);
   const id = db.nextId('utilisateurs');
+  const serviceVal = String(service || fonction || '').trim();
   const user = {
     id,
     prenom: prenom.trim(),
     nom: nom.trim(),
     email: emailNorm,
     matricule: matNorm,
-    date_naissance: date_naissance ? String(date_naissance).trim() : null,
+    date_naissance: null,
     telephone: telTrim,
     adresse: adresse ? String(adresse).trim() : '',
+    service: serviceVal || '',
+    fonction: serviceVal || '',
     mot_de_passe: hash,
     role,
-    etablissement_id: isAdminGlobal ? null : etabIdForUser,
+    etablissement_id: isGlobalRole ? null : etabIdForUser,
     actif: true,
     must_change_password: true,
+    must_complete_profile: true,
+    photo_url: null,
     login_attempts: 0,
     is_locked: false,
     lock_until: null,
     created_at: new Date().toISOString(),
     created_by: req.user.id,
   };
+  // date_naissance volontairement non exigée à la création (complétée à l’activation)
+  if (date_naissance) user.date_naissance = String(date_naissance).trim();
+
   db.get('utilisateurs').push(user).write();
 
   if (role === 'admin_etablissement' && etabIdForUser) {
@@ -716,7 +741,9 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   res.status(201).json({
     message: role === 'admin_etablissement'
       ? 'Compte administrateur d’établissement créé. S’il existait déjà un admin pour cet établissement, il a été remplacé automatiquement.'
-      : `Compte ${role} créé. L'utilisateur devra changer son mot de passe à la première connexion.`,
+      : role === ROLE_DIRECTEUR
+        ? 'Compte Directeur créé. À la première connexion : mot de passe puis complétion du profil.'
+        : `Compte ${role} créé. L'utilisateur devra changer son mot de passe puis compléter son profil à la première connexion.`,
     utilisateur: safe,
   });
 });
@@ -777,9 +804,10 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     } else {
       update.role = nextRole;
     }
-    if (nextRole === 'admin') {
+    if (nextRole === 'admin' || nextRole === ROLE_DIRECTEUR) {
       update.etablissement_id = null;
-      const needGlobalMat = user.role !== 'admin' || user.etablissement_id != null;
+      const needGlobalMat =
+        (user.role !== 'admin' && user.role !== ROLE_DIRECTEUR) || user.etablissement_id != null;
       if (needGlobalMat) {
         const gen = generateNextMatriculeGlobalAdmin();
         if (gen.error) return res.status(400).json({ message: gen.error });
@@ -789,12 +817,13 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     }
     if (
       nextRole !== 'admin' &&
+      nextRole !== ROLE_DIRECTEUR &&
       ROLES_ETAB_RATTACHEMENT.includes(nextRole) &&
-      user.role === 'admin' &&
+      (user.role === 'admin' || user.role === ROLE_DIRECTEUR) &&
       etablissement_id === undefined
     ) {
       return res.status(400).json({
-        message: 'Pour quitter le rôle administrateur, indiquez l’établissement de rattachement.',
+        message: 'Pour quitter le rôle global, indiquez l’établissement de rattachement.',
       });
     }
   }
@@ -808,7 +837,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
   ) {
     return res.status(403).json({ message: 'Impossible de désactiver le dernier administrateur actif.' });
   }
-  if (etablissement_id !== undefined && effectiveRoleAfter !== 'admin') {
+  if (etablissement_id !== undefined && effectiveRoleAfter !== 'admin' && effectiveRoleAfter !== ROLE_DIRECTEUR) {
     if (etablissement_id) {
       const newEid = parseInt(etablissement_id, 10);
       const etab = db.get('etablissements').find({ id: newEid }).value();

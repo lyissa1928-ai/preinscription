@@ -55,7 +55,15 @@ export default function StaffEtabEquipe() {
         <header className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Équipe — {etab.nom}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Créez et gérez les comptes staff de votre établissement. Toutes vos actions sont enregistrées dans le journal d’audit visible par l’administrateur plateforme.
+            Créez et gérez les comptes staff de votre établissement.
+            {user?.role === 'admin' ? (
+              <>
+                {' '}Le profil <strong>Directeur</strong> (vision tous les établissements) se crée depuis{' '}
+                <Link to="/admin/utilisateurs" className="font-semibold text-indigo-700 hover:underline">Utilisateurs</Link>.
+              </>
+            ) : (
+              <> Le profil <strong>Directeur</strong> est créé uniquement par l’administrateur plateforme (menu Utilisateurs).</>
+            )}
           </p>
         </header>
         <div className="card overflow-hidden border-slate-200/80 shadow-md p-5 md:p-8 space-y-8">

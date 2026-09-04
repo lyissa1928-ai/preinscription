@@ -28,14 +28,32 @@ const authMiddleware = (req, res, next) => {
       fonctions: getFonctions(dbUser),
     };
 
+    const path = (req.originalUrl || req.url || '').split('?')[0];
     if (dbUser.must_change_password === true) {
-      const path = (req.originalUrl || req.url || '').split('?')[0];
-      const allowed = ['/api/auth/changer-mot-de-passe-obligatoire', '/api/auth/deconnexion'];
+      const allowed = ['/api/auth/changer-mot-de-passe-obligatoire', '/api/auth/deconnexion', '/api/auth/me'];
       if (!allowed.includes(path)) {
         return res.status(403).json({
           code: 'MUST_CHANGE_PASSWORD',
           message: 'Vous devez changer votre mot de passe avant de poursuivre.',
         });
+      }
+    }
+    {
+      const { staffNeedsProfileCompletion } = require('../utils/staffProfile');
+      if (staffNeedsProfileCompletion(dbUser) && dbUser.must_change_password !== true) {
+        const allowed = [
+          '/api/auth/completer-profil-staff',
+          '/api/auth/completer-profil-staff/photo',
+          '/api/auth/deconnexion',
+          '/api/auth/me',
+          '/api/auth/profil',
+        ];
+        if (!allowed.includes(path)) {
+          return res.status(403).json({
+            code: 'MUST_COMPLETE_PROFILE',
+            message: 'Complétez votre profil (date de naissance, photo) avant de poursuivre.',
+          });
+        }
       }
     }
     next();
@@ -53,17 +71,18 @@ const roleGuard = (...roles) => (req, res, next) => {
 };
 
 const adminOnly = roleGuard('admin');
-const adminOrDirecteur = adminOnly;
+const adminOrDirecteur = roleGuard('admin', 'directeur');
 const responsableOnly = roleGuard('responsable');
 const agentAdminOnly = roleGuard('agent_admin');
 const comptableOnly = roleGuard('comptable');
 const controleurQualiteOnly = roleGuard('controleur_qualite');
 
-const responsableOrAdmin = roleGuard('responsable', 'admin');
+const responsableOrAdmin = roleGuard('responsable', 'admin', 'directeur');
 
 /** Décision pédagogique dossiers (accepter / refuser) : admin + admin étab. + responsable (+ FAD). */
 const staffDossierDecision = roleGuard(
   'admin',
+  'directeur',
   'admin_etablissement',
   'responsable',
   'responsable_fad',
@@ -73,6 +92,7 @@ const staffDossierDecision = roleGuard(
 /** Lecture demandes proforma : tout le staff établissement (+ admin plateforme). */
 const staffProformaView = roleGuard(
   'admin',
+  'directeur',
   'admin_etablissement',
   'responsable',
   'responsable_fad',
@@ -85,6 +105,7 @@ const staffProformaView = roleGuard(
 /** Décision / création proforma : admin + staff décisionnel établissement. */
 const staffProformaDecision = roleGuard(
   'admin',
+  'directeur',
   'admin_etablissement',
   'responsable',
   'responsable_fad',
@@ -96,6 +117,7 @@ const staffProformaDecision = roleGuard(
 /** Guichet walk-in : admin + staff établissement facturation / accueil. */
 const staffGuichet = roleGuard(
   'admin',
+  'directeur',
   'admin_etablissement',
   'responsable',
   'responsable_fad',
@@ -107,6 +129,7 @@ const staffGuichet = roleGuard(
 /** Lecture lettre / attestation officielle. */
 const staffLettreAttestation = roleGuard(
   'admin',
+  'directeur',
   'admin_etablissement',
   'responsable',
   'responsable_fad',
@@ -116,12 +139,13 @@ const staffLettreAttestation = roleGuard(
   'controleur_qualite',
 );
 
-const agentAdminOrAdmin = roleGuard('agent_admin', 'admin');
-const comptableOrAdmin = roleGuard('comptable', 'admin');
-const directeurOrAdmin = adminOnly;
-const controleurQualiteOrAdmin = roleGuard('controleur_qualite', 'admin');
+const agentAdminOrAdmin = roleGuard('agent_admin', 'admin', 'directeur');
+const comptableOrAdmin = roleGuard('comptable', 'admin', 'directeur');
+const directeurOrAdmin = adminOrDirecteur;
+const controleurQualiteOrAdmin = roleGuard('controleur_qualite', 'admin', 'directeur');
 const staffOnly = roleGuard(
   'admin',
+  'directeur',
   'admin_etablissement',
   'responsable',
   'responsable_fad',

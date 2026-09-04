@@ -2,6 +2,7 @@ export const ROLE_ADMIN_ETABLISSEMENT = 'admin_etablissement'
 
 export const ROLES_STAFF_LABELS = {
   admin: 'Administrateur plateforme',
+  directeur: 'Directeur',
   admin_etablissement: 'Administrateur établissement',
   responsable: 'Responsable pédagogique',
   responsable_fad: 'Responsable FAD',
@@ -19,6 +20,10 @@ export function isPlatformAdmin(user) {
   return user?.role === 'admin'
 }
 
+export function isDirecteur(user) {
+  return user?.role === 'directeur'
+}
+
 export function canManageEtabTeam(user) {
   return isPlatformAdmin(user) || isAdminEtablissement(user)
 }
@@ -26,8 +31,8 @@ export function canManageEtabTeam(user) {
 /** Rôles proposés à la création selon l’acteur. */
 export function rolesCreatablesForActor(user, allStaffRoles) {
   if (isPlatformAdmin(user)) {
-    // L’admin établissement se désigne via l’onglet dédié (unicité).
-    return allStaffRoles.filter((r) => r.val !== 'admin' && r.val !== 'admin_etablissement')
+    // Admin / Directeur / admin étab. se créent via Utilisateurs plateforme.
+    return allStaffRoles.filter((r) => r.val !== 'admin' && r.val !== 'directeur' && r.val !== 'admin_etablissement')
   }
   if (isAdminEtablissement(user)) {
     return allStaffRoles.filter((r) =>

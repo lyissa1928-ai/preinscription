@@ -237,6 +237,40 @@ async function buildWeeklyWorkbookForEtab(etab, { start, end } = weekBounds()) {
   addCountSheet('Par formation', byFormation, 'Formation', 'Préinscriptions');
   addCountSheet('Par niveau', byNiveau, 'Niveau d’étude', 'Préinscriptions');
 
+  // ── Feuille Activité staff ──
+  const { computeStaffActivityForEtab } = require('./staffActivityReport');
+  const activity = computeStaffActivityForEtab(etabId, start, end);
+  const staffSh = wb.addWorksheet('Activité staff');
+  ;[8, 16, 16, 28, 18, 12, 14, 14, 14, 12].forEach((w, i) => { staffSh.getColumn(i + 1).width = w; });
+  staffSh.getCell(1, 1).value = `Activité du staff — ${etab.nom}`;
+  staffSh.getCell(1, 1).font = { bold: true, size: 13 };
+  staffSh.mergeCells('A1:J1');
+  staffSh.getCell(2, 1).value = periodLabel;
+  staffSh.getCell(2, 1).font = { italic: true, size: 9, color: { argb: 'FF6B7280' } };
+  if (activity.mostActive) {
+    staffSh.getCell(3, 1).value = `Membre le plus actif : ${activity.mostActive.prenom} ${activity.mostActive.nom} (${activity.mostActive.actions_total} actions)`;
+    staffSh.getCell(3, 1).font = { bold: true, color: { argb: 'FFB45309' } };
+    staffSh.mergeCells('A3:J3');
+  }
+  const staffHeaders = [
+    'Rang', 'Prénom', 'Nom', 'Email', 'Rôle', 'Actions', 'Dossiers', 'Factures', 'Demandes', 'Audit',
+  ];
+  staffHeaders.forEach((h, i) => { staffSh.getCell(5, i + 1).value = h; });
+  styleHeaderRow(staffSh.getRow(5), primary);
+  activity.ranking.forEach((r, idx) => {
+    const row = 6 + idx;
+    staffSh.getCell(row, 1).value = idx + 1;
+    staffSh.getCell(row, 2).value = r.prenom;
+    staffSh.getCell(row, 3).value = r.nom;
+    staffSh.getCell(row, 4).value = r.email;
+    staffSh.getCell(row, 5).value = r.role;
+    staffSh.getCell(row, 6).value = r.actions_total;
+    staffSh.getCell(row, 7).value = r.dossiers_traites;
+    staffSh.getCell(row, 8).value = r.factures_generees;
+    staffSh.getCell(row, 9).value = r.demandes_traitees;
+    staffSh.getCell(row, 10).value = r.audit_actions;
+  });
+
   // Feuille détail dossiers
   const det = wb.addWorksheet('Détail préinscriptions');
   ;[14, 14, 14, 28, 22, 12, 14, 14, 12].forEach((w, i) => { det.getColumn(i + 1).width = w; });
@@ -271,6 +305,7 @@ async function buildWeeklyWorkbookForEtab(etab, { start, end } = weekBounds()) {
       factures: factures.length,
       demandes: demandes.length,
     },
+    activity,
   };
 }
 
@@ -281,28 +316,96 @@ function rapportsDir() {
 }
 
 /**
- * Génère et enregistre un .xlsx par établissement pour la semaine écoulée.
+ * Génère Excel + PDF par établissement, compare pour le Directeur, envoie les e-mails.
  */
 async function generateWeeklyRapportsForAllEtabs(refDate = new Date()) {
   const { start, end } = weekBounds(refDate);
   const etabs = (db.get('etablissements').value() || []).filter((e) => e && e.actif !== false);
   const dir = rapportsDir();
   const stamp = end.toISOString().slice(0, 10);
+  const fmtDate = (d) => d.toLocaleDateString('fr-FR');
+  const periodLabel = `Du ${fmtDate(start)} au ${fmtDate(end)}`;
+  const generatedAt = new Date().toLocaleString('fr-FR');
   const results = [];
+  const compareRows = [];
+
+  const { writeStaffActivityPdf, writeDirecteurComparePdf } = require('./weeklyRapportPdf');
+  const { sendMail, isSmtpConfigured } = require('./mail');
+  const { createUserNotification } = require('./notificationService');
+  const { ROLE_ADMIN_ETABLISSEMENT, ROLE_DIRECTEUR } = require('./staffRoles');
 
   for (const etab of etabs) {
     try {
-      const { workbook, stats } = await buildWeeklyWorkbookForEtab(etab, { start, end });
-      const filename = `rapport-hebdo-${slugify(etab.nom)}-${etab.id}-${stamp}.xlsx`;
-      const abs = path.join(dir, filename);
-      await workbook.xlsx.writeFile(abs);
-      results.push({
-        ok: true,
-        path: abs,
-        filename,
-        url: `/uploads/rapports-hebdomadaires/${filename}`,
-        ...stats,
+      const { workbook, stats, activity } = await buildWeeklyWorkbookForEtab(etab, { start, end });
+      const base = `rapport-hebdo-${slugify(etab.nom)}-${etab.id}-${stamp}`;
+      const xlsxName = `${base}.xlsx`;
+      const pdfName = `${base}.pdf`;
+      const xlsxAbs = path.join(dir, xlsxName);
+      const pdfAbs = path.join(dir, pdfName);
+      await workbook.xlsx.writeFile(xlsxAbs);
+      await writeStaffActivityPdf(pdfAbs, {
+        etabNom: etab.nom,
+        periodLabel,
+        activity,
+        generatedAt,
       });
+
+      const fileMeta = {
+        ok: true,
+        path: xlsxAbs,
+        filename: xlsxName,
+        url: `/uploads/rapports-hebdomadaires/${xlsxName}`,
+        pdf_filename: pdfName,
+        pdf_url: `/uploads/rapports-hebdomadaires/${pdfName}`,
+        pdf_path: pdfAbs,
+        most_active: activity?.mostActive
+          ? `${activity.mostActive.prenom} ${activity.mostActive.nom}`
+          : null,
+        staff_actions: activity?.totals?.actions_total ?? 0,
+        ...stats,
+      };
+      results.push(fileMeta);
+
+      compareRows.push({
+        etablissement_id: etab.id,
+        etablissement_nom: etab.nom,
+        dossiers: stats.dossiers,
+        factures: stats.factures,
+        demandes: stats.demandes,
+        staff_actions: fileMeta.staff_actions,
+        most_active_name: fileMeta.most_active,
+      });
+
+      // E-mail admin établissement (PDF + Excel)
+      const adminsEtab = (db.get('utilisateurs').value() || []).filter(
+        (u) =>
+          u &&
+          u.actif !== false &&
+          u.role === ROLE_ADMIN_ETABLISSEMENT &&
+          Number(u.etablissement_id) === Number(etab.id) &&
+          u.email,
+      );
+      for (const admin of adminsEtab) {
+        createUserNotification(admin.id, {
+          type: 'rapport_hebdo',
+          title: 'Rapport hebdomadaire staff',
+          message: `Rapport ${periodLabel} — ${etab.nom}${fileMeta.most_active ? ` · Plus actif : ${fileMeta.most_active}` : ''}`,
+          link: fileMeta.url,
+          meta: { etablissement_id: etab.id, period_start: start.toISOString(), period_end: end.toISOString() },
+        });
+        if (isSmtpConfigured()) {
+          await sendMail({
+            to: admin.email,
+            subject: `Rapport hebdomadaire — ${etab.nom}`,
+            text: `Bonjour,\n\nVeuillez trouver ci-joint le rapport hebdomadaire de votre établissement (${periodLabel}).\nFormats : Excel (.xlsx) et PDF.\n`,
+            html: `<p>Bonjour,</p><p>Rapport hebdomadaire de <strong>${etab.nom}</strong> (${periodLabel}).</p><p>Pièces jointes : Excel et PDF (activité staff, classement).</p>`,
+            attachments: [
+              { filename: xlsxName, path: xlsxAbs },
+              { filename: pdfName, path: pdfAbs },
+            ],
+          }).catch(() => false);
+        }
+      }
     } catch (e) {
       results.push({
         ok: false,
@@ -313,13 +416,91 @@ async function generateWeeklyRapportsForAllEtabs(refDate = new Date()) {
     }
   }
 
-  // Méta pour le Directeur
+  // Rapport comparaison Directeur
+  let directeurCompare = null;
+  try {
+    const compareXlsxName = `rapport-directeur-comparaison-${stamp}.xlsx`;
+    const comparePdfName = `rapport-directeur-comparaison-${stamp}.pdf`;
+    const compareXlsxAbs = path.join(dir, compareXlsxName);
+    const comparePdfAbs = path.join(dir, comparePdfName);
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'UniPortail';
+    const sh = wb.addWorksheet('Comparaison');
+    ;[28, 14, 12, 12, 14, 28].forEach((w, i) => { sh.getColumn(i + 1).width = w; });
+    sh.getCell(1, 1).value = 'Comparaison des établissements — Directeur';
+    sh.getCell(1, 1).font = { bold: true, size: 14 };
+    sh.mergeCells('A1:F1');
+    sh.getCell(2, 1).value = periodLabel;
+    ['Établissement', 'Préinscriptions', 'Factures', 'Demandes', 'Actions staff', 'Plus actif'].forEach((h, i) => {
+      sh.getCell(4, i + 1).value = h;
+    });
+    styleHeaderRow(sh.getRow(4), 'FF1E40AF');
+    compareRows
+      .slice()
+      .sort((a, b) => (b.staff_actions || 0) - (a.staff_actions || 0))
+      .forEach((r, idx) => {
+        const row = 5 + idx;
+        sh.getCell(row, 1).value = r.etablissement_nom;
+        sh.getCell(row, 2).value = r.dossiers;
+        sh.getCell(row, 3).value = r.factures;
+        sh.getCell(row, 4).value = r.demandes;
+        sh.getCell(row, 5).value = r.staff_actions;
+        sh.getCell(row, 6).value = r.most_active_name || '—';
+      });
+    await wb.xlsx.writeFile(compareXlsxAbs);
+    await writeDirecteurComparePdf(comparePdfAbs, { periodLabel, rows: compareRows, generatedAt });
+
+    directeurCompare = {
+      filename: compareXlsxName,
+      url: `/uploads/rapports-hebdomadaires/${compareXlsxName}`,
+      pdf_filename: comparePdfName,
+      pdf_url: `/uploads/rapports-hebdomadaires/${comparePdfName}`,
+      path: compareXlsxAbs,
+      pdf_path: comparePdfAbs,
+    };
+
+    const directeurs = (db.get('utilisateurs').value() || []).filter(
+      (u) => u && u.actif !== false && (u.role === ROLE_DIRECTEUR || u.role === 'admin') && u.email,
+    );
+    const okFiles = results.filter((r) => r.ok);
+    for (const dirUser of directeurs) {
+      createUserNotification(dirUser.id, {
+        type: 'rapport_hebdo_directeur',
+        title: 'Rapports hebdomadaires (tous établissements)',
+        message: `${okFiles.length} établissement(s) — ${periodLabel}`,
+        link: '/admin/rapports-hebdo',
+        meta: { period_start: start.toISOString(), period_end: end.toISOString() },
+      });
+      if (isSmtpConfigured()) {
+        const attachments = [
+          { filename: compareXlsxName, path: compareXlsxAbs },
+          { filename: comparePdfName, path: comparePdfAbs },
+        ];
+        for (const f of okFiles) {
+          if (f.path) attachments.push({ filename: f.filename, path: f.path });
+          if (f.pdf_path) attachments.push({ filename: f.pdf_filename, path: f.pdf_path });
+        }
+        await sendMail({
+          to: dirUser.email,
+          subject: `Rapports hebdomadaires Directeur — ${periodLabel}`,
+          text: `Bonjour,\n\nRapports hebdomadaires de tous les établissements (${periodLabel}).\nComparaison + fichiers PDF/Excel joints.\n`,
+          html: `<p>Bonjour,</p><p>Rapports hebdomadaires multi-établissements (<strong>${periodLabel}</strong>).</p><p>Pièces jointes : comparaison Directeur + rapports par établissement (PDF et Excel).</p>`,
+          attachments: attachments.slice(0, 40),
+        }).catch(() => false);
+      }
+    }
+  } catch (e) {
+    console.warn('[RAPPORT-HEBDO] comparaison Directeur:', e.message);
+  }
+
   const meta = {
     generated_at: new Date().toISOString(),
     period_start: start.toISOString(),
     period_end: end.toISOString(),
     files: results.filter((r) => r.ok),
     errors: results.filter((r) => !r.ok),
+    directeur_compare: directeurCompare,
   };
   if (!Array.isArray(db.get('rapports_hebdomadaires').value())) {
     db.set('rapports_hebdomadaires', []).write();

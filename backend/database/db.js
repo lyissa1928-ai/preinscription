@@ -152,21 +152,9 @@ if (!adminExist) {
 }
 
 // Note : les comptes staff (responsable, agent_admin, comptable, etc.)
-// doivent être créés par l'admin via l'interface (établissement requis sauf admin).
-// Migration : ancien rôle « directeur » → « admin »
-try {
-  const users = db.get('utilisateurs').value() || [];
-  users.forEach((u) => {
-    if (u && u.role === 'directeur') {
-      db.get('utilisateurs')
-        .find({ id: u.id })
-        .assign({ role: 'admin', etablissement_id: null })
-        .write();
-    }
-  });
-} catch (e) {
-  console.warn('⚠️ Migration rôle directeur → admin ignorée:', e.message);
-}
+// doivent être créés par l'admin via l'interface (établissement requis sauf admin / directeur).
+// Le rôle « directeur » est un profil global distinct (vision multi-établissements).
+// Ancienne migration directeur → admin retirée pour préserver / réactiver le profil Directeur.
 
 // S'assurer que tous les compteurs _nextId existent
 [
