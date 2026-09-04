@@ -1,7 +1,7 @@
 /**
- * Lignes facture — structure imposée :
- * Frais d'inscription | Mensualité | Solde | Frais par an
- * (+ bibliothèque / EPI si montants > 0, avant le frais par an)
+ * Lignes facture — libellés administratifs clairs :
+ * Inscription | Mensualité | Total mensualités (N × montant) | Bibliothèque | EPI | …
+ * Le total à payer est affiché hors tableau (pied de tableau), pas comme « Frais par an ».
  */
 export function buildDisplayRows(facture, fo = {}) {
   const labels = fo.libelles_champs && typeof fo.libelles_champs === 'object' ? fo.libelles_champs : {}
@@ -9,6 +9,7 @@ export function buildDisplayRows(facture, fo = {}) {
     const v = labels[key]
     return v != null && String(v).trim() !== '' ? String(v).trim() : fallback
   }
+  const fmt = (n) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0))
 
   const moisFromLigne = Number(facture?.lignes?.find?.((l) => Number(l.duree_mois) > 0)?.duree_mois) || 0
   const mois = Number(fo.duree_mois) > 0 ? Number(fo.duree_mois) : moisFromLigne
@@ -17,16 +18,9 @@ export function buildDisplayRows(facture, fo = {}) {
   const bib = Number(fo.frais_bibliotheque) || 0
   const epi = Number(fo.frais_epi) || 0
 
-  // Fallback depuis les lignes stockées si snapshot incomplet
   if (!men && Array.isArray(facture?.lignes)) {
     const u = facture.lignes.find((l) => l.kind === 'mensualite_unitaire' || /^mensualit/i.test(l.description || ''))
     if (u) men = Number(u.montant_unitaire ?? u.prix_unitaire ?? u.total ?? u.montant) || 0
-  }
-  if (!fi && Array.isArray(facture?.lignes)) {
-    const ins = facture.lignes.find((l) => l.kind === 'inscription' || /inscription/i.test(l.description || ''))
-    if (ins) {
-      /* keep 0 if already set */
-    }
   }
 
   const inscription =
@@ -43,7 +37,6 @@ export function buildDisplayRows(facture, fo = {}) {
   const mensualite = men
   const solde = mensualite * (mois > 0 ? mois : 0)
 
-  // Suppléments hors bib/EPI déjà dans snapshot
   const rawSupp = facture?.lignes_supplementaires || []
   const supplementaires = (Array.isArray(rawSupp) ? rawSupp : [])
     .map((l) => ({
@@ -65,12 +58,16 @@ export function buildDisplayRows(facture, fo = {}) {
     0
   const epiEff =
     epi ||
-    Number((Array.isArray(rawSupp) ? rawSupp : []).find((l) => /^epi$/i.test(String(l.designation || '').trim()))?.montant) ||
+    Number(
+      (Array.isArray(rawSupp) ? rawSupp : []).find((l) =>
+        /^epi$/i.test(String(l.designation || '').trim()),
+      )?.montant,
+    ) ||
     0
 
   const rows = []
   rows.push({
-    designation: labelOf('frais_inscription', "Frais d'inscription"),
+    designation: labelOf('frais_inscription', 'Inscription'),
     montant: inscription,
     kind: 'inscription',
   })
@@ -80,16 +77,21 @@ export function buildDisplayRows(facture, fo = {}) {
     isUnitMensualite: true,
     kind: 'mensualite',
   })
+
+  const totalMensLabel =
+    mois > 0 && mensualite > 0
+      ? `${labelOf('solde', 'Total mensualités')} (${mois} × ${fmt(mensualite)} FCFA)`
+      : labelOf('solde', 'Total mensualités')
   rows.push({
-    designation: labelOf('solde', 'Solde'),
+    designation: totalMensLabel,
     montant: solde,
     isTotalMensualites: true,
     kind: 'solde',
-    hint: mois > 0 ? `${mensualite} × ${mois} mois` : null,
   })
+
   if (bibEff > 0) {
     rows.push({
-      designation: labelOf('frais_bibliotheque', 'Abonnement bibliothèque'),
+      designation: labelOf('frais_bibliotheque', 'Bibliothèque'),
       montant: bibEff,
       kind: 'bibliotheque',
     })
@@ -111,13 +113,6 @@ export function buildDisplayRows(facture, fo = {}) {
     bibEff +
     epiEff +
     supplementaires.reduce((a, b) => a + (Number(b.montant) || 0), 0)
-
-  rows.push({
-    designation: labelOf('frais_par_an', 'Frais par an'),
-    montant: fraisParAn,
-    isFraisParAn: true,
-    kind: 'frais_par_an',
-  })
 
   const fromSnapshot = Number(facture?.montant_total_a_payer) || Number(facture?.montant_ttc) || 0
   return {

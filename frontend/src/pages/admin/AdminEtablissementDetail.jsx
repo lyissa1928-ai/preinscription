@@ -2615,7 +2615,7 @@ export default function AdminEtablissementDetail() {
           />
         )}
         {tab === 'flyers' && (
-          <TabFlyers etabId={etab.id} formations={etab.formations || []} />
+          <TabFlyers etabId={etab.id} filieres={etab.filieres || []} />
         )}
         {tab === 'acceptes' && (
           <TabAcceptesParFormation etabId={etab.id} />

@@ -83,15 +83,30 @@ export default function PublicEtablissementPage() {
     const map = new Map()
     for (const f of formationsFiltrees) {
       const key = (f.filiere_nom && String(f.filiere_nom).trim()) || 'Sans filière'
-      if (!map.has(key)) map.set(key, [])
-      map.get(key).push(f)
+      if (!map.has(key)) {
+        map.set(key, { filiere_id: f.filiere_id || null, nom: key, formations: [] })
+      }
+      const bloc = map.get(key)
+      if (!bloc.filiere_id && f.filiere_id) bloc.filiere_id = f.filiere_id
+      bloc.formations.push(f)
     }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'fr'))
+    return [...map.values()].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
   }, [formationsFiltrees])
 
-  const listeFiliere = selectedFiliereNom
-    ? formationsParFiliere.find(([n]) => n === selectedFiliereNom)?.[1] || []
-    : []
+  const filiereSelectionnee = selectedFiliereNom
+    ? formationsParFiliere.find((b) => b.nom === selectedFiliereNom) || null
+    : null
+
+  const listeFiliere = filiereSelectionnee?.formations || []
+
+  const flyersPourFiliere = (filiereId, filiereNom) =>
+    flyers.filter((fl) => {
+      if (filiereId && Number(fl.filiere_id) === Number(filiereId)) return true
+      if (filiereNom && fl.filiere_nom && String(fl.filiere_nom).trim() === String(filiereNom).trim()) {
+        return true
+      }
+      return false
+    })
 
   const typesDispo = useMemo(() => {
     const order = ['presentiel', 'en_ligne']
@@ -258,9 +273,11 @@ export default function PublicEtablissementPage() {
           <>
             {step === 'filieres' && (
               <div className="grid gap-4 sm:grid-cols-2">
-                {formationsParFiliere.map(([nom, liste]) => {
+                {formationsParFiliere.map((bloc) => {
+                  const { nom, formations: liste, filiere_id: fid } = bloc
                   const nP = liste.filter((x) => x.type === 'presentiel').length
                   const nD = liste.filter((x) => x.type === 'en_ligne').length
+                  const flyersF = flyersPourFiliere(fid, nom)
                   return (
                     <button
                       key={nom}
@@ -287,6 +304,26 @@ export default function PublicEtablissementPage() {
                           </span>
                         )}
                       </div>
+                      {flyersF.length > 0 && (
+                        <div
+                          className="mt-3 space-y-1 border-t border-slate-100 pt-2"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          <p className="text-[11px] font-semibold text-slate-600">Flyers</p>
+                          {flyersF.map((fl) => (
+                            <a
+                              key={fl.id}
+                              href={mediaUrl(fl.file_url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block text-sm font-semibold text-blue-700 hover:underline"
+                            >
+                              ⬇ {fl.titre || 'Télécharger le flyer'}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                       <p className="mt-4 text-xs font-bold text-blue-700">Voir les modes →</p>
                     </button>
                   )
@@ -381,22 +418,20 @@ export default function PublicEtablissementPage() {
                             <PreinscriptionConditionsBlock formationNiveau={f.niveau} />
                           </div>
                         </details>
-                        {flyers.filter((fl) => Number(fl.formation_id) === Number(f.id)).length > 0 && (
+                        {flyersPourFiliere(f.filiere_id, f.filiere_nom).length > 0 && (
                           <div className="mt-3 space-y-1">
-                            <p className="text-[11px] font-semibold text-slate-600">Flyers</p>
-                            {flyers
-                              .filter((fl) => Number(fl.formation_id) === Number(f.id))
-                              .map((fl) => (
-                                <a
-                                  key={fl.id}
-                                  href={mediaUrl(fl.file_url)}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="block text-sm font-semibold text-blue-700 hover:underline"
-                                >
-                                  ⬇ {fl.titre || 'Télécharger le flyer'}
-                                </a>
-                              ))}
+                            <p className="text-[11px] font-semibold text-slate-600">Flyers de la filière</p>
+                            {flyersPourFiliere(f.filiere_id, f.filiere_nom).map((fl) => (
+                              <a
+                                key={fl.id}
+                                href={mediaUrl(fl.file_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block text-sm font-semibold text-blue-700 hover:underline"
+                              >
+                                ⬇ {fl.titre || 'Télécharger le flyer'}
+                              </a>
+                            ))}
                           </div>
                         )}
                         <p className="mt-3 text-[10px] text-amber-800/90 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1.5">
@@ -419,6 +454,9 @@ export default function PublicEtablissementPage() {
               {flyers.map((fl) => (
                 <li key={fl.id} className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
                   <p className="font-bold text-slate-900">{fl.titre}</p>
+                  {fl.filiere_nom && (
+                    <p className="mt-0.5 text-[11px] font-semibold text-indigo-700">Filière : {fl.filiere_nom}</p>
+                  )}
                   {fl.description && <p className="mt-1 text-xs text-slate-600 line-clamp-2">{fl.description}</p>}
                   {fl.debouches && (
                     <p className="mt-1 text-xs text-slate-500 line-clamp-2">

@@ -1,5 +1,6 @@
 /**
  * Flyers établissement — upload admin, téléchargement public.
+ * Association : filière (plus formation).
  */
 const express = require('express');
 const multer = require('multer');
@@ -40,10 +41,26 @@ function canManageFlyers(user, etabId) {
   return canEditEtabIdentite(user, etabId) || userAdministersEtablissement(user, etabId);
 }
 
+function resolveFiliereId(flyer) {
+  if (flyer.filiere_id) return Number(flyer.filiere_id) || null;
+  // Rétrocompat : anciens flyers liés à une formation → filière de la formation
+  if (flyer.formation_id) {
+    const fo = db.get('formations').find({ id: Number(flyer.formation_id) }).value();
+    return fo?.filiere_id != null ? Number(fo.filiere_id) : null;
+  }
+  return null;
+}
+
 function publicFlyer(f, req) {
+  const filiereId = resolveFiliereId(f);
+  const filiere = filiereId
+    ? db.get('filieres').find({ id: filiereId }).value()
+    : null;
   return {
     id: f.id,
     etablissement_id: f.etablissement_id,
+    filiere_id: filiereId,
+    filiere_nom: filiere?.nom || null,
     formation_id: f.formation_id || null,
     titre: f.titre,
     description: f.description || '',
@@ -90,24 +107,25 @@ router.post('/:etabId/flyers', authMiddleware, upload.single('fichier'), async (
     return res.status(400).json({ message: clam.message || 'Fichier refusé.' });
   }
 
-  const formationId = req.body.formation_id ? parseInt(req.body.formation_id, 10) : null;
-  let formation = null;
-  if (formationId) {
-    formation = db.get('formations').find({ id: formationId, etablissement_id: etabId }).value();
-    if (!formation) {
+  const filiereId = req.body.filiere_id ? parseInt(req.body.filiere_id, 10) : null;
+  let filiere = null;
+  if (filiereId) {
+    filiere = db.get('filieres').find({ id: filiereId, etablissement_id: etabId }).value();
+    if (!filiere) {
       unlinkQuiet(fullPath);
-      return res.status(400).json({ message: 'Formation introuvable pour cet établissement.' });
+      return res.status(400).json({ message: 'Filière introuvable pour cet établissement.' });
     }
   }
 
-  const titre = String(req.body.titre || formation?.titre || 'Flyer').trim();
-  const description = String(req.body.description || formation?.description || '').trim();
-  const debouches = String(req.body.debouches || formation?.debouches || '').trim();
+  const titre = String(req.body.titre || filiere?.nom || 'Flyer').trim();
+  const description = String(req.body.description || filiere?.description || '').trim();
+  const debouches = String(req.body.debouches || '').trim();
   const id = db.nextId('flyers');
   const flyer = {
     id,
     etablissement_id: etabId,
-    formation_id: formationId || null,
+    filiere_id: filiereId || null,
+    formation_id: null,
     titre,
     description,
     debouches,
@@ -119,7 +137,7 @@ router.post('/:etabId/flyers', authMiddleware, upload.single('fichier'), async (
     created_by: req.user.id,
   };
   db.get('flyers').push(flyer).write();
-  logAudit(req, 'flyer_cree', 'flyer', id, { etablissement_id: etabId, titre });
+  logAudit(req, 'flyer_cree', 'flyer', id, { etablissement_id: etabId, titre, filiere_id: filiereId });
   res.status(201).json(publicFlyer(flyer, req));
 });
 
@@ -138,9 +156,14 @@ router.put('/:etabId/flyers/:id', authMiddleware, (req, res) => {
   if (req.body.titre !== undefined) patch.titre = String(req.body.titre).trim();
   if (req.body.description !== undefined) patch.description = String(req.body.description).trim();
   if (req.body.debouches !== undefined) patch.debouches = String(req.body.debouches).trim();
-  if (req.body.formation_id !== undefined) {
-    const fid = req.body.formation_id ? parseInt(req.body.formation_id, 10) : null;
-    patch.formation_id = fid;
+  if (req.body.filiere_id !== undefined) {
+    const fid = req.body.filiere_id ? parseInt(req.body.filiere_id, 10) : null;
+    if (fid) {
+      const filiere = db.get('filieres').find({ id: fid, etablissement_id: etabId }).value();
+      if (!filiere) return res.status(400).json({ message: 'Filière introuvable.' });
+    }
+    patch.filiere_id = fid;
+    patch.formation_id = null;
   }
   db.get('flyers').find({ id }).assign({ ...patch, updated_at: new Date().toISOString() }).write();
   res.json(publicFlyer(db.get('flyers').find({ id }).value(), req));

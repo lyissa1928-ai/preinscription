@@ -8,8 +8,9 @@ import { mediaUrl } from '../utils/mediaUrl'
 
 /**
  * Gestion des flyers — admin établissement (et plateforme via AdminEtablissementDetail).
+ * Association : filière (pas formation).
  */
-export function TabFlyers({ etabId, formations = [] }) {
+export function TabFlyers({ etabId, filieres = [] }) {
   const [flyers, setFlyers] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -17,7 +18,7 @@ export function TabFlyers({ etabId, formations = [] }) {
     titre: '',
     description: '',
     debouches: '',
-    formation_id: '',
+    filiere_id: '',
     fichier: null,
   })
 
@@ -34,14 +35,13 @@ export function TabFlyers({ etabId, formations = [] }) {
     if (etabId) load()
   }, [etabId])
 
-  const onFormationPick = (fid) => {
-    const f = formations.find((x) => String(x.id) === String(fid))
+  const onFilierePick = (fid) => {
+    const f = filieres.find((x) => String(x.id) === String(fid))
     setForm((p) => ({
       ...p,
-      formation_id: fid,
-      titre: p.titre || f?.titre || '',
+      filiere_id: fid,
+      titre: p.titre || f?.nom || '',
       description: p.description || f?.description || '',
-      debouches: p.debouches || f?.debouches || '',
     }))
   }
 
@@ -58,10 +58,10 @@ export function TabFlyers({ etabId, formations = [] }) {
       fd.append('titre', form.titre || 'Flyer')
       fd.append('description', form.description || '')
       fd.append('debouches', form.debouches || '')
-      if (form.formation_id) fd.append('formation_id', form.formation_id)
+      if (form.filiere_id) fd.append('filiere_id', form.filiere_id)
       const { data } = await axios.post(`/api/etablissements/${etabId}/flyers`, fd)
       setFlyers((prev) => [data, ...prev])
-      setForm({ titre: '', description: '', debouches: '', formation_id: '', fichier: null })
+      setForm({ titre: '', description: '', debouches: '', filiere_id: '', fichier: null })
       toast.success('Flyer publié — téléchargeable sans connexion.')
     } catch (err) {
       toast.error(err.response?.data?.message || 'Erreur.')
@@ -85,22 +85,23 @@ export function TabFlyers({ etabId, formations = [] }) {
     <div className="space-y-6">
       <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-indigo-900">
         Les flyers sont visibles sur la page publique de l&apos;établissement et téléchargeables
-        <strong> sans compte</strong>. Associez une formation pour préremplir description et débouchés.
+        <strong> sans compte</strong>. Associez une <strong>filière</strong> pour préremplir le titre et la
+        description.
       </div>
 
       <form onSubmit={handleCreate} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="font-bold text-slate-900">Ajouter un flyer</h3>
         <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-semibold">Formation liée (optionnel)</label>
+            <label className="mb-1 block text-sm font-semibold">Filière liée (optionnel)</label>
             <select
               className="input-field"
-              value={form.formation_id}
-              onChange={(e) => onFormationPick(e.target.value)}
+              value={form.filiere_id}
+              onChange={(e) => onFilierePick(e.target.value)}
             >
               <option value="">— Aucune —</option>
-              {formations.map((f) => (
-                <option key={f.id} value={String(f.id)}>{f.titre}</option>
+              {filieres.map((f) => (
+                <option key={f.id} value={String(f.id)}>{f.nom}</option>
               ))}
             </select>
           </div>
@@ -111,11 +112,11 @@ export function TabFlyers({ etabId, formations = [] }) {
               value={form.titre}
               onChange={(e) => setForm((p) => ({ ...p, titre: e.target.value }))}
               required
-              placeholder="Ex. Licence Infirmière — brochure 2026"
+              placeholder="Ex. Brochure Électrotechnique 2026"
             />
           </div>
           <div className="md:col-span-2">
-            <label className="mb-1 block text-sm font-semibold">Description de la formation</label>
+            <label className="mb-1 block text-sm font-semibold">Description</label>
             <textarea
               className="input-field"
               rows={2}
@@ -164,6 +165,9 @@ export function TabFlyers({ etabId, formations = [] }) {
             <li key={f.id} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
               <div className="min-w-0 flex-1">
                 <p className="font-bold text-slate-900">{f.titre}</p>
+                {f.filiere_nom && (
+                  <p className="mt-0.5 text-xs font-semibold text-indigo-700">Filière : {f.filiere_nom}</p>
+                )}
                 {f.description && <p className="mt-1 text-sm text-slate-600 line-clamp-2">{f.description}</p>}
                 {f.debouches && <p className="mt-1 text-xs text-slate-500 line-clamp-2">Débouchés : {f.debouches}</p>}
                 <a
@@ -189,13 +193,13 @@ export function TabFlyers({ etabId, formations = [] }) {
 export default function StaffEtabFlyers() {
   const { user } = useAuth()
   const etabId = user?.etablissement_id
-  const [formations, setFormations] = useState([])
+  const [filieres, setFilieres] = useState([])
 
   useEffect(() => {
     if (!etabId) return
     axios
-      .get(`/api/etablissements/${etabId}/formations`)
-      .then(({ data }) => setFormations(Array.isArray(data) ? data : []))
+      .get(`/api/etablissements/${etabId}/filieres`)
+      .then(({ data }) => setFilieres(Array.isArray(data) ? data : []))
       .catch(() => {})
   }, [etabId])
 
@@ -218,7 +222,7 @@ export default function StaffEtabFlyers() {
           ← Mon établissement
         </Link>
       </div>
-      <TabFlyers etabId={etabId} formations={formations} />
+      <TabFlyers etabId={etabId} filieres={filieres} />
     </DashboardPage>
   )
 }
