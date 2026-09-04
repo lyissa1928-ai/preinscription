@@ -12,6 +12,7 @@ import { getRouterBasename } from './utils/appBasePath'
 import { loadAndApplySiteBranding } from './utils/applySiteBranding'
 import './index.css'
 import './lettre-print-additive.css'
+import './a4-document.css'
 
 const apiBase = resolveApiBaseUrl()
 if (apiBase) {

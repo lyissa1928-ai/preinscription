@@ -39,7 +39,8 @@ export default function AttestationDocument({
   return (
     <article
       ref={documentRef}
-      className="print-page relative mx-auto box-border flex min-h-[297mm] w-full max-w-[210mm] flex-col bg-white p-[10mm] text-slate-800 shadow-xl"
+      className="a4-sheet print-page relative box-border flex flex-col bg-white p-[10mm] text-slate-800 shadow-xl"
+      style={{ minHeight: '297mm' }}
     >
       {/* Cadre double certificat */}
       <div
@@ -158,23 +159,15 @@ export default function AttestationDocument({
 
           {/* Signature */}
           <section className="relative z-[1] mt-auto flex items-end justify-between gap-6 pt-4">
-            <div style={{ fontFamily: 'system-ui, sans-serif' }}>
+            <div>
               <p className="text-[11px] text-slate-600">
                 Fait à {lieu}, le {emitDate}
               </p>
               <div className="mt-3">
                 <CachetScolarite cachetUrl={etab?.cachet_url} />
               </div>
-              {(etab?.signataire_nom || etab?.signataire_fonction) && (
-                <p className="mt-1 text-[10px] font-medium text-slate-600">
-                  {[etab.signataire_fonction, etab.signataire_nom].filter(Boolean).join(' — ')}
-                </p>
-              )}
             </div>
-            <p
-              className="max-w-[55mm] text-right text-[8px] leading-snug text-slate-400"
-              style={{ fontFamily: 'system-ui, sans-serif' }}
-            >
+            <p className="max-w-[55mm] text-right text-[8px] leading-snug text-slate-400">
               Document officiel — ne remplace pas l&apos;inscription définitive.
             </p>
           </section>

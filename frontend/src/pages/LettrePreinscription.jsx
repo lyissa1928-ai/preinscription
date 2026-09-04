@@ -123,10 +123,11 @@ export default function LettrePreinscription() {
         backFallback={getRoleHome(user?.role)}
       />
 
+      <div className="a4-preview-stage">
       <article
         ref={documentRef}
-        className="print-page relative mx-auto flex min-h-[297mm] w-full max-w-[210mm] flex-col bg-white text-[12.5px] leading-[1.55] text-slate-800 shadow-xl"
-        style={{ fontFamily: 'Georgia, "Times New Roman", Times, serif' }}
+        className="a4-sheet print-page relative flex flex-col bg-white text-[12.5px] leading-[1.55] text-slate-800 shadow-xl"
+        style={{ minHeight: '297mm' }}
       >
         {/* En-tête centré type papier à en-tête */}
         <header className="relative border-b border-slate-300 px-[16mm] pb-4 pt-[12mm]">
@@ -257,7 +258,7 @@ export default function LettrePreinscription() {
             >
               Récapitulatif
             </p>
-            <div className="grid grid-cols-2 divide-x divide-slate-200 text-[10.5px]">
+            <div className="a4-grid-2 divide-x divide-slate-200 text-[10.5px]">
               <div className="divide-y divide-slate-100">
                 {identityLines.map(([k, v]) => (
                   <div key={k} className="flex gap-2 px-3 py-1.5">
@@ -296,13 +297,7 @@ export default function LettrePreinscription() {
           </p>
 
           <div className="mt-6 flex justify-end">
-            <div className="text-center" style={{ fontFamily: 'system-ui, sans-serif' }}>
-              <CachetScolarite cachetUrl={etab?.cachet_url} className="w-44" />
-              <p className="mt-1 text-[10px] font-semibold text-slate-600">
-                {[etab?.signataire_fonction, etab?.signataire_nom].filter(Boolean).join(' — ') ||
-                  'Pour la scolarité'}
-              </p>
-            </div>
+            <CachetScolarite cachetUrl={etab?.cachet_url} className="w-44" />
           </div>
         </div>
 
@@ -320,6 +315,7 @@ export default function LettrePreinscription() {
         </footer>
         <div className="h-[2px] w-full" style={{ background: primary }} />
       </article>
+      </div>
     </div>
   )
 }

@@ -1,0 +1,76 @@
+/**
+ * Templates documents officiels A4 — indépendants du responsive UI.
+ * Largeur physique fixe 210 mm. Aucun vw / breakpoint / scale sur .a4-sheet.
+ */
+
+.a4-preview-stage {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.a4-sheet {
+  box-sizing: border-box;
+  width: 210mm !important;
+  min-width: 210mm !important;
+  max-width: 210mm !important;
+  margin-left: auto;
+  margin-right: auto;
+  background: #fff;
+  color: #1e293b;
+  /* Typo système stable pour html2canvas (évite substitutions) */
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.a4-sheet,
+.a4-sheet * {
+  box-sizing: border-box;
+}
+
+/* Pendant la capture : pas de zoom / scale sur la feuille (pas sur les enfants utiles) */
+.a4-sheet--capturing {
+  transform: none !important;
+  zoom: normal !important;
+}
+
+/* Grilles / flex des documents : comportement figé (pas de wrap « mobile ») */
+.a4-sheet .a4-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.a4-sheet .a4-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8mm;
+}
+
+.a4-sheet table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.a4-sheet img {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  .a4-sheet {
+    width: 210mm !important;
+    min-width: 210mm !important;
+    max-width: 210mm !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+}

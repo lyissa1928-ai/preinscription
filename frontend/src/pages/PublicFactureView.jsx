@@ -147,21 +147,23 @@ export default function PublicFactureView() {
         </div>
       </div>
 
-      <FactureDocument
-        documentRef={documentRef}
-        etab={etab}
-        facture={{
-          ...facture,
-          type_payeur: type_payeur || facture?.type_payeur,
-          payeur: payeur || facture?.payeur,
-          date_emission: facture?.date_emission || data.created_at,
-          annee_academique: facture?.annee_academique || data.annee_academique,
-        }}
-        etudiant={{ prenom, nom, email, telephone }}
-        formation={fo}
-        rows={rows}
-        totalAPayer={totalAPayer || facture?.montant_ttc || 0}
-      />
+      <div className="a4-preview-stage">
+        <FactureDocument
+          documentRef={documentRef}
+          etab={etab}
+          facture={{
+            ...facture,
+            type_payeur: type_payeur || facture?.type_payeur,
+            payeur: payeur || facture?.payeur,
+            date_emission: facture?.date_emission || data.created_at,
+            annee_academique: facture?.annee_academique || data.annee_academique,
+          }}
+          etudiant={{ prenom, nom, email, telephone }}
+          formation={fo}
+          rows={rows}
+          totalAPayer={totalAPayer || facture?.montant_ttc || 0}
+        />
+      </div>
 
       <div className="no-print mx-auto mt-8 max-w-[210mm] rounded-2xl p-6 text-center text-white" style={{ background: primary }}>
         <h3 className="mb-2 text-lg font-bold">Prêt à vous inscrire officiellement ?</h3>

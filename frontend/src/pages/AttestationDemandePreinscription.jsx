@@ -100,6 +100,7 @@ export default function AttestationDemandePreinscription() {
         backFallback={getRoleHome(user?.role)}
         className="mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3"
       />
+      <div className="a4-preview-stage">
       <AttestationDocument
         documentRef={documentRef}
         etab={etab}
@@ -116,6 +117,7 @@ export default function AttestationDemandePreinscription() {
         texteCorps={texteCorps}
         texteOfficiel={ext.texte_officiel_base}
       />
+      </div>
     </div>
   )
 }

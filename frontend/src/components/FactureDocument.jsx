@@ -1,6 +1,6 @@
 /**
- * Document facture A4 — rendu unique (aperçu = PDF via html2canvas).
- * Identité visuelle : facture scolarité (pas lettre, pas certificat).
+ * Document facture A4 — une seule source (aperçu = PDF).
+ * Largeur fixe 210 mm — aucun layout responsive.
  */
 import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from './CachetScolarite'
@@ -13,16 +13,6 @@ const fmtDate = (d) => {
 }
 const typeLabel = (t) => (t === 'en_ligne' ? 'Formation à distance (FAD)' : 'Formation en présentiel')
 
-/**
- * @param {object} props
- * @param {React.Ref} [props.documentRef]
- * @param {object} props.etab
- * @param {object} props.facture — { numero, date_emission, date_echeance, type_document, type_payeur, payeur, annee_academique }
- * @param {object} props.etudiant — { prenom, nom, email, telephone, nationalite }
- * @param {object} props.formation — { titre, niveau, type, duree, annee_academique }
- * @param {{ designation: string, montant: number, isUnitMensualite?: boolean, isTotalMensualites?: boolean }[]} props.rows
- * @param {number} props.totalAPayer
- */
 export default function FactureDocument({
   documentRef,
   etab,
@@ -61,26 +51,24 @@ export default function FactureDocument({
   return (
     <article
       ref={documentRef}
-      className="print-page relative mx-auto flex min-h-[297mm] w-full max-w-[210mm] flex-col bg-white text-[12.5px] leading-snug text-slate-800"
-      style={{ fontFamily: 'Georgia, "Times New Roman", Times, serif' }}
+      className="a4-sheet print-page flex flex-col bg-white text-[12.5px] leading-snug text-slate-800"
+      style={{ minHeight: '297mm' }}
     >
-      {/* Accent fin haut */}
       <div className="h-[2.5px] w-full shrink-0" style={{ background: primary }} />
 
-      {/* En-tête facture */}
-      <header className="flex items-start justify-between gap-6 px-[16mm] pb-4 pt-[12mm]">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
+      <header className="a4-row justify-between gap-[6mm] px-[16mm] pb-[4mm] pt-[12mm]">
+        <div className="a4-row min-w-0 flex-1 gap-[3mm]">
           {logoSrc ? (
             <img src={logoSrc} alt="" className="h-[18mm] w-[18mm] shrink-0 object-contain" />
           ) : (
             <div
               className="flex h-[18mm] w-[18mm] shrink-0 items-center justify-center text-sm font-bold text-white"
-              style={{ background: primary, fontFamily: 'system-ui, sans-serif' }}
+              style={{ background: primary }}
             >
               {nomEtab.slice(0, 2).toUpperCase()}
             </div>
           )}
-          <div className="min-w-0" style={{ fontFamily: 'system-ui, sans-serif' }}>
+          <div className="min-w-0">
             <p className="text-[13px] font-bold uppercase tracking-wide" style={{ color: primary }}>
               {nomEtab}
             </p>
@@ -92,7 +80,7 @@ export default function FactureDocument({
           </div>
         </div>
 
-        <div className="w-[48mm] shrink-0 text-right" style={{ fontFamily: 'system-ui, sans-serif' }}>
+        <div className="w-[48mm] shrink-0 text-right">
           <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-900">
             {titreTypeDocument(facture?.type_document, { uppercase: false })}
           </p>
@@ -116,11 +104,7 @@ export default function FactureDocument({
 
       <div className="mx-[16mm] border-b border-slate-300" />
 
-      {/* Bénéficiaire + formation */}
-      <section
-        className="grid grid-cols-2 gap-8 px-[16mm] py-4"
-        style={{ fontFamily: 'system-ui, sans-serif' }}
-      >
+      <section className="a4-grid-2 px-[16mm] py-[4mm]">
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">Bénéficiaire</p>
           <p className="mt-1 text-[13px] font-bold text-slate-900">
@@ -156,9 +140,8 @@ export default function FactureDocument({
         </div>
       </section>
 
-      {/* Tableau lignes */}
-      <section className="px-[16mm] pb-3" style={{ fontFamily: 'system-ui, sans-serif' }}>
-        <table className="w-full border-collapse text-[11.5px]">
+      <section className="px-[16mm] pb-[3mm]">
+        <table className="text-[11.5px]">
           <thead>
             <tr className="border-y border-slate-800">
               <th className="py-2 text-left text-[9.5px] font-semibold uppercase tracking-wide text-slate-800">
@@ -199,9 +182,7 @@ export default function FactureDocument({
           </tbody>
           <tfoot>
             <tr>
-              <td
-                className="border-t-2 border-slate-800 py-2.5 text-[12px] font-bold text-slate-900"
-              >
+              <td className="border-t-2 border-slate-800 py-2.5 text-[12px] font-bold text-slate-900">
                 Montant total à payer
               </td>
               <td
@@ -216,11 +197,11 @@ export default function FactureDocument({
       </section>
 
       {payLines.length > 0 && (
-        <section className="px-[16mm] pb-4" style={{ fontFamily: 'system-ui, sans-serif' }}>
+        <section className="px-[16mm] pb-[4mm]">
           <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
             Coordonnées de paiement
           </p>
-          <div className="border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-[10.5px] text-slate-700">
+          <div className="border border-slate-200 bg-slate-50 px-3 py-2.5 text-[10.5px] text-slate-700">
             {payLines.map((l) => (
               <p key={l.label} className="leading-relaxed">
                 <span className="font-semibold text-slate-500">{l.label} :</span> {l.value}
@@ -230,8 +211,8 @@ export default function FactureDocument({
         </section>
       )}
 
-      <section className="mt-auto flex items-end justify-between gap-6 px-[16mm] pb-3 pt-2">
-        <div className="max-w-[55%] text-[9.5px] leading-relaxed text-slate-500" style={{ fontFamily: 'system-ui, sans-serif' }}>
+      <section className="a4-row mt-auto justify-between gap-[6mm] px-[16mm] pb-[3mm] pt-[2mm]">
+        <div className="max-w-[55%] text-[9.5px] leading-relaxed text-slate-500">
           <p>
             {definitive
               ? 'Facture définitive — document à conserver.'
@@ -241,15 +222,10 @@ export default function FactureDocument({
             <p className="mt-1">Valable jusqu’au {fmtDate(facture.date_echeance)}.</p>
           )}
         </div>
-        <div style={{ fontFamily: 'system-ui, sans-serif' }}>
-          <CachetScolarite cachetUrl={etab?.cachet_url} />
-        </div>
+        <CachetScolarite cachetUrl={etab?.cachet_url} />
       </section>
 
-      <footer
-        className="mt-2 border-t border-slate-300 px-[16mm] py-2.5 text-center text-[8.5px] text-slate-500"
-        style={{ fontFamily: 'system-ui, sans-serif' }}
-      >
+      <footer className="mt-2 border-t border-slate-300 px-[16mm] py-2.5 text-center text-[8.5px] text-slate-500">
         {[nomEtab, etab?.email_contact, etab?.telephone].filter(Boolean).join(' · ')}
       </footer>
       <div className="h-[2px] w-full shrink-0" style={{ background: secondary }} />

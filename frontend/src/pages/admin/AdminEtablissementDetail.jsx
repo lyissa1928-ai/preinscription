@@ -279,8 +279,9 @@ function TabIdentite({ etab, onUpdated }) {
           <div className="md:col-span-2 rounded-xl border border-gray-200 bg-white p-4">
             <p className="text-xs font-semibold text-gray-500 uppercase">Signature / validation</p>
             <div className="mt-2 grid md:grid-cols-2 gap-3 text-sm text-gray-800">
-              <p>Nom du signataire : <strong>{form.signataire_nom || 'Le Responsable pédagogique'}</strong></p>
-              <p>Fonction : <strong>{form.signataire_fonction || 'Pour le Directeur des études'}</strong></p>
+              <p>Nom du signataire : <strong>{form.signataire_nom || '—'}</strong></p>
+              <p>Fonction (interne) : <strong>{form.signataire_fonction || '—'}</strong></p>
+              <p className="text-xs text-slate-500 mt-1">Sur les documents PDF, seul le libellé « La scolarité » apparaît avec le cachet.</p>
             </div>
             <p className="text-xs text-gray-500 mt-3">
               Conseil : renseigner le <strong>nom</strong> et la <strong>fonction</strong> pour une lettre plus institutionnelle.

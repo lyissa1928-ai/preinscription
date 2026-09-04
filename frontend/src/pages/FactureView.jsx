@@ -134,21 +134,23 @@ export default function FactureView() {
         backFallback={home}
       />
 
-      <FactureDocument
-        documentRef={documentRef}
-        etab={eb}
-        facture={facture}
-        etudiant={et}
-        formation={{
-          titre: fo.titre,
-          niveau: fo.niveau,
-          type: fo.type,
-          duree: fo.duree_formation || fo.duree,
-          annee_academique: facture.annee_academique || fo.annee_academique,
-        }}
-        rows={rows}
-        totalAPayer={totalAPayer}
-      />
+      <div className="a4-preview-stage">
+        <FactureDocument
+          documentRef={documentRef}
+          etab={eb}
+          facture={facture}
+          etudiant={et}
+          formation={{
+            titre: fo.titre,
+            niveau: fo.niveau,
+            type: fo.type,
+            duree: fo.duree_formation || fo.duree,
+            annee_academique: facture.annee_academique || fo.annee_academique,
+          }}
+          rows={rows}
+          totalAPayer={totalAPayer}
+        />
+      </div>
     </div>
   )
 }
