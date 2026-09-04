@@ -4,7 +4,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
-import DashboardPage from '../components/DashboardPage'
+import { DashboardPage } from '../components/dashboard/DashboardChrome'
 
 const TYPES_ETAB = [
   { val: 'sante', label: 'Santé' },
