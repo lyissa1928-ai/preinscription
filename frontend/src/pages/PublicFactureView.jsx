@@ -517,61 +517,57 @@ export default function PublicFactureView() {
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
 
         {/* Bande couleur haute */}
-        <div style={{ height: 6, background: `linear-gradient(90deg, ${primary}, ${secondary})` }} />
+        <div style={{ height: 3, background: `linear-gradient(90deg, ${primary}, ${secondary})` }} />
 
         {/* ── EN-TÊTE ─────────────────────────────────────────────────────── */}
-        <div className="px-8 pt-7 pb-5">
+        <div className="px-8 pt-7 pb-5 border-b" style={{ borderColor: `${primary}35` }}>
           <div className="flex items-start justify-between gap-6">
 
             {/* Logo + infos établissement */}
-            <div className="flex flex-col gap-2">
-              <div className="w-16 h-16 rounded-xl overflow-hidden flex items-center justify-center border border-gray-100"
-                style={{ background: etab.logo_url ? '#f8fafc' : primary }}>
+            <div className="flex items-start gap-3.5 min-w-0">
+              <div className="w-[4.25rem] h-[4.25rem] shrink-0 overflow-hidden flex items-center justify-center border border-gray-100"
+                style={{ background: etab.logo_url ? '#fff' : primary }}>
                 {etab.logo_url
-                  ? <img src={mediaUrl(etab.logo_url)} alt="logo" className="w-full h-full object-contain" />
+                  ? <img src={mediaUrl(etab.logo_url)} alt="logo" className="w-full h-full object-contain p-1" />
                   : <span className="text-2xl font-black text-white">{etabNom[0]}</span>
                 }
               </div>
-              <div>
-                <div className="text-xl font-black" style={{ color: primary }}>{etabNom.toUpperCase()}</div>
-                <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+              <div className="min-w-0">
+                <div className="text-[15px] font-black uppercase tracking-wide" style={{ color: primary }}>{etabNom}</div>
+                <div className="text-[10.5px] text-gray-500 mt-1.5 space-y-0.5 leading-snug">
                   {etab.adresse      && <p>{etab.adresse}</p>}
                   {etab.telephone    && <p>{etab.telephone}</p>}
                   {etab.email_contact && <p>{etab.email_contact}</p>}
-                  {etab.ninea        && <p className="font-semibold text-gray-600">NINEA : {etab.ninea}</p>}
-                  {etab.rc           && <p className="font-semibold text-gray-600">RC : {etab.rc}</p>}
-                  {etab.arrete       && <p className="font-semibold text-gray-600">Arrêté : {etab.arrete}</p>}
-                  {etab.site_web     && <p>{etab.site_web}</p>}
+                  {etab.ninea        && <p>NINEA : {etab.ninea}</p>}
+                  {etab.rc           && <p>RC : {etab.rc}</p>}
+                  {etab.arrete       && <p>Arrêté : {etab.arrete}</p>}
                 </div>
               </div>
             </div>
 
             {/* Métadonnées facture */}
-            <div className="text-right flex-shrink-0">
-              <div className="inline-block text-white font-black text-sm px-5 py-2.5 rounded-xl mb-3"
-                style={{ background: primary }}>
-                {titreTypeDocument(facture?.type_document)}
-              </div>
-              <div className="text-xs text-gray-500 space-y-1">
-                <p><span className="font-semibold text-gray-700">N° :</span>{' '}
-                  <span className="font-mono font-bold" style={{ color: primary }}>{facture.numero}</span></p>
-                <p><span className="font-semibold text-gray-700">Date :</span> {fmtDate(data.created_at)}</p>
-                <p><span className="font-semibold text-gray-700">Réf :</span> <span className="font-mono">{data.reference}</span></p>
-              </div>
+            <div className="text-right flex-shrink-0 w-44">
+              <p className="text-[9.5px] font-bold uppercase tracking-[0.16em] text-slate-400">Document financier</p>
+              <p className="mt-1.5 text-[12px] font-black uppercase leading-tight tracking-[0.06em]" style={{ color: primary }}>
+                {titreTypeDocument(facture?.type_document, { uppercase: false })}
+              </p>
+              <p className="mt-3 font-mono text-sm font-bold text-slate-900">{facture.numero}</p>
+              <p className="mt-1 text-[11px] text-slate-500">{fmtDate(data.created_at)}</p>
+              <p className="mt-0.5 text-[11px] text-slate-500 font-mono">Réf. {data.reference}</p>
             </div>
           </div>
         </div>
 
-        <div className="mx-8 border-t border-gray-100 mb-5" />
+        <div className="mx-8 border-t border-gray-100 mb-5 hidden" />
 
         {/* ── ÉTUDIANT + PAYEUR ───────────────────────────────────────────── */}
-        <div className={`px-8 mb-5 grid gap-4 ${hasPayeur ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
+        <div className={`px-8 py-5 grid gap-4 ${hasPayeur ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
 
           {/* Étudiant */}
-          <div className="rounded-xl border border-gray-200 p-4 bg-gray-50"
-            style={{ borderLeftWidth: 3, borderLeftColor: primary }}>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Étudiant concerné</p>
-            <p className="font-bold text-gray-900 text-base">{prenom} {nom.toUpperCase()}</p>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: primary }}>Bénéficiaire</p>
+            <div className="mb-2 mt-1 h-0.5 w-10" style={{ background: primary }} />
+            <p className="font-bold text-gray-900 text-[15px]">{prenom} {nom.toUpperCase()}</p>
             <p className="text-sm text-gray-600 mt-1">{email}</p>
             <p className="text-sm text-gray-600">Tél : {telephone}</p>
             {niveau && (
@@ -629,32 +625,28 @@ export default function PublicFactureView() {
 
         {/* ── FORMATION ───────────────────────────────────────────────────── */}
         <div className="px-8 mb-5">
-          <div className="rounded-xl p-4 border" style={{ background: `${primary}12`, borderColor: `${primary}40` }}>
-            <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: `${primary}99` }}>
-              Formation concernée
-            </p>
-            <p className="font-bold text-base" style={{ color: primary }}>
-              {formation_titre}
-              <span className="ml-2 text-sm font-semibold text-gray-600">({typeLabel(type_formation)})</span>
-            </p>
-            {formation_description && (
-              <p className="text-xs text-gray-600 mt-1 leading-snug break-words">{formation_description}</p>
-            )}
-            <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
-              {formation_ville        && <span>📍 {formation_ville}</span>}
-              {formation_niveau_requis && <span>🎓 Niveau requis : {formation_niveau_requis}</span>}
-            </div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: primary }}>Formation</p>
+          <div className="mb-2 mt-1 h-0.5 w-10" style={{ background: primary }} />
+          <p className="font-bold text-base text-slate-900">
+            {formation_titre}
+            <span className="ml-2 text-sm font-semibold text-gray-600">({typeLabel(type_formation)})</span>
+          </p>
+          {formation_description && (
+            <p className="text-xs text-gray-600 mt-1 leading-snug break-words">{formation_description}</p>
+          )}
+          <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
+            {formation_ville        && <span>{formation_ville}</span>}
+            {formation_niveau_requis && <span>Niveau requis : {formation_niveau_requis}</span>}
           </div>
         </div>
 
         {/* ── TABLEAU DES FRAIS (forfait annuel structuré) ───────────────── */}
         <div className="px-8 mb-0">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Détail de la facturation</p>
-          <table className="w-full border-collapse overflow-hidden rounded-xl border border-gray-200">
+          <table className="w-full border-collapse overflow-hidden border border-gray-200">
             <thead>
-              <tr style={{ background: primary }}>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-white">Désignation</th>
-                <th className="text-right px-4 py-3 text-sm font-semibold text-white w-44">Montant (FCFA)</th>
+              <tr style={{ background: `${primary}12` }}>
+                <th className="text-left px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide border-b" style={{ color: primary, borderColor: `${primary}35` }}>Désignation</th>
+                <th className="text-right px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide w-44 border-b" style={{ color: primary, borderColor: `${primary}35` }}>Montant (FCFA)</th>
               </tr>
             </thead>
             <tbody>

@@ -1,10 +1,10 @@
 /**
- * Attestation de préinscription — template A4 administratif.
- * Identité visuelle dynamique par établissement (logo, couleurs, coords, cachet).
- * Pas de photo candidat (contrairement à la lettre).
+ * Attestation de préinscription — certificat A4 administratif élégant.
+ * Identité visuelle dynamique (logo, couleurs, cachet). Sans photo candidat.
  */
 import CachetScolarite from './CachetScolarite'
 import { mediaUrl } from '../utils/mediaUrl'
+import { OfficialDocHeader, OfficialDocFooter } from './official/OfficialDocChrome'
 
 const fmtDate = (d) => {
   if (d == null || d === '') return '—'
@@ -13,16 +13,15 @@ const fmtDate = (d) => {
 
 function Field({ label, value }) {
   return (
-    <div className="min-w-0 border-b border-slate-100 py-2 last:border-0">
+    <div className="min-w-0 py-2">
       <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-[13.5px] font-semibold leading-snug text-slate-900 break-words">{value || '—'}</dd>
+      <dd className="mt-0.5 border-b border-slate-100 pb-2 text-[13.5px] font-semibold leading-snug text-slate-900 break-words">
+        {value || '—'}
+      </dd>
     </div>
   )
 }
 
-/**
- * @param {object} props
- */
 export default function AttestationDocument({
   etab,
   refAtt,
@@ -42,85 +41,71 @@ export default function AttestationDocument({
   const primary = etab?.couleur_primaire || '#1e3a8a'
   const secondary = etab?.couleur_secondaire || '#0f172a'
   const logoSrc = mediaUrl(etab?.logo_url)
-  const siteWeb = (etab?.site_web || '').replace(/^https?:\/\//i, '') || null
   const emitDate = fmtDate(new Date())
-  const lieu = etab?.ville || etab?.adresse?.split(',')?.pop()?.trim() || etab?.nom || '—'
+  const lieu =
+    etab?.ville ||
+    etab?.adresse?.split(',')?.pop()?.trim() ||
+    etab?.nom ||
+    '—'
 
   return (
     <article
       ref={documentRef}
       className="print-page relative mx-auto flex min-h-[297mm] max-w-[210mm] flex-col overflow-hidden bg-white text-[13.5px] leading-relaxed text-slate-800 shadow-2xl"
-      style={{ '--att-primary': primary, '--att-secondary': secondary }}
     >
-      {/* Bande institutionnelle */}
-      <div className="h-2.5 shrink-0" style={{ background: `linear-gradient(90deg, ${primary}, ${secondary})` }} />
+      {/* Filigrane discret */}
+      {logoSrc ? (
+        <img
+          src={logoSrc}
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.04]"
+        />
+      ) : null}
 
-      {/* En-tête */}
-      <header className="lettre-print-header-root flex items-start justify-between gap-6 border-b px-10 pb-5 pt-7" style={{ borderColor: `${primary}55` }}>
-        <div className="flex min-w-0 flex-1 items-start gap-4">
-          {logoSrc ? (
-            <img src={logoSrc} alt="" className="h-[4.5rem] w-[4.5rem] shrink-0 object-contain" />
-          ) : (
-            <div
-              className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded text-sm font-black text-white"
-              style={{ background: primary }}
-            >
-              {(etab?.nom || 'ET').slice(0, 2).toUpperCase()}
-            </div>
-          )}
-          <div className="min-w-0 pt-0.5">
-            <p className="text-[15px] font-black uppercase leading-tight tracking-wide" style={{ color: secondary }}>
-              {etab?.nom || 'Établissement'}
+      <div className="h-[3px] shrink-0" style={{ background: `linear-gradient(90deg, ${primary}, ${secondary})` }} />
+
+      <OfficialDocHeader
+        etab={etab}
+        compact
+        rightSlot={
+          <div className="w-[11rem] shrink-0 text-right">
+            <p className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-slate-400">Document officiel</p>
+            <p className="mt-1.5 text-[12px] font-black uppercase leading-tight tracking-[0.06em]" style={{ color: primary }}>
+              Attestation de préinscription
             </p>
-            {etab?.description && (
-              <p className="mt-0.5 text-[11px] font-medium italic text-slate-500">{etab.description}</p>
-            )}
-            <div className="mt-2 space-y-0.5 text-[11px] leading-snug text-slate-600">
-              {etab?.adresse && <p>{etab.adresse}</p>}
-              {(etab?.telephone || etab?.email_contact) && (
-                <p>{[etab.telephone && `Tél. ${etab.telephone}`, etab.email_contact].filter(Boolean).join(' · ')}</p>
-              )}
-              {(etab?.ninea || etab?.rc) && (
-                <p className="text-[10px] text-slate-500">
-                  {[etab.ninea && `NINEA ${etab.ninea}`, etab.rc && `RC ${etab.rc}`].filter(Boolean).join(' — ')}
-                </p>
-              )}
-            </div>
+            <p className="mt-3 font-mono text-[11px] font-bold text-slate-800">{refAtt}</p>
+            <p className="mt-1 text-[11px] text-slate-500">Émise le {emitDate}</p>
           </div>
-        </div>
-        <div className="w-[11.5rem] shrink-0 text-right">
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Document officiel</p>
-          <h1 className="mt-1 text-[13px] font-black uppercase leading-tight tracking-wide" style={{ color: primary }}>
-            Attestation de préinscription
-          </h1>
-          <p className="mt-3 font-mono text-[11px] font-bold text-slate-800">{refAtt}</p>
-          <p className="mt-1 text-[11px] text-slate-500">Émise le {emitDate}</p>
-        </div>
-      </header>
+        }
+      />
 
-      <div className="flex flex-1 flex-col px-10 py-6">
-        <p className="text-center text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+      <div className="relative z-[1] flex flex-1 flex-col px-10 py-6">
+        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
           Année académique {anneeAcademique || '—'}
         </p>
 
-        {/* Corps synthétique */}
-        <section className="mt-5 rounded border px-5 py-4" style={{ borderColor: `${primary}40`, background: `${primary}08` }}>
-          <p className="text-[14px] font-medium leading-relaxed text-slate-800">{texteCorps}</p>
+        <section
+          className="mt-5 border-y-2 px-1 py-5 text-center"
+          style={{ borderColor: `${primary}55` }}
+        >
+          <p className="mx-auto max-w-[36rem] text-[14.5px] font-medium leading-relaxed text-slate-800">
+            {texteCorps}
+          </p>
           {texteOfficiel ? (
-            <p className="mt-3 border-t pt-3 text-[12.5px] leading-relaxed text-slate-600" style={{ borderColor: `${primary}25` }}>
-              {texteOfficiel}
-            </p>
+            <p className="mx-auto mt-3 max-w-[36rem] text-[12px] leading-relaxed text-slate-500">{texteOfficiel}</p>
           ) : null}
         </section>
 
-        <div className="mt-6 grid grid-cols-2 gap-8">
+        <div className="mt-6 grid grid-cols-2 gap-10">
           <section>
             <h2
-              className="mb-2 border-b-2 pb-1 text-[11px] font-black uppercase tracking-[0.14em]"
-              style={{ color: primary, borderColor: primary }}
+              className="mb-1 text-[11px] font-black uppercase tracking-[0.14em]"
+              style={{ color: primary }}
             >
               Bénéficiaire
             </h2>
+            <div className="mb-3 h-0.5 w-12" style={{ background: primary }} />
             <dl>
               <Field label="Prénom(s)" value={prenom} />
               <Field label="Nom" value={(nom || '').toUpperCase()} />
@@ -131,11 +116,12 @@ export default function AttestationDocument({
           </section>
           <section>
             <h2
-              className="mb-2 border-b-2 pb-1 text-[11px] font-black uppercase tracking-[0.14em]"
-              style={{ color: primary, borderColor: primary }}
+              className="mb-1 text-[11px] font-black uppercase tracking-[0.14em]"
+              style={{ color: primary }}
             >
               Formation
             </h2>
+            <div className="mb-3 h-0.5 w-12" style={{ background: primary }} />
             <dl>
               <Field label="Intitulé" value={formationTitre} />
               <Field label="Filière" value={filiere} />
@@ -145,16 +131,12 @@ export default function AttestationDocument({
           </section>
         </div>
 
-        {/* Signature */}
         <section className="mt-auto flex items-end justify-between gap-8 pt-10">
-          <div className="max-w-[55%]">
+          <div>
             <p className="text-[12px] text-slate-600">
               Fait à {lieu}, le {emitDate}
             </p>
-            <p className="mt-4 text-[11px] font-black uppercase tracking-wide" style={{ color: secondary }}>
-              La scolarité
-            </p>
-            <div className="mt-2">
+            <div className="mt-4">
               <CachetScolarite cachetUrl={etab?.cachet_url} />
             </div>
             {(etab?.signataire_nom || etab?.signataire_fonction) && (
@@ -164,33 +146,26 @@ export default function AttestationDocument({
             )}
           </div>
           <div
-            className="rounded border px-3 py-2 text-center text-[9px] font-bold uppercase leading-relaxed tracking-wide text-slate-600"
-            style={{ borderColor: `${primary}55` }}
+            className="max-w-[8.5rem] border px-2.5 py-2 text-center text-[9px] font-bold uppercase leading-relaxed tracking-wide text-slate-500"
+            style={{ borderColor: `${primary}40` }}
           >
-            <p className="mb-1 text-[8px] text-slate-400">Valeurs</p>
             {(Array.isArray(etab?.valeurs_institutionnelles) && etab.valeurs_institutionnelles.length
               ? etab.valeurs_institutionnelles
               : ['Rigueur', 'Innovation', 'Engagement']
             ).map((v) => (
-              <div key={v}>{v}</div>
+              <div key={v} className="py-0.5">
+                {v}
+              </div>
             ))}
           </div>
         </section>
       </div>
 
-      <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 px-10 py-3 text-[10px] text-white" style={{ background: secondary }}>
-        <div className="space-y-0.5">
-          {siteWeb && <p className="font-semibold opacity-95">{siteWeb}</p>}
-          <p className="opacity-85">
-            Document officiel — {refAtt} — ne remplace pas l’inscription définitive
-          </p>
-        </div>
-        {(etab?.ninea || etab?.rc) && (
-          <p className="opacity-70">
-            {[etab.ninea && `NINEA ${etab.ninea}`, etab.rc && `RC ${etab.rc}`].filter(Boolean).join(' · ')}
-          </p>
-        )}
-      </footer>
+      <OfficialDocFooter etab={etab} primary={primary} secondary={secondary}>
+        <p>
+          Document officiel — {refAtt} — ne remplace pas l&apos;inscription définitive
+        </p>
+      </OfficialDocFooter>
     </article>
   )
 }

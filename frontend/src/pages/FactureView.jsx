@@ -57,8 +57,8 @@ function CoordonneesPaiement({ eb, primary }) {
   if (!lines.length) return null
 
   return (
-    <section className="px-8 pb-5">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+    <section className="px-9 pb-5">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: primary }}>
         Coordonnées de paiement
       </p>
       <div className="border border-slate-200 px-4 py-3 text-xs text-slate-700" style={{ borderLeftWidth: 3, borderLeftColor: primary }}>
@@ -411,12 +411,12 @@ export default function FactureView() {
       </div>
 
       <article className="print-page mx-auto max-w-[210mm] overflow-hidden bg-white text-[13px] text-slate-800 shadow-xl">
-        <div className="h-1" style={{ background: primary }} />
+        <div className="h-[3px]" style={{ background: `linear-gradient(90deg, ${primary}, ${eb.couleur_secondaire || primary})` }} />
 
-        <header className="flex items-start justify-between gap-6 px-8 pb-5 pt-6">
-          <div className="flex min-w-0 items-start gap-4">
+        <header className="flex items-start justify-between gap-6 border-b px-9 pb-5 pt-6" style={{ borderColor: `${primary}35` }}>
+          <div className="flex min-w-0 items-start gap-3.5">
             <div
-              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden border border-slate-100"
+              className="flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center overflow-hidden border border-slate-100"
               style={{ background: eb.logo_url ? '#fff' : primary }}
             >
               {eb.logo_url ? (
@@ -426,36 +426,35 @@ export default function FactureView() {
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="text-base font-black uppercase tracking-wide" style={{ color: primary }}>
+              <h1 className="text-[15px] font-black uppercase tracking-wide" style={{ color: primary }}>
                 {etabNom}
               </h1>
-              <div className="mt-1.5 space-y-0.5 text-[11px] leading-snug text-slate-600">
+              <div className="mt-1.5 space-y-0.5 text-[10.5px] leading-snug text-slate-600">
                 {contacts.map((line) => (
                   <p key={line}>{line}</p>
                 ))}
               </div>
             </div>
           </div>
-          <div className="shrink-0 text-right">
-            <div
-              className="inline-block px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-white"
-              style={{ background: primary }}
-            >
+          <div className="w-[11rem] shrink-0 text-right">
+            <p className="text-[9.5px] font-bold uppercase tracking-[0.16em] text-slate-400">Document financier</p>
+            <p className="mt-1.5 text-[12px] font-black uppercase leading-tight tracking-[0.06em]" style={{ color: primary }}>
               {titreTypeDocument(facture.type_document, { uppercase: false })}
-            </div>
-            <p className="mt-2.5 font-mono text-sm font-bold" style={{ color: primary }}>{facture.numero}</p>
+            </p>
+            <p className="mt-3 font-mono text-sm font-bold text-slate-900">{facture.numero}</p>
             <p className="mt-1 text-[11px] text-slate-500">{fmtDate(facture.date_emission)}</p>
           </div>
         </header>
 
-        <div className="mx-8 border-t border-slate-200" />
-
-        <section className="grid gap-6 px-8 py-5 sm:grid-cols-2">
+        <section className="grid gap-6 px-9 py-5 sm:grid-cols-2">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: primary }}>
-              {isFactureDefinitive(facture.type_document) ? 'Bénéficiaire' : 'Identité du bénéficiaire'}
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: primary }}>
+              Bénéficiaire
             </p>
-            <p className="mt-1.5 text-[15px] font-bold text-slate-900">{prenom} {nom.toUpperCase()}</p>
+            <div className="mb-2 mt-1 h-0.5 w-10" style={{ background: primary }} />
+            <p className="text-[15px] font-bold text-slate-900">
+              {prenom} {nom.toUpperCase()}
+            </p>
             {et.email && <p className="mt-1 text-sm text-slate-600">{et.email}</p>}
             {et.telephone && <p className="text-sm text-slate-600">Tél. {et.telephone}</p>}
             {isFactureDefinitive(facture.type_document) && et.nationalite && (
@@ -468,14 +467,19 @@ export default function FactureView() {
             )}
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: primary }}>Formation</p>
-            <p className="mt-1.5 font-bold text-slate-900">{fo.titre || '—'}</p>
-            <p className="mt-1.5 text-xs text-slate-600">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: primary }}>
+              Formation
+            </p>
+            <div className="mb-2 mt-1 h-0.5 w-10" style={{ background: primary }} />
+            <p className="font-bold text-slate-900">{fo.titre || '—'}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
               {[
                 fo.niveau && `Niveau : ${fo.niveau}`,
                 typeLabel(fo.type),
                 (fo.duree_formation || fo.duree) && `Durée : ${fo.duree_formation || fo.duree}`,
-              ].filter(Boolean).join(' · ')}
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
             {(facture.annee_academique || fo.annee_academique) && (
               <p className="mt-1 text-xs font-semibold text-slate-700">
@@ -485,19 +489,29 @@ export default function FactureView() {
           </div>
         </section>
 
-        <section className="px-8 pb-4">
+        <section className="px-9 pb-4">
           <table className="w-full border-collapse overflow-hidden border border-slate-200">
             <thead>
-              <tr style={{ background: primary }}>
-                <th className="px-4 py-2.5 text-left text-sm font-semibold text-white">Désignation</th>
-                <th className="w-40 px-4 py-2.5 text-right text-sm font-semibold text-white">Montant (FCFA)</th>
+              <tr style={{ background: `${primary}12` }}>
+                <th
+                  className="border-b px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide"
+                  style={{ color: primary, borderColor: `${primary}35` }}
+                >
+                  Désignation
+                </th>
+                <th
+                  className="w-40 border-b px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wide"
+                  style={{ color: primary, borderColor: `${primary}35` }}
+                >
+                  Montant (FCFA)
+                </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={`${r.designation}-${i}`} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/80'}>
+                <tr key={`${r.designation}-${i}`} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
                   <td
-                    className={`px-4 py-2.5 text-sm ${
+                    className={`border-b border-slate-100 px-4 py-2.5 text-sm ${
                       r.isTotalMensualites
                         ? 'font-semibold text-slate-900'
                         : r.isUnitMensualite
@@ -508,7 +522,7 @@ export default function FactureView() {
                     {r.designation}
                   </td>
                   <td
-                    className={`px-4 py-2.5 text-right text-sm tabular-nums ${
+                    className={`border-b border-slate-100 px-4 py-2.5 text-right text-sm tabular-nums ${
                       r.isTotalMensualites
                         ? 'font-bold text-slate-900'
                         : r.isUnitMensualite
@@ -532,7 +546,7 @@ export default function FactureView() {
 
         <CoordonneesPaiement eb={eb} primary={primary} />
 
-        <section className="flex items-end justify-between gap-6 px-8 pb-7 pt-1">
+        <section className="flex items-end justify-between gap-6 px-9 pb-7 pt-1">
           <div className="max-w-xs text-[10px] leading-relaxed text-slate-500">
             <p>
               {isFactureDefinitive(facture.type_document)
@@ -545,6 +559,8 @@ export default function FactureView() {
           </div>
           <CachetScolarite cachetUrl={eb.cachet_url} />
         </section>
+
+        <div className="h-[3px]" style={{ background: primary }} />
       </article>
     </div>
   )
