@@ -1,25 +1,13 @@
 /**
- * Attestation de préinscription — certificat A4 administratif élégant.
- * Identité visuelle dynamique (logo, couleurs, cachet). Sans photo candidat.
+ * Attestation de préinscription — certificat A4 (cadre, titre fort, phrase centrale).
+ * Pas de photo. Pas de grille formulaire. Branding établissement dynamique.
  */
 import CachetScolarite from './CachetScolarite'
 import { mediaUrl } from '../utils/mediaUrl'
-import { OfficialDocHeader, OfficialDocFooter } from './official/OfficialDocChrome'
 
 const fmtDate = (d) => {
   if (d == null || d === '') return '—'
   return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
-}
-
-function Field({ label, value }) {
-  return (
-    <div className="min-w-0 py-2">
-      <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{label}</dt>
-      <dd className="mt-0.5 border-b border-slate-100 pb-2 text-[13.5px] font-semibold leading-snug text-slate-900 break-words">
-        {value || '—'}
-      </dd>
-    </div>
-  )
 }
 
 export default function AttestationDocument({
@@ -45,127 +33,153 @@ export default function AttestationDocument({
   const lieu =
     etab?.ville ||
     etab?.adresse?.split(',')?.pop()?.trim() ||
-    etab?.nom ||
     '—'
+  const nomComplet = `${(prenom || '').trim()} ${(nom || '').trim().toUpperCase()}`.trim()
 
   return (
     <article
       ref={documentRef}
-      className="print-page relative mx-auto flex min-h-[297mm] max-w-[210mm] flex-col overflow-hidden bg-white text-[13.5px] leading-relaxed text-slate-800 shadow-2xl"
+      className="print-page relative mx-auto box-border flex min-h-[297mm] w-full max-w-[210mm] flex-col bg-white p-[10mm] text-slate-800 shadow-xl"
     >
-      {/* Filigrane discret */}
-      {logoSrc ? (
-        <img
-          src={logoSrc}
-          alt=""
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.04]"
-        />
-      ) : null}
-
-      <div className="h-[3px] shrink-0" style={{ background: `linear-gradient(90deg, ${primary}, ${secondary})` }} />
-
-      <OfficialDocHeader
-        etab={etab}
-        compact
-        rightSlot={
-          <div className="w-[11rem] shrink-0 text-right">
-            <p className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-slate-400">Document officiel</p>
-            <p className="mt-1.5 text-[12px] font-black uppercase leading-tight tracking-[0.06em]" style={{ color: primary }}>
-              Attestation de préinscription
-            </p>
-            <p className="mt-3 font-mono text-[11px] font-bold text-slate-800">{refAtt}</p>
-            <p className="mt-1 text-[11px] text-slate-500">Émise le {emitDate}</p>
-          </div>
-        }
-      />
-
-      <div className="relative z-[1] flex flex-1 flex-col px-10 py-6">
-        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-          Année académique {anneeAcademique || '—'}
-        </p>
-
-        <section
-          className="mt-5 border-y-2 px-1 py-5 text-center"
-          style={{ borderColor: `${primary}55` }}
+      {/* Cadre double certificat */}
+      <div
+        className="relative flex min-h-[calc(297mm-20mm)] flex-1 flex-col border-[1.5px] p-[5mm]"
+        style={{ borderColor: secondary }}
+      >
+        <div
+          className="relative flex flex-1 flex-col border px-[10mm] py-[8mm]"
+          style={{ borderColor: `${primary}99` }}
         >
-          <p className="mx-auto max-w-[36rem] text-[14.5px] font-medium leading-relaxed text-slate-800">
-            {texteCorps}
-          </p>
-          {texteOfficiel ? (
-            <p className="mx-auto mt-3 max-w-[36rem] text-[12px] leading-relaxed text-slate-500">{texteOfficiel}</p>
+          {/* Filigrane */}
+          {logoSrc ? (
+            <img
+              src={logoSrc}
+              alt=""
+              aria-hidden
+              className="pointer-events-none absolute left-1/2 top-[42%] h-[90mm] w-[90mm] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.045]"
+            />
           ) : null}
-        </section>
 
-        <div className="mt-6 grid grid-cols-2 gap-10">
-          <section>
-            <h2
-              className="mb-1 text-[11px] font-black uppercase tracking-[0.14em]"
-              style={{ color: primary }}
+          {/* En-tête centré certificat */}
+          <header className="relative z-[1] flex flex-col items-center text-center">
+            {logoSrc ? (
+              <img src={logoSrc} alt="" className="mb-2 h-[16mm] w-[16mm] object-contain" />
+            ) : (
+              <div
+                className="mb-2 flex h-[14mm] w-[14mm] items-center justify-center text-xs font-bold text-white"
+                style={{ background: primary }}
+              >
+                {(etab?.nom || 'ET').slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <p
+              className="text-[12px] font-bold uppercase tracking-[0.18em]"
+              style={{ color: primary, fontFamily: 'system-ui, sans-serif' }}
             >
-              Bénéficiaire
-            </h2>
-            <div className="mb-3 h-0.5 w-12" style={{ background: primary }} />
-            <dl>
-              <Field label="Prénom(s)" value={prenom} />
-              <Field label="Nom" value={(nom || '').toUpperCase()} />
-              <Field label="E-mail" value={email} />
-              <Field label="N° dossier" value={nDossier} />
-              <Field label="Date de préinscription" value={fmtDate(datePreinscription)} />
-            </dl>
-          </section>
-          <section>
-            <h2
-              className="mb-1 text-[11px] font-black uppercase tracking-[0.14em]"
-              style={{ color: primary }}
-            >
-              Formation
-            </h2>
-            <div className="mb-3 h-0.5 w-12" style={{ background: primary }} />
-            <dl>
-              <Field label="Intitulé" value={formationTitre} />
-              <Field label="Filière" value={filiere} />
-              <Field label="Niveau" value={niveau} />
-              <Field label="Année académique" value={anneeAcademique} />
-            </dl>
-          </section>
-        </div>
-
-        <section className="mt-auto flex items-end justify-between gap-8 pt-10">
-          <div>
-            <p className="text-[12px] text-slate-600">
-              Fait à {lieu}, le {emitDate}
+              {etab?.nom || 'Établissement'}
             </p>
-            <div className="mt-4">
-              <CachetScolarite cachetUrl={etab?.cachet_url} />
+            <div className="mt-1 max-w-[140mm] text-[8.5px] leading-snug text-slate-500" style={{ fontFamily: 'system-ui, sans-serif' }}>
+              {[etab?.adresse, etab?.telephone, etab?.email_contact].filter(Boolean).join(' · ')}
             </div>
-            {(etab?.signataire_nom || etab?.signataire_fonction) && (
-              <p className="mt-2 text-[11px] font-semibold text-slate-700">
-                {[etab.signataire_fonction, etab.signataire_nom].filter(Boolean).join(' — ')}
+            {(etab?.ninea || etab?.rc) && (
+              <p className="mt-0.5 text-[8px] text-slate-400" style={{ fontFamily: 'system-ui, sans-serif' }}>
+                {[etab.ninea && `NINEA ${etab.ninea}`, etab.rc && `RC ${etab.rc}`].filter(Boolean).join(' — ')}
               </p>
             )}
-          </div>
-          <div
-            className="max-w-[8.5rem] border px-2.5 py-2 text-center text-[9px] font-bold uppercase leading-relaxed tracking-wide text-slate-500"
-            style={{ borderColor: `${primary}40` }}
-          >
-            {(Array.isArray(etab?.valeurs_institutionnelles) && etab.valeurs_institutionnelles.length
-              ? etab.valeurs_institutionnelles
-              : ['Rigueur', 'Innovation', 'Engagement']
-            ).map((v) => (
-              <div key={v} className="py-0.5">
-                {v}
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+          </header>
 
-      <OfficialDocFooter etab={etab} primary={primary} secondary={secondary}>
-        <p>
-          Document officiel — {refAtt} — ne remplace pas l&apos;inscription définitive
-        </p>
-      </OfficialDocFooter>
+          <div className="relative z-[1] mx-auto mt-5 h-px w-[48mm]" style={{ background: primary }} />
+
+          <h1
+            className="relative z-[1] mt-5 text-center text-[15px] font-bold uppercase tracking-[0.2em]"
+            style={{ color: secondary, fontFamily: 'Georgia, "Times New Roman", Times, serif' }}
+          >
+            Attestation de préinscription
+          </h1>
+
+          <p
+            className="relative z-[1] mt-2 text-center text-[10px] text-slate-500"
+            style={{ fontFamily: 'system-ui, sans-serif' }}
+          >
+            Réf. <span className="font-mono font-semibold text-slate-700">{refAtt}</span>
+            {' · '}Émise le {emitDate}
+            {anneeAcademique ? ` · Année académique ${anneeAcademique}` : ''}
+          </p>
+
+          {/* Phrase centrale */}
+          <section className="relative z-[1] my-8 flex flex-1 flex-col justify-center px-2">
+            <p
+              className="text-center text-[14px] font-medium leading-[1.7] text-slate-800"
+              style={{ fontFamily: 'Georgia, "Times New Roman", Times, serif' }}
+            >
+              {texteCorps || (
+                <>
+                  Nous attestons que <strong>{nomComplet}</strong> est admis(e) en{' '}
+                  <strong>{formationTitre}</strong>
+                  {anneeAcademique ? (
+                    <>
+                      {' '}
+                      pour l&apos;année académique <strong>{anneeAcademique}</strong>
+                    </>
+                  ) : null}
+                  , sous réserve des formalités d&apos;inscription définitive.
+                </>
+              )}
+            </p>
+            {texteOfficiel ? (
+              <p
+                className="mx-auto mt-4 max-w-[145mm] text-center text-[10.5px] leading-relaxed text-slate-500"
+                style={{ fontFamily: 'system-ui, sans-serif' }}
+              >
+                {texteOfficiel}
+              </p>
+            ) : null}
+
+            {/* Synthèse compacte — une seule bande, pas une grille de labels */}
+            <div
+              className="mx-auto mt-8 w-full max-w-[150mm] border-y border-slate-300 py-3 text-center text-[11px] leading-relaxed text-slate-700"
+              style={{ fontFamily: 'system-ui, sans-serif' }}
+            >
+              <p>
+                <strong>{nomComplet}</strong>
+                {email ? ` · ${email}` : ''}
+              </p>
+              <p className="mt-1">
+                Dossier <span className="font-mono">{nDossier}</span>
+                {datePreinscription ? ` · Préinscrit(e) le ${fmtDate(datePreinscription)}` : ''}
+              </p>
+              <p className="mt-1">
+                {[formationTitre, filiere && filiere !== formationTitre ? filiere : null, niveau]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            </div>
+          </section>
+
+          {/* Signature */}
+          <section className="relative z-[1] mt-auto flex items-end justify-between gap-6 pt-4">
+            <div style={{ fontFamily: 'system-ui, sans-serif' }}>
+              <p className="text-[11px] text-slate-600">
+                Fait à {lieu}, le {emitDate}
+              </p>
+              <div className="mt-3">
+                <CachetScolarite cachetUrl={etab?.cachet_url} />
+              </div>
+              {(etab?.signataire_nom || etab?.signataire_fonction) && (
+                <p className="mt-1 text-[10px] font-medium text-slate-600">
+                  {[etab.signataire_fonction, etab.signataire_nom].filter(Boolean).join(' — ')}
+                </p>
+              )}
+            </div>
+            <p
+              className="max-w-[55mm] text-right text-[8px] leading-snug text-slate-400"
+              style={{ fontFamily: 'system-ui, sans-serif' }}
+            >
+              Document officiel — ne remplace pas l&apos;inscription définitive.
+            </p>
+          </section>
+        </div>
+      </div>
     </article>
   )
 }
