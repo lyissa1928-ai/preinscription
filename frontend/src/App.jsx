@@ -48,6 +48,7 @@ import {
   StaffProfileCompletion,
   StaffEtabEquipe,
   StaffEtabIdentite,
+  StaffEtabFlyers,
   StaffFacturesEtab,
   StaffAcceptesParFormation,
   BienvenueCompte,
@@ -184,6 +185,11 @@ function AppRoutes() {
         <Route path="/mon-etablissement/identite" element={
           <PrivateRoute roles={['admin_etablissement']}>
             <StaffEtabIdentite />
+          </PrivateRoute>
+        } />
+        <Route path="/mon-etablissement/flyers" element={
+          <PrivateRoute roles={['admin_etablissement', 'admin']}>
+            <StaffEtabFlyers />
           </PrivateRoute>
         } />
         <Route path="/mon-etablissement/factures" element={

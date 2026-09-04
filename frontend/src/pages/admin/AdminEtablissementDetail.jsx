@@ -26,10 +26,11 @@ import { TabFacturesEtab } from './TabFacturesEtab'
 import { TabAcceptesParFormation } from './TabAcceptesParFormation'
 import PreinscriptionConditionsBlock from '../../components/PreinscriptionConditionsBlock'
 import FormationExcelGrid from '../../components/FormationExcelGrid'
-import { computeScolariteAnnuelle, computeTotalMensualites, dureeLabelFromMois } from '../../lib/formationTarifs'
+import { computeSolde, computeTotalFormation, computeFraisParAn, dureeLabelFromMois } from '../../lib/formationTarifs'
 import { loadColumnState, templateColumnsFromState, formationToGridRow } from '../../lib/formationGridSchema'
 import DonneesBackupPanel from '../../components/DonneesBackupPanel'
 import { mediaUrl } from '../../utils/mediaUrl'
+import { TabFlyers } from '../StaffEtabFlyers'
 import {
   canCreateStaffAccount as userCanCreateStaff,
   creatableRoleOptions,
@@ -522,15 +523,17 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
   const [excelEditRows, setExcelEditRows] = useState([])
   const [excelSaving, setExcelSaving] = useState(false)
   const EMPTY = {
-    filiere_id: '', titre: '', type: lockedType || 'presentiel', niveau: '', niveau_requis: '', duree: '', description: '', debouches: '',
+    filiere_id: '', titre: '', type: lockedType || 'presentiel', niveau: '', niveau_requis: '',
+    nombre_annees: '', duree: '', description: '', debouches: '',
     frais_inscription: '', mensualite: '', duree_mois: '', frais_soutenance: '',
     frais_bibliotheque: '', frais_epi: '', autres_frais: '0',
     frais_supplementaires: [],
     libelles_champs: {
       frais_inscription: "Frais d'inscription",
       mensualite: 'Mensualité',
-      frais_soutenance: 'Frais de soutenance',
-      frais_bibliotheque: 'Bibliothèque',
+      solde: 'Solde',
+      frais_par_an: 'Frais par an',
+      frais_bibliotheque: 'Abonnement bibliothèque',
       frais_epi: 'EPI',
     },
     elements_facturation: [],
@@ -572,6 +575,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       type: f.type,
       niveau: f.niveau || '',
       niveau_requis: f.niveau_requis || '',
+      nombre_annees: f.nombre_annees != null ? String(f.nombre_annees) : '',
       duree: f.duree || '',
       description: f.description || '',
       debouches: f.debouches || '',
@@ -586,8 +590,9 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       libelles_champs: {
         frais_inscription: "Frais d'inscription",
         mensualite: 'Mensualité',
-        frais_soutenance: 'Frais de soutenance',
-        frais_bibliotheque: 'Bibliothèque',
+        solde: 'Solde',
+        frais_par_an: 'Frais par an',
+        frais_bibliotheque: 'Abonnement bibliothèque',
         frais_epi: 'EPI',
         ...(f.libelles_champs && typeof f.libelles_champs === 'object' ? f.libelles_champs : {}),
       },
@@ -618,6 +623,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         type: lockedType || form.type,
         niveau: form.niveau,
         niveau_requis: form.niveau_requis,
+        nombre_annees: parseInt(form.nombre_annees, 10) || 0,
         duree: form.duree || dureeLabelFromMois(form.duree_mois),
         description: form.description,
         debouches: form.debouches || '',
@@ -1072,7 +1078,8 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                       { l: 'Inscription', v: f.frais_inscription },
                       { l: 'Mensualité', v: f.mensualite },
                       { l: 'Durée (mois)', v: f.duree_mois },
-                      { l: 'Total mensualités', v: computeTotalMensualites(f.mensualite, f.duree_mois) },
+                      { l: 'Solde', v: computeSolde(f.mensualite, f.duree_mois) },
+                      { l: 'Total', v: computeTotalFormation(f.mensualite, f.duree_mois, f.frais_bibliotheque, f.frais_epi) },
                       { l: 'Scolarité annuelle', v: f.prix },
                       { l: 'Soutenance', v: f.frais_soutenance },
                       { l: 'Bibliothèque', v: f.frais_bibliotheque },
@@ -1201,8 +1208,20 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                   </select>
                 </div>
                 <div>
-                  <L>Niveau requis (prérequis)</L>
+                  <L>Niveau exigé</L>
                   <input className="input-field" value={form.niveau_requis} onChange={up('niveau_requis')} placeholder="Ex: Baccalauréat" />
+                </div>
+                <div>
+                  <L>Nombre d&apos;années</L>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={form.nombre_annees}
+                    onChange={up('nombre_annees')}
+                    placeholder="Ex: 3"
+                  />
                 </div>
                 {form.niveau ? (
                   <div className="col-span-2">
@@ -1215,11 +1234,11 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                     className="input-field bg-gray-50"
                     value={form.duree || dureeLabelFromMois(form.duree_mois)}
                     readOnly
-                    placeholder="Calculé depuis le nombre de mois"
+                    placeholder="Calculé depuis la durée mensualité"
                   />
                 </div>
                 <div>
-                  <L>Nombre de mois *</L>
+                  <L>Durée mensualité (mois) *</L>
                   <input
                     className="input-field"
                     type="number"
@@ -1230,7 +1249,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                     placeholder="Ex: 10"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Total mensualités = mois × mensualité.</p>
+                  <p className="text-xs text-gray-500 mt-1">Solde = mensualité × durée mensualité.</p>
                 </div>
                 <div>
                   <L>Photos d’identité (préinscription)</L>
@@ -1258,14 +1277,14 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                   <div className="bg-blue-50 rounded-xl p-4 space-y-3">
                     <p className="font-semibold text-blue-900 text-sm mb-2">💰 Tarification (FCFA)</p>
                     <p className="text-xs text-blue-800 mb-2">
-                      Forfait annuel (scolarité) = frais d&apos;inscription + (mensualité × durée en mois). Les frais supplémentaires ci‑dessous sont indiqués à part (hors total annuel).
+                      Solde = mensualité × durée mensualité. Total = solde + abonnement bibliothèque + EPI.
+                      Frais par an = frais d&apos;inscription + total.
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {[
-                        { f: 'frais_inscription', l: 'Frais d\'inscription', lk: 'frais_inscription' },
+                        { f: 'frais_inscription', l: "Frais d'inscription", lk: 'frais_inscription' },
                         { f: 'mensualite', l: 'Mensualité', lk: 'mensualite' },
-                        { f: 'frais_soutenance', l: 'Frais de soutenance', lk: 'frais_soutenance' },
-                        { f: 'frais_bibliotheque', l: 'Bibliothèque', lk: 'frais_bibliotheque' },
+                        { f: 'frais_bibliotheque', l: 'Abonnement bibliothèque', lk: 'frais_bibliotheque' },
                         { f: 'frais_epi', l: 'EPI', lk: 'frais_epi' },
                       ].map(({ f, l, lk }) => (
                         <div key={f}>
@@ -1287,15 +1306,21 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                         </div>
                       ))}
                       <div>
-                        <L>Total mensualités (calculé)</L>
+                        <L>Solde (calculé)</L>
                         <div className="input-field bg-gray-100 text-gray-900 font-semibold">
-                          {fmt(computeTotalMensualites(form.mensualite, form.duree_mois))} FCFA
+                          {fmt(computeSolde(form.mensualite, form.duree_mois))} FCFA
+                        </div>
+                      </div>
+                      <div>
+                        <L>Total (solde + biblio + EPI)</L>
+                        <div className="input-field bg-gray-100 text-gray-900 font-semibold">
+                          {fmt(computeTotalFormation(form.mensualite, form.duree_mois, form.frais_bibliotheque, form.frais_epi))} FCFA
                         </div>
                       </div>
                       <div className="sm:col-span-2">
-                        <L>Scolarité annuelle (calculée)</L>
-                        <div className="input-field bg-gray-100 text-gray-900 font-semibold">
-                          {fmt(computeScolariteAnnuelle(form.frais_inscription, form.mensualite, form.duree_mois))} FCFA
+                        <L>Frais par an (calculés)</L>
+                        <div className="input-field bg-blue-100 text-blue-950 font-bold">
+                          {fmt(computeFraisParAn(form.frais_inscription, form.mensualite, form.duree_mois, form.frais_bibliotheque, form.frais_epi))} FCFA
                         </div>
                       </div>
                     </div>
@@ -2357,6 +2382,7 @@ const TABS_ALL = [
   { id: 'identite', label: 'Identité', Icon: FaUniversity },
   { id: 'filieres', label: 'Filières', Icon: FaBook },
   { id: 'formations', label: 'Formations', Icon: FaGraduationCap },
+  { id: 'flyers', label: 'Flyers', Icon: FaFileInvoice },
   { id: 'acceptes', label: 'Acceptés', Icon: FaCheckCircle },
   { id: 'factures', label: 'Factures', Icon: FaFileInvoice },
   { id: 'membres', label: 'Membres', Icon: FaUsers },
@@ -2543,6 +2569,9 @@ export default function AdminEtablissementDetail() {
             onRefreshFilieres={refreshFilieresOnly}
             onRefreshFormations={refreshFormationsOnly}
           />
+        )}
+        {tab === 'flyers' && (
+          <TabFlyers etabId={etab.id} formations={etab.formations || []} />
         )}
         {tab === 'acceptes' && (
           <TabAcceptesParFormation etabId={etab.id} />

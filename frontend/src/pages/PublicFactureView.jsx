@@ -106,10 +106,19 @@ export default function PublicFactureView() {
   const fo = {
     titre: formation_titre || facture?.formation_snapshot?.titre,
     niveau: data.niveau || facture?.formation_snapshot?.niveau,
+    niveau_requis: facture?.formation_snapshot?.niveau_requis,
+    nombre_annees: facture?.formation_snapshot?.nombre_annees,
     type: type_formation || facture?.formation_snapshot?.type,
     duree: data.formation_duree || facture?.formation_snapshot?.duree,
     duree_formation: data.formation_duree,
+    duree_mois: facture?.formation_snapshot?.duree_mois,
+    mensualite: facture?.formation_snapshot?.mensualite,
+    frais_inscription: facture?.formation_snapshot?.frais_inscription,
+    frais_bibliotheque: facture?.formation_snapshot?.frais_bibliotheque,
+    frais_epi: facture?.formation_snapshot?.frais_epi,
+    libelles_champs: facture?.formation_snapshot?.libelles_champs,
     description: data.formation_description || facture?.formation_snapshot?.description || '',
+    debouches: facture?.formation_snapshot?.debouches || '',
   }
   // Réutilise la même logique de lignes que l’espace connecté
   const { rows, totalAPayer } = buildDisplayRows(
@@ -163,6 +172,7 @@ export default function PublicFactureView() {
           formation={{
             ...fo,
             description: fo.description || facture?.formation_snapshot?.description || '',
+            debouches: fo.debouches || facture?.formation_snapshot?.debouches || '',
           }}
           rows={rows}
           totalAPayer={totalAPayer || facture?.montant_ttc || 0}

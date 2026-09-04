@@ -94,6 +94,7 @@ const MENUS = {
   admin_etablissement: [
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     { label: 'Identité établissement', to: '/mon-etablissement/identite', icon: ICONS.identifiants },
+    { label: 'Flyers publics', to: '/mon-etablissement/flyers', icon: ICONS.dossiers },
     { label: 'Équipe & comptes', to: '/mon-etablissement/equipe', icon: ICONS.users, exact: true },
     { label: 'Filières & formations', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
     { label: 'Dossiers & acceptation', to: '/responsable', icon: ICONS.dossiers },

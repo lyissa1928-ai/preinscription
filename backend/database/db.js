@@ -63,6 +63,7 @@ db.defaults({
   chatbot_logs: [],
   chatbot_config: [],
   rapports_hebdomadaires: [],
+  flyers: [],
   site_config: {
     platform_name: 'Préinscription Universitaire',
     favicon_url: null,
@@ -86,8 +87,16 @@ db.defaults({
     security_events: 1,
     conditions_admission: 1,
     chatbot_logs: 1,
+    flyers: 1,
   },
 }).write();
+
+if (db.get('flyers').value() == null) {
+  db.set('flyers', []).write();
+}
+if (db.get('_nextId.flyers').value() == null) {
+  db.set('_nextId.flyers', 1).write();
+}
 
 // Migrations versionnées (continuité données anciennes → nouvelle app)
 try {
@@ -171,6 +180,7 @@ if (!adminExist) {
   'security_events',
   'conditions_admission',
   'chatbot_logs',
+  'flyers',
 ].forEach((col) => {
   const v = db.get(`_nextId.${col}`).value();
   if (!v || typeof v !== 'number') {

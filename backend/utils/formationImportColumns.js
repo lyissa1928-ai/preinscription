@@ -3,30 +3,32 @@
  */
 
 const DATA_COLUMNS = [
-  { key: 'titre', label: 'Nom de la formation', required: true },
-  { key: 'niveau', label: 'Niveau' },
-  { key: 'niveau_requis', label: 'Niveau requis' },
-  { key: 'duree_mois', label: 'Nombre de mois', required: true },
-  { key: 'frais_inscription', label: 'Inscription' },
+  { key: 'titre', label: 'Intitulé de la formation', required: true },
+  { key: 'niveau', label: 'Niveau', required: true },
+  { key: 'niveau_requis', label: 'Niveau exigé' },
+  { key: 'nombre_annees', label: "Nombre d'années" },
+  { key: 'duree_mois', label: 'Durée mensualité', required: true },
   { key: 'mensualite', label: 'Mensualité' },
-  { key: 'frais_soutenance', label: 'Soutenance' },
-  { key: 'frais_bibliotheque', label: 'Bibliothèque' },
+  { key: 'frais_inscription', label: "Frais d'inscription" },
+  { key: 'frais_bibliotheque', label: 'Abonnement bibliothèque' },
   { key: 'frais_epi', label: 'EPI' },
   { key: 'description', label: 'Description' },
+  { key: 'debouches', label: 'Débouchés' },
   { key: 'actif', label: 'Actif' },
 ];
 
 const ALIASES = {
   titre: ['titre', 'intitule', 'intitulé', 'nom de la formation', 'nom formation', 'formation'],
   niveau: ['niveau'],
-  niveau_requis: ['niveau_requis', 'niveau requis', 'niv. requis', 'niv requis'],
-  duree_mois: ['duree_mois', 'duree mois', 'nombre de mois', 'mois', 'nb mois'],
-  frais_inscription: ['frais_inscription', 'inscription', 'frais d inscription', "frais d'inscription"],
+  niveau_requis: ['niveau_requis', 'niveau requis', 'niveau exige', 'niveau exigé', 'niv. requis'],
+  nombre_annees: ['nombre_annees', "nombre d'annees", "nombre d'années", 'nb annees', 'annees', 'années'],
+  duree_mois: ['duree_mois', 'duree mois', 'duree mensualite', 'durée mensualité', 'nombre de mois', 'mois', 'nb mois'],
   mensualite: ['mensualite', 'mensualité', 'mens.'],
-  frais_soutenance: ['frais_soutenance', 'soutenance'],
-  frais_bibliotheque: ['frais_bibliotheque', 'bibliotheque', 'bibliothèque', 'biblio'],
+  frais_inscription: ['frais_inscription', 'inscription', 'frais d inscription', "frais d'inscription"],
+  frais_bibliotheque: ['frais_bibliotheque', 'bibliotheque', 'bibliothèque', 'abonnement bibliotheque', 'abonnement bibliothèque', 'biblio'],
   frais_epi: ['frais_epi', 'epi'],
   description: ['description'],
+  debouches: ['debouches', 'débouchés', 'debouche', 'débouché'],
   actif: ['actif', 'active', 'enabled'],
 };
 
@@ -69,9 +71,6 @@ function defaultTemplateColumns() {
   }));
 }
 
-/**
- * Parse query/body columns JSON : [{key,label}]
- */
 function parseCustomColumns(raw) {
   if (!raw) return defaultTemplateColumns();
   let arr = raw;
@@ -95,8 +94,7 @@ function parseCustomColumns(raw) {
       label: def.required && !label.includes('*') ? `${label} *` : label,
     });
   });
-  // Toujours garder titre + duree_mois
-  ['titre', 'duree_mois'].forEach((reqKey) => {
+  ['titre', 'duree_mois', 'niveau'].forEach((reqKey) => {
     if (!out.some((c) => c.key === reqKey)) {
       const def = DATA_COLUMNS.find((c) => c.key === reqKey);
       out.unshift({ key: reqKey, label: `${def.label} *` });

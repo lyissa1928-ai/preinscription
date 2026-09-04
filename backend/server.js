@@ -124,6 +124,7 @@ app.use('/api/agent-admin', require('./routes/agent_admin'));   // Agent adminis
 app.use('/api/comptable', require('./routes/comptable'));       // Comptable / Finance
 app.use('/api/qualite', require('./routes/qualite'));          // Contrôleur qualité
 app.use('/api/etablissements', require('./routes/etablissements'));
+app.use('/api/etablissements', require('./routes/flyers'));
 app.use('/api/formations', require('./routes/formations'));
 app.use('/api/niveaux-etude', require('./routes/niveauxEtude'));
 app.use('/api/responsable-fad', require('./routes/responsableFadAgents'));

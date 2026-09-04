@@ -143,9 +143,18 @@ export default function FactureView() {
           formation={{
             titre: fo.titre,
             niveau: fo.niveau,
+            niveau_requis: fo.niveau_requis,
+            nombre_annees: fo.nombre_annees,
             type: fo.type,
             duree: fo.duree_formation || fo.duree,
             description: fo.description || '',
+            debouches: fo.debouches || '',
+            duree_mois: fo.duree_mois,
+            mensualite: fo.mensualite,
+            frais_inscription: fo.frais_inscription,
+            frais_bibliotheque: fo.frais_bibliotheque,
+            frais_epi: fo.frais_epi,
+            libelles_champs: fo.libelles_champs,
             annee_academique: facture.annee_academique || fo.annee_academique,
           }}
           rows={rows}

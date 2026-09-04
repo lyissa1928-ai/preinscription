@@ -322,32 +322,39 @@ router.get('/formations', (req, res) => {
   }
 
   res.json(formations.map(f => ({
-
     id: f.id,
-
     etablissement_id: f.etablissement_id,
-
+    filiere_id: f.filiere_id,
+    filiere_nom: (db.get('filieres').find({ id: f.filiere_id }).value() || {}).nom || null,
     titre: f.titre,
-
     type: f.type,
-
     ville: f.ville,
-
-    prix: f.prix,
-
-    frais_inscription: f.frais_inscription,
-
-    mensualite: f.mensualite,
-
+    niveau: f.niveau || null,
+    niveau_requis: f.niveau_requis || null,
+    nombre_annees: f.nombre_annees || null,
+    duree: f.duree || null,
     duree_mois: f.duree_mois,
-
-    niveau_requis: f.niveau_requis
-
+    description: f.description || null,
+    debouches: f.debouches || null,
   })));
-
 });
 
-
+// GET /api/public/etablissements/:id/flyers — téléchargeables sans compte
+router.get('/etablissements/:id/flyers', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ message: 'Identifiant invalide.' });
+  }
+  const etab = db.get('etablissements').find({ id }).value();
+  if (!etab || etab.actif === false) {
+    return res.status(404).json({ message: 'Établissement introuvable.' });
+  }
+  const { publicFlyer } = require('./flyers');
+  const list = (db.get('flyers').value() || [])
+    .filter((f) => Number(f.etablissement_id) === id && f.actif !== false)
+    .map((f) => publicFlyer(f, req));
+  res.json(list);
+});
 
 // GET /api/public/site-branding — favicon et nom plateforme (sans auth)
 

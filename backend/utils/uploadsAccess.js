@@ -6,7 +6,7 @@
  * rôle/établissement de l'utilisateur et un contexte de résolution du dossier,
  * et retourne une décision normalisée.
  */
-const PUBLIC_PREFIXES = ['etablissements/', 'platform/'];
+const PUBLIC_PREFIXES = ['etablissements/', 'platform/', 'flyers/'];
 const STAFF_ROLES = new Set(['admin', 'admin_etablissement', 'responsable', 'responsable_fad', 'agent_fad', 'agent_admin', 'comptable', 'controleur_qualite']);
 
 /** Normalise un chemin d'upload et détecte les tentatives de traversal. */

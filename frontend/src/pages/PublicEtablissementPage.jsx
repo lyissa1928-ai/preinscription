@@ -19,6 +19,7 @@ export default function PublicEtablissementPage() {
 
   const [etab, setEtab] = useState(null)
   const [formations, setFormations] = useState([])
+  const [flyers, setFlyers] = useState([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   /** 'all' | 'presentiel' | 'en_ligne' */
@@ -36,9 +37,10 @@ export default function PublicEtablissementPage() {
     let cancelled = false
     Promise.all([
       axios.get(`/api/public/etablissements/${etabId}`).catch(() => ({ data: null })),
-      axios.get(`/api/formations?etablissement_id=${etabId}`).catch(() => ({ data: [] })),
+      axios.get(`/api/public/formations?etablissement_id=${etabId}`).catch(() => ({ data: [] })),
+      axios.get(`/api/public/etablissements/${etabId}/flyers`).catch(() => ({ data: [] })),
     ])
-      .then(([etabRes, formRes]) => {
+      .then(([etabRes, formRes, flyersRes]) => {
         if (cancelled) return
         if (!etabRes.data) {
           setNotFound(true)
@@ -46,6 +48,7 @@ export default function PublicEtablissementPage() {
         }
         setEtab(etabRes.data)
         setFormations(Array.isArray(formRes.data) ? formRes.data : [])
+        setFlyers(Array.isArray(flyersRes.data) ? flyersRes.data : [])
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -363,20 +366,38 @@ export default function PublicEtablissementPage() {
                           <p className="mt-1 text-xs text-gray-600">Accès : {f.filiere_condition_acces}</p>
                         )}
                         {f.niveau && <p className="mt-1 text-xs text-gray-600">Niveau : {f.niveau}</p>}
+                        {f.nombre_annees > 0 && (
+                          <p className="mt-1 text-xs text-gray-600">Durée : {f.nombre_annees} an(s)</p>
+                        )}
                         {f.description && <p className="mt-2 text-xs text-gray-500 line-clamp-3">{f.description}</p>}
+                        {f.debouches && (
+                          <p className="mt-2 text-xs text-slate-600">
+                            <span className="font-semibold text-slate-700">Débouchés :</span> {f.debouches}
+                          </p>
+                        )}
                         <details className="mt-3 text-xs">
                           <summary className="cursor-pointer font-semibold text-blue-700">Conditions d&apos;entrée</summary>
                           <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-gray-100 bg-slate-50 p-2">
                             <PreinscriptionConditionsBlock formationNiveau={f.niveau} />
                           </div>
                         </details>
-                        {(f.places_restantes != null || f.places) && (
-                          <p className="mt-3 text-[11px] text-gray-400">
-                            Places restantes (indicatif) :{' '}
-                            <span className="font-semibold text-gray-600">
-                              {f.places_restantes != null ? f.places_restantes : f.places}
-                            </span>
-                          </p>
+                        {flyers.filter((fl) => Number(fl.formation_id) === Number(f.id)).length > 0 && (
+                          <div className="mt-3 space-y-1">
+                            <p className="text-[11px] font-semibold text-slate-600">Flyers</p>
+                            {flyers
+                              .filter((fl) => Number(fl.formation_id) === Number(f.id))
+                              .map((fl) => (
+                                <a
+                                  key={fl.id}
+                                  href={mediaUrl(fl.file_url)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block text-sm font-semibold text-blue-700 hover:underline"
+                                >
+                                  ⬇ {fl.titre || 'Télécharger le flyer'}
+                                </a>
+                              ))}
+                          </div>
                         )}
                         <p className="mt-3 text-[10px] text-amber-800/90 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1.5">
                           Tarifs non affichés sur cette page — communiqués après inscription ou sur demande de facture proforma.
@@ -388,6 +409,35 @@ export default function PublicEtablissementPage() {
               </div>
             )}
           </>
+        )}
+
+        {flyers.length > 0 && (
+          <section className="mt-10 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-black text-gray-900">Flyers à télécharger</h2>
+            <p className="mt-1 text-xs text-gray-500">Documents publics — aucun compte requis.</p>
+            <ul className="mt-4 space-y-3">
+              {flyers.map((fl) => (
+                <li key={fl.id} className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
+                  <p className="font-bold text-slate-900">{fl.titre}</p>
+                  {fl.description && <p className="mt-1 text-xs text-slate-600 line-clamp-2">{fl.description}</p>}
+                  {fl.debouches && (
+                    <p className="mt-1 text-xs text-slate-500 line-clamp-2">
+                      <span className="font-semibold">Débouchés :</span> {fl.debouches}
+                    </p>
+                  )}
+                  <a
+                    href={mediaUrl(fl.file_url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-block text-sm font-bold hover:underline"
+                    style={{ color: primary }}
+                  >
+                    ⬇ Télécharger
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         <div className="mt-10 flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">

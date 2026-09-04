@@ -26,6 +26,7 @@ const {
   canManageTargetMembre,
   isPlatformAdmin,
   isAdminEtablissement,
+  userAdministersEtablissement,
   ROLE_ADMIN_ETABLISSEMENT,
 } = require('../utils/staffRoles');
 const {
@@ -74,11 +75,11 @@ function etabPedagogieWrite(req, res, next) {
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
   }
-  if (Number(req.user.etablissement_id) !== etabId) {
+  if (Number(req.user.etablissement_id) !== etabId && !userAdministersEtablissement(req.user, etabId)) {
     return res.status(403).json({ message: 'Vous ne pouvez modifier que les formations de votre établissement.' });
   }
   if (isAdminEtablissement(req.user) || actsAsResponsable(req.user)) {
-    req.pedagogieScope = 'presentiel'; // responsable présentiel : pas de FAD
+    req.pedagogieScope = 'presentiel';
     return next();
   }
   if (req.user.role === 'responsable_fad' || req.user.role === 'agent_fad') {
@@ -1771,6 +1772,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     frais_inscription, mensualite, frais_soutenance, autres_frais,
     duree_mois, frais_supplementaires,
     frais_bibliotheque, frais_epi,
+    nombre_annees,
     nombre_photos_preinscription,
     libelles_champs,
     elements_facturation,
@@ -1822,6 +1824,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     niveau_requis: niveau_requis || '',
     duree: duree || '',
     duree_mois: dureeMoisN,
+    nombre_annees: parseInt(nombre_annees, 10) || 0,
     description: description || '',
     debouches: debouches || '',
     ville: null,
@@ -1950,6 +1953,7 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
     const description = String(data.description || '').trim();
     const debouches = String(data.debouches || '').trim();
     const duree_mois = toInt(data.duree_mois, 0);
+    const nombre_annees = toInt(data.nombre_annees, 0);
     const frais_inscription = toInt(data.frais_inscription, 0);
     const mensualite = toInt(data.mensualite, 0);
     const frais_soutenance = toInt(data.frais_soutenance, 0);
@@ -1981,6 +1985,7 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
       niveau_requis,
       duree: duree_mois > 0 ? (duree_mois === 12 ? '12 mois (1 an)' : `${duree_mois} mois`) : '',
       duree_mois: duree_mois || 0,
+      nombre_annees: nombre_annees || 0,
       description,
       debouches,
       ville: null,
@@ -2050,15 +2055,15 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
   }
 
   const allowed = new Set([
-    'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree',
+    'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree', 'nombre_annees',
     'description', 'debouches', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
     'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
-    'frais_bibliotheque', 'frais_epi',
+    'frais_bibliotheque', 'frais_epi', 'libelles_champs', 'elements_facturation',
   ]);
   const numericFields = new Set([
     'filiere_id', 'places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'duree_mois',
-    'frais_bibliotheque', 'frais_epi',
+    'frais_bibliotheque', 'frais_epi', 'nombre_annees',
   ]);
 
   const updated = [];
@@ -2217,7 +2222,7 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
   }
 
   const fields = [
-    'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree',
+    'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree', 'nombre_annees',
     'description', 'debouches', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
     'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',

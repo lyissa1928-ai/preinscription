@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { computeScolariteAnnuelle, computeTotalMensualites, dureeLabelFromMois } from '../lib/formationTarifs'
+import { computeSolde, computeTotalFormation, dureeLabelFromMois } from '../lib/formationTarifs'
 import {
   emptyGridRow,
   formationToGridRow,
@@ -58,8 +58,8 @@ export default function FormationExcelGrid({
   const [mode, setMode] = useState(initialType === 'en_ligne' ? 'en_ligne' : 'presentiel')
   const [columns, setColumns] = useState(() => loadColumnState(etabId))
   const [computedVisible, setComputedVisible] = useState(() => ({
-    _total_mens: true,
-    _forfait: true,
+    _solde: true,
+    _total: true,
   }))
   const [rows, setRows] = useState(() => [
     emptyGridRow(initialFiliereId, initialType),
@@ -167,8 +167,9 @@ export default function FormationExcelGrid({
       toast.error(`La colonne « ${col.label} » est obligatoire et ne peut pas être masquée.`)
       return
     }
-    if (key === '_total_mens' || key === '_forfait') {
-      setComputedVisible((p) => ({ ...p, [key]: false }))
+    if (key === '_solde' || key === '_total' || key === '_total_mens' || key === '_forfait') {
+      const k = key === '_total_mens' ? '_solde' : key === '_forfait' ? '_total' : key
+      setComputedVisible((p) => ({ ...p, [k]: false }))
       toast.success('Colonne calculée masquée.')
       return
     }
@@ -178,7 +179,7 @@ export default function FormationExcelGrid({
 
   const restoreAllColumns = () => {
     persistColumns(columns.map((c) => ({ ...c, visible: true })))
-    setComputedVisible({ _total_mens: true, _forfait: true })
+    setComputedVisible({ _solde: true, _total: true })
     toast.success('Toutes les colonnes restaurées.')
   }
 
@@ -304,9 +305,11 @@ export default function FormationExcelGrid({
         type: isEdit ? rowType : mode,
         niveau: r.niveau || '',
         niveau_requis: r.niveau_requis || '',
+        nombre_annees: parseInt(r.nombre_annees, 10) || 0,
         duree: dureeLabelFromMois(mois),
         duree_mois: mois,
         description: r.description || '',
+        debouches: r.debouches || '',
         ville: null,
         places: 0,
         frais_inscription: parseInt(r.frais_inscription, 10) || 0,
@@ -485,8 +488,8 @@ export default function FormationExcelGrid({
             </thead>
             <tbody>
               {rows.map((r, ri) => {
-                const totalMen = computeTotalMensualites(r.mensualite, r.duree_mois)
-                const forfait = computeScolariteAnnuelle(r.frais_inscription, r.mensualite, r.duree_mois)
+                const solde = computeSolde(r.mensualite, r.duree_mois)
+                const total = computeTotalFormation(r.mensualite, r.duree_mois, r.frais_bibliotheque, r.frais_epi)
                 const rowSelected = sel && ri >= Math.min(sel.r1, sel.r2) && ri <= Math.max(sel.r1, sel.r2)
                 return (
                   <tr
@@ -550,14 +553,14 @@ export default function FormationExcelGrid({
                         </td>
                       )
                     })}
-                    {computedVisible._total_mens !== false && (
+                    {computedVisible._solde !== false && (
                       <td className="px-1.5 py-1 font-semibold tabular-nums text-emerald-800 whitespace-nowrap text-xs">
-                        {fmt(totalMen)}
+                        {fmt(solde)}
                       </td>
                     )}
-                    {computedVisible._forfait !== false && (
+                    {computedVisible._total !== false && (
                       <td className="px-1.5 py-1 font-bold tabular-nums text-blue-900 whitespace-nowrap text-xs">
-                        {fmt(forfait)}
+                        {fmt(total)}
                       </td>
                     )}
                     <td className="px-1 py-1">
