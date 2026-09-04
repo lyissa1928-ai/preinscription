@@ -137,7 +137,7 @@ export default function ComptableDashboard() {
 
         {tab === 'dashboard' && stats && (
           <div className="space-y-8">
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="ui-grid-stats">
               <StatTile icon={<span className="text-xl">📩</span>} gradient="blue" label="Demandes proforma" value={stats.total_demandes_proforma} />
               <StatTile icon={<span className="text-xl">🧾</span>} gradient="violet" label="Factures générées" value={stats.factures_generees} />
               <StatTile icon={<span className="text-xl">💵</span>} gradient="emerald" label="Montant total proforma" value={`${fmt(stats.montant_total_proforma)} FCFA`} />

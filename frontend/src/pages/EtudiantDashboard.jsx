@@ -54,21 +54,18 @@ function ModalDetail({ open, onClose, type, payload }) {
     const b = badgeProforma(d.statut, d)
     const okDocs = d.statut === 'acceptee'
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" role="dialog" aria-modal onClick={onClose}>
-        <div
-          className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200"
-          onClick={stop}
-        >
-          <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-gradient-to-r from-slate-50 to-white">
-            <div>
+      <div className="ui-modal-overlay" role="dialog" aria-modal onClick={onClose}>
+        <div className="ui-modal" onClick={stop}>
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-4 py-4 sm:px-5">
+            <div className="min-w-0 pr-3">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Demande de facture proforma</p>
-              <p className="font-mono font-bold text-slate-900">{d.reference}</p>
+              <p className="truncate font-mono font-bold text-slate-900">{d.reference}</p>
             </div>
-            <button type="button" onClick={onClose} className="text-2xl text-slate-400 hover:text-slate-700 leading-none" aria-label="Fermer">
+            <button type="button" onClick={onClose} className="shrink-0 text-2xl leading-none text-slate-400 hover:text-slate-700" aria-label="Fermer">
               ×
             </button>
           </div>
-          <div className="p-5 space-y-4 text-sm">
+          <div className="ui-modal-body space-y-4 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <span className={`text-xs font-bold px-2.5 py-1 rounded-full ring-1 ${b.cls}`}>{b.label}</span>
             </div>
@@ -129,18 +126,18 @@ function ModalDetail({ open, onClose, type, payload }) {
   const { dossier, formation, facture, documents } = payload
   const ld = labelDossierStatut(dossier.statut)
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" role="dialog" aria-modal onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200" onClick={stop}>
-        <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-gradient-to-r from-slate-50 to-white">
-          <div>
+    <div className="ui-modal-overlay" role="dialog" aria-modal onClick={onClose}>
+      <div className="ui-modal" onClick={stop}>
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-4 py-4 sm:px-5">
+          <div className="min-w-0 pr-3">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Préinscription</p>
-            <p className="font-mono font-bold text-slate-900">{dossier.numero_dossier}</p>
+            <p className="truncate font-mono font-bold text-slate-900">{dossier.numero_dossier}</p>
           </div>
-          <button type="button" onClick={onClose} className="text-2xl text-slate-400 hover:text-slate-700 leading-none" aria-label="Fermer">
+          <button type="button" onClick={onClose} className="shrink-0 text-2xl leading-none text-slate-400 hover:text-slate-700" aria-label="Fermer">
             ×
           </button>
         </div>
-        <div className="p-5 space-y-4 text-sm">
+        <div className="ui-modal-body space-y-4 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ring-1 ${ld.cls}`}>{ld.label}</span>
             <StatutBadge statut={dossier.statut} />
@@ -189,6 +186,9 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
   const canEditPhoto = dossier.statut === 'en_attente' || dossier.statut === 'en_cours'
   const [photoBusy, setPhotoBusy] = useState(false)
   const photoInputRef = useRef(null)
+  const showLettre = canShowLettrePreinscription(dossier, inferIsForeignerFromNationalite)
+  const accepted = isDossierAcceptePourDocuments(dossier.statut)
+  const statutCfg = STATUT_CONFIG[dossier.statut] || { color: 'border-slate-200 bg-slate-50', icon: '📋', msg: '' }
 
   const handlePhotoSelected = async (e) => {
     const file = e.target.files?.[0]
@@ -211,216 +211,196 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
   }
 
   return (
-    <div className="space-y-6 rounded-3xl border border-slate-200/80 bg-slate-50/30 p-4 sm:p-6">
+    <article className="space-y-5 sm:space-y-6">
       {canEditPhoto && (
-        <div className="overflow-hidden rounded-3xl border border-indigo-200/90 bg-gradient-to-br from-indigo-50/90 to-white p-5 shadow-md shadow-indigo-100/40 sm:p-6">
-          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="flex items-center gap-2 text-base font-bold text-slate-900">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-lg" aria-hidden>
-                  🖼️
-                </span>
-                Photo d’identité
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                Ajoutez ou remplacez votre photo (JPG, PNG, max. 2 Mo). Elle sera utilisée sur les documents officiels une fois votre dossier accepté.
+        <div className="flex flex-col gap-3 rounded-2xl border border-indigo-200/80 bg-indigo-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            {photoDoc && (
+              <img
+                src={mediaUrl(`/uploads/${photoDoc.chemin}`)}
+                alt=""
+                className="h-16 w-14 shrink-0 rounded-lg border border-white object-cover shadow ring-1 ring-indigo-200"
+              />
+            )}
+            <div className="min-w-0 text-sm text-indigo-950">
+              <p className="font-bold">Photo d’identité</p>
+              <p className="mt-0.5 text-indigo-900/80">
+                {photoDoc
+                  ? 'Une photo est déjà jointe — vous pouvez la remplacer tant que le dossier n’est pas tranché.'
+                  : 'Ajoutez une photo d’identité (JPG/PNG) pour les documents officiels.'}
               </p>
             </div>
-            {photoDoc && (
-              <div className="mx-auto shrink-0 overflow-hidden rounded-2xl border-2 border-white shadow ring-2 ring-indigo-200/80 sm:mx-0">
-                <img
-                  src={mediaUrl(`/uploads/${photoDoc.chemin}`)}
-                  alt=""
-                  className="h-36 w-28 object-cover sm:h-40 sm:w-32"
-                />
-              </div>
-            )}
           </div>
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/jpg"
-            className="hidden"
-            onChange={handlePhotoSelected}
-          />
+          <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/jpg" className="hidden" onChange={handlePhotoSelected} />
           <button
             type="button"
             disabled={photoBusy}
             onClick={() => photoInputRef.current?.click()}
-            className="w-full rounded-xl border-2 border-indigo-300 bg-white px-4 py-3 text-sm font-bold text-indigo-800 shadow-sm transition hover:bg-indigo-50 disabled:opacity-50 sm:w-auto"
+            className="inline-flex min-h-[44px] w-full shrink-0 items-center justify-center rounded-xl border-2 border-indigo-300 bg-white px-4 py-2.5 text-sm font-bold text-indigo-800 shadow-sm hover:bg-indigo-50 disabled:opacity-50 sm:w-auto"
           >
-            {photoBusy ? 'Envoi…' : photoDoc ? 'Remplacer la photo' : 'Ajouter ma photo d’identité'}
+            {photoBusy ? 'Envoi…' : photoDoc ? 'Remplacer la photo' : 'Ajouter ma photo'}
           </button>
         </div>
       )}
 
-      <div className={`rounded-3xl border-2 p-6 shadow-lg shadow-slate-200/30 ${STATUT_CONFIG[dossier.statut]?.color || 'border-slate-200 bg-slate-50'}`}>
-        <div className="flex items-start gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-3xl shadow-inner">{STATUT_CONFIG[dossier.statut]?.icon}</div>
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-3 mb-2">
-              <h2 className="text-lg font-bold text-gray-900">Dossier N° {dossier.numero_dossier}</h2>
+      {/* 1. Statut de la candidature */}
+      <section className={`ui-section border-2 ${statutCfg.color}`}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/90 text-2xl shadow-inner sm:h-14 sm:w-14 sm:text-3xl">
+            {statutCfg.icon}
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h2 className="text-base font-bold text-slate-900 sm:text-lg">
+                Dossier N° <span className="font-mono">{dossier.numero_dossier}</span>
+              </h2>
               <StatutBadge statut={dossier.statut} />
             </div>
             {formation?.titre && (
-              <p className="text-sm font-semibold text-blue-900 mb-1">{formation.titre}</p>
+              <p className="text-sm font-semibold text-blue-900 text-safe">{formation.titre}</p>
             )}
-            <p className="text-gray-600 text-sm mb-2">{STATUT_CONFIG[dossier.statut]?.msg}</p>
+            <p className="text-sm leading-relaxed text-slate-600">{statutCfg.msg}</p>
             {dossier.commentaire_admin && (
-              <div className="mt-3 p-3 bg-white/70 rounded-xl border border-white">
-                <p className="text-xs font-bold text-gray-500 mb-1">MESSAGE DE L&apos;ADMINISTRATION</p>
-                <p className="text-sm text-gray-700">{dossier.commentaire_admin}</p>
+              <div className="mt-2 rounded-xl border border-white/80 bg-white/70 p-3">
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Message de l&apos;administration</p>
+                <p className="text-sm text-slate-700 text-safe">{dossier.commentaire_admin}</p>
               </div>
             )}
-            <p className="text-xs text-gray-400 mt-2">Soumis le {new Date(dossier.created_at).toLocaleDateString('fr-FR', { dateStyle: 'long' })}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-6">
-        {formation && (
-          <div className="lg:col-span-2 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 p-6 shadow-xl shadow-slate-200/30 backdrop-blur-sm">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-lg text-white shadow-md">🎓</div>
-              <h3 className="font-bold text-slate-900">Formation concernée</h3>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h4 className="font-bold text-gray-900">{formation.titre}</h4>
-                  <span className={`inline-block mt-1 text-xs font-semibold px-2.5 py-1 rounded-full ${formation.type === 'en_ligne' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {formation.type === 'en_ligne' ? '🌐 En ligne' : `🏫 Présentiel · ${formation.ville}`}
-                  </span>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 mt-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-                Les montants (frais et scolarité) figurent sur votre facture proforma une fois le dossier instruit.
-              </p>
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100 text-sm">
-                {[
-                  ['Durée', formation.duree],
-                  ['Niveau de formation', formation.niveau || '—'],
-                  ['Niveau requis (diplôme)', formation.niveau_requis],
-                  ['Année', dossier.annee_academique],
-                ].map(([l, v]) => (
-                  <div key={l}><span className="text-gray-400 text-xs uppercase">{l}</span><p className="font-semibold text-gray-800">{v}</p></div>
-                ))}
-              </div>
-            </div>
-            <div className="mt-4">
-              <PreinscriptionConditionsBlock
-                formationNiveau={dossier.formation_niveau_cible || formation?.niveau}
-                profileKey={dossier.document_rule_profile}
-              />
-            </div>
-          </div>
-        )}
-
-        {dossier && !isDossierAcceptePourDocuments(dossier.statut) && (
-          <div className="lg:col-span-3 overflow-hidden rounded-3xl border border-amber-200/80 bg-amber-50/40 p-5 shadow-sm">
-            <p className="text-sm text-amber-950/90">
-              <span className="font-bold">Documents officiels :</span> la lettre et l&apos;attestation de préinscription ne sont téléchargeables qu&apos;après{' '}
-              <strong>validation</strong> de cette candidature (statut « accepté »).
+            <p className="text-xs text-slate-500">
+              Soumis le {new Date(dossier.created_at).toLocaleDateString('fr-FR', { dateStyle: 'long' })}
             </p>
           </div>
-        )}
-
-        {isDossierAcceptePourDocuments(dossier.statut) && (
-          <div className="lg:col-span-3 overflow-hidden rounded-3xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50 to-teal-50/50 p-6 shadow-lg shadow-emerald-100/40">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h3 className="flex items-center gap-2 font-bold text-emerald-900">📜 Documents officiels disponibles</h3>
-                <p className="mt-1 text-sm text-emerald-800/90">
-                  Candidature acceptée : facture proforma et attestation disponibles
-                  {canShowLettrePreinscription(dossier, inferIsForeignerFromNationalite)
-                    ? ' ; lettre de préinscription (candidat étranger).'
-                    : '.'}
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row flex-wrap gap-2 shrink-0">
-                <Link
-                  to={`/facture/${dossier.id}`}
-                  className="flex items-center justify-center gap-2 rounded-xl border-2 border-blue-600 bg-white px-5 py-2.5 text-sm font-bold text-blue-700 shadow-sm transition-all hover:bg-blue-50"
-                >
-                  🧾 Facture proforma
-                </Link>
-                <Link
-                  to={`/attestation/${dossier.id}`}
-                  className="flex items-center justify-center gap-2 rounded-xl border-2 border-indigo-600 bg-white px-5 py-2.5 text-sm font-bold text-indigo-700 shadow-sm transition-all hover:bg-indigo-50"
-                >
-                  🏅 Attestation de préinscription
-                </Link>
-                {canShowLettrePreinscription(dossier, inferIsForeignerFromNationalite) && (
-                  <Link
-                    to={`/lettre/${dossier.id}`}
-                    className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:from-emerald-700 hover:to-teal-700 hover:shadow-lg"
-                  >
-                    📄 Lettre de préinscription
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 p-6 shadow-xl shadow-slate-200/30 backdrop-blur-sm lg:col-span-1">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 text-lg shadow-md">🧾</div>
-            <h3 className="font-bold text-slate-900">Facture Proforma</h3>
-          </div>
-          {facture ? (
-            <div className="flex-1 flex flex-col">
-              <div className="mb-4 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-inner">
-                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-emerald-600">Facture émise</p>
-                <p className="font-mono font-bold text-slate-800">{facture.numero}</p>
-                <p className="mt-2 text-2xl font-black text-blue-700 tabular-nums">
-                  {fmt(facture.montant_ttc)} <span className="text-sm font-semibold text-slate-500">FCFA</span>
-                </p>
-              </div>
-              <Link to={`/facture/${dossier.id}`} className="btn-primary mt-auto flex w-full items-center justify-center gap-2 text-center text-sm shadow-lg shadow-blue-600/20">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                Voir et télécharger
-              </Link>
-            </div>
-          ) : isDossierAcceptePourDocuments(dossier.statut) ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
-              <p className="text-gray-400 text-sm mb-4">Aucune facture générée</p>
-              <Link to={`/facture/${dossier.id}`} className="btn-outline text-sm w-full text-center">
-                Générer ma facture proforma
-              </Link>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
-              <p className="text-sm text-slate-500">
-                Disponible après acceptation de votre candidature (y compris pour les candidats étrangers).
-              </p>
-            </div>
-          )}
         </div>
-      </div>
+      </section>
 
-      {documents && documents.length > 0 && (
-        <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 p-6 shadow-xl shadow-slate-200/30 backdrop-blur-sm">
+      {/* 2. Formation concernée */}
+      {formation && (
+        <section className="ui-section">
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-lg shadow-inner">📎</div>
-            <h3 className="font-bold text-slate-900">Documents soumis</h3>
-            <span className="ml-auto rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">{documents.length} fichier(s)</span>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-lg text-white shadow-md">
+              🎓
+            </div>
+            <div className="min-w-0">
+              <h3 className="ui-section-title mb-0">Formation concernée</h3>
+            </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {documents.map((doc) => (
-              <div key={doc.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 transition-colors hover:bg-white hover:shadow-md">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg shadow-sm">📄</div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-700 capitalize">{doc.type_document.replace('_', ' ')}</p>
-                  <p className="text-xs text-gray-400 truncate">{doc.nom_fichier}</p>
-                </div>
-                <span className="text-emerald-500 text-lg">✓</span>
+          <h4 className="text-lg font-bold text-slate-900 text-safe sm:text-xl">{formation.titre}</h4>
+          <span
+            className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+              formation.type === 'en_ligne' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+            }`}
+          >
+            {formation.type === 'en_ligne' ? 'En ligne (FAD)' : `Présentiel${formation.ville ? ` · ${formation.ville}` : ''}`}
+          </span>
+          <p className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600 sm:text-sm">
+            Les montants (frais et scolarité) figurent sur votre facture proforma une fois le dossier instruit.
+          </p>
+          <div className="ui-info-grid mt-4 border-t border-slate-100 pt-4">
+            {[
+              ['Durée', formation.duree],
+              ['Niveau de formation', formation.niveau || '—'],
+              ['Niveau requis', formation.niveau_requis],
+              ['Année académique', dossier.annee_academique],
+            ].map(([l, v]) => (
+              <div key={l} className="min-w-0 rounded-xl bg-slate-50/80 px-3 py-2.5">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{l}</span>
+                <p className="mt-0.5 font-semibold text-slate-800 text-safe">{v || '—'}</p>
               </div>
             ))}
           </div>
-        </div>
+          <div className="mt-4">
+            <PreinscriptionConditionsBlock
+              formationNiveau={dossier.formation_niveau_cible || formation?.niveau}
+              profileKey={dossier.document_rule_profile}
+            />
+          </div>
+        </section>
       )}
-    </div>
+
+      {/* 3. Documents officiels */}
+      <section
+        className={`ui-section ${
+          accepted ? 'border-emerald-200/90 bg-gradient-to-br from-emerald-50/80 to-white' : 'border-amber-200/80 bg-amber-50/40'
+        }`}
+      >
+        <h3 className="ui-section-title">Documents officiels</h3>
+        {!accepted ? (
+          <p className="text-sm leading-relaxed text-amber-950/90">
+            La facture proforma, l&apos;attestation et la lettre de préinscription ne sont téléchargeables qu&apos;après{' '}
+            <strong>validation</strong> de cette candidature (statut « accepté »).
+          </p>
+        ) : (
+          <>
+            <p className="ui-section-sub">
+              Candidature acceptée — téléchargez vos documents administratifs
+              {showLettre ? ' (lettre réservée aux candidats étrangers éligibles).' : '.'}
+            </p>
+            <div className="ui-action-bar">
+              <Link to={`/facture/${dossier.id}`} className="ui-doc-btn">
+                Facture proforma
+              </Link>
+              <Link to={`/attestation/${dossier.id}`} className="ui-doc-btn">
+                Attestation de préinscription
+              </Link>
+              {showLettre && (
+                <Link to={`/lettre/${dossier.id}`} className="ui-doc-btn-solid">
+                  Lettre de préinscription
+                </Link>
+              )}
+            </div>
+            {facture && (
+              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-emerald-100 bg-white/90 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Facture émise</p>
+                  <p className="font-mono text-sm font-bold text-slate-800">{facture.numero}</p>
+                  <p className="mt-1 text-xl font-black tabular-nums text-slate-900">
+                    {fmt(facture.montant_ttc)} <span className="text-sm font-semibold text-slate-500">FCFA</span>
+                  </p>
+                </div>
+                <Link to={`/facture/${dossier.id}`} className="btn-primary inline-flex min-h-[44px] w-full items-center justify-center sm:w-auto">
+                  Voir et télécharger
+                </Link>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* 4. Documents soumis */}
+      {documents && documents.length > 0 && (
+        <section className="ui-section">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <h3 className="ui-section-title mb-0">Documents soumis</h3>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-500">
+              {documents.length} fichier{documents.length > 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="ui-grid-docs">
+            {documents.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-base shadow-sm">
+                  📄
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold capitalize text-slate-800">
+                    {String(doc.type_document || '').replace(/_/g, ' ')}
+                  </p>
+                  <p className="truncate text-xs text-slate-400" title={doc.nom_fichier}>
+                    {doc.nom_fichier}
+                  </p>
+                </div>
+                <span className="shrink-0 text-sm font-bold text-emerald-600" title="Déposé">
+                  ✓
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </article>
   )
 }
 
@@ -471,14 +451,14 @@ export default function EtudiantDashboard() {
   const dossiersSorted = [...dossierItems].sort((a, b) => new Date(b.dossier?.created_at) - new Date(a.dossier?.created_at))
 
   return (
-    <DashboardPage maxWidthClass="max-w-5xl">
+    <DashboardPage maxWidthClass="max-w-7xl">
       <DashboardHero
         eyebrow="Espace étudiant"
         title={`Bonjour, ${user.prenom} ${user.nom}`}
-        subtitle="Compte candidat : la préinscription et la demande de facture proforma sont deux démarches séparées — suivez chaque ligne pour le détail."
+        subtitle="Votre compte candidat regroupe la préinscription et la demande de facture proforma — deux démarches distinctes. Utilisez les actions ci-dessous, puis suivez l’avancement de chaque dossier."
         actions={
           !loading ? (
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+            <>
               <Link to="/chat" className="btn-outline inline-flex min-h-[44px] items-center justify-center gap-2">
                 Messages
               </Link>
@@ -489,12 +469,12 @@ export default function EtudiantDashboard() {
                 to="/demande-proforma"
                 className="btn-outline inline-flex min-h-[44px] items-center justify-center gap-2 border-violet-200 text-violet-800 hover:bg-violet-50"
               >
-                🧾 Demande de facture proforma
+                Demande de facture proforma
               </Link>
-              <Link to="/preinscription" className="btn-primary inline-flex min-h-[44px] items-center justify-center gap-2 shadow-lg shadow-blue-600/25">
+              <Link to="/preinscription" className="btn-primary inline-flex min-h-[44px] items-center justify-center gap-2 shadow-lg shadow-blue-600/20">
                 {hasDossiers ? '+ Candidater à une autre formation' : '+ Nouvelle préinscription'}
               </Link>
-            </div>
+            </>
           ) : null
         }
       />
@@ -623,12 +603,12 @@ export default function EtudiantDashboard() {
                 })
               )}
             </div>
-            <div className="hidden md:block overflow-x-auto touch-pan-x -mx-1 px-1 sm:mx-0 sm:px-0">
-              <table className="w-full text-sm">
+            <div className="hidden md:block table-scroll">
+              <table className="dashboard-table w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/90 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-3">Référence</th>
-                    <th className="px-4 py-3">Formation</th>
+                    <th className="px-4 py-3 min-w-[12rem]">Formation</th>
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">État</th>
                     <th className="px-4 py-3 w-28"> </th>
@@ -655,7 +635,7 @@ export default function EtudiantDashboard() {
                             onClick={() => setModal({ type: 'proforma', payload: d })}
                           >
                             <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">{d.reference}</td>
-                            <td className="px-4 py-3 font-medium text-slate-900 max-w-[200px] truncate" title={d.formation_titre}>
+                            <td className="px-4 py-3 font-medium text-slate-900 table-cell-primary" title={d.formation_titre}>
                               {d.formation_titre || '—'}
                             </td>
                             <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{fmtDate(d.created_at)}</td>
@@ -753,12 +733,12 @@ export default function EtudiantDashboard() {
                 })
               )}
             </div>
-            <div className="hidden md:block overflow-x-auto touch-pan-x -mx-1 px-1 sm:mx-0 sm:px-0">
-              <table className="w-full text-sm">
+            <div className="hidden md:block table-scroll">
+              <table className="dashboard-table w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/90 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-3">N° dossier</th>
-                    <th className="px-4 py-3">Formation</th>
+                    <th className="px-4 py-3 min-w-[12rem]">Formation</th>
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">État</th>
                     <th className="px-4 py-3 w-28"> </th>
@@ -787,7 +767,7 @@ export default function EtudiantDashboard() {
                         onClick={() => setModal({ type: 'dossier', payload: row })}
                       >
                         <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">{dossier.numero_dossier}</td>
-                        <td className="px-4 py-3 font-medium text-slate-900 max-w-[200px] truncate" title={formation?.titre}>
+                        <td className="px-4 py-3 font-medium text-slate-900 table-cell-primary" title={formation?.titre}>
                           {formation?.titre || '—'}
                         </td>
                         <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{fmtDate(dossier.created_at)}</td>

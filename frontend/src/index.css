@@ -167,6 +167,101 @@
   .dashboard-table td {
     @apply px-3 py-3 align-middle;
   }
+
+  /* ── Design system UniPortail (responsive global) ── */
+  .ui-page {
+    @apply w-full min-w-0;
+  }
+
+  .ui-card {
+    @apply min-w-0;
+  }
+
+  .ui-action-bar {
+    @apply flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap;
+  }
+
+  .ui-action-bar > * {
+    @apply w-full sm:w-auto;
+  }
+
+  .ui-grid-stats {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4;
+  }
+
+  .ui-grid-cards {
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3;
+  }
+
+  .ui-grid-docs {
+    @apply grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3;
+  }
+
+  .ui-form-grid {
+    @apply grid grid-cols-1 gap-4 md:grid-cols-2;
+  }
+
+  .ui-form-grid-3 {
+    @apply grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3;
+  }
+
+  .ui-info-grid {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4;
+  }
+
+  .ui-section {
+    @apply w-full min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6;
+  }
+
+  .ui-section-title {
+    @apply mb-1 text-base font-bold tracking-tight text-slate-900 sm:text-lg;
+  }
+
+  .ui-section-sub {
+    @apply mb-4 text-sm leading-relaxed text-slate-500;
+  }
+
+  .ui-doc-btn {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border-2 bg-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors;
+    border-color: color-mix(in srgb, var(--etab-primary, #4f46e5) 45%, transparent);
+    color: var(--etab-primary, #4f46e5);
+  }
+  .ui-doc-btn:hover {
+    background-color: var(--etab-primary-soft, rgba(79, 70, 229, 0.08));
+  }
+  .ui-doc-btn-solid {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-md transition-all;
+    background-color: var(--etab-primary, #4f46e5);
+  }
+  .ui-doc-btn-solid:hover {
+    filter: brightness(0.92);
+  }
+
+  .ui-modal-overlay {
+    @apply fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-4;
+  }
+  .ui-modal {
+    @apply flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl;
+  }
+  .ui-modal-body {
+    @apply min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5;
+  }
+  .ui-modal-footer {
+    @apply flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/80 p-4 sm:flex-row sm:justify-end;
+  }
+
+  .table-scroll {
+    @apply -mx-1 overflow-x-auto overscroll-x-contain px-1 touch-pan-x sm:mx-0 sm:px-0;
+  }
+
+  .table-cell-primary {
+    @apply min-w-0 max-w-[14rem] truncate sm:max-w-[20rem] lg:max-w-none lg:whitespace-normal lg:break-words;
+  }
+
+  /* Empêche les colonnes flex d’écraser le texte en mots verticaux */
+  .text-safe {
+    @apply min-w-0 break-words [overflow-wrap:anywhere];
+  }
 }
 
 @media print {

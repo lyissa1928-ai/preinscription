@@ -4,7 +4,8 @@
  */
 @media print {
   @page {
-    margin: 12mm 14mm;
+    size: A4;
+    margin: 10mm 12mm;
   }
 
   body:has(.lettre-print-scope) {

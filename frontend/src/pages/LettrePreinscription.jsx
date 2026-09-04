@@ -100,7 +100,7 @@ export default function LettrePreinscription() {
   const primary = etab?.couleur_primaire || '#1e3a8a'
 
   return (
-    <div className="lettre-print-scope min-h-screen bg-slate-200 px-4 py-8">
+    <div className="lettre-print-scope min-h-screen bg-slate-200 px-3 py-6 sm:px-4 sm:py-8">
       <DocumentDownloadBar
         documentRef={documentRef}
         filename={`${refLettre}.pdf`}
@@ -109,123 +109,143 @@ export default function LettrePreinscription() {
       />
       <article
         ref={documentRef}
-        className="print-page mx-auto max-w-[210mm] bg-white text-[13px] leading-relaxed text-slate-800 shadow-xl"
+        className="print-page mx-auto flex min-h-[297mm] max-w-[210mm] flex-col bg-white text-[13.5px] leading-relaxed text-slate-800 shadow-xl"
       >
-        {/* Bande couleur top */}
-        <div className="h-1.5" style={{ background: primary }} />
+        <div className="h-2.5 shrink-0" style={{ background: `linear-gradient(90deg, ${primary}, ${etab?.couleur_secondaire || primary})` }} />
 
         {/* En-tête établissement */}
-        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-10 py-6">
-          <div className="flex min-w-0 items-start gap-4">
+        <header className="lettre-print-header-root flex items-start justify-between gap-5 border-b border-slate-200 px-10 py-6">
+          <div className="flex min-w-0 flex-1 items-start gap-4">
             {logoSrc ? (
-              <img src={logoSrc} alt="" className="h-16 w-16 shrink-0 object-contain" />
+              <img src={logoSrc} alt="" className="h-[4.25rem] w-[4.25rem] shrink-0 object-contain" />
             ) : (
               <div
-                className="flex h-16 w-16 shrink-0 items-center justify-center rounded border text-sm font-bold text-white"
+                className="flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center rounded border text-sm font-bold text-white"
                 style={{ background: primary }}
               >
                 {(etab?.nom || 'ET').slice(0, 2).toUpperCase()}
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-base font-black uppercase tracking-wide" style={{ color: primary }}>
+              <p className="text-[15px] font-black uppercase leading-tight tracking-wide" style={{ color: primary }}>
                 {etab?.nom || 'Établissement'}
               </p>
               {etab?.description && (
-                <p className="text-[11px] italic text-slate-500">{etab.description}</p>
+                <p className="mt-0.5 text-[11px] italic text-slate-500">{etab.description}</p>
               )}
-              <div className="mt-1 space-y-0.5 text-[11px] text-slate-600">
+              <div className="mt-2 space-y-0.5 text-[11px] leading-snug text-slate-600">
                 {etab?.adresse && <p>{etab.adresse}</p>}
                 {(etab?.telephone || etab?.email_contact) && (
                   <p>{[etab.telephone && `Tél. ${etab.telephone}`, etab.email_contact].filter(Boolean).join(' · ')}</p>
                 )}
                 {(etab?.ninea || etab?.rc) && (
-                  <p>{[etab.ninea && `NINEA ${etab.ninea}`, etab.rc && `RC ${etab.rc}`].filter(Boolean).join(' — ')}</p>
+                  <p className="text-[10px] text-slate-500">
+                    {[etab.ninea && `NINEA ${etab.ninea}`, etab.rc && `RC ${etab.rc}`].filter(Boolean).join(' — ')}
+                  </p>
                 )}
-                {etab?.arrete && <p className="text-[10px]">Arrêté : {etab.arrete}</p>}
+                {etab?.arrete && <p className="text-[10px] text-slate-500">Arrêté : {etab.arrete}</p>}
               </div>
             </div>
           </div>
 
-          {/* Photo demandeur */}
           <div className="shrink-0 text-center">
             {photoSrc ? (
               <img
                 src={photoSrc}
                 alt="Photo candidat"
-                className="h-28 w-24 border-2 border-slate-300 object-cover shadow-sm"
+                className="h-[7.5rem] w-[6rem] border border-slate-300 object-cover shadow-sm"
               />
             ) : (
-              <div className="flex h-28 w-24 items-center justify-center border-2 border-dashed border-slate-300 bg-slate-50 text-[10px] text-slate-400">
+              <div className="flex h-[7.5rem] w-[6rem] items-center justify-center border border-dashed border-slate-300 bg-slate-50 text-[10px] text-slate-400">
                 Photo
               </div>
             )}
           </div>
         </header>
 
-        {/* Références */}
-        <div className="flex flex-wrap items-start justify-between gap-4 px-10 py-4 text-[12px]">
-          <div className="space-y-0.5">
-            <p><span className="text-slate-500">Référence :</span> <strong className="font-mono">{refLettre}</strong></p>
-            <p><span className="text-slate-500">N° dossier :</span> <strong className="font-mono">{dossier.numero_dossier}</strong></p>
+        {/* Références + lieu/date */}
+        <div className="flex flex-wrap items-start justify-between gap-4 px-10 py-4 text-[12.5px]">
+          <div className="space-y-1">
+            <p>
+              <span className="text-slate-500">Réf. :</span>{' '}
+              <strong className="font-mono tracking-wide">{refLettre}</strong>
+            </p>
+            <p>
+              <span className="text-slate-500">N° dossier :</span>{' '}
+              <strong className="font-mono">{dossier.numero_dossier}</strong>
+            </p>
             {ext.matricule_candidat && (
-              <p><span className="text-slate-500">Matricule :</span> <strong className="font-mono">{ext.matricule_candidat}</strong></p>
+              <p>
+                <span className="text-slate-500">Matricule :</span>{' '}
+                <strong className="font-mono">{ext.matricule_candidat}</strong>
+              </p>
             )}
           </div>
-          <p className="text-right text-[12px]">{ville}, le {fmtDate(new Date())}</p>
+          <p className="text-right font-medium text-slate-700">
+            {ville}, le {fmtDate(new Date())}
+          </p>
         </div>
 
-        {/* Titre */}
-        <h1 className="mx-10 mt-2 border-b-2 pb-2 text-center text-[15px] font-black uppercase tracking-[0.10em]" style={{ color: primary, borderColor: primary }}>
+        <h1
+          className="mx-10 border-b-2 pb-2 text-center text-[14px] font-black uppercase tracking-[0.12em]"
+          style={{ color: primary, borderColor: primary }}
+        >
           Lettre de préinscription
         </h1>
 
-        <div className="px-10 py-5 space-y-4">
-          {/* Destinataire */}
-          <p className="font-semibold">Madame, Monsieur {prenom} {nom},</p>
-
-          {/* Objet */}
-          <p>
-            <span className="font-semibold">Objet :</span>{' '}
-            Confirmation de préinscription — {formationTitre} — année académique {annee}
+        <div className="flex flex-1 flex-col space-y-4 px-10 py-5">
+          <p className="font-semibold text-[13.5px]">
+            Madame, Monsieur {prenom} {nom},
           </p>
 
-          {/* Corps */}
-          <div className="space-y-3 text-justify text-[13px]">
+          <p className="text-[13.5px]">
+            <span className="font-semibold">Objet :</span> Confirmation de préinscription — {formationTitre} — année
+            académique {annee}
+          </p>
+
+          <div className="space-y-3 text-justify text-[13.5px] leading-[1.55]">
             <p>
-              Nous avons le plaisir de vous informer que votre demande de préinscription pour
-              l'année académique <strong>{annee}</strong> a été <strong>acceptée</strong> par
-              notre commission pédagogique.
+              Nous avons le plaisir de vous informer que votre demande de préinscription pour l&apos;année académique{' '}
+              <strong>{annee}</strong> a été <strong>acceptée</strong> par notre commission pédagogique.
             </p>
             <p>
-              Vous êtes ainsi préinscrit(e) à la formation <strong>{formationTitre}</strong>
-              {' '}({typeLabel}){formation?.duree ? <>, pour une durée de <strong>{formation.duree}</strong></> : null}.
+              Vous êtes ainsi préinscrit(e) à la formation <strong>{formationTitre}</strong> ({typeLabel})
+              {formation?.duree ? (
+                <>
+                  , pour une durée de <strong>{formation.duree}</strong>
+                </>
+              ) : null}
+              .
             </p>
             <p>
-              Cette lettre confirme votre place sous réserve de la finalisation administrative
-              et financière de votre inscription. Les modalités de paiement figurent sur la
-              facture proforma qui vous a été (ou sera) communiquée.
+              Cette lettre confirme votre place sous réserve de la finalisation administrative et financière de votre
+              inscription. Les modalités de paiement figurent sur la facture proforma qui vous a été (ou sera)
+              communiquée.
             </p>
           </div>
 
-          {/* Tableau identité + formation */}
-          <table className="mt-4 w-full border-collapse border border-slate-300 text-[12px]">
+          <table className="mt-2 w-full border-collapse border border-slate-300 text-[12.5px]">
             <thead>
               <tr style={{ background: primary }}>
-                <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-white" colSpan={2}>
-                  Informations du demandeur
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide text-white" colSpan={2}>
+                  Informations du candidat
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-b border-slate-200">
-                <td className="w-2/5 bg-slate-50 px-3 py-2 font-semibold text-slate-600">Nom complet</td>
-                <td className="px-3 py-2 font-bold">{prenom} {nom}</td>
+                <td className="w-[38%] bg-slate-50 px-3 py-2 font-semibold text-slate-600">Nom complet</td>
+                <td className="px-3 py-2 font-bold">
+                  {prenom} {nom}
+                </td>
               </tr>
               {dateNaissance && (
                 <tr className="border-b border-slate-200">
                   <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Date de naissance</td>
-                  <td className="px-3 py-2">{fmtDate(dateNaissance)}{lieuNaissance ? ` — ${lieuNaissance}` : ''}</td>
+                  <td className="px-3 py-2">
+                    {fmtDate(dateNaissance)}
+                    {lieuNaissance ? ` — ${lieuNaissance}` : ''}
+                  </td>
                 </tr>
               )}
               {nin && (
@@ -237,7 +257,7 @@ export default function LettrePreinscription() {
               {email && (
                 <tr className="border-b border-slate-200">
                   <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Courriel</td>
-                  <td className="px-3 py-2">{email}</td>
+                  <td className="px-3 py-2 break-all">{email}</td>
                 </tr>
               )}
               {adresse && (
@@ -255,7 +275,7 @@ export default function LettrePreinscription() {
             </tbody>
             <thead>
               <tr style={{ background: primary }}>
-                <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-white" colSpan={2}>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide text-white" colSpan={2}>
                   Formation retenue
                 </th>
               </tr>
@@ -279,54 +299,42 @@ export default function LettrePreinscription() {
                 <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Année académique</td>
                 <td className="px-3 py-2 font-semibold">{annee}</td>
               </tr>
-              {formation?.description && (
-                <tr className="border-b border-slate-200">
-                  <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Description</td>
-                  <td className="px-3 py-2 text-[12px]">{formation.description}</td>
-                </tr>
-              )}
-              {formation?.debouches && (
-                <tr className="border-b border-slate-200">
-                  <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Débouchés</td>
-                  <td className="px-3 py-2 text-[12px]">{formation.debouches}</td>
-                </tr>
-              )}
             </tbody>
           </table>
 
-          {/* Formalités */}
-          <div className="mt-3">
-            <p className="font-semibold">Formalités à accomplir :</p>
-            <ol className="mt-1 list-decimal space-y-1 pl-5 text-[12px]">
+          <div>
+            <p className="font-semibold text-[13px]">Formalités à accomplir :</p>
+            <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-[12.5px]">
               <li>Régler les frais selon la facture proforma.</li>
               <li>Déposer les pièces justificatives originales auprès du service scolarité.</li>
-              <li>Conserver la présente lettre jusqu'à l'inscription définitive.</li>
+              <li>Conserver la présente lettre jusqu&apos;à l&apos;inscription définitive.</li>
             </ol>
           </div>
 
-          <p className="text-[13px]">
-            Nous vous souhaitons la bienvenue au sein de notre établissement et restons
-            à votre disposition pour toute information complémentaire.
+          <p className="text-[13.5px]">
+            Nous vous souhaitons la bienvenue au sein de notre établissement et restons à votre disposition pour toute
+            information complémentaire.
           </p>
 
-          <p className="text-[13px]">
-            Veuillez agréer, Madame, Monsieur, l'expression de nos salutations distinguées.
+          <p className="text-[13.5px]">
+            Veuillez agréer, Madame, Monsieur, l&apos;expression de nos salutations distinguées.
           </p>
 
-          {/* Signature */}
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end pt-2">
             <div className="text-center">
-              <CachetScolarite cachetUrl={etab?.cachet_url} className="w-52" />
-              <p className="mt-1 text-[11px] font-semibold text-slate-600">Pour la scolarité, Le Responsable</p>
+              <CachetScolarite cachetUrl={etab?.cachet_url} className="w-48" />
+              <p className="mt-1 text-[11px] font-semibold text-slate-600">
+                {[etab?.signataire_fonction, etab?.signataire_nom].filter(Boolean).join(' — ') ||
+                  'Pour la scolarité, Le Responsable'}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Pied */}
-        <footer className="border-t border-slate-300 px-10 py-3 text-center text-[10px] text-slate-500">
+        <footer className="mt-auto border-t border-slate-300 px-10 py-3 text-center text-[10px] leading-snug text-slate-500">
           <p>
-            Document émis électroniquement le {fmtDate(new Date())} · Réf. {refLettre}
-            {' '}· Ne constitue pas une inscription définitive.
+            Document émis électroniquement le {fmtDate(new Date())} · Réf. {refLettre} · Ne constitue pas une inscription
+            définitive.
           </p>
           {etab?.nom && (
             <p className="mt-0.5">
@@ -339,8 +347,7 @@ export default function LettrePreinscription() {
           )}
         </footer>
 
-        {/* Bande couleur bas */}
-        <div className="h-1.5" style={{ background: primary }} />
+        <div className="h-2 shrink-0" style={{ background: primary }} />
       </article>
     </div>
   )

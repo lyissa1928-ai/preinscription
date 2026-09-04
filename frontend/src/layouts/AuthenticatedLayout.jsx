@@ -31,7 +31,7 @@ export default function AuthenticatedLayout() {
     <div className="app-shell-bg relative flex h-screen overflow-hidden">
       <Sidebar />
       {/* Décalage sur mobile pour la topbar fixe */}
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-y-auto pt-14 scrollbar-thin md:pt-0">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto pt-14 scrollbar-thin md:pt-0">
         <Outlet />
       </div>
     </div>
