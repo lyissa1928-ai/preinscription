@@ -109,6 +109,7 @@ export default function PublicFactureView() {
     type: type_formation || facture?.formation_snapshot?.type,
     duree: data.formation_duree || facture?.formation_snapshot?.duree,
     duree_formation: data.formation_duree,
+    description: data.formation_description || facture?.formation_snapshot?.description || '',
   }
   // Réutilise la même logique de lignes que l’espace connecté
   const { rows, totalAPayer } = buildDisplayRows(
@@ -159,7 +160,10 @@ export default function PublicFactureView() {
             annee_academique: facture?.annee_academique || data.annee_academique,
           }}
           etudiant={{ prenom, nom, email, telephone }}
-          formation={fo}
+          formation={{
+            ...fo,
+            description: fo.description || facture?.formation_snapshot?.description || '',
+          }}
           rows={rows}
           totalAPayer={totalAPayer || facture?.montant_ttc || 0}
         />

@@ -1744,8 +1744,8 @@ export function TabMembres({ etabId, membres: init, responsable_id, admin_etabli
       setMembres(prev => [...prev, { ...data, actif: data.actif !== false, created_at: new Date().toISOString() }])
       toast.success(
         data.matricule
-          ? `Membre créé — matricule ${data.matricule}. Première connexion : mot de passe puis complétion du profil.`
-          : 'Membre créé. Il devra changer son mot de passe puis compléter son profil.'
+          ? `Membre créé — matricule ${data.matricule}. ${data.email_invite_sent ? 'E-mail d’activation envoyé.' : 'E-mail d’activation non envoyé (vérifiez SMTP).'}`
+          : data.message || 'Membre créé. Un e-mail d’activation a été envoyé si SMTP est configuré.'
       )
       setShowForm(false)
       setForm(EMPTY_MEMBRE_FORM)
@@ -2029,8 +2029,8 @@ export function TabMembres({ etabId, membres: init, responsable_id, admin_etabli
                 <div><L>Nom *</L><input className="input-field" value={form.nom} onChange={up('nom')} required /></div>
               </div>
               <p className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                Le <strong>matricule</strong> est généré automatiquement. La date de naissance et la photo seront
-                demandées au membre lors de la <strong>première activation</strong> du compte.
+                Le <strong>matricule</strong> est généré automatiquement. Pas de date de naissance ni de photo à la création :
+                le membre les complète librement dans « Mon profil » après connexion.
               </p>
               <div><L>Email *</L><input className="input-field" type="email" value={form.email} onChange={up('email')} required /></div>
               <div>
@@ -2040,10 +2040,10 @@ export function TabMembres({ etabId, membres: init, responsable_id, admin_etabli
               </div>
               <div><L>Service / fonction</L><input className="input-field" value={form.service} onChange={up('service')} placeholder="Optionnel" /></div>
               <div><L>Adresse</L><input className="input-field" value={form.adresse} onChange={up('adresse')} placeholder="Optionnel" /></div>
-              <div><L>Mot de passe *</L><input className="input-field" type="password" value={form.mot_de_passe} onChange={up('mot_de_passe')} required minLength={6} /></div>
+              <div><L>Mot de passe initial *</L><input className="input-field" type="password" value={form.mot_de_passe} onChange={up('mot_de_passe')} required minLength={6} /></div>
               <div><L>Confirmer *</L><input className="input-field" type="password" value={form.mot_de_passe_confirmation} onChange={up('mot_de_passe_confirmation')} required minLength={6} /></div>
-              <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                Première connexion : changement de mot de passe, puis complétion du profil (naissance, photo).
+              <p className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                Un e-mail d’activation avec lien pour définir le mot de passe est envoyé automatiquement (SMTP).
               </p>
               <div>
                 <L>Rôle *</L>
@@ -2198,6 +2198,30 @@ function TabResponsable({
   const [savingAdmin, setSavingAdmin] = useState(false)
 
   const eligibles = staffEligiblesDesignation(membres)
+  const [adminCandidates, setAdminCandidates] = useState(eligibles)
+
+  useEffect(() => {
+    setAdminCandidates(eligibles)
+    if (!isPlatformAdmin) return
+    let cancelled = false
+    axios
+      .get('/api/admin/utilisateurs')
+      .then(({ data }) => {
+        if (cancelled) return
+        const list = Array.isArray(data) ? data : data?.utilisateurs || []
+        const others = list.filter(
+          (u) =>
+            u.role === 'admin_etablissement' &&
+            u.actif !== false &&
+            !eligibles.some((e) => Number(e.id) === Number(u.id)),
+        )
+        setAdminCandidates([...eligibles, ...others])
+      })
+      .catch(() => {
+        if (!cancelled) setAdminCandidates(eligibles)
+      })
+    return () => { cancelled = true }
+  }, [etabId, isPlatformAdmin, membres])
 
   useEffect(() => {
     setResponsable(initResp)
@@ -2253,6 +2277,7 @@ function TabResponsable({
     onSave,
     saving,
     cardClass,
+    options = eligibles,
   }) => (
     <div className="space-y-4">
       <div className={`card ${cardClass}`}>
@@ -2262,7 +2287,7 @@ function TabResponsable({
       <div>
         <p className="font-semibold text-gray-800 mb-1">Changer la désignation</p>
         <p className="text-xs text-gray-500 mb-3">{hint}</p>
-        {eligibles.length === 0 ? (
+        {options.length === 0 ? (
           <div className="p-4 bg-amber-50 rounded-xl text-sm text-amber-700">
             ⚠ Ajoutez d&apos;abord un membre du staff actif (onglet <strong>Membres</strong>).
           </div>
@@ -2270,9 +2295,13 @@ function TabResponsable({
           <>
             <select className="input-field mb-4" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
               <option value="">-- Aucune désignation --</option>
-              {eligibles.map((m) => (
+              {options.map((m) => (
                 <option key={m.id} value={String(m.id)}>
-                  {m.prenom} {m.nom} ({ROLE_LABELS[m.role] || m.role})
+                  {m.prenom} {m.nom} ({ROLE_LABELS[m.role] || m.role}
+                  {m.etablissement_id && Number(m.etablissement_id) !== Number(etabId)
+                    ? ' · autre étab.'
+                    : ''}
+                  )
                 </option>
               ))}
             </select>
@@ -2295,7 +2324,7 @@ function TabResponsable({
     <div className="max-w-2xl space-y-10">
       {isPlatformAdmin && renderDesignationBlock({
         title: 'Administrateur établissement',
-        hint: 'Gère le staff et l’établissement. Un seul administrateur à la fois — l’ancien est rétrogradé automatiquement.',
+        hint: 'Gère le staff et l’identité de l’établissement. Un administrateur par établissement ; la même personne peut aussi administrer un autre établissement (présentiel et FAD).',
         current: adminEtab,
         emptyLabel: 'Aucun administrateur établissement désigné.',
         selectedId: selectedAdminId,
@@ -2303,6 +2332,7 @@ function TabResponsable({
         onSave: handleSaveAdmin,
         saving: savingAdmin,
         cardClass: 'bg-indigo-50 border-indigo-100',
+        options: adminCandidates,
       })}
 
       {renderDesignationBlock({

@@ -210,6 +210,16 @@ db.nextId = (collection) =>
   });
 })();
 
+// ─── Migration : staff — plus de complétion forcée naissance/photo ───────────
+(() => {
+  const users = db.get('utilisateurs').value() || [];
+  users.forEach((u) => {
+    if (u && u.must_complete_profile === true) {
+      db.get('utilisateurs').find({ id: u.id }).assign({ must_complete_profile: false }).write();
+    }
+  });
+})();
+
 // ─── Migration : verrouillage compte (tentatives / blocage) ─────────────────
 (() => {
   const users = db.get('utilisateurs').value() || [];

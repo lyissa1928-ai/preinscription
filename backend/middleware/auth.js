@@ -25,6 +25,9 @@ const authMiddleware = (req, res, next) => {
       ...decoded,
       role: dbUser.role,
       etablissement_id: dbUser.etablissement_id || null,
+      administre_etablissement_ids: Array.isArray(dbUser.administre_etablissement_ids)
+        ? dbUser.administre_etablissement_ids
+        : [],
       fonctions: getFonctions(dbUser),
     };
 
@@ -36,24 +39,6 @@ const authMiddleware = (req, res, next) => {
           code: 'MUST_CHANGE_PASSWORD',
           message: 'Vous devez changer votre mot de passe avant de poursuivre.',
         });
-      }
-    }
-    {
-      const { staffNeedsProfileCompletion } = require('../utils/staffProfile');
-      if (staffNeedsProfileCompletion(dbUser) && dbUser.must_change_password !== true) {
-        const allowed = [
-          '/api/auth/completer-profil-staff',
-          '/api/auth/completer-profil-staff/photo',
-          '/api/auth/deconnexion',
-          '/api/auth/me',
-          '/api/auth/profil',
-        ];
-        if (!allowed.includes(path)) {
-          return res.status(403).json({
-            code: 'MUST_COMPLETE_PROFILE',
-            message: 'Complétez votre profil (date de naissance, photo) avant de poursuivre.',
-          });
-        }
       }
     }
     next();

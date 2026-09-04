@@ -476,6 +476,8 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
     prenom: user?.prenom || '',
     nom: user?.nom || '',
     email: user?.email || '',
+    date_naissance: user?.date_naissance ? String(user.date_naissance).slice(0, 10) : '',
+    lieu_naissance: user?.lieu_naissance || '',
   })
   const [files, setFiles] = useState({ diplome: null, releve: null, formation: null })
   const [formations, setFormations] = useState([])
@@ -483,6 +485,9 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
   const [loading, setLoading] = useState(false)
   const up = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }))
   const upFile = (f) => (e) => setFiles((p) => ({ ...p, [f]: e.target.files?.[0] || null }))
+
+  const birthFromProfile = Boolean(user?.date_naissance && String(user.date_naissance).trim())
+  const birthDateRequired = !birthFromProfile
 
   const handleEtabChange = (val) => {
     setForm((p) => ({ ...p, etablissement_id: val, type_formation: '', formation_id: '' }))
@@ -505,6 +510,10 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
       prenom: user.prenom || p.prenom,
       nom: user.nom || p.nom,
       email: user.email || p.email,
+      date_naissance: user.date_naissance
+        ? String(user.date_naissance).slice(0, 10)
+        : (p.date_naissance || ''),
+      lieu_naissance: user.lieu_naissance || p.lieu_naissance || '',
     }))
   }, [user])
 
@@ -560,6 +569,10 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
       toast.error('Les trois justificatifs sont obligatoires : diplôme, relevé de notes, document formation.')
       return
     }
+    if (birthDateRequired && !String(form.date_naissance || '').trim()) {
+      toast.error('La date de naissance est obligatoire pour la demande de facture proforma.')
+      return
+    }
     setLoading(true)
     try {
       const fd = new FormData()
@@ -568,6 +581,8 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
       fd.append('formation_id', form.formation_id)
       fd.append('etablissement_id', form.etablissement_id)
       fd.append('type_payeur', form.type_payeur || 'etudiant')
+      if (form.date_naissance) fd.append('date_naissance', String(form.date_naissance).trim())
+      if (form.lieu_naissance) fd.append('lieu_naissance', String(form.lieu_naissance).trim())
       if (form.type_payeur === 'organisation') {
         fd.append('payeur_org_nom', String(form.destinataire || '').trim())
       }
@@ -604,7 +619,22 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
       <div className="border-t border-gray-200 pt-3">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Identité du bénéficiaire</p>
       </div>
-      <IdentiteBeneficiaireProforma form={form} up={up} identityReadOnly />
+      <IdentiteBeneficiaireProforma
+        form={form}
+        up={up}
+        identityReadOnly
+        birthDateRequired={birthDateRequired}
+      />
+      {birthFromProfile && (
+        <p className="text-xs text-emerald-700 -mt-2">
+          Date de naissance reprise automatiquement depuis votre profil.
+        </p>
+      )}
+      {birthDateRequired && (
+        <p className="text-xs text-amber-800 -mt-2">
+          Indiquez votre date de naissance : elle sera utilisée pour les documents administratifs liés à cette demande.
+        </p>
+      )}
 
       <div className="border-t border-gray-200 pt-3">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Formation souhaitée</p>

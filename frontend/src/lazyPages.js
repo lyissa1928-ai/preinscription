@@ -42,6 +42,7 @@ export const PublicEtablissementsPage = lazy(() => import('./pages/PublicEtablis
 export const ForcePasswordChange = lazy(() => import('./pages/ForcePasswordChange'))
 export const StaffProfileCompletion = lazy(() => import('./pages/StaffProfileCompletion'))
 export const StaffEtabEquipe = lazy(() => import('./pages/StaffEtabEquipe'))
+export const StaffEtabIdentite = lazy(() => import('./pages/StaffEtabIdentite'))
 export const StaffFacturesEtab = lazy(() => import('./pages/StaffFacturesEtab'))
 export const StaffAcceptesParFormation = lazy(() => import('./pages/StaffAcceptesParFormation'))
 export const BienvenueCompte = lazy(() => import('./pages/BienvenueCompte'))

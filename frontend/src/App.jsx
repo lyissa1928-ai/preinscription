@@ -47,6 +47,7 @@ import {
   ForcePasswordChange,
   StaffProfileCompletion,
   StaffEtabEquipe,
+  StaffEtabIdentite,
   StaffFacturesEtab,
   StaffAcceptesParFormation,
   BienvenueCompte,
@@ -104,7 +105,6 @@ function AppRoutes() {
   const homeRedirect = () => {
     if (!user) return '/'
     if (user.must_change_password) return '/changer-mot-de-passe-obligatoire'
-    if (user.must_complete_profile) return '/completer-profil-staff'
     if (user.role === 'admin' || user.role === 'directeur') return '/admin'
     if (user.role === 'admin_etablissement') return '/mon-etablissement'
     if (user.role === 'controleur_qualite') return '/qualite'
@@ -179,6 +179,11 @@ function AppRoutes() {
         <Route path="/mon-etablissement/equipe" element={
           <PrivateRoute roles={['admin', 'admin_etablissement']}>
             <StaffEtabEquipe />
+          </PrivateRoute>
+        } />
+        <Route path="/mon-etablissement/identite" element={
+          <PrivateRoute roles={['admin_etablissement']}>
+            <StaffEtabIdentite />
           </PrivateRoute>
         } />
         <Route path="/mon-etablissement/factures" element={

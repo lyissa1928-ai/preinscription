@@ -8,7 +8,7 @@ import AuthCinematicBackground from '../components/AuthCinematicBackground'
 import { validatePasswordPolicy } from '@/lib/inscriptionValidation'
 
 function destForRole(role) {
-  if (role === 'admin') return '/admin'
+  if (role === 'admin' || role === 'directeur') return '/admin'
   if (role === 'admin_etablissement') return '/mon-etablissement'
   if (role === 'controleur_qualite') return '/qualite'
   if (role === 'responsable' || role === 'responsable_fad' || role === 'agent_fad') return '/responsable'

@@ -145,6 +145,7 @@ export default function FactureView() {
             niveau: fo.niveau,
             type: fo.type,
             duree: fo.duree_formation || fo.duree,
+            description: fo.description || '',
             annee_academique: facture.annee_academique || fo.annee_academique,
           }}
           rows={rows}

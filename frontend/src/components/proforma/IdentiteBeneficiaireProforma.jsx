@@ -1,7 +1,7 @@
 /**
- * Identité du bénéficiaire — formulaire proforma unifié (tous établissements).
- * Champs : prénom, nom, e-mail, téléphone, destinataire (personnel ou organisation).
- * Date / lieu de naissance : facultatifs (saisie possible, non bloquante).
+ * Identité du bénéficiaire — formulaire proforma unifié.
+ * Date / lieu de naissance : facultatifs pour le staff guichet ;
+ * pour un étudiant connecté, `birthDateRequired` impose la date si absente du profil.
  */
 export default function IdentiteBeneficiaireProforma({
   form,
@@ -10,7 +10,11 @@ export default function IdentiteBeneficiaireProforma({
   identityReadOnly = false,
   /** E-mail obligatoire (demande sans compte). */
   emailRequired = false,
+  /** Date de naissance obligatoire (étudiants / documents admin). */
+  birthDateRequired = false,
 }) {
+  const birthRequired = birthDateRequired === true
+
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div>
@@ -30,14 +34,18 @@ export default function IdentiteBeneficiaireProforma({
         )}
       </div>
       <div>
-        <label className="mb-1 block text-sm font-semibold">Date de naissance</label>
+        <label className="mb-1 block text-sm font-semibold">
+          Date de naissance{birthRequired ? ' *' : ''}
+        </label>
         <input
           type="date"
           className="input-field"
           value={form.date_naissance || ''}
           onChange={up('date_naissance')}
+          required={birthRequired}
+          readOnly={identityReadOnly && Boolean(form.date_naissance) && !birthRequired}
         />
-        <p className="mt-1 text-xs text-slate-500">Facultatif</p>
+        {!birthRequired && <p className="mt-1 text-xs text-slate-500">Facultatif</p>}
       </div>
       <div>
         <label className="mb-1 block text-sm font-semibold">Lieu de naissance</label>

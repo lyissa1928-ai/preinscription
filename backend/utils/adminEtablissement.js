@@ -3,6 +3,20 @@ const { ROLE_ADMIN_ETABLISSEMENT } = require('./staffRoles');
 
 const ROLE_FALLBACK_AFTER_DEMOTE = 'agent_admin';
 
+function normalizeIdList(raw) {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+}
+
+function administreIdsOf(user) {
+  const ids = normalizeIdList(user?.administre_etablissement_ids);
+  if (user?.etablissement_id != null && user.role === ROLE_ADMIN_ETABLISSEMENT) {
+    const primary = Number(user.etablissement_id);
+    if (Number.isFinite(primary) && !ids.includes(primary)) ids.unshift(primary);
+  }
+  return ids;
+}
+
 function demotePatchFromAdminEtab(user) {
   const restored =
     user?.role_before_admin_etab && user.role_before_admin_etab !== ROLE_ADMIN_ETABLISSEMENT
@@ -11,6 +25,7 @@ function demotePatchFromAdminEtab(user) {
   return {
     role: restored,
     role_before_admin_etab: null,
+    administre_etablissement_ids: [],
     updated_at: new Date().toISOString(),
   };
 }
@@ -27,8 +42,7 @@ function promotePatchToAdminEtab(user) {
 }
 
 /**
- * Résout l’administrateur établissement actuel (pointeur ou rôle).
- * @returns {object|null} utilisateur DB
+ * Résout l’administrateur établissement actuel (pointeur ou rôle + liste).
  */
 function findAdminEtablissementUser(etabId) {
   const eid = Number(etabId);
@@ -41,7 +55,7 @@ function findAdminEtablissementUser(etabId) {
       byPtr &&
       byPtr.actif !== false &&
       byPtr.role === ROLE_ADMIN_ETABLISSEMENT &&
-      Number(byPtr.etablissement_id) === eid
+      (Number(byPtr.etablissement_id) === eid || administreIdsOf(byPtr).includes(eid))
     ) {
       return byPtr;
     }
@@ -50,19 +64,19 @@ function findAdminEtablissementUser(etabId) {
   const byRole = (db.get('utilisateurs').value() || []).find(
     (u) =>
       u.role === ROLE_ADMIN_ETABLISSEMENT &&
-      Number(u.etablissement_id) === eid &&
-      u.actif !== false
+      u.actif !== false &&
+      (Number(u.etablissement_id) === eid || administreIdsOf(u).includes(eid))
   );
   return byRole || null;
 }
 
 /**
- * Désigne (ou retire) l’unique administrateur d’un établissement.
- * L’ancien admin reprend son rôle d’origine (role_before_admin_etab) ou agent_admin par défaut.
+ * Désigne (ou retire) l’administrateur d’un établissement.
+ * Une même personne peut administrer plusieurs établissements (ex. présentiel + FAD) :
+ * on ne retire plus ses autres désignations.
  *
  * @param {number} etabId
  * @param {number|null} userId  null = retirer
- * @returns {{ ok: true, previous_id, nouveau_id } | { ok: false, status, message }}
  */
 function designateAdminEtablissement(etabId, userId) {
   const eid = Number(etabId);
@@ -74,9 +88,25 @@ function designateAdminEtablissement(etabId, userId) {
 
   if (userId == null || userId === '' || userId === 0) {
     (db.get('utilisateurs').value() || [])
-      .filter((u) => u.role === ROLE_ADMIN_ETABLISSEMENT && Number(u.etablissement_id) === eid)
+      .filter(
+        (u) =>
+          u.role === ROLE_ADMIN_ETABLISSEMENT &&
+          (Number(u.etablissement_id) === eid || administreIdsOf(u).includes(eid))
+      )
       .forEach((u) => {
-        db.get('utilisateurs').find({ id: u.id }).assign(demotePatchFromAdminEtab(u)).write();
+        const remaining = administreIdsOf(u).filter((id) => id !== eid);
+        if (remaining.length === 0) {
+          db.get('utilisateurs').find({ id: u.id }).assign(demotePatchFromAdminEtab(u)).write();
+        } else {
+          db.get('utilisateurs')
+            .find({ id: u.id })
+            .assign({
+              administre_etablissement_ids: remaining,
+              etablissement_id: remaining[0],
+              updated_at: new Date().toISOString(),
+            })
+            .write();
+        }
       });
     db.get('etablissements').find({ id: eid }).assign({ admin_etablissement_id: null }).write();
     return { ok: true, previous_id: previousId, nouveau_id: null };
@@ -102,36 +132,57 @@ function designateAdminEtablissement(etabId, userId) {
       message: 'Un administrateur plateforme dispose déjà de tous les droits.',
     };
   }
-  if (Number(user.etablissement_id) !== eid) {
+
+  const alreadyAdminElsewhere =
+    user.role === ROLE_ADMIN_ETABLISSEMENT && administreIdsOf(user).some((id) => id !== eid);
+  const isMember = Number(user.etablissement_id) === eid || administreIdsOf(user).includes(eid);
+  if (!isMember && !alreadyAdminElsewhere) {
     return {
       ok: false,
       status: 400,
-      message: 'L’utilisateur doit être membre de cet établissement.',
+      message:
+        'L’utilisateur doit être membre de cet établissement, ou déjà administrateur d’un autre établissement (présentiel / FAD).',
     };
   }
 
+  // Un seul admin « actif » par établissement (autres rétrogradés sur CET étab. uniquement)
   (db.get('utilisateurs').value() || [])
     .filter(
       (u) =>
+        Number(u.id) !== uid &&
         u.role === ROLE_ADMIN_ETABLISSEMENT &&
-        Number(u.etablissement_id) === eid &&
-        Number(u.id) !== uid
+        (Number(u.etablissement_id) === eid || administreIdsOf(u).includes(eid))
     )
     .forEach((u) => {
-      db.get('utilisateurs').find({ id: u.id }).assign(demotePatchFromAdminEtab(u)).write();
+      const remaining = administreIdsOf(u).filter((id) => id !== eid);
+      if (remaining.length === 0) {
+        db.get('utilisateurs').find({ id: u.id }).assign(demotePatchFromAdminEtab(u)).write();
+      } else {
+        db.get('utilisateurs')
+          .find({ id: u.id })
+          .assign({
+            administre_etablissement_ids: remaining,
+            etablissement_id: Number(u.etablissement_id) === eid ? remaining[0] : u.etablissement_id,
+            updated_at: new Date().toISOString(),
+          })
+          .write();
+      }
     });
 
-  (db.get('etablissements').value() || []).forEach((e) => {
-    if (e.id !== eid && Number(e.admin_etablissement_id) === uid) {
-      db.get('etablissements').find({ id: e.id }).assign({ admin_etablissement_id: null }).write();
-    }
-  });
+  const ids = administreIdsOf(user);
+  if (!ids.includes(eid)) ids.push(eid);
+
+  const primary =
+    user.role === ROLE_ADMIN_ETABLISSEMENT && user.etablissement_id != null
+      ? Number(user.etablissement_id)
+      : eid;
 
   db.get('utilisateurs')
     .find({ id: uid })
     .assign({
       ...promotePatchToAdminEtab(user),
-      etablissement_id: eid,
+      etablissement_id: primary,
+      administre_etablissement_ids: ids,
     })
     .write();
 
@@ -153,6 +204,8 @@ function pickAdminPublic(user) {
     email: user.email,
     role: user.role,
     actif: user.actif !== false,
+    etablissement_id: user.etablissement_id ?? null,
+    administre_etablissement_ids: administreIdsOf(user),
   };
 }
 
@@ -163,5 +216,6 @@ module.exports = {
   pickAdminPublic,
   demotePatchFromAdminEtab,
   promotePatchToAdminEtab,
+  administreIdsOf,
   ROLE_FALLBACK_AFTER_DEMOTE,
 };

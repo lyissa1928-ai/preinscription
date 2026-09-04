@@ -52,6 +52,26 @@ function isAdminEtablissement(user) {
   return user?.role === ROLE_ADMIN_ETABLISSEMENT;
 }
 
+/** Établissements administrés (multi : présentiel + FAD). */
+function administeredEtablissementIds(user) {
+  if (!isAdminEtablissement(user)) return [];
+  const ids = Array.isArray(user.administre_etablissement_ids)
+    ? user.administre_etablissement_ids.map(Number).filter((n) => Number.isFinite(n) && n > 0)
+    : [];
+  if (user.etablissement_id != null) {
+    const p = Number(user.etablissement_id);
+    if (Number.isFinite(p) && !ids.includes(p)) ids.unshift(p);
+  }
+  return [...new Set(ids)];
+}
+
+function userAdministersEtablissement(user, etabId) {
+  if (!user || etabId == null) return false;
+  if (isPlatformAdmin(user)) return true;
+  if (!isAdminEtablissement(user)) return false;
+  return administeredEtablissementIds(user).includes(Number(etabId));
+}
+
 function isEtabScopedStaff(user) {
   return user && ETAB_STAFF_ROLES.includes(user.role);
 }
@@ -63,13 +83,17 @@ function isResponsableFad(user) {
 /** Gestion des membres : admin plateforme, admin étab., ou responsable FAD (agents FAD seulement). */
 function canManageEtabMembres(user, etabId) {
   if (isPlatformAdmin(user)) return true;
-  if (isAdminEtablissement(user) && Number(user.etablissement_id) === Number(etabId)) {
-    return true;
-  }
+  if (userAdministersEtablissement(user, etabId)) return true;
   if (isResponsableFad(user) && Number(user.etablissement_id) === Number(etabId)) {
     return true;
   }
   return false;
+}
+
+/** Modifier l’identité (logo, contacts, banque…) de l’établissement. */
+function canEditEtabIdentite(user, etabId) {
+  if (isPlatformAdmin(user)) return true;
+  return userAdministersEtablissement(user, etabId);
 }
 
 function rolesCreatablesMembres(user) {
@@ -95,6 +119,7 @@ function canManageTargetMembre(actor, targetUser, etab) {
     return targetUser.role === 'agent_fad';
   }
   if (!isAdminEtablissement(actor)) return false;
+  if (!userAdministersEtablissement(actor, etab.id)) return false;
   if (Number(actor.id) === Number(targetUser.id)) return false;
   if (targetUser.role === ROLE_ADMIN_ETABLISSEMENT) return false;
   if (targetUser.role === 'admin') return false;
@@ -116,7 +141,10 @@ module.exports = {
   isAdminEtablissement,
   isResponsableFad,
   isEtabScopedStaff,
+  administeredEtablissementIds,
+  userAdministersEtablissement,
   canManageEtabMembres,
+  canEditEtabIdentite,
   rolesCreatablesMembres,
   canManageTargetMembre,
 };

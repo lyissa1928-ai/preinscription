@@ -54,9 +54,6 @@ export default function ForcePasswordChange() {
   if (!user) return <Navigate to="/connexion" replace />
 
   if (!user.must_change_password) {
-    if (user.must_complete_profile) {
-      return <Navigate to="/completer-profil-staff" replace />
-    }
     return <Navigate to={getRoleHome(user.role)} replace />
   }
 
@@ -94,11 +91,7 @@ export default function ForcePasswordChange() {
       }
       toast.success('Mot de passe mis à jour')
       const nextUser = data.utilisateur || user
-      if (nextUser?.must_complete_profile) {
-        navigate('/completer-profil-staff', { replace: true })
-      } else {
-        navigate(getRoleHome(nextUser?.role || user.role), { replace: true })
-      }
+      navigate(getRoleHome(nextUser?.role || user.role), { replace: true })
     } catch (err) {
       const msg = err.response?.data?.message || 'Erreur lors du changement de mot de passe.'
       setServerError(msg)

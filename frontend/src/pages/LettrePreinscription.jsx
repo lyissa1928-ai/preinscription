@@ -126,55 +126,46 @@ export default function LettrePreinscription() {
       <div className="a4-preview-stage">
       <article
         ref={documentRef}
-        className="a4-sheet print-page relative flex flex-col bg-white text-[12.5px] leading-[1.55] text-slate-800 shadow-xl"
-        style={{ minHeight: '297mm' }}
+        className="a4-sheet a4-sheet--single print-page relative flex flex-col bg-white text-[11px] leading-[1.45] text-slate-800 shadow-xl"
       >
-        {/* En-tête centré type papier à en-tête */}
-        <header className="relative border-b border-slate-300 px-[16mm] pb-4 pt-[12mm]">
-          {/* Photo — coin haut droit */}
-          <div
-            className="absolute right-[16mm] top-[12mm] border border-slate-400 bg-white p-[1.5px]"
-            style={{ fontFamily: 'system-ui, sans-serif' }}
-          >
+        <header className="relative border-b border-slate-300 px-[14mm] pb-2.5 pt-[9mm]">
+          <div className="absolute right-[14mm] top-[9mm] border border-slate-400 bg-white p-[1px]">
             {photoSrc ? (
-              <img src={photoSrc} alt="Photo du candidat" className="h-[28mm] w-[22mm] object-cover" />
+              <img src={photoSrc} alt="Photo du candidat" className="h-[22mm] w-[17mm] object-cover" />
             ) : (
-              <div className="flex h-[28mm] w-[22mm] items-center justify-center bg-slate-50 text-[8px] text-slate-400">
+              <div className="flex h-[22mm] w-[17mm] items-center justify-center bg-slate-50 text-[7px] text-slate-400">
                 Photo
               </div>
             )}
           </div>
 
-          <div className="mx-auto flex max-w-[130mm] flex-col items-center pr-[24mm] text-center">
+          <div className="mx-auto flex max-w-[130mm] flex-col items-center pr-[22mm] text-center">
             {logoSrc ? (
-              <img src={logoSrc} alt="" className="mb-2 h-[15mm] w-[15mm] object-contain" />
+              <img src={logoSrc} alt="" className="mb-1 h-[12mm] w-[12mm] object-contain" />
             ) : (
               <div
-                className="mb-2 flex h-[14mm] w-[14mm] items-center justify-center text-xs font-bold text-white"
-                style={{ background: primary, fontFamily: 'system-ui, sans-serif' }}
+                className="mb-1 flex h-[11mm] w-[11mm] items-center justify-center text-[10px] font-bold text-white"
+                style={{ background: primary }}
               >
                 {(etab?.nom || 'ET').slice(0, 2).toUpperCase()}
               </div>
             )}
             <p
-              className="text-[13px] font-bold uppercase tracking-[0.12em]"
-              style={{ color: primary, fontFamily: 'system-ui, sans-serif' }}
+              className="text-[11.5px] font-bold uppercase tracking-[0.1em]"
+              style={{ color: primary }}
             >
               {etab?.nom || 'Établissement'}
             </p>
             {etab?.description && (
-              <p className="mt-0.5 text-[9px] italic text-slate-500">{etab.description}</p>
+              <p className="mt-0.5 line-clamp-2 text-[8px] italic text-slate-500">{etab.description}</p>
             )}
-            <div
-              className="mt-1.5 space-y-0.5 text-[8.5px] leading-snug text-slate-600"
-              style={{ fontFamily: 'system-ui, sans-serif' }}
-            >
+            <div className="mt-1 space-y-0 text-[8px] leading-snug text-slate-600">
               {etab?.adresse && <p>{etab.adresse}</p>}
               <p>
                 {[etab?.telephone && `Tél. ${etab.telephone}`, etab?.email_contact].filter(Boolean).join(' · ')}
               </p>
               {(etab?.ninea || etab?.rc || etab?.arrete) && (
-                <p className="text-[8px] text-slate-500">
+                <p className="text-[7.5px] text-slate-500">
                   {[
                     etab.ninea && `NINEA ${etab.ninea}`,
                     etab.rc && `RC ${etab.rc}`,
@@ -188,11 +179,7 @@ export default function LettrePreinscription() {
           </div>
         </header>
 
-        {/* Références */}
-        <div
-          className="flex justify-between gap-4 px-[16mm] pt-4 text-[11px]"
-          style={{ fontFamily: 'system-ui, sans-serif' }}
-        >
+        <div className="flex justify-between gap-4 px-[14mm] pt-2.5 text-[10px]">
           <div className="space-y-0.5">
             <p>
               N/Réf. : <strong className="font-mono">{refLettre}</strong>
@@ -212,21 +199,21 @@ export default function LettrePreinscription() {
         </div>
 
         <h1
-          className="mx-[16mm] mt-5 border-b pb-1.5 text-center text-[13px] font-bold uppercase tracking-[0.16em]"
-          style={{ color: secondary, borderColor: primary, fontFamily: 'system-ui, sans-serif' }}
+          className="mx-[14mm] mt-3 border-b pb-1 text-center text-[11.5px] font-bold uppercase tracking-[0.14em]"
+          style={{ color: secondary, borderColor: primary }}
         >
           Lettre de préinscription
         </h1>
 
-        <div className="flex flex-1 flex-col px-[16mm] py-4">
-          <p className="font-semibold">Madame, Monsieur {prenom} {nom},</p>
+        <div className="flex flex-1 flex-col px-[14mm] py-2.5">
+          <p className="font-semibold text-[11px]">Madame, Monsieur {prenom} {nom},</p>
 
-          <p className="mt-3">
+          <p className="mt-2 text-[10.5px]">
             <span className="font-semibold">Objet :</span> Confirmation de préinscription — {formationTitre} — année
             académique {annee}
           </p>
 
-          <div className="mt-4 space-y-3 text-justify">
+          <div className="mt-2.5 space-y-2 text-justify text-[10.5px]">
             <p>
               Nous avons le plaisir de vous informer que votre demande de préinscription pour l&apos;année académique{' '}
               <strong>{annee}</strong> a été <strong>acceptée</strong> par notre commission pédagogique.
@@ -241,6 +228,11 @@ export default function LettrePreinscription() {
               ) : null}
               .
             </p>
+            {formation?.description ? (
+              <p className="text-[9.5px] text-slate-600">
+                <span className="font-semibold text-slate-700">Description :</span> {formation.description}
+              </p>
+            ) : null}
             <p>
               La présente lettre confirme votre place sous réserve de la finalisation administrative et financière de
               votre inscription. Les modalités de paiement figurent sur la facture proforma qui vous a été ou vous sera
@@ -248,29 +240,23 @@ export default function LettrePreinscription() {
             </p>
           </div>
 
-          {/* Annexe discrète — traits fins, pas de bandeaux colorés */}
-          <div
-            className="mt-5 border border-slate-300"
-            style={{ fontFamily: 'system-ui, sans-serif' }}
-          >
-            <p
-              className="border-b border-slate-300 bg-slate-50 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-600"
-            >
+          <div className="mt-3 border border-slate-300">
+            <p className="border-b border-slate-300 bg-slate-50 px-2.5 py-1 text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-600">
               Récapitulatif
             </p>
-            <div className="a4-grid-2 divide-x divide-slate-200 text-[10.5px]">
+            <div className="a4-grid-2 divide-x divide-slate-200 text-[9.5px]">
               <div className="divide-y divide-slate-100">
                 {identityLines.map(([k, v]) => (
-                  <div key={k} className="flex gap-2 px-3 py-1.5">
-                    <span className="w-[28mm] shrink-0 text-slate-500">{k}</span>
+                  <div key={k} className="flex gap-2 px-2.5 py-1">
+                    <span className="w-[26mm] shrink-0 text-slate-500">{k}</span>
                     <span className="min-w-0 font-medium text-slate-900 break-words">{v}</span>
                   </div>
                 ))}
               </div>
               <div className="divide-y divide-slate-100">
                 {formationLines.map(([k, v]) => (
-                  <div key={k} className="flex gap-2 px-3 py-1.5">
-                    <span className="w-[28mm] shrink-0 capitalize text-slate-500">{k}</span>
+                  <div key={k} className="flex gap-2 px-2.5 py-1">
+                    <span className="w-[26mm] shrink-0 capitalize text-slate-500">{k}</span>
                     <span className="min-w-0 font-medium text-slate-900 break-words">{v}</span>
                   </div>
                 ))}
@@ -278,33 +264,30 @@ export default function LettrePreinscription() {
             </div>
           </div>
 
-          <div className="mt-4">
-            <p className="font-semibold">Formalités à accomplir :</p>
-            <ol className="mt-1 list-decimal space-y-1 pl-5 text-[12px]">
+          <div className="mt-2.5">
+            <p className="font-semibold text-[10.5px]">Formalités à accomplir :</p>
+            <ol className="mt-0.5 list-decimal space-y-0.5 pl-5 text-[10px]">
               <li>Régler les frais selon la facture proforma.</li>
               <li>Déposer les pièces justificatives originales auprès du service de la scolarité.</li>
               <li>Conserver la présente lettre jusqu&apos;à l&apos;inscription définitive.</li>
             </ol>
           </div>
 
-          <p className="mt-4">
+          <p className="mt-2.5 text-[10.5px]">
             Nous vous souhaitons la bienvenue au sein de notre établissement et restons à votre disposition pour toute
             information complémentaire.
           </p>
 
-          <p className="mt-3">
+          <p className="mt-2 text-[10.5px]">
             Veuillez agréer, Madame, Monsieur, l&apos;expression de nos salutations distinguées.
           </p>
 
-          <div className="mt-6 flex justify-end">
-            <CachetScolarite cachetUrl={etab?.cachet_url} className="w-44" />
+          <div className="mt-4 flex justify-end">
+            <CachetScolarite cachetUrl={etab?.cachet_url} className="w-40" />
           </div>
         </div>
 
-        <footer
-          className="mt-auto border-t border-slate-300 px-[16mm] py-2.5 text-center text-[8.5px] leading-snug text-slate-500"
-          style={{ fontFamily: 'system-ui, sans-serif' }}
-        >
+        <footer className="mt-auto border-t border-slate-300 px-[14mm] py-1.5 text-center text-[7.5px] leading-snug text-slate-500">
           <p>
             Document émis électroniquement le {fmtDate(new Date())} · Réf. {refLettre} · Ne constitue pas une
             inscription définitive.
@@ -313,7 +296,7 @@ export default function LettrePreinscription() {
             {[etab?.nom, etab?.email_contact, etab?.telephone].filter(Boolean).join(' · ')}
           </p>
         </footer>
-        <div className="h-[2px] w-full" style={{ background: primary }} />
+        <div className="h-[1.5px] w-full" style={{ background: primary }} />
       </article>
       </div>
     </div>

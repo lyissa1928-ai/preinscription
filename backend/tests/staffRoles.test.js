@@ -22,6 +22,21 @@ describe('staffRoles — admin_etablissement', () => {
     assert.equal(canManageEtabMembres(u, 6), false);
   });
 
+  it('admin établissement peut gérer plusieurs étabs (présentiel + FAD)', () => {
+    const { canEditEtabIdentite, userAdministersEtablissement } = require('../utils/staffRoles');
+    const u = {
+      id: 10,
+      role: 'admin_etablissement',
+      etablissement_id: 5,
+      administre_etablissement_ids: [5, 8],
+    };
+    assert.equal(userAdministersEtablissement(u, 5), true);
+    assert.equal(userAdministersEtablissement(u, 8), true);
+    assert.equal(canManageEtabMembres(u, 8), true);
+    assert.equal(canEditEtabIdentite(u, 8), true);
+    assert.equal(canEditEtabIdentite(u, 9), false);
+  });
+
   it('responsable ne gère plus les membres', () => {
     const u = { id: 11, role: 'responsable', etablissement_id: 5 };
     assert.equal(canManageEtabMembres(u, 5), false);

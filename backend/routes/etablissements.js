@@ -21,9 +21,11 @@ const { stripEtabSensitiveFields } = require('../utils/etablissementSanitize');
 const { actsAsResponsable } = require('../utils/userFonctions');
 const {
   canManageEtabMembres,
+  canEditEtabIdentite,
   rolesCreatablesMembres,
   canManageTargetMembre,
   isPlatformAdmin,
+  isAdminEtablissement,
   ROLE_ADMIN_ETABLISSEMENT,
 } = require('../utils/staffRoles');
 const {
@@ -724,11 +726,14 @@ router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
   });
 });
 
-// POST /api/etablissements/:id/upload — upload logo/cachet séparé
-router.post('/:id/upload', adminOnly, upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'cachet', maxCount: 1 }]), async (req, res) => {
+// POST /api/etablissements/:id/upload — logo/cachet (admin plateforme ou admin de cet établissement)
+router.post('/:id/upload', authMiddleware, upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'cachet', maxCount: 1 }]), async (req, res) => {
   const id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  if (!canEditEtabIdentite(req.user, id)) {
+    return res.status(403).json({ message: 'Accès refusé : vous ne pouvez modifier que l’identité de votre établissement.' });
+  }
   if (req.files) {
     const ve = await verifyEtabUploadFiles(req.files);
     if (!ve.ok) return res.status(400).json({ message: ve.message || 'Fichier invalide.' });
@@ -738,6 +743,10 @@ router.post('/:id/upload', adminOnly, upload.fields([{ name: 'logo', maxCount: 1
   if (req.files?.cachet?.[0]) updates.cachet_url = `/uploads/etablissements/${req.files.cachet[0].filename}`;
   db.get('etablissements').find({ id }).assign(updates).write();
   const updated = db.get('etablissements').find({ id }).value();
+  logAudit(req, 'etablissement_identite_fichiers', 'etablissement', id, {
+    champs: Object.keys(updates),
+    by_admin_etab: isAdminEtablissement(req.user),
+  });
   res.json({
     ...updated,
     logo_url: publicAssetUrl(req, updated.logo_url),
@@ -1440,9 +1449,14 @@ router.get('/:id', (req, res) => {
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
-  // Admin / Directeur : tous les établissements ; autres rôles : uniquement leur rattachement
+  // Admin / Directeur : tous ; admin étab. multi (présentiel+FAD) ; autres : leur rattachement
   const accesTousEtabs = req.user.role === 'admin' || req.user.role === 'directeur';
-  if (!accesTousEtabs && Number(req.user.etablissement_id) !== id) {
+  const { userAdministersEtablissement } = require('../utils/staffRoles');
+  if (
+    !accesTousEtabs &&
+    Number(req.user.etablissement_id) !== id &&
+    !userAdministersEtablissement(req.user, id)
+  ) {
     return res.status(403).json({ message: 'Accès refusé.' });
   }
 
@@ -1502,11 +1516,14 @@ router.get('/:id', (req, res) => {
   });
 });
 
-// PUT /api/etablissements/:id — modifier (JSON uniquement)
-router.put('/:id', adminOnly, (req, res) => {
+// PUT /api/etablissements/:id — identité (admin plateforme ou admin de cet établissement)
+router.put('/:id', authMiddleware, (req, res) => {
   const id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  if (!canEditEtabIdentite(req.user, id)) {
+    return res.status(403).json({ message: 'Accès refusé : vous ne pouvez modifier que l’identité de votre établissement.' });
+  }
 
   const updates = {};
   const fields = [
@@ -1518,6 +1535,10 @@ router.put('/:id', adminOnly, (req, res) => {
   fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
 
   db.get('etablissements').find({ id }).assign(updates).write();
+  logAudit(req, 'etablissement_identite_modifiee', 'etablissement', id, {
+    champs: Object.keys(updates),
+    by_admin_etab: isAdminEtablissement(req.user),
+  });
   res.json(db.get('etablissements').find({ id }).value());
 });
 
@@ -2404,7 +2425,7 @@ router.get('/:id/membres', etabMembresManageAccess, (req, res) => {
 });
 
 // POST /api/etablissements/:id/membres — créer un compte membre (admin ou responsable étab.)
-router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
+router.post('/:id/membres', etabMembresManageAccess, async (req, res) => {
   const etablissement_id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id: etablissement_id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
@@ -2471,7 +2492,7 @@ router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
     etablissement_id,
     actif: true,
     must_change_password: true,
-    must_complete_profile: true,
+    must_complete_profile: false,
     photo_url: null,
     login_attempts: 0,
     is_locked: false,
@@ -2494,6 +2515,15 @@ router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
     actor_scope: isPlatformAdmin(req.user) ? 'platform' : 'admin_etablissement',
     admin_etablissement_remplace: demotedPrevious,
   });
+
+  let emailSent = false;
+  try {
+    const { sendStaffInviteEmail } = require('../utils/staffInviteEmail');
+    emailSent = await sendStaffInviteEmail(user);
+  } catch (e) {
+    console.warn('[etab] invitation staff non envoyée:', e.message);
+  }
+
   res.status(201).json({
     id,
     prenom: user.prenom,
@@ -2504,9 +2534,10 @@ router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
     etablissement_id,
     actif: true,
     must_change_password: true,
+    email_invite_sent: emailSent,
     message: demotedPrevious
-      ? 'Compte créé. L’ancien administrateur d’établissement a été remplacé automatiquement.'
-      : undefined,
+      ? 'Compte créé. L’ancien administrateur d’établissement a été remplacé. E-mail d’activation envoyé si SMTP est configuré.'
+      : `Compte créé. Un e-mail d’activation a été envoyé${emailSent ? '' : ' (SMTP indisponible)'}.`,
   });
 });
 

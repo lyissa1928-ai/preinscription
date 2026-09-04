@@ -1,6 +1,6 @@
 /**
  * Templates documents officiels A4 — indépendants du responsive UI.
- * Largeur physique fixe 210 mm. Aucun vw / breakpoint / scale sur .a4-sheet.
+ * Une page A4 : hauteur fixée 297 mm.
  */
 
 .a4-preview-stage {
@@ -18,10 +18,17 @@
   margin-right: auto;
   background: #fff;
   color: #1e293b;
-  /* Typo système stable pour html2canvas (évite substitutions) */
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+}
+
+/* Documents officiels : une seule page A4 */
+.a4-sheet--single {
+  height: 297mm !important;
+  min-height: 297mm !important;
+  max-height: 297mm !important;
+  overflow: hidden;
 }
 
 .a4-sheet,
@@ -29,13 +36,11 @@
   box-sizing: border-box;
 }
 
-/* Pendant la capture : pas de zoom / scale sur la feuille (pas sur les enfants utiles) */
 .a4-sheet--capturing {
   transform: none !important;
   zoom: normal !important;
 }
 
-/* Grilles / flex des documents : comportement figé (pas de wrap « mobile ») */
 .a4-sheet .a4-row {
   display: flex;
   flex-wrap: nowrap;
@@ -45,7 +50,7 @@
 .a4-sheet .a4-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8mm;
+  gap: 6mm;
 }
 
 .a4-sheet table {
@@ -72,5 +77,13 @@
     max-width: 210mm !important;
     box-shadow: none !important;
     margin: 0 !important;
+  }
+
+  .a4-sheet--single {
+    height: 297mm !important;
+    max-height: 297mm !important;
+    overflow: hidden;
+    page-break-after: avoid;
+    page-break-inside: avoid;
   }
 }

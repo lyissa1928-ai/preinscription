@@ -639,7 +639,7 @@ router.post('/utilisateurs/:id/reinitialiser-mot-de-passe', adminSensitiveLimite
 });
 
 // POST /api/admin/utilisateurs — Créer un compte staff
-router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
+router.post('/utilisateurs', adminSensitiveLimiter, async (req, res) => {
   const {
     prenom, nom, email, mot_de_passe, mot_de_passe_confirmation,
     role, etablissement_id, date_naissance, telephone, adresse, service, fonction,
@@ -719,7 +719,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     etablissement_id: isGlobalRole ? null : etabIdForUser,
     actif: true,
     must_change_password: true,
-    must_complete_profile: true,
+    must_complete_profile: false,
     photo_url: null,
     login_attempts: 0,
     is_locked: false,
@@ -727,7 +727,6 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     created_at: new Date().toISOString(),
     created_by: req.user.id,
   };
-  // date_naissance volontairement non exigée à la création (complétée à l’activation)
   if (date_naissance) user.date_naissance = String(date_naissance).trim();
 
   db.get('utilisateurs').push(user).write();
@@ -737,14 +736,23 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     enforceSingleAdminEtablissement(etabIdForUser, id);
   }
 
+  let emailSent = false;
+  try {
+    const { sendStaffInviteEmail } = require('../utils/staffInviteEmail');
+    emailSent = await sendStaffInviteEmail(user);
+  } catch (e) {
+    console.warn('[admin] invitation staff non envoyée:', e.message);
+  }
+
   const { mot_de_passe: _, ...safe } = user;
   res.status(201).json({
     message: role === 'admin_etablissement'
-      ? 'Compte administrateur d’établissement créé. S’il existait déjà un admin pour cet établissement, il a été remplacé automatiquement.'
+      ? 'Compte administrateur d’établissement créé. Un e-mail d’activation a été envoyé (si SMTP est configuré).'
       : role === ROLE_DIRECTEUR
-        ? 'Compte Directeur créé. À la première connexion : mot de passe puis complétion du profil.'
-        : `Compte ${role} créé. L'utilisateur devra changer son mot de passe puis compléter son profil à la première connexion.`,
+        ? 'Compte Directeur créé. Un e-mail d’activation avec lien de définition du mot de passe a été envoyé.'
+        : `Compte ${role} créé. Un e-mail d’activation a été envoyé à l’utilisateur${emailSent ? '' : ' (SMTP indisponible — communiquez le matricule hors bande)'}.`,
     utilisateur: safe,
+    email_invite_sent: emailSent,
   });
 });
 

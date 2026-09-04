@@ -531,6 +531,25 @@ router.post(
       return res.status(400).json({ message: 'Numéro de téléphone valide obligatoire (au moins 8 caractères).' });
     }
 
+    const dateNaissanceBody = String(req.body.date_naissance || '').trim();
+    const dateNaissance = dateNaissanceBody || (user.date_naissance ? String(user.date_naissance).trim() : '');
+    if (!dateNaissance) {
+      cleanupProformaUploads(req.files);
+      return res.status(400).json({
+        message: 'La date de naissance est obligatoire pour une demande de facture proforma (profil ou formulaire).',
+      });
+    }
+    const lieuNaissance = String(req.body.lieu_naissance || user.lieu_naissance || '').trim() || null;
+
+    // Enrichir le profil étudiant si la date manquait
+    if (!user.date_naissance && dateNaissanceBody) {
+      db.get('utilisateurs').find({ id: user.id }).assign({
+        date_naissance: dateNaissanceBody,
+        ...(lieuNaissance ? { lieu_naissance: lieuNaissance } : {}),
+        updated_at: new Date().toISOString(),
+      }).write();
+    }
+
     const {
       type_formation, formation_id, etablissement_id, niveau, details,
       type_payeur,
@@ -621,6 +640,8 @@ router.post(
       nom: String(user.nom || '').trim(),
       email: String(user.email || '').trim().toLowerCase(),
       telephone,
+      date_naissance: dateNaissance,
+      lieu_naissance: lieuNaissance,
       niveau: niveau ? String(niveau).trim() : null,
       type_formation,
       formation_id: parseInt(formation_id, 10),
