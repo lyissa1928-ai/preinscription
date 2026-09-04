@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { FaTrashAlt } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
 import { DashboardPage } from '../components/dashboard/DashboardChrome'
@@ -33,8 +34,26 @@ export default function StaffEtabIdentite() {
   const [cachet, setCachet] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [removingMedia, setRemovingMedia] = useState(null)
 
   const up = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }))
+
+  const removeMedia = async (kind) => {
+    if (!etab?.id || removingMedia) return
+    if (!window.confirm(kind === 'logo' ? 'Supprimer le logo ?' : 'Supprimer le cachet ?')) return
+    setRemovingMedia(kind)
+    try {
+      const { data } = await axios.delete(`/api/etablissements/${etab.id}/media/${kind}`)
+      toast.success(data.message || 'Supprimé.')
+      setEtab((prev) => ({ ...prev, ...data }))
+      if (kind === 'logo') setLogo(null)
+      if (kind === 'cachet') setCachet(null)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Suppression impossible.')
+    } finally {
+      setRemovingMedia(null)
+    }
+  }
 
   const load = (id) => {
     if (!id) return
@@ -223,16 +242,38 @@ export default function StaffEtabIdentite() {
             </div>
             <div>
               <L>Logo</L>
-              {etab.logo_url && (
-                <img src={mediaUrl(etab.logo_url)} alt="" className="mb-2 h-20 w-20 rounded-xl border bg-gray-50 object-contain p-1" />
-              )}
+              {etab.logo_url ? (
+                <div className="group relative mb-2 inline-block">
+                  <img src={mediaUrl(etab.logo_url)} alt="" className="h-20 w-20 rounded-xl border bg-gray-50 object-contain p-1" />
+                  <button
+                    type="button"
+                    title="Supprimer le logo"
+                    disabled={removingMedia === 'logo'}
+                    onClick={() => removeMedia('logo')}
+                    className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white opacity-0 shadow transition group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+                  >
+                    <FaTrashAlt className="text-xs" />
+                  </button>
+                </div>
+              ) : null}
               <input type="file" accept=".png,.jpg,.jpeg,.svg,.webp" onChange={(e) => setLogo(e.target.files[0])} className="block w-full text-sm" />
             </div>
             <div>
               <L>Cachet officiel</L>
-              {etab.cachet_url && (
-                <img src={mediaUrl(etab.cachet_url)} alt="" className="mb-2 h-20 w-20 rounded-xl border bg-gray-50 object-contain p-1" />
-              )}
+              {etab.cachet_url ? (
+                <div className="group relative mb-2 inline-block">
+                  <img src={mediaUrl(etab.cachet_url)} alt="" className="h-20 w-20 rounded-xl border bg-gray-50 object-contain p-1" />
+                  <button
+                    type="button"
+                    title="Supprimer le cachet"
+                    disabled={removingMedia === 'cachet'}
+                    onClick={() => removeMedia('cachet')}
+                    className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white opacity-0 shadow transition group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+                  >
+                    <FaTrashAlt className="text-xs" />
+                  </button>
+                </div>
+              ) : null}
               <input type="file" accept=".png,.jpg,.jpeg,.webp" onChange={(e) => setCachet(e.target.files[0])} className="block w-full text-sm" />
             </div>
           </div>

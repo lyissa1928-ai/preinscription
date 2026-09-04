@@ -1540,7 +1540,41 @@ router.put('/:id', authMiddleware, (req, res) => {
     champs: Object.keys(updates),
     by_admin_etab: isAdminEtablissement(req.user),
   });
-  res.json(db.get('etablissements').find({ id }).value());
+  const after = db.get('etablissements').find({ id }).value();
+  res.json({
+    ...after,
+    logo_url: publicAssetUrl(req, after.logo_url),
+    cachet_url: publicAssetUrl(req, after.cachet_url),
+  });
+});
+
+// DELETE /api/etablissements/:id/media/:kind — supprimer logo ou cachet
+router.delete('/:id/media/:kind', authMiddleware, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const kind = String(req.params.kind || '').toLowerCase();
+  if (!['logo', 'cachet'].includes(kind)) {
+    return res.status(400).json({ message: 'Type de média invalide (logo ou cachet).' });
+  }
+  const etab = db.get('etablissements').find({ id }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  if (!canEditEtabIdentite(req.user, id)) {
+    return res.status(403).json({ message: 'Accès refusé.' });
+  }
+  const field = kind === 'logo' ? 'logo_url' : 'cachet_url';
+  const prev = etab[field];
+  if (prev) {
+    const disk = resolveEtabLogoDiskPath(prev);
+    if (disk) unlinkQuiet(disk);
+  }
+  db.get('etablissements').find({ id }).assign({ [field]: null }).write();
+  logAudit(req, 'etablissement_media_supprime', 'etablissement', id, { kind });
+  const updated = db.get('etablissements').find({ id }).value();
+  res.json({
+    ...updated,
+    logo_url: publicAssetUrl(req, updated.logo_url),
+    cachet_url: publicAssetUrl(req, updated.cachet_url),
+    message: kind === 'logo' ? 'Logo supprimé.' : 'Cachet supprimé.',
+  });
 });
 
 // DELETE /api/etablissements/:id — désactiver
