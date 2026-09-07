@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const db = require('../database/db');
 
 /** Admins actifs, en excluant certains ids (ex. suppressions / désactivations en cours). */
@@ -20,6 +21,7 @@ const { createBackup, DB_PATH, BACKUP_DIR } = require('../utils/dbBackup');
 const { logAudit } = require('../utils/auditLog');
 const { DOSSIER_STATUSES, canTransitionDossierStatus, requiresRejectionComment } = require('../utils/dossierWorkflow');
 const { createUserNotification } = require('../utils/notificationService');
+const { notifyDossierStatutChange, notifyFactureDossierGeneree } = require('../utils/transactionalEmail');
 const { rateLimit, getClientIp } = require('../utils/rateLimit');
 const { retentionConfigFromEnv, runMaintenancePrune } = require('../utils/maintenance');
 const { getRuntimeMetricsSnapshot } = require('../utils/runtimeMetrics');
@@ -33,16 +35,47 @@ const {
 } = require('../utils/statsHelpers');
 const { isMaintenanceModeEnabled } = require('../utils/maintenanceMode');
 const { runHealthChecks } = require('../utils/healthCheck');
+const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
+const { filterDossiersAffichables, assertDossierAffichable } = require('../utils/dossierVisibility');
 const { parsePagination, wantsPagination, paginateArray } = require('../utils/pagination');
+const { STAFF_ROLES: STAFF_ROLES_CANON, ROLE_DIRECTEUR } = require('../utils/staffRoles');
+const { purgeUserPersonalData } = require('../utils/purgeUserPersonalData');
+const {
+  parseUserImportBuffer,
+  buildUsersTemplateWorkbook,
+  importUsersRows,
+} = require('../utils/userImportExcel');
+
+const userImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 },
+});
+
+const ROLES_STAFF_ADMIN = [...STAFF_ROLES_CANON];
+const ROLES_VALIDES_ADMIN = [...STAFF_ROLES_CANON, 'etudiant'];
+const ROLES_ETAB_RATTACHEMENT = STAFF_ROLES_CANON.filter((r) => r !== 'admin' && r !== ROLE_DIRECTEUR);
 
 router.use(authMiddleware);
 router.use((req, res, next) => {
   const path = (req.path || '').split('?')[0];
-  // Création de compte staff : admin uniquement.
+  const role = req.user?.role;
+
+  if (role === 'admin') return next();
+
+  if (role === 'directeur') {
+    // Directeur : consultation globale + génération / lecture des rapports hebdo.
+    const allowedWrite =
+      (req.method === 'POST' && path === '/rapports-hebdomadaires/generer');
+    if (req.method === 'GET' || allowedWrite) return next();
+    return res.status(403).json({
+      message: 'Le profil Directeur est limité à la consultation et aux rapports hebdomadaires.',
+    });
+  }
+
+  // Création / suppression comptes : admin uniquement (déjà couvert ci-dessus).
   if (req.method === 'POST' && path === '/utilisateurs') {
     return adminOnly(req, res, next);
   }
-  // Suppression définitive d’un compte : réservée aux administrateurs (via routes sensibles).
   if (req.method === 'DELETE' && /\/utilisateurs\/\d+\/supprimer$/.test(path)) {
     return adminOnly(req, res, next);
   }
@@ -55,14 +88,50 @@ const adminSensitiveLimiter = rateLimit({
   keyGenerator: (req) => `admin-sensitive:${getClientIp(req)}:${req.method}:${req.path}`,
 });
 
-// GET /api/admin/backup/export — crée un snapshot et le télécharge
+// GET /api/admin/backup/export — archive ZIP (preinscription.json + manifest)
 router.get('/backup/export', (req, res) => {
   try {
-    const backupPath = createBackup('admin-export');
-    return res.download(backupPath);
+    const { buildPlatformBackupZip, sendZipDownload } = require('../utils/backupZip');
+    createBackup('admin-export');
+    const { buffer, filename } = buildPlatformBackupZip(DB_PATH);
+    logAudit(req, 'export_backup_plateforme_zip', 'system', null, { filename });
+    return sendZipDownload(res, buffer, filename);
   } catch (e) {
     return res.status(500).json({ message: `Backup impossible: ${e.message}` });
   }
+});
+
+// POST /api/admin/backup/restore — restauration depuis ZIP plateforme
+router.post('/backup/restore', adminSensitiveLimiter, (req, res, next) => {
+  const {
+    handleBackupUpload,
+    isRestoreConfirmed,
+    parseUploadedBackupZip,
+    restorePlatformDatabaseFromObject,
+  } = require('../utils/backupZip');
+  return handleBackupUpload('backup')(req, res, (uploadErr) => {
+    if (uploadErr) return next(uploadErr);
+    if (!isRestoreConfirmed(req.body)) {
+      return res.status(400).json({ message: 'Confirmation requise (confirm=true).' });
+    }
+    try {
+      const preBackup = createBackup('pre-restore-admin');
+      const parsed = parseUploadedBackupZip(req.file.buffer);
+      if (parsed.kind !== 'plateforme') {
+        return res.status(400).json({
+          message: 'Archive plateforme attendue (fichier preinscription.json dans le ZIP).',
+        });
+      }
+      restorePlatformDatabaseFromObject(parsed.payload);
+      logAudit(req, 'restauration_backup_plateforme_zip', 'system', null, { pre_backup: preBackup });
+      return res.json({
+        message: 'Base restaurée depuis le ZIP. Reconnectez les utilisateurs si nécessaire.',
+        pre_backup: preBackup,
+      });
+    } catch (e) {
+      return res.status(400).json({ message: e.message });
+    }
+  });
 });
 
 // GET /api/admin/backup/db — télécharge le fichier base actuel
@@ -154,16 +223,15 @@ router.get('/dossiers', (req, res) => {
 
   let dossiers = db.get('dossiers').value();
 
-  // Joindre avec les utilisateurs
+  // Joindre avec les utilisateurs — exclure dossiers orphelins (compte étudiant supprimé)
   const utilisateurs = db.get('utilisateurs').value();
+  dossiers = filterDossiersAffichables(dossiers, utilisateurs);
   dossiers = dossiers.map(d => {
     const u = utilisateurs.find(u => u.id === d.etudiant_id) || {};
+    const identite = resolveCandidatIdentite(d, u);
     return {
       ...d,
-      nom: u.nom,
-      prenom: u.prenom,
-      email: u.email,
-      matricule: u.matricule || null,
+      ...identite,
     };
   });
 
@@ -195,24 +263,40 @@ router.get('/dossiers/:id', (req, res) => {
   const dossier = db.get('dossiers').find({ id }).value();
   if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
 
+  const utilisateurs = db.get('utilisateurs').value();
+  const vis = assertDossierAffichable(dossier, utilisateurs);
+  if (!vis.ok) return res.status(vis.status).json({ message: vis.message });
+
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
   const documents = db.get('documents').filter({ dossier_id: id }).value();
+  const identite = resolveCandidatIdentite(dossier, u);
+  const formation = db.get('formations').find({ id: dossier.formation_id }).value() || null;
+  const etablissement = dossier.etablissement_id
+    ? db.get('etablissements').find({ id: dossier.etablissement_id }).value() || null
+    : null;
+  const { genererOuRecupererFactureDossier } = require('../services/factureService');
+  const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
+  const factureRow = db.get('factures').find({ dossier_id: id }).value() || null;
+  const facture =
+    (isDossierAcceptePourLettre(dossier.statut) && dossier.formation_id)
+      ? genererOuRecupererFactureDossier(id)
+      : (factureRow ? genererOuRecupererFactureDossier(id) : null);
 
   res.json({
     dossier: {
       ...dossier,
-      nom: u.nom,
-      prenom: u.prenom,
-      email: u.email,
-      matricule: u.matricule || null,
-      date_inscription: u.created_at,
+      ...identite,
+      date_inscription: u.created_at || dossier.created_at || null,
+      etablissement_nom: etablissement?.nom || null,
     },
-    documents
+    documents,
+    formation,
+    facture,
   });
 });
 
 // PUT /api/admin/dossiers/:id/statut
-router.put('/dossiers/:id/statut', (req, res) => {
+router.put('/dossiers/:id/statut', async (req, res) => {
   const { statut, commentaire } = req.body;
   if (!statut || !DOSSIER_STATUSES.includes(statut)) return res.status(400).json({ message: 'Statut invalide' });
 
@@ -245,6 +329,13 @@ router.put('/dossiers/:id/statut', (req, res) => {
       link: '/dashboard',
       meta: { dossier_id: dossier.id, numero_dossier: dossier.numero_dossier, statut },
     });
+  }
+  const dossierAfter = { ...dossier, statut, commentaire_admin: commentaire || null };
+  await notifyDossierStatutChange(dossierAfter, statut);
+  if (statut === 'accepte') {
+    const { genererOuRecupererFactureDossier } = require('../services/factureService');
+    const facture = genererOuRecupererFactureDossier(id);
+    if (facture) await notifyFactureDossierGeneree(dossierAfter, facture);
   }
   logAudit(req, 'update_status', 'dossier', id, {
     from: dossier.statut,
@@ -318,24 +409,25 @@ router.put('/demandes-proforma/:id/statut', (req, res) => {
 });
 
 // PUT /api/admin/demandes-proforma/:id/decision — accepter / refuser (même logique que le staff établissement)
-router.put('/demandes-proforma/:id/decision', (req, res) => {
+router.put('/demandes-proforma/:id/decision', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ message: 'Identifiant invalide.' });
   }
   const demande = db.get('demandes_proforma').find({ id }).value();
   if (!demande) return res.status(404).json({ message: 'Demande introuvable.' });
-  const { decision, motif_refus } = req.body;
-  const result = proformaDemandeDecision({
+  const { decision, motif_refus, avec_cachet } = req.body;
+  const result = await proformaDemandeDecision({
     demandeId: id,
     userId: req.user.id,
     decision,
     motif_refus,
+    avec_cachet,
   });
   if (!result.ok) {
     return res.status(result.status).json({ message: result.message });
   }
-  res.json({ message: result.message, demande: result.demande });
+  res.json({ message: result.message, demande: result.demande, email_envoye: result.email_envoye });
 });
 
 // PUT /api/admin/demandes-proforma/:id/revoke-acceptation — retire la facture et remet la demande en attente
@@ -425,13 +517,15 @@ router.post('/demandes-proforma/delete-batch', adminSensitiveLimiter, (req, res)
 router.get('/utilisateurs', (req, res) => {
   const { role = 'all', page, limit, search = '', etablissement_id = '' } = req.query;
   const dossiers = db.get('dossiers').value();
-  const STAFF_ROLES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const STAFF_ROLES = ROLES_STAFF_ADMIN;
 
   let utilisateurs = db.get('utilisateurs').value();
   if (role === 'etudiant') {
     utilisateurs = utilisateurs.filter(u => u.role === 'etudiant');
   } else if (role === 'staff') {
     utilisateurs = utilisateurs.filter(u => STAFF_ROLES.includes(u.role));
+  } else if (role && role !== 'all' && STAFF_ROLES.includes(role)) {
+    utilisateurs = utilisateurs.filter(u => u.role === role);
   }
   if (etablissement_id && etablissement_id !== 'all') {
     utilisateurs = utilisateurs.filter((u) => String(u.etablissement_id || '') === String(etablissement_id));
@@ -477,6 +571,58 @@ router.get('/utilisateurs', (req, res) => {
   });
 });
 
+// GET /api/admin/utilisateurs/import/template — modèle Excel import staff
+router.get('/utilisateurs/import/template', adminSensitiveLimiter, async (req, res) => {
+  try {
+    const wb = await buildUsersTemplateWorkbook();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="template-utilisateurs-staff.xlsx"');
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Impossible de générer le modèle.' });
+  }
+});
+
+// POST /api/admin/utilisateurs/import?dry_run=1 — import Excel/CSV (validation par défaut)
+router.post('/utilisateurs/import', adminSensitiveLimiter, userImportUpload.single('file'), async (req, res) => {
+  const dryRunRaw = req.query.dry_run ?? req.body?.dry_run ?? '1';
+  const dryRun = !['0', 'false', 'no', 'non'].includes(String(dryRunRaw).toLowerCase());
+
+  if (!req.file) {
+    return res.status(400).json({ message: 'Fichier Excel (.xlsx) ou CSV requis (champ file).' });
+  }
+
+  let parsed;
+  try {
+    parsed = await parseUserImportBuffer(req.file.buffer, req.file.originalname);
+  } catch (err) {
+    return res.status(400).json({ message: err.message || 'Impossible de lire le fichier.' });
+  }
+  if (parsed.error) {
+    return res.status(400).json({ message: parsed.error });
+  }
+
+  const forcedEtabRaw = req.body?.etablissement_id ?? req.query?.etablissement_id;
+  const forcedEtabId = forcedEtabRaw != null && String(forcedEtabRaw).trim() !== ''
+    ? parseInt(String(forcedEtabRaw), 10)
+    : null;
+  const allowedRoles = ROLES_STAFF_ADMIN.filter((r) => r !== 'etudiant');
+
+  const result = await importUsersRows({
+    rows: parsed.rows,
+    allowedRoles,
+    forcedEtabId: Number.isFinite(forcedEtabId) ? forcedEtabId : null,
+    dryRun,
+    actorId: req.user.id,
+  });
+
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  return res.json(result);
+});
+
 // POST /api/admin/utilisateurs/bulk-action — Actions par lot
 // DOIT être défini AVANT /:id pour éviter le conflit de route
 router.post('/utilisateurs/bulk-action', adminSensitiveLimiter, (req, res) => {
@@ -504,7 +650,7 @@ router.post('/utilisateurs/bulk-action', adminSensitiveLimiter, (req, res) => {
         message: `Pour confirmer, saisissez exactement : ${expected}`,
       });
     }
-    ids.forEach(id => db.get('utilisateurs').remove({ id: parseInt(id) }).write());
+    ids.forEach(id => purgeUserPersonalData(parseInt(id, 10)));
     return res.json({ message: `${ids.length} compte(s) supprimé(s) définitivement.` });
   }
 
@@ -557,16 +703,16 @@ router.post('/utilisateurs/:id/reinitialiser-mot-de-passe', adminSensitiveLimite
 });
 
 // POST /api/admin/utilisateurs — Créer un compte staff
-router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
+router.post('/utilisateurs', adminSensitiveLimiter, async (req, res) => {
   const {
     prenom, nom, email, mot_de_passe, mot_de_passe_confirmation,
-    role, etablissement_id, date_naissance, telephone, adresse,
+    role, etablissement_id, date_naissance, telephone, adresse, service, fonction,
   } = req.body;
-  const ROLES_STAFF = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const ROLES_STAFF = ROLES_STAFF_ADMIN;
 
-  if (!prenom || !nom || !email || !mot_de_passe || !role || !telephone) {
+  if (!prenom || !nom || !email || !mot_de_passe || !role) {
     return res.status(400).json({
-      message: 'Champs obligatoires : prénom, nom, email, téléphone, mot de passe, rôle.',
+      message: 'Champs obligatoires : prénom, nom, email, mot de passe, rôle.',
     });
   }
   if (mot_de_passe !== mot_de_passe_confirmation) {
@@ -576,10 +722,10 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     return res.status(400).json({ message: 'Rôle invalide.' });
   }
 
-  const isAdminGlobal = role === 'admin';
+  const isGlobalRole = role === 'admin' || role === ROLE_DIRECTEUR;
   let etabIdForUser = null;
   let etab = null;
-  if (!isAdminGlobal) {
+  if (!isGlobalRole) {
     if (!etablissement_id) {
       return res.status(400).json({ message: 'L\'établissement est obligatoire pour ce rôle staff.' });
     }
@@ -596,7 +742,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   if (mot_de_passe.length < 6) {
     return res.status(400).json({ message: 'Mot de passe trop court (min 6 caractères).' });
   }
-  const gen = isAdminGlobal
+  const gen = isGlobalRole
     ? generateNextMatriculeGlobalAdmin()
     : generateNextMatriculeForEtablissement(etabIdForUser);
   if (gen.error) return res.status(400).json({ message: gen.error });
@@ -605,39 +751,48 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
   const exist = db.get('utilisateurs').find({ email: emailNorm }).value();
   if (exist) return res.status(409).json({ message: 'Un compte avec cet email existe déjà.' });
 
-  const telTrim = String(telephone).trim();
-  const telNorm = normalizeTelephoneForUniqueness(telTrim);
-  if (telNorm.length < 8) {
-    return res.status(400).json({
-      message: 'Numéro de téléphone invalide ou trop court (minimum 8 chiffres).',
-    });
-  }
-  if (telephoneTaken(telNorm, null)) {
-    return res.status(409).json({ message: 'Ce numéro de téléphone est déjà associé à un autre compte.' });
+  const telTrim = telephone != null && String(telephone).trim() ? String(telephone).trim() : '';
+  if (telTrim) {
+    const telNorm = normalizeTelephoneForUniqueness(telTrim);
+    if (telNorm.length < 8) {
+      return res.status(400).json({
+        message: 'Numéro de téléphone invalide ou trop court (minimum 8 chiffres).',
+      });
+    }
+    if (telephoneTaken(telNorm, null)) {
+      return res.status(409).json({ message: 'Ce numéro de téléphone est déjà associé à un autre compte.' });
+    }
   }
 
   const hash = bcrypt.hashSync(mot_de_passe, 10);
   const id = db.nextId('utilisateurs');
+  const serviceVal = String(service || fonction || '').trim();
   const user = {
     id,
     prenom: prenom.trim(),
     nom: nom.trim(),
     email: emailNorm,
     matricule: matNorm,
-    date_naissance: date_naissance ? String(date_naissance).trim() : null,
+    date_naissance: null,
     telephone: telTrim,
     adresse: adresse ? String(adresse).trim() : '',
+    service: serviceVal || '',
+    fonction: serviceVal || '',
     mot_de_passe: hash,
     role,
-    etablissement_id: isAdminGlobal ? null : etabIdForUser,
+    etablissement_id: isGlobalRole ? null : etabIdForUser,
     actif: true,
     must_change_password: true,
+    must_complete_profile: false,
+    photo_url: null,
     login_attempts: 0,
     is_locked: false,
     lock_until: null,
     created_at: new Date().toISOString(),
     created_by: req.user.id,
   };
+  if (date_naissance) user.date_naissance = String(date_naissance).trim();
+
   db.get('utilisateurs').push(user).write();
 
   if (role === 'admin_etablissement' && etabIdForUser) {
@@ -645,12 +800,23 @@ router.post('/utilisateurs', adminSensitiveLimiter, (req, res) => {
     enforceSingleAdminEtablissement(etabIdForUser, id);
   }
 
+  let emailSent = false;
+  try {
+    const { sendStaffInviteEmail } = require('../utils/staffInviteEmail');
+    emailSent = await sendStaffInviteEmail(user);
+  } catch (e) {
+    console.warn('[admin] invitation staff non envoyée:', e.message);
+  }
+
   const { mot_de_passe: _, ...safe } = user;
   res.status(201).json({
     message: role === 'admin_etablissement'
-      ? 'Compte administrateur d’établissement créé. S’il existait déjà un admin pour cet établissement, il a été remplacé automatiquement.'
-      : `Compte ${role} créé. L'utilisateur devra changer son mot de passe à la première connexion.`,
+      ? 'Compte administrateur d’établissement créé. Un e-mail d’activation a été envoyé (si SMTP est configuré).'
+      : role === ROLE_DIRECTEUR
+        ? 'Compte Directeur créé. Un e-mail d’activation avec lien de définition du mot de passe a été envoyé.'
+        : `Compte ${role} créé. Un e-mail d’activation a été envoyé à l’utilisateur${emailSent ? '' : ' (SMTP indisponible — communiquez le matricule hors bande)'}.`,
     utilisateur: safe,
+    email_invite_sent: emailSent,
   });
 });
 
@@ -664,7 +830,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     nom, prenom, email, role, actif, etablissement_id, mot_de_passe,
     matricule, date_naissance, telephone, adresse,
   } = req.body;
-  const ROLES_VALIDES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite', 'etudiant'];
+  const ROLES_VALIDES = ROLES_VALIDES_ADMIN;
   const update = { updated_at: new Date().toISOString(), updated_by: req.user.id };
   let matriculeRegenerated = false;
 
@@ -701,10 +867,19 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
         });
       }
     }
-    update.role = nextRole;
-    if (nextRole === 'admin') {
+    if (nextRole === 'admin_etablissement' && user.role !== 'admin_etablissement') {
+      const { promotePatchToAdminEtab } = require('../utils/adminEtablissement');
+      Object.assign(update, promotePatchToAdminEtab(user));
+    } else if (user.role === 'admin_etablissement' && nextRole !== 'admin_etablissement') {
+      update.role = nextRole;
+      update.role_before_admin_etab = null;
+    } else {
+      update.role = nextRole;
+    }
+    if (nextRole === 'admin' || nextRole === ROLE_DIRECTEUR) {
       update.etablissement_id = null;
-      const needGlobalMat = user.role !== 'admin' || user.etablissement_id != null;
+      const needGlobalMat =
+        (user.role !== 'admin' && user.role !== ROLE_DIRECTEUR) || user.etablissement_id != null;
       if (needGlobalMat) {
         const gen = generateNextMatriculeGlobalAdmin();
         if (gen.error) return res.status(400).json({ message: gen.error });
@@ -714,12 +889,13 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
     }
     if (
       nextRole !== 'admin' &&
-      ['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(nextRole) &&
-      user.role === 'admin' &&
+      nextRole !== ROLE_DIRECTEUR &&
+      ROLES_ETAB_RATTACHEMENT.includes(nextRole) &&
+      (user.role === 'admin' || user.role === ROLE_DIRECTEUR) &&
       etablissement_id === undefined
     ) {
       return res.status(400).json({
-        message: 'Pour quitter le rôle administrateur, indiquez l’établissement de rattachement.',
+        message: 'Pour quitter le rôle global, indiquez l’établissement de rattachement.',
       });
     }
   }
@@ -733,7 +909,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
   ) {
     return res.status(403).json({ message: 'Impossible de désactiver le dernier administrateur actif.' });
   }
-  if (etablissement_id !== undefined && effectiveRoleAfter !== 'admin') {
+  if (etablissement_id !== undefined && effectiveRoleAfter !== 'admin' && effectiveRoleAfter !== ROLE_DIRECTEUR) {
     if (etablissement_id) {
       const newEid = parseInt(etablissement_id, 10);
       const etab = db.get('etablissements').find({ id: newEid }).value();
@@ -746,7 +922,7 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
         matriculeRegenerated = true;
       }
     } else {
-      if (['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(effectiveRoleAfter)) {
+      if (ROLES_ETAB_RATTACHEMENT.includes(effectiveRoleAfter)) {
         return res.status(400).json({
           message: 'L\'établissement est obligatoire pour ce rôle.',
         });
@@ -781,6 +957,11 @@ router.put('/utilisateurs/:id', adminSensitiveLimiter, (req, res) => {
   if (fresh.role === 'admin_etablissement' && fresh.etablissement_id) {
     const { enforceSingleAdminEtablissement } = require('../utils/adminEtablissement');
     enforceSingleAdminEtablissement(fresh.etablissement_id, id);
+  } else if (user.role === 'admin_etablissement' && fresh.role !== 'admin_etablissement' && user.etablissement_id) {
+    const etab = db.get('etablissements').find({ id: user.etablissement_id }).value();
+    if (etab && Number(etab.admin_etablissement_id) === id) {
+      db.get('etablissements').find({ id: user.etablissement_id }).assign({ admin_etablissement_id: null }).write();
+    }
   }
 
   res.json({ message: 'Utilisateur mis à jour.' });
@@ -833,7 +1014,7 @@ router.delete('/utilisateurs/:id/supprimer', adminSensitiveLimiter, (req, res) =
     }
   }
 
-  db.get('utilisateurs').remove({ id }).write();
+  purgeUserPersonalData(id);
   res.json({ message: 'Compte supprimé définitivement.' });
 });
 
@@ -844,7 +1025,7 @@ router.get('/statistiques-globales', (req, res) => {
   const demandes = db.get('demandes_proforma').value();
   const etablissements = db.get('etablissements').value();
   const formations = db.get('formations').value();
-  const STAFF_ROLES = ['admin', 'admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'];
+  const STAFF_ROLES = ROLES_STAFF_ADMIN;
 
   const parRole = {};
   STAFF_ROLES.forEach(r => { parRole[r] = utilisateurs.filter(u => u.role === r).length; });
@@ -951,6 +1132,80 @@ router.get('/security-events', (req, res) => {
       totalPages: Math.max(Math.ceil(total / limitNum), 1),
     },
   });
+});
+
+// ─── Identité plateforme (favicon, nom) ─────────────────────────────────────
+const {
+  getSiteConfigForClient,
+  getSiteConfigRaw,
+  updateSiteConfig,
+  platformUpload,
+  verifyPlatformFile,
+  removeOldPlatformFile,
+} = require('../utils/siteConfig');
+
+router.get('/site-config', (req, res) => {
+  return res.json(getSiteConfigForClient(req));
+});
+
+router.put('/site-config', adminSensitiveLimiter, (req, res) => {
+  const { platform_name } = req.body || {};
+  if (platform_name != null && !String(platform_name).trim()) {
+    return res.status(400).json({ message: 'Le nom de la plateforme ne peut pas être vide.' });
+  }
+  const patch = {};
+  if (platform_name != null) patch.platform_name = String(platform_name).trim();
+  updateSiteConfig(patch);
+  logAudit(req, 'site_config_update', 'system', null, { fields: Object.keys(patch) });
+  return res.json(getSiteConfigForClient(req));
+});
+
+router.post('/site-config/favicon', adminSensitiveLimiter, platformUpload.single('favicon'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'Fichier favicon requis (.ico, .png, .svg, .webp).' });
+  }
+  const ve = await verifyPlatformFile(req.file, 'favicon');
+  if (!ve.ok) return res.status(400).json({ message: ve.message || 'Fichier invalide.' });
+  const prev = getSiteConfigRaw();
+  removeOldPlatformFile(prev.favicon_url, 'favicon');
+  const favicon_url = `/uploads/platform/${req.file.filename}`;
+  updateSiteConfig({ favicon_url });
+  logAudit(req, 'site_config_favicon', 'system', null, { favicon_url });
+  return res.json({
+    message: 'Favicon enregistré.',
+    ...getSiteConfigForClient(req),
+  });
+});
+
+router.delete('/site-config/favicon', adminSensitiveLimiter, (req, res) => {
+  const prev = getSiteConfigRaw();
+  removeOldPlatformFile(prev.favicon_url, 'favicon');
+  updateSiteConfig({ favicon_url: null });
+  logAudit(req, 'site_config_favicon_remove', 'system', null, {});
+  return res.json({
+    message: 'Favicon supprimé.',
+    ...getSiteConfigForClient(req),
+  });
+});
+
+// ─── Rapports hebdomadaires Directeur (1 .xlsx / établissement) ─────────────
+router.get('/rapports-hebdomadaires', (req, res) => {
+  const list = (db.get('rapports_hebdomadaires').value() || []).slice().reverse().slice(0, 26);
+  res.json(list);
+});
+
+router.post('/rapports-hebdomadaires/generer', adminSensitiveLimiter, async (req, res) => {
+  try {
+    const { generateWeeklyRapportsForAllEtabs } = require('../utils/weeklyRapportExcel');
+    const meta = await generateWeeklyRapportsForAllEtabs(new Date());
+    logAudit(req, 'rapport_hebdo_genere', 'system', null, {
+      files: meta.files?.length || 0,
+      errors: meta.errors?.length || 0,
+    });
+    res.status(201).json(meta);
+  } catch (e) {
+    res.status(500).json({ message: e.message || 'Échec génération des rapports.' });
+  }
 });
 
 module.exports = router;

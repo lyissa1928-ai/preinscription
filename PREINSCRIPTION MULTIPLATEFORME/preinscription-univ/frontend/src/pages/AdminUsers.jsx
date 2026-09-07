@@ -3,11 +3,15 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { mediaUrl } from '../utils/mediaUrl'
 
 const ROLES_STAFF = [
   { val: 'admin', label: 'Administrateur (plateforme)' },
+  { val: 'directeur', label: 'Directeur — vision tous établissements' },
   { val: 'admin_etablissement', label: 'Administrateur établissement' },
   { val: 'responsable', label: 'Responsable pédagogique' },
+  { val: 'responsable_fad', label: 'Responsable FAD (formations à distance)' },
+  { val: 'agent_fad', label: 'Agent FAD' },
   { val: 'agent_admin', label: 'Agent administratif' },
   { val: 'comptable', label: 'Comptable / Finance' },
   { val: 'controleur_qualite', label: 'Contrôleur qualité' },
@@ -15,15 +19,20 @@ const ROLES_STAFF = [
 
 const ROLE_COLORS = {
   admin:       'bg-red-100 text-red-700',
+  directeur:   'bg-indigo-100 text-indigo-800',
   admin_etablissement: 'bg-blue-100 text-blue-800',
   responsable: 'bg-teal-100 text-teal-700',
+  responsable_fad: 'bg-indigo-100 text-indigo-700',
+  agent_fad: 'bg-sky-100 text-sky-800',
   agent_admin: 'bg-orange-100 text-orange-700',
   comptable:   'bg-purple-100 text-purple-700',
   controleur_qualite: 'bg-cyan-100 text-cyan-800',
   etudiant:    'bg-gray-100 text-gray-700'
 }
 const ROLE_LABELS = {
-  admin: 'Administrateur', admin_etablissement: 'Admin. établissement', responsable: 'Resp. Pédagogique',
+  admin: 'Administrateur', directeur: 'Directeur', admin_etablissement: 'Admin. établissement', responsable: 'Resp. Pédagogique',
+  responsable_fad: 'Responsable FAD',
+  agent_fad: 'Agent FAD',
   agent_admin: 'Agent Administratif', comptable: 'Comptable',
   controleur_qualite: 'Contrôleur qualité', etudiant: 'Étudiant'
 }
@@ -37,7 +46,7 @@ function RoleBadge({ role }) {
 }
 
 const EMPTY_FORM = {
-  prenom: '', nom: '', email: '', telephone: '', adresse: '',
+  prenom: '', nom: '', email: '', telephone: '', adresse: '', service: '',
   mot_de_passe: '', mot_de_passe_confirmation: '', role: 'responsable', etablissement_id: '',
 }
 
@@ -77,7 +86,62 @@ export default function AdminUsers() {
   const [deleteEmailInput, setDeleteEmailInput] = useState('')
   const [bulkAction, setBulkAction] = useState(null)           // 'desactiver' | 'reactiver' | 'supprimer'
   const [bulkPhrase, setBulkPhrase] = useState('')
-  const [resetResult, setResetResult] = useState(null)         // { label, password }
+  // Import Excel
+  const [showImport, setShowImport] = useState(false)
+  const [importFile, setImportFile] = useState(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  const [importEtabId, setImportEtabId] = useState('')
+
+  const downloadTemplate = async () => {
+    try {
+      const { data } = await axios.get('/api/admin/utilisateurs/import/template', { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([data]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'template-utilisateurs-staff.xlsx'
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success('Modèle téléchargé.')
+    } catch {
+      toast.error('Impossible de télécharger le modèle.')
+    }
+  }
+
+  const runImport = async (dryRun) => {
+    if (!importFile) {
+      toast.error('Sélectionnez un fichier Excel ou CSV.')
+      return
+    }
+    setImportLoading(true)
+    setImportResult(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', importFile)
+      if (importEtabId) fd.append('etablissement_id', importEtabId)
+      const { data } = await axios.post(`/api/admin/utilisateurs/import?dry_run=${dryRun ? '1' : '0'}`, fd)
+      setImportResult(data)
+      if (data.ok) {
+        toast.success(
+          dryRun
+            ? `${data.summary?.valid_rows ?? 0} ligne(s) valide(s) — confirmez l’import.`
+            : `${data.summary?.created ?? 0} compte(s) créé(s).`
+        )
+        if (!dryRun) {
+          setImportFile(null)
+          loadUsers()
+        }
+      } else {
+        toast.error(`${data.errors?.length ?? 0} erreur(s) détectée(s). Corrigez le fichier.`)
+      }
+    } catch (err) {
+      const payload = err.response?.data
+      if (payload?.errors) setImportResult(payload)
+      toast.error(payload?.message || 'Import impossible.')
+    } finally {
+      setImportLoading(false)
+    }
+  }
 
   const loadUsers = (role = filtreRole, targetPage = page) => {
     setLoading(true)
@@ -150,7 +214,7 @@ export default function AdminUsers() {
       toast.error('Les mots de passe ne correspondent pas.')
       return
     }
-    if (createForm.role !== 'admin' && !createForm.etablissement_id) {
+    if (createForm.role !== 'admin' && createForm.role !== 'directeur' && !createForm.etablissement_id) {
       toast.error('Sélectionnez un établissement pour ce rôle.')
       return
     }
@@ -158,10 +222,15 @@ export default function AdminUsers() {
     try {
       const { data } = await axios.post('/api/admin/utilisateurs', {
         ...createForm,
-        etablissement_id: createForm.role === 'admin' ? null : createForm.etablissement_id,
+        etablissement_id: (createForm.role === 'admin' || createForm.role === 'directeur') ? null : createForm.etablissement_id,
       })
       const mat = data.utilisateur?.matricule
-      toast.success(mat ? `Compte créé. Matricule : ${mat}` : 'Compte créé.')
+      const mailOk = data.email_invite_sent === true
+      toast.success(
+        mat
+          ? `Compte créé (matricule ${mat}). ${mailOk ? 'E-mail d’activation envoyé.' : 'E-mail d’activation non envoyé (vérifiez SMTP).'}`
+          : data.message || 'Compte créé.'
+      )
       setShowCreate(false)
       setCreateForm(EMPTY_FORM)
       loadUsers()
@@ -183,8 +252,9 @@ export default function AdminUsers() {
     e.preventDefault()
     if (
       editForm.role !== 'admin' &&
+      editForm.role !== 'directeur' &&
       editForm.role !== 'etudiant' &&
-      ['admin_etablissement', 'responsable', 'agent_admin', 'comptable', 'controleur_qualite'].includes(editForm.role) &&
+      ['admin_etablissement', 'responsable', 'responsable_fad', 'agent_fad', 'agent_admin', 'comptable', 'controleur_qualite'].includes(editForm.role) &&
       !editForm.etablissement_id
     ) {
       toast.error('Indiquez un établissement pour ce rôle.')
@@ -193,7 +263,7 @@ export default function AdminUsers() {
     setEditSaving(true)
     try {
       const payload = { ...editForm }
-      if (payload.role === 'admin') payload.etablissement_id = null
+      if (payload.role === 'admin' || payload.role === 'directeur') payload.etablissement_id = null
       if (!payload.mot_de_passe) delete payload.mot_de_passe
       await axios.put(`/api/admin/utilisateurs/${editUser.id}`, payload)
       const etabChanged = String(editForm.etablissement_id || '') !== String(editUser.etablissement_id || '')
@@ -282,14 +352,14 @@ export default function AdminUsers() {
   const upCreate = (f) => (e) => {
     const v = e.target.value
     setCreateForm((p) => {
-      if (f === 'role' && v === 'admin') return { ...p, role: v, etablissement_id: '' }
+      if (f === 'role' && (v === 'admin' || v === 'directeur')) return { ...p, role: v, etablissement_id: '' }
       return { ...p, [f]: v }
     })
   }
   const upEdit = (f) => (e) => {
     const v = e.target.value
     setEditForm((p) => {
-      if (f === 'role' && v === 'admin') return { ...p, role: v, etablissement_id: '' }
+      if (f === 'role' && (v === 'admin' || v === 'directeur')) return { ...p, role: v, etablissement_id: '' }
       return { ...p, [f]: v }
     })
   }
@@ -321,11 +391,123 @@ export default function AdminUsers() {
             <p className="text-gray-500 mt-0.5">{pagination.total} compte{pagination.total !== 1 ? 's' : ''} · {etablissements.length} établissement{etablissements.length !== 1 ? 's' : ''}</p>
           </div>
           {isAdmin && (
-            <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
-              + Créer un compte staff
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowImport((v) => !v); setImportResult(null) }}
+                className="btn-secondary flex items-center gap-2"
+              >
+                📥 Import Excel
+              </button>
+              <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+                + Créer un compte staff
+              </button>
+            </div>
           )}
         </div>
+
+        {showImport && isAdmin && (
+          <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm p-5 mb-5 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Import utilisateurs (Excel / CSV)</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Téléchargez le modèle, remplissez-le, puis validez (dry-run) avant de créer les comptes.
+                </p>
+              </div>
+              <button type="button" onClick={downloadTemplate} className="btn-secondary text-sm shrink-0">
+                Télécharger le modèle
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Fichier *</label>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="block w-full text-sm"
+                  onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null) }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Forcer établissement (optionnel)</label>
+                <select className="input-field" value={importEtabId} onChange={(e) => setImportEtabId(e.target.value)}>
+                  <option value="">— Depuis le fichier —</option>
+                  {etablissements.map((e) => (
+                    <option key={e.id} value={e.id}>{e.nom}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={importLoading || !importFile}
+                onClick={() => runImport(true)}
+                className="btn-secondary text-sm disabled:opacity-40"
+              >
+                {importLoading ? 'Validation…' : 'Valider (dry-run)'}
+              </button>
+              <button
+                type="button"
+                disabled={importLoading || !importFile || !importResult?.ok}
+                onClick={() => {
+                  if (!window.confirm('Créer définitivement les comptes valides ?')) return
+                  runImport(false)
+                }}
+                className="btn-primary text-sm disabled:opacity-40"
+              >
+                Confirmer l’import
+              </button>
+            </div>
+            {importResult && (
+              <div className={`rounded-xl border p-4 text-sm ${importResult.ok ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+                <p className="font-semibold text-gray-900">
+                  {importResult.dry_run ? 'Résultat validation' : 'Résultat import'}
+                  {importResult.summary && (
+                    <span className="ml-2 font-normal text-gray-600">
+                      — {importResult.summary.valid_rows ?? 0} valide(s)
+                      {importResult.summary.skipped ? ` · ${importResult.summary.skipped} ignoré(s) (doublon email)` : ''}
+                      {!importResult.dry_run && importResult.summary.created != null ? ` · ${importResult.summary.created} créé(s)` : ''}
+                    </span>
+                  )}
+                </p>
+                {importResult.errors?.length > 0 && (
+                  <div className="mt-3 max-h-48 overflow-auto overflow-x-auto">
+                    <table className="w-full min-w-[420px] text-xs">
+                      <thead>
+                        <tr className="text-left text-gray-500 border-b">
+                          <th className="py-1 pr-2">Ligne</th>
+                          <th className="py-1 pr-2">Champ</th>
+                          <th className="py-1">Erreur</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importResult.errors.map((err, i) => (
+                          <tr key={i} className="border-b border-red-100">
+                            <td className="py-1 pr-2 font-mono">{err.row}</td>
+                            <td className="py-1 pr-2">{err.field}</td>
+                            <td className="py-1 text-red-800">{err.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {importResult.created?.length > 0 && (
+                  <ul className="mt-2 text-xs text-emerald-900 space-y-0.5">
+                    {importResult.created.map((c) => (
+                      <li key={c.id || c.email}>
+                        {c.email} — {c.matricule} ({c.role})
+                        {c.email_invite_sent === false && ' · e-mail non envoyé'}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Barre de filtres */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5 space-y-3">
@@ -333,6 +515,7 @@ export default function AdminUsers() {
           <div className="flex flex-wrap gap-2">
             {[
               { val: 'staff', label: '👥 Staff' },
+              { val: 'directeur', label: '🏛️ Directeur' },
               { val: 'etudiant', label: '🎓 Étudiants' },
               { val: 'all', label: '📋 Tous' }
             ].map(f => (
@@ -414,7 +597,7 @@ export default function AdminUsers() {
                   <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-100"
                     style={{ background: etab ? `linear-gradient(135deg, ${etab.couleur_primaire}15, ${etab.couleur_secondaire || etab.couleur_primaire}08)` : '#f9fafb' }}>
                     {etab?.logo_url
-                      ? <img src={etab.logo_url} alt="" className="w-7 h-7 rounded-lg object-contain bg-white border border-gray-200 p-0.5" />
+                      ? <img src={mediaUrl(etab.logo_url)} alt="" className="w-7 h-7 rounded-lg object-contain bg-white border border-gray-200 p-0.5" />
                       : <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black"
                           style={{ background: etab?.couleur_primaire || '#6b7280' }}>
                           {group.nom[0]}
@@ -499,9 +682,9 @@ export default function AdminUsers() {
               <Field label="Nom" required><input className="input-field" value={createForm.nom} onChange={upCreate('nom')} required /></Field>
             </div>
             <p className="text-xs text-gray-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-              {createForm.role === 'admin' ? (
+              {createForm.role === 'admin' || createForm.role === 'directeur' ? (
                 <>
-                  Le <strong>matricule</strong> sera du type <span className="font-mono">DIR001</span> (administrateur global, sans rattachement à un établissement).
+                  Le <strong>matricule</strong> sera du type <span className="font-mono">DIR001</span> (compte global, sans rattachement à un établissement).
                 </>
               ) : (
                 <>
@@ -511,29 +694,39 @@ export default function AdminUsers() {
               )}
             </p>
             <Field label="Email" required><input type="email" className="input-field" value={createForm.email} onChange={upCreate('email')} required /></Field>
-            <Field label="Téléphone" required note="unique (8 chiffres min., espaces et + ignorés)">
-              <input type="tel" className="input-field" value={createForm.telephone} onChange={upCreate('telephone')} required />
+            <Field label="Téléphone" note="optionnel à la création — unique s’il est renseigné">
+              <input type="tel" className="input-field" value={createForm.telephone} onChange={upCreate('telephone')} />
             </Field>
-            <Field label="Adresse" note="recommandé">
+            <Field label="Service / fonction" note="optionnel">
+              <input className="input-field" value={createForm.service || ''} onChange={upCreate('service')} placeholder="Ex. Direction, Scolarité…" />
+            </Field>
+            <Field label="Adresse" note="optionnel — complétable plus tard dans Mon profil">
               <input className="input-field" value={createForm.adresse} onChange={upCreate('adresse')} placeholder="Optionnel" />
             </Field>
-            <Field label="Mot de passe" required><input type="password" className="input-field" value={createForm.mot_de_passe} onChange={upCreate('mot_de_passe')} required minLength={6} /></Field>
+            <Field label="Mot de passe initial" required><input type="password" className="input-field" value={createForm.mot_de_passe} onChange={upCreate('mot_de_passe')} required minLength={6} /></Field>
             <Field label="Confirmer le mot de passe" required>
               <input type="password" className="input-field" value={createForm.mot_de_passe_confirmation} onChange={upCreate('mot_de_passe_confirmation')} required minLength={6} />
             </Field>
-            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-              Le compte sera créé avec un mot de passe provisoire : l’utilisateur devra le changer à la première connexion.
+            <p className="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              Un e-mail d’activation avec lien pour définir le mot de passe est envoyé automatiquement (SMTP). Pas de date de naissance ni de photo à la création : le collaborateur les complète librement dans « Mon profil ».
             </p>
             <Field label="Rôle" required>
               <select className="input-field" value={createForm.role} onChange={upCreate('role')} required>
                 {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
               </select>
+              <p className="mt-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2.5 py-1.5">
+                Le profil <strong>Directeur</strong> est dans cette liste (2ᵉ option) : vision globale multi-établissements, sans rattachement à une école.
+              </p>
             </Field>
-            {createForm.role === 'admin' ? (
+            {createForm.role === 'admin' || createForm.role === 'directeur' ? (
               <div className="rounded-xl border border-blue-100 bg-blue-50/90 px-3 py-3 text-sm text-blue-900">
-                <p className="font-semibold">Administrateur — plateforme</p>
+                <p className="font-semibold">
+                  {createForm.role === 'directeur' ? 'Directeur — vision globale' : 'Administrateur — plateforme'}
+                </p>
                 <p className="text-xs text-blue-800/90 mt-1 leading-relaxed">
-                  Aucun établissement à choisir : accès global à la configuration, aux comptes et aux données métier. Vous pouvez créer d’autres administrateurs ; le dernier compte admin actif ne peut pas être supprimé ni retiré de son rôle.
+                  {createForm.role === 'directeur'
+                    ? 'Aucun établissement à choisir : consultation multi-établissements et rapports hebdomadaires consolidés.'
+                    : 'Aucun établissement à choisir : accès global à la configuration, aux comptes et aux données métier.'}
                 </p>
               </div>
             ) : (
@@ -584,11 +777,11 @@ export default function AdminUsers() {
                 {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
               </select>
             </Field>
-            {editForm.role === 'admin' ? (
+            {editForm.role === 'admin' || editForm.role === 'directeur' ? (
               <div className="rounded-xl border border-blue-100 bg-blue-50/90 px-3 py-3 text-sm text-blue-900">
                 <p className="font-semibold">Rattachement établissement</p>
                 <p className="text-xs text-blue-800/90 mt-1">
-                  Compte administrateur global : <strong>aucun établissement</strong>. Pour rattacher ce compte à une école, changez le rôle vers Responsable, Agent ou Comptable puis choisissez l’établissement.
+                  Compte global ({editForm.role === 'directeur' ? 'Directeur' : 'administrateur'}) : <strong>aucun établissement</strong>.
                 </p>
               </div>
             ) : (

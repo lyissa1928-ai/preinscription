@@ -26,8 +26,17 @@ import { TabFacturesEtab } from './TabFacturesEtab'
 import { TabAcceptesParFormation } from './TabAcceptesParFormation'
 import PreinscriptionConditionsBlock from '../../components/PreinscriptionConditionsBlock'
 import FormationExcelGrid from '../../components/FormationExcelGrid'
-import { computeScolariteAnnuelle, computeTotalMensualites, dureeLabelFromMois } from '../../lib/formationTarifs'
+import { computeSolde, computeTotalFormation, computeFraisParAn, dureeLabelFromMois } from '../../lib/formationTarifs'
 import { loadColumnState, templateColumnsFromState, formationToGridRow } from '../../lib/formationGridSchema'
+import DonneesBackupPanel from '../../components/DonneesBackupPanel'
+import { mediaUrl } from '../../utils/mediaUrl'
+import { TabFlyers } from '../StaffEtabFlyers'
+import {
+  canCreateStaffAccount as userCanCreateStaff,
+  creatableRoleOptions,
+  canManageMembre,
+  roleLabel,
+} from '../../utils/staffMembresPermissions'
 
 const fmt = n => new Intl.NumberFormat('fr-FR').format(n || 0)
 
@@ -46,16 +55,49 @@ const TYPES_ETAB = [
   { val: 'btp',     label: '🏗️ BTP / Génie Civil' },
   { val: 'gestion', label: '📊 Commerce / Informatique / Administration' },
 ]
-const ROLES_STAFF = [
-  { val: 'responsable', label: 'Responsable pédagogique' },
-  { val: 'agent_admin', label: 'Agent administratif' },
-  { val: 'comptable', label: 'Comptable' },
-  { val: 'controleur_qualite', label: 'Contrôleur qualité' },
-]
 const ROLE_COLORS = {
-  responsable: 'bg-teal-100 text-teal-700', agent_admin: 'bg-orange-100 text-orange-700',
+  admin_etablissement: 'bg-indigo-100 text-indigo-800',
+  responsable: 'bg-teal-100 text-teal-700',
+  responsable_fad: 'bg-indigo-100 text-indigo-700',
+  agent_fad: 'bg-sky-100 text-sky-800',
+  agent_admin: 'bg-orange-100 text-orange-700',
   comptable: 'bg-violet-100 text-violet-700',
   controleur_qualite: 'bg-cyan-100 text-cyan-800',
+}
+
+const ROLE_LABELS = {
+  admin_etablissement: 'Administrateur établissement',
+  responsable: 'Responsable pédagogique',
+  responsable_fad: 'Responsable FAD',
+  agent_fad: 'Agent FAD',
+  agent_admin: 'Agent administratif',
+  comptable: 'Comptable',
+  controleur_qualite: 'Contrôleur qualité',
+}
+
+function staffEligiblesDesignation(membres) {
+  return (membres || []).filter(
+    (m) => m.actif !== false && m.role !== 'admin' && m.role !== 'etudiant',
+  )
+}
+
+function PersonCard({ person, emptyLabel }) {
+  if (!person) {
+    return <p className="text-sm text-gray-500 mt-1">{emptyLabel}</p>
+  }
+  return (
+    <div className="flex items-center gap-3 mt-2">
+      <div className="w-10 h-10 rounded-full bg-teal-500 text-white font-bold text-sm flex items-center justify-center">
+        {(person.prenom?.[0] || '?')}{(person.nom?.[0] || '')}
+      </div>
+      <div>
+        <p className="font-semibold text-gray-800">{person.prenom} {person.nom}</p>
+        <p className="text-xs text-gray-400">
+          {person.email} · {ROLE_LABELS[person.role] || person.role}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 // ─── Helper label ──────────────────────────────────────────────────────────────
@@ -71,6 +113,24 @@ function TabIdentite({ etab, onUpdated }) {
   const [saving, setSaving] = useState(false)
 
   const up = f => e => setForm(p => ({ ...p, [f]: e.target.value }))
+  const [removingMedia, setRemovingMedia] = useState(null)
+
+  const removeMedia = async (kind) => {
+    if (!etab?.id || removingMedia) return
+    if (!window.confirm(kind === 'logo' ? 'Supprimer le logo ?' : 'Supprimer le cachet ?')) return
+    setRemovingMedia(kind)
+    try {
+      const { data } = await axios.delete(`/api/etablissements/${etab.id}/media/${kind}`)
+      toast.success(data.message || 'Supprimé.')
+      onUpdated(data)
+      if (kind === 'logo') setLogo(null)
+      if (kind === 'cachet') setCachet(null)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Suppression impossible.')
+    } finally {
+      setRemovingMedia(null)
+    }
+  }
 
   const handleSave = async e => {
     e.preventDefault()
@@ -81,7 +141,9 @@ function TabIdentite({ etab, onUpdated }) {
         'nom', 'type', 'description', 'couleur_primaire', 'couleur_secondaire',
         'adresse', 'telephone', 'email_contact', 'site_web',
         'ninea', 'rc', 'arrete', 'compte_bancaire',
-        'banque', 'iban', 'swift', 'signataire_nom', 'signataire_fonction'
+        'banque', 'iban', 'swift', 'signataire_nom', 'signataire_fonction',
+        'adresse_fad', 'telephone_fad', 'email_contact_fad',
+        'banque_fad', 'compte_bancaire_fad', 'iban_fad', 'swift_fad',
       ]
       const payload = {}
       fields.forEach(f => { payload[f] = form[f] || '' })
@@ -132,6 +194,40 @@ function TabIdentite({ etab, onUpdated }) {
         <div className="md:col-span-2">
           <L>Adresse</L>
           <input className="input-field" value={form.adresse || ''} onChange={up('adresse')} />
+        </div>
+        <div className="md:col-span-2 border-t border-slate-200 pt-4">
+          <p className="mb-3 text-sm font-bold text-slate-800">Coordonnées FAD (formation à distance)</p>
+        </div>
+        <div className="md:col-span-2">
+          <L>Adresse FAD</L>
+          <input className="input-field" value={form.adresse_fad || ''} onChange={up('adresse_fad')} />
+        </div>
+        <div>
+          <L>Téléphone FAD</L>
+          <input className="input-field" value={form.telephone_fad || ''} onChange={up('telephone_fad')} />
+        </div>
+        <div>
+          <L>Email contact FAD</L>
+          <input className="input-field" type="email" value={form.email_contact_fad || ''} onChange={up('email_contact_fad')} />
+        </div>
+        <div>
+          <L>Banque FAD</L>
+          <input className="input-field" value={form.banque_fad || ''} onChange={up('banque_fad')} placeholder="Optionnel" />
+        </div>
+        <div>
+          <L>Compte bancaire FAD</L>
+          <input className="input-field" value={form.compte_bancaire_fad || ''} onChange={up('compte_bancaire_fad')} placeholder="Optionnel" />
+        </div>
+        <div>
+          <L>IBAN FAD</L>
+          <input className="input-field" value={form.iban_fad || ''} onChange={up('iban_fad')} placeholder="Optionnel" />
+        </div>
+        <div>
+          <L>SWIFT FAD</L>
+          <input className="input-field" value={form.swift_fad || ''} onChange={up('swift_fad')} placeholder="Optionnel" />
+        </div>
+        <div className="md:col-span-2 border-t border-slate-200 pt-2">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Conformité & présentiel</p>
         </div>
         <div>
           <L>NINEA</L>
@@ -188,15 +284,41 @@ function TabIdentite({ etab, onUpdated }) {
             <input className="input-field flex-1" value={form.couleur_secondaire || ''} onChange={up('couleur_secondaire')} />
           </div>
         </div>
-        {/* Fichiers */}
+        {/* Fichiers — survol pour supprimer logo / cachet */}
         <div>
           <L>Logo</L>
-          {etab.logo_url && <img src={etab.logo_url} alt="logo" className="w-20 h-20 object-contain border rounded-xl mb-2 p-1 bg-gray-50" />}
+          {etab.logo_url ? (
+            <div className="group relative mb-2 inline-block">
+              <img src={mediaUrl(etab.logo_url)} alt="logo" className="h-20 w-20 rounded-xl border bg-gray-50 object-contain p-1" />
+              <button
+                type="button"
+                title="Supprimer le logo"
+                disabled={removingMedia === 'logo'}
+                onClick={() => removeMedia('logo')}
+                className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white opacity-0 shadow transition group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+              >
+                <FaTrashAlt className="text-xs" />
+              </button>
+            </div>
+          ) : null}
           <input type="file" accept=".png,.jpg,.jpeg,.svg,.webp" onChange={e => setLogo(e.target.files[0])} className="block w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
         </div>
         <div>
           <L>Cachet officiel</L>
-          {etab.cachet_url && <img src={etab.cachet_url} alt="cachet" className="w-20 h-20 object-contain border rounded-xl mb-2 p-1 bg-gray-50" />}
+          {etab.cachet_url ? (
+            <div className="group relative mb-2 inline-block">
+              <img src={mediaUrl(etab.cachet_url)} alt="cachet" className="h-20 w-20 rounded-xl border bg-gray-50 object-contain p-1" />
+              <button
+                type="button"
+                title="Supprimer le cachet"
+                disabled={removingMedia === 'cachet'}
+                onClick={() => removeMedia('cachet')}
+                className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white opacity-0 shadow transition group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+              >
+                <FaTrashAlt className="text-xs" />
+              </button>
+            </div>
+          ) : null}
           <input type="file" accept=".png,.jpg,.jpeg,.webp" onChange={e => setCachet(e.target.files[0])} className="block w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
         </div>
       </div>
@@ -238,8 +360,9 @@ function TabIdentite({ etab, onUpdated }) {
           <div className="md:col-span-2 rounded-xl border border-gray-200 bg-white p-4">
             <p className="text-xs font-semibold text-gray-500 uppercase">Signature / validation</p>
             <div className="mt-2 grid md:grid-cols-2 gap-3 text-sm text-gray-800">
-              <p>Nom du signataire : <strong>{form.signataire_nom || 'Le Responsable pédagogique'}</strong></p>
-              <p>Fonction : <strong>{form.signataire_fonction || 'Pour le Directeur des études'}</strong></p>
+              <p>Nom du signataire : <strong>{form.signataire_nom || '—'}</strong></p>
+              <p>Fonction (interne) : <strong>{form.signataire_fonction || '—'}</strong></p>
+              <p className="text-xs text-slate-500 mt-1">Sur les documents PDF, seul le libellé « La scolarité » apparaît avec le cachet.</p>
             </div>
             <p className="text-xs text-gray-500 mt-3">
               Conseil : renseigner le <strong>nom</strong> et la <strong>fonction</strong> pour une lettre plus institutionnelle.
@@ -454,32 +577,46 @@ export function TabFilieres({ etabId, filieres: init, onFiliereChange }) {
 // ═══════════════════════════════════════════════════════════════════════
 // Onglet 3 — Formations
 // ═══════════════════════════════════════════════════════════════════════
-const NIVEAUX = ['Terminale / Bac', 'Bac+1 / Licence 1', 'Bac+2 / Licence 2', 'Licence 3', 'Master 1', 'Master 2', 'Doctorat', 'Autre']
 
 export function TabFormations({ etabId, formations: init, filieres, onRefreshFilieres, onRefreshFormations }) {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
+  const isFadStaff = user?.role === 'responsable_fad' || user?.role === 'agent_fad'
+  const isPresentielStaff = user?.role === 'responsable'
+  const lockedType = isFadStaff ? 'en_ligne' : isPresentielStaff ? 'presentiel' : null
   const [formations, setFormations] = useState(() => (Array.isArray(init) ? init : []))
+  const [niveaux, setNiveaux] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [editing, setEditing] = useState(null)
   const [filtreFiliere, setFiltreFiliere] = useState('')
-  const [filtreType, setFiltreType] = useState('')
+  const [filtreType, setFiltreType] = useState(lockedType || '')
+  const [filtreNiveau, setFiltreNiveau] = useState('')
   const [searchText, setSearchText] = useState('')
   const [importFile, setImportFile] = useState(null)
   const [importing, setImporting] = useState(false)
   const [importDryRun, setImportDryRun] = useState(true)
   const [importResult, setImportResult] = useState(null)
-  const [importMode, setImportMode] = useState('presentiel') // presentiel | en_ligne
+  const [importMode, setImportMode] = useState(lockedType || 'presentiel') // presentiel | en_ligne
   const [showExcelGrid, setShowExcelGrid] = useState(false)
   const [excelGridVariant, setExcelGridVariant] = useState('create') // create | edit
   const [excelEditRows, setExcelEditRows] = useState([])
   const [excelSaving, setExcelSaving] = useState(false)
   const EMPTY = {
-    filiere_id: '', titre: '', type: 'presentiel', niveau: '', niveau_requis: '', duree: '', description: '',
+    filiere_id: '', titre: '', type: lockedType || 'presentiel', niveau: '', niveau_requis: '',
+    nombre_annees: '', duree: '', description: '', debouches: '',
     frais_inscription: '', mensualite: '', duree_mois: '', frais_soutenance: '',
     frais_bibliotheque: '', frais_epi: '', autres_frais: '0',
     frais_supplementaires: [],
+    libelles_champs: {
+      frais_inscription: "Frais d'inscription",
+      mensualite: 'Mensualité',
+      solde: 'Solde',
+      frais_par_an: 'Frais par an',
+      frais_bibliotheque: 'Abonnement bibliothèque',
+      frais_epi: 'EPI',
+    },
+    elements_facturation: [],
     nombre_photos_preinscription: '1',
   }
   const [form, setForm] = useState(EMPTY)
@@ -491,6 +628,20 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
   useEffect(() => {
     if (init !== undefined) setFormations(Array.isArray(init) ? init : [])
   }, [init])
+
+  useEffect(() => {
+    if (lockedType) {
+      setFiltreType(lockedType)
+      setImportMode(lockedType)
+    }
+  }, [lockedType])
+
+  useEffect(() => {
+    axios
+      .get('/api/niveaux-etude')
+      .then(({ data }) => setNiveaux(Array.isArray(data) ? data : []))
+      .catch(() => setNiveaux([]))
+  }, [])
 
   const up = f => e => setForm(p => ({ ...p, [f]: e.target.value }))
 
@@ -511,8 +662,10 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       type: f.type,
       niveau: f.niveau || '',
       niveau_requis: f.niveau_requis || '',
+      nombre_annees: f.nombre_annees != null ? String(f.nombre_annees) : '',
       duree: f.duree || '',
       description: f.description || '',
+      debouches: f.debouches || '',
       frais_inscription: String(f.frais_inscription || ''),
       mensualite: String(f.mensualite || ''),
       duree_mois: String(f.duree_mois ?? ''),
@@ -521,6 +674,27 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       frais_epi: String(f.frais_epi || ''),
       autres_frais: String(f.autres_frais || '0'),
       frais_supplementaires: supp.length ? supp : [],
+      libelles_champs: {
+        frais_inscription: "Frais d'inscription",
+        mensualite: 'Mensualité',
+        solde: 'Solde',
+        frais_par_an: 'Frais par an',
+        frais_bibliotheque: 'Abonnement bibliothèque',
+        frais_epi: 'EPI',
+        ...(f.libelles_champs && typeof f.libelles_champs === 'object' ? f.libelles_champs : {}),
+      },
+      elements_facturation: Array.isArray(f.elements_facturation)
+        ? f.elements_facturation.map((el, i) => ({
+            id: el.id || `el-${i}`,
+            libelle: el.libelle || '',
+            type: el.type || 'fixe',
+            montant: String(el.montant ?? ''),
+            quantite: el.quantite != null ? String(el.quantite) : '',
+            actif: el.actif !== false,
+            ordre: el.ordre != null ? Number(el.ordre) : i,
+            hors_forfait: el.hors_forfait === true,
+          }))
+        : [],
       nombre_photos_preinscription: String(f.nombre_photos_preinscription ?? 1),
     })
     setShowForm(true)
@@ -533,17 +707,32 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       const body = {
         filiere_id: form.filiere_id,
         titre: form.titre,
-        type: form.type,
+        type: lockedType || form.type,
         niveau: form.niveau,
         niveau_requis: form.niveau_requis,
+        nombre_annees: parseInt(form.nombre_annees, 10) || 0,
         duree: form.duree || dureeLabelFromMois(form.duree_mois),
         description: form.description,
+        debouches: form.debouches || '',
         ville: null,
         places: 0,
         frais_inscription: parseInt(form.frais_inscription, 10) || 0,
         mensualite: parseInt(form.mensualite, 10) || 0,
         duree_mois: parseInt(form.duree_mois, 10) || 0,
         frais_supplementaires: normalizeFraisSuppFromForm(form.frais_supplementaires),
+        libelles_champs: form.libelles_champs && typeof form.libelles_champs === 'object' ? form.libelles_champs : {},
+        elements_facturation: (form.elements_facturation || [])
+          .map((el, i) => ({
+            id: el.id || `el-${i}`,
+            libelle: String(el.libelle || '').trim(),
+            type: el.type || 'fixe',
+            montant: parseInt(el.montant, 10) || 0,
+            quantite: el.quantite !== '' && el.quantite != null ? parseInt(el.quantite, 10) || 0 : null,
+            actif: el.actif !== false,
+            ordre: el.ordre != null ? Number(el.ordre) : i,
+            hors_forfait: el.hors_forfait === true || el.type === 'hors_forfait',
+          }))
+          .filter((el) => el.libelle),
         frais_soutenance: parseInt(form.frais_soutenance, 10) || 0,
         frais_bibliotheque: parseInt(form.frais_bibliotheque, 10) || 0,
         frais_epi: parseInt(form.frais_epi, 10) || 0,
@@ -623,7 +812,8 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
   const affichees = formations.filter((f) => {
     const byFiliere = !filtreFiliere || String(f.filiere_id) === filtreFiliere
     const byType = !filtreType || f.type === filtreType
-    if (!searchNorm) return byFiliere && byType
+    const byNiveau = !filtreNiveau || String(f.niveau || '') === filtreNiveau
+    if (!searchNorm) return byFiliere && byType && byNiveau
     const haystack = [
       f.titre,
       f.niveau,
@@ -631,7 +821,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       f.filiere_nom,
       f.type === 'en_ligne' ? 'fad' : 'presentiel',
     ].filter(Boolean).join(' ').toLowerCase()
-    return byFiliere && byType && haystack.includes(searchNorm)
+    return byFiliere && byType && byNiveau && haystack.includes(searchNorm)
   })
 
   const afficheesIds = affichees.map((f) => f.id)
@@ -765,7 +955,8 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       toast.error('Sélectionnez une filière avant l’import.')
       return
     }
-    if (!importMode) {
+    const modeImport = lockedType || importMode
+    if (!modeImport) {
       toast.error('Choisissez le mode : présentiel ou en ligne.')
       return
     }
@@ -780,7 +971,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       const fd = new FormData()
       fd.append('file', importFile)
       const { data } = await axios.post(
-        `/api/etablissements/${etabId}/formations/import/${selectedFiliereId}?dry_run=${importDryRun}&type=${importMode}&columns=${encodeURIComponent(JSON.stringify(columns))}`,
+        `/api/etablissements/${etabId}/formations/import/${selectedFiliereId}?dry_run=${importDryRun}&type=${modeImport}&columns=${encodeURIComponent(JSON.stringify(columns))}`,
         fd
       )
       setImportResult(data)
@@ -870,12 +1061,30 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
             </select>
             <select
               className="input-field min-w-[160px] rounded-xl border-slate-200 bg-white py-2 text-sm shadow-sm"
-              value={filtreType}
-              onChange={(e) => setFiltreType(e.target.value)}
+              value={lockedType || filtreType}
+              onChange={(e) => {
+                if (lockedType) return
+                setFiltreType(e.target.value)
+              }}
+              disabled={!!lockedType}
             >
-              <option value="">Tous les modes</option>
-              <option value="presentiel">Présentiel</option>
-              <option value="en_ligne">À distance (FAD)</option>
+              {!lockedType && <option value="">Tous les modes</option>}
+              {(!lockedType || lockedType === 'presentiel') && (
+                <option value="presentiel">Présentiel</option>
+              )}
+              {(!lockedType || lockedType === 'en_ligne') && (
+                <option value="en_ligne">À distance (FAD)</option>
+              )}
+            </select>
+            <select
+              className="input-field min-w-[160px] rounded-xl border-slate-200 bg-white py-2 text-sm shadow-sm"
+              value={filtreNiveau}
+              onChange={(e) => setFiltreNiveau(e.target.value)}
+            >
+              <option value="">Tous les niveaux</option>
+              {niveaux.map((n) => (
+                <option key={n.id || n.libelle} value={n.libelle}>{n.libelle}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -896,13 +1105,13 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         </div>
       )}
 
-      {(filtreFiliere || filtreType || searchNorm) && (
+      {(filtreFiliere || filtreType || filtreNiveau || searchNorm) && (
         <div className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-center gap-2">
-          Filtre actif : {searchNorm ? 'recherche' : ''}{searchNorm && (filtreFiliere || filtreType) ? ' + ' : ''}{filtreFiliere ? 'filière' : ''}{filtreFiliere && filtreType ? ' + ' : ''}{filtreType ? 'type' : ''}
+          Filtre actif
           <button
             type="button"
             className="underline"
-            onClick={() => { setFiltreFiliere(''); setFiltreType(''); setSearchText('') }}
+            onClick={() => { setFiltreFiliere(''); setFiltreType(''); setFiltreNiveau(''); setSearchText('') }}
           >
             Afficher tout
           </button>
@@ -965,7 +1174,8 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                       { l: 'Inscription', v: f.frais_inscription },
                       { l: 'Mensualité', v: f.mensualite },
                       { l: 'Durée (mois)', v: f.duree_mois },
-                      { l: 'Total mensualités', v: computeTotalMensualites(f.mensualite, f.duree_mois) },
+                      { l: 'Solde', v: computeSolde(f.mensualite, f.duree_mois) },
+                      { l: 'Total', v: computeTotalFormation(f.mensualite, f.duree_mois, f.frais_bibliotheque, f.frais_epi) },
                       { l: 'Scolarité annuelle', v: f.prix },
                       { l: 'Soutenance', v: f.frais_soutenance },
                       { l: 'Bibliothèque', v: f.frais_bibliotheque },
@@ -1069,21 +1279,45 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                 </div>
                 <div>
                   <L>Mode *</L>
-                  <select className="input-field" value={form.type} onChange={up('type')}>
-                    <option value="presentiel">🏫 Présentiel</option>
-                    <option value="en_ligne">🌐 Formation à distance (FAD)</option>
+                  <select
+                    className="input-field"
+                    value={lockedType || form.type}
+                    onChange={up('type')}
+                    disabled={!!lockedType}
+                    required
+                  >
+                    {(!lockedType || lockedType === 'presentiel') && (
+                      <option value="presentiel">🏫 Présentiel</option>
+                    )}
+                    {(!lockedType || lockedType === 'en_ligne') && (
+                      <option value="en_ligne">🌐 Formation à distance (FAD)</option>
+                    )}
                   </select>
                 </div>
                 <div>
-                  <L>Niveau</L>
-                  <select className="input-field" value={form.niveau} onChange={up('niveau')}>
+                  <L>Niveau *</L>
+                  <select className="input-field" value={form.niveau} onChange={up('niveau')} required>
                     <option value="">-- Sélectionner --</option>
-                    {NIVEAUX.map(n => <option key={n} value={n}>{n}</option>)}
+                    {niveaux.map((n) => (
+                      <option key={n.id || n.libelle} value={n.libelle}>{n.libelle}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <L>Niveau requis (prérequis)</L>
+                  <L>Niveau exigé</L>
                   <input className="input-field" value={form.niveau_requis} onChange={up('niveau_requis')} placeholder="Ex: Baccalauréat" />
+                </div>
+                <div>
+                  <L>Nombre d&apos;années</L>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={form.nombre_annees}
+                    onChange={up('nombre_annees')}
+                    placeholder="Ex: 3"
+                  />
                 </div>
                 {form.niveau ? (
                   <div className="col-span-2">
@@ -1096,11 +1330,11 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                     className="input-field bg-gray-50"
                     value={form.duree || dureeLabelFromMois(form.duree_mois)}
                     readOnly
-                    placeholder="Calculé depuis le nombre de mois"
+                    placeholder="Calculé depuis la durée mensualité"
                   />
                 </div>
                 <div>
-                  <L>Nombre de mois *</L>
+                  <L>Durée mensualité (mois) *</L>
                   <input
                     className="input-field"
                     type="number"
@@ -1111,7 +1345,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                     placeholder="Ex: 10"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Total mensualités = mois × mensualité.</p>
+                  <p className="text-xs text-gray-500 mt-1">Solde = mensualité × durée mensualité.</p>
                 </div>
                 <div>
                   <L>Photos d’identité (préinscription)</L>
@@ -1127,7 +1361,11 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                 </div>
                 <div className="col-span-2">
                   <L>Description</L>
-                  <textarea className="input-field" rows={2} value={form.description} onChange={up('description')} />
+                  <textarea className="input-field min-h-[120px]" rows={6} value={form.description} onChange={up('description')} placeholder="Présentation de la formation (contenu pédagogique, objectifs…) — aucune limite de longueur." />
+                </div>
+                <div className="col-span-2">
+                  <L>Débouchés professionnels</L>
+                  <textarea className="input-field min-h-[120px]" rows={6} value={form.debouches || ''} onChange={up('debouches')} placeholder="Métiers et secteurs accessibles après la formation… — aucune limite de longueur." />
                 </div>
 
                 {/* Tarification */}
@@ -1135,36 +1373,202 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                   <div className="bg-blue-50 rounded-xl p-4 space-y-3">
                     <p className="font-semibold text-blue-900 text-sm mb-2">💰 Tarification (FCFA)</p>
                     <p className="text-xs text-blue-800 mb-2">
-                      Forfait annuel (scolarité) = frais d&apos;inscription + (mensualité × durée en mois). Les frais supplémentaires ci‑dessous sont indiqués à part (hors total annuel).
+                      Solde = mensualité × durée mensualité. Total = solde + abonnement bibliothèque + EPI.
+                      Frais par an = frais d&apos;inscription + total.
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {[
-                        { f: 'frais_inscription', l: 'Frais d\'inscription' },
-                        { f: 'mensualite', l: 'Mensualité' },
-                        { f: 'frais_soutenance', l: 'Frais de soutenance' },
-                        { f: 'frais_bibliotheque', l: 'Bibliothèque' },
-                        { f: 'frais_epi', l: 'EPI' },
-                      ].map(({ f, l }) => (
+                        { f: 'frais_inscription', l: "Frais d'inscription", lk: 'frais_inscription' },
+                        { f: 'mensualite', l: 'Mensualité', lk: 'mensualite' },
+                        { f: 'frais_bibliotheque', l: 'Abonnement bibliothèque', lk: 'frais_bibliotheque' },
+                        { f: 'frais_epi', l: 'EPI', lk: 'frais_epi' },
+                      ].map(({ f, l, lk }) => (
                         <div key={f}>
-                          <L>{l}</L>
+                          <L>Libellé facture</L>
+                          <input
+                            className="input-field mb-1 text-xs"
+                            value={(form.libelles_champs || {})[lk] || l}
+                            onChange={(e) => {
+                              const v = e.target.value
+                              setForm((p) => ({
+                                ...p,
+                                libelles_champs: { ...(p.libelles_champs || {}), [lk]: v },
+                              }))
+                            }}
+                            placeholder={l}
+                          />
+                          <L>Montant ({l})</L>
                           <input className="input-field" type="number" min="0" value={form[f]} onChange={up(f)} placeholder="0" />
                         </div>
                       ))}
                       <div>
-                        <L>Total mensualités (calculé)</L>
+                        <L>Solde (calculé)</L>
                         <div className="input-field bg-gray-100 text-gray-900 font-semibold">
-                          {fmt(computeTotalMensualites(form.mensualite, form.duree_mois))} FCFA
+                          {fmt(computeSolde(form.mensualite, form.duree_mois))} FCFA
+                        </div>
+                      </div>
+                      <div>
+                        <L>Total (solde + biblio + EPI)</L>
+                        <div className="input-field bg-gray-100 text-gray-900 font-semibold">
+                          {fmt(computeTotalFormation(form.mensualite, form.duree_mois, form.frais_bibliotheque, form.frais_epi))} FCFA
                         </div>
                       </div>
                       <div className="sm:col-span-2">
-                        <L>Scolarité annuelle (calculée)</L>
-                        <div className="input-field bg-gray-100 text-gray-900 font-semibold">
-                          {fmt(computeScolariteAnnuelle(form.frais_inscription, form.mensualite, form.duree_mois))} FCFA
+                        <L>Frais par an (calculés)</L>
+                        <div className="input-field bg-blue-100 text-blue-950 font-bold">
+                          {fmt(computeFraisParAn(form.frais_inscription, form.mensualite, form.duree_mois, form.frais_bibliotheque, form.frais_epi))} FCFA
                         </div>
                       </div>
                     </div>
                     <div className="border-t border-blue-100 pt-3 mt-2">
-                      <p className="text-sm font-semibold text-blue-900 mb-2">Frais supplémentaires (hors forfait annuel)</p>
+                      <p className="text-sm font-semibold text-blue-900 mb-1">Éléments de facturation personnalisés</p>
+                      <p className="text-xs text-blue-800/80 mb-2">
+                        Structure libre par formation : créez, renommez, ordonnez, activez/désactivez.
+                        Si au moins un élément actif est défini, la facture utilise exclusivement ces libellés (calcul automatique du total).
+                      </p>
+                      <div className="space-y-2">
+                        {(form.elements_facturation || []).map((el, idx) => (
+                          <div key={el.id || idx} className="rounded-lg border border-blue-100 bg-white/70 p-2 space-y-2">
+                            <div className="flex flex-wrap gap-2 items-end">
+                              <div className="flex-1 min-w-[140px]">
+                                <L>Libellé exact (facture)</L>
+                                <input
+                                  className="input-field py-1.5"
+                                  value={el.libelle}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    setForm((p) => ({
+                                      ...p,
+                                      elements_facturation: (p.elements_facturation || []).map((r, i) =>
+                                        i === idx ? { ...r, libelle: v } : r
+                                      ),
+                                    }))
+                                  }}
+                                  placeholder="Ex: Frais de laboratoire"
+                                />
+                              </div>
+                              <div className="w-28">
+                                <L>Type</L>
+                                <select
+                                  className="input-field py-1.5"
+                                  value={el.type}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    setForm((p) => ({
+                                      ...p,
+                                      elements_facturation: (p.elements_facturation || []).map((r, i) =>
+                                        i === idx ? { ...r, type: v, hors_forfait: v === 'hors_forfait' } : r
+                                      ),
+                                    }))
+                                  }}
+                                >
+                                  <option value="fixe">Montant fixe</option>
+                                  <option value="inscription">Inscription</option>
+                                  <option value="mensualite">Mensualité × nb mois</option>
+                                  <option value="hors_forfait">Hors forfait</option>
+                                </select>
+                              </div>
+                              <div className="w-28">
+                                <L>Montant</L>
+                                <input
+                                  className="input-field py-1.5"
+                                  type="number"
+                                  min="0"
+                                  value={el.montant}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    setForm((p) => ({
+                                      ...p,
+                                      elements_facturation: (p.elements_facturation || []).map((r, i) =>
+                                        i === idx ? { ...r, montant: v } : r
+                                      ),
+                                    }))
+                                  }}
+                                />
+                              </div>
+                              {el.type === 'mensualite' && (
+                                <div className="w-24">
+                                  <L>Nb mois</L>
+                                  <input
+                                    className="input-field py-1.5"
+                                    type="number"
+                                    min="0"
+                                    value={el.quantite}
+                                    placeholder="auto"
+                                    onChange={(e) => {
+                                      const v = e.target.value
+                                      setForm((p) => ({
+                                        ...p,
+                                        elements_facturation: (p.elements_facturation || []).map((r, i) =>
+                                          i === idx ? { ...r, quantite: v } : r
+                                        ),
+                                      }))
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              <label className="flex items-center gap-1 text-xs text-slate-700 mb-1">
+                                <input
+                                  type="checkbox"
+                                  checked={el.actif !== false}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked
+                                    setForm((p) => ({
+                                      ...p,
+                                      elements_facturation: (p.elements_facturation || []).map((r, i) =>
+                                        i === idx ? { ...r, actif: checked } : r
+                                      ),
+                                    }))
+                                  }}
+                                />
+                                Actif
+                              </label>
+                              <button
+                                type="button"
+                                className="text-xs text-red-600 mb-1"
+                                onClick={() =>
+                                  setForm((p) => ({
+                                    ...p,
+                                    elements_facturation: (p.elements_facturation || []).filter((_, i) => i !== idx),
+                                  }))
+                                }
+                              >
+                                Retirer
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="text-sm text-blue-700 hover:underline"
+                          onClick={() =>
+                            setForm((p) => ({
+                              ...p,
+                              elements_facturation: [
+                                ...(p.elements_facturation || []),
+                                {
+                                  id: `el-${Date.now()}`,
+                                  libelle: '',
+                                  type: 'fixe',
+                                  montant: '',
+                                  quantite: '',
+                                  actif: true,
+                                  ordre: (p.elements_facturation || []).length,
+                                  hors_forfait: false,
+                                },
+                              ],
+                            }))
+                          }
+                        >
+                          + Ajouter un élément de facturation
+                        </button>
+                      </div>
+                    </div>
+                    <div className="border-t border-blue-100 pt-3 mt-2">
+                      <p className="text-sm font-semibold text-blue-900 mb-2">Autres postes tarifaires (désignation libre)</p>
+                      <p className="text-xs text-blue-800/80 mb-2">
+                        Chaque ligne porte le libellé que vous choisissez — repris tel quel sur les factures (aucun titre générique).
+                      </p>
                       <div className="space-y-2">
                         {(form.frais_supplementaires || []).map((row, idx) => (
                           <div key={idx} className="flex flex-wrap gap-2 items-end">
@@ -1277,39 +1681,49 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                 </div>
                 <div>
                   <L>Mode du template *</L>
-                  <div className="flex gap-1 rounded-xl bg-slate-50 p-1 ring-1 ring-slate-200">
-                    {[
-                      { val: 'presentiel', label: 'Présentiel' },
-                      { val: 'en_ligne', label: 'En ligne' },
-                    ].map(({ val, label }) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setImportMode(val)}
-                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition ${
-                          importMode === val ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-white'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                  {lockedType ? (
+                    <p className="rounded-xl bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-800 ring-1 ring-indigo-100">
+                      {lockedType === 'en_ligne' ? 'À distance (FAD) uniquement' : 'Présentiel uniquement'}
+                    </p>
+                  ) : (
+                    <div className="flex gap-1 rounded-xl bg-slate-50 p-1 ring-1 ring-slate-200">
+                      {[
+                        { val: 'presentiel', label: 'Présentiel' },
+                        { val: 'en_ligne', label: 'En ligne' },
+                      ].map(({ val, label }) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setImportMode(val)}
+                          className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition ${
+                            importMode === val ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-white'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               {!selectedFiliereId && (
                 <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  Sélectionnez une filière et le mode (présentiel ou en ligne) pour synchroniser l’import.
+                  Sélectionnez une filière{lockedType ? '' : ' et le mode (présentiel ou en ligne)'} pour synchroniser l’import.
                 </div>
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap gap-3">
-                  <button type="button" onClick={() => downloadTemplate('presentiel')} className="text-sm text-blue-600 hover:underline">
-                    Template Excel présentiel (.xlsx)
-                  </button>
-                  <button type="button" onClick={() => downloadTemplate('en_ligne')} className="text-sm text-emerald-700 hover:underline">
-                    Template Excel en ligne (.xlsx)
-                  </button>
+                  {(!lockedType || lockedType === 'presentiel') && (
+                    <button type="button" onClick={() => downloadTemplate('presentiel')} className="text-sm text-blue-600 hover:underline">
+                      Template Excel présentiel (.xlsx)
+                    </button>
+                  )}
+                  {(!lockedType || lockedType === 'en_ligne') && (
+                    <button type="button" onClick={() => downloadTemplate('en_ligne')} className="text-sm text-emerald-700 hover:underline">
+                      Template Excel en ligne / FAD (.xlsx)
+                    </button>
+                  )}
                 </div>
                 <label className="text-sm text-gray-700 flex items-center gap-2">
                   <input type="checkbox" checked={importDryRun} onChange={(e) => setImportDryRun(e.target.checked)} />
@@ -1370,7 +1784,8 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         etabId={etabId}
         filieres={filieres}
         initialFiliereId={filtreFiliere || (filieres[0] ? String(filieres[0].id) : '')}
-        initialType={filtreType === 'en_ligne' ? 'en_ligne' : 'presentiel'}
+        initialType={lockedType || (filtreType === 'en_ligne' ? 'en_ligne' : 'presentiel')}
+        lockedType={lockedType}
         variant={excelGridVariant}
         initialRows={excelGridVariant === 'edit' ? excelEditRows : null}
         onSubmit={handleExcelGridSubmit}
@@ -1384,7 +1799,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
 // Onglet 4 — Membres
 // ═══════════════════════════════════════════════════════════════════════
 const EMPTY_MEMBRE_FORM = {
-  prenom: '', nom: '', email: '', telephone: '', adresse: '', date_naissance: '',
+  prenom: '', nom: '', email: '', telephone: '', adresse: '', service: '',
   mot_de_passe: '', mot_de_passe_confirmation: '', role: 'responsable',
 }
 
@@ -1393,10 +1808,16 @@ const EMPTY_EDIT_FORM = {
   mot_de_passe: '', mot_de_passe_confirmation: '',
 }
 
-export function TabMembres({ etabId, membres: init, responsable_id }) {
+export function TabMembres({ etabId, membres: init, responsable_id, admin_etablissement_id, onEtabRefresh }) {
   const { user } = useAuth()
-  const canCreateStaffAccount = user?.role === 'admin'
-  const canDeleteStaffPermanently = user?.role === 'admin'
+  const isPlatformAdmin = user?.role === 'admin'
+  const canCreateStaffAccount = userCanCreateStaff(user)
+  const canDeleteStaffPermanently = isPlatformAdmin
+  const roleOptions = useMemo(() => creatableRoleOptions(user), [user])
+  const roleOptionsAll = useMemo(
+    () => [...roleOptions, { val: 'admin_etablissement', label: 'Administrateur établissement' }],
+    [roleOptions],
+  )
   const [membres, setMembres] = useState(init || [])
   const [q, setQ] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -1408,6 +1829,11 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
   const [permanentFor, setPermanentFor] = useState(null)
   const [confirmEmail, setConfirmEmail] = useState('')
   const [permanentSaving, setPermanentSaving] = useState(false)
+  const [showUserImport, setShowUserImport] = useState(false)
+  const [userImportFile, setUserImportFile] = useState(null)
+  const [userImporting, setUserImporting] = useState(false)
+  const [userImportDryRun, setUserImportDryRun] = useState(true)
+  const [userImportResult, setUserImportResult] = useState(null)
 
   useEffect(() => {
     setMembres(init || [])
@@ -1449,21 +1875,18 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
       toast.error('Les mots de passe ne correspondent pas.')
       return
     }
-    if (!form.date_naissance?.trim()) {
-      toast.error('La date de naissance est obligatoire.')
-      return
-    }
     setSaving(true)
     try {
       const { data } = await axios.post(`/api/etablissements/${etabId}/membres`, form)
       setMembres(prev => [...prev, { ...data, actif: data.actif !== false, created_at: new Date().toISOString() }])
       toast.success(
         data.matricule
-          ? `Membre créé — matricule ${data.matricule}. Changement de mot de passe obligatoire à la première connexion.`
-          : 'Membre créé. Il devra changer son mot de passe à la première connexion.'
+          ? `Membre créé — matricule ${data.matricule}. ${data.email_invite_sent ? 'E-mail d’activation envoyé.' : 'E-mail d’activation non envoyé (vérifiez SMTP).'}`
+          : data.message || 'Membre créé. Un e-mail d’activation a été envoyé si SMTP est configuré.'
       )
       setShowForm(false)
       setForm(EMPTY_MEMBRE_FORM)
+      onEtabRefresh?.()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Erreur.')
     } finally { setSaving(false) }
@@ -1494,6 +1917,7 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
       toast.success(data.message || 'Membre mis à jour.')
       setEditId(null)
       setEditForm(EMPTY_EDIT_FORM)
+      onEtabRefresh?.()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Erreur.')
     } finally { setSavingEdit(false) }
@@ -1538,6 +1962,55 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
     } finally { setPermanentSaving(false) }
   }
 
+  const downloadUserImportTemplate = async () => {
+    try {
+      const { data } = await axios.get(`/api/etablissements/${etabId}/membres/import/template`, { responseType: 'blob' })
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'modele-import-membres.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Impossible de télécharger le modèle.')
+    }
+  }
+
+  const runUserImport = async (dryRun) => {
+    if (!userImportFile) {
+      toast.error('Choisissez un fichier Excel ou CSV.')
+      return
+    }
+    setUserImporting(true)
+    setUserImportResult(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', userImportFile)
+      const { data } = await axios.post(
+        `/api/etablissements/${etabId}/membres/import?dry_run=${dryRun ? '1' : '0'}`,
+        fd,
+      )
+      setUserImportResult(data)
+      setUserImportDryRun(dryRun)
+      if (!dryRun && data.ok) {
+        toast.success(`${data.summary?.created || 0} compte(s) créé(s).`)
+        onEtabRefresh?.()
+        axios.get(`/api/etablissements/${etabId}`).then(({ data: et }) => {
+          if (Array.isArray(et.membres)) setMembres(et.membres)
+        }).catch(() => {})
+      } else if (dryRun && data.ok) {
+        toast.success('Validation OK — vous pouvez importer.')
+      } else if (!data.ok) {
+        toast.error(`${data.summary?.invalid_rows || data.errors?.length || 0} ligne(s) en erreur.`)
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Import impossible.')
+      setUserImportResult(err.response?.data || null)
+    } finally {
+      setUserImporting(false)
+    }
+  }
+
   const actifs = membres.filter(m => m.actif !== false).length
 
   return (
@@ -1553,7 +2026,12 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
             </div>
             <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Membres du staff</h2>
             <p className="mt-1 max-w-xl text-sm text-slate-300">
-              Gérez les rôles, l’identité et l’état des comptes. Les étudiants ne sont pas listés ici.
+              Gérez les rôles, l’identité et l’état des comptes staff. Les étudiants ne sont pas listés ici.
+              {user?.role === 'admin_etablissement' && (
+                <span className="mt-1 block text-cyan-100/90">
+                  Vous pouvez créer, modifier et désactiver les comptes staff de votre établissement.
+                </span>
+              )}
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
               <span className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-1.5 text-sm font-medium ring-1 ring-white/10">
@@ -1566,14 +2044,28 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
             </div>
           </div>
           {canCreateStaffAccount && (
-            <button
-              type="button"
-              onClick={() => { setShowForm(true); setForm(EMPTY_MEMBRE_FORM) }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-900/40 transition hover:brightness-110 active:scale-[0.98]"
-            >
-              <FaPlus className="h-4 w-4" aria-hidden />
-              Ajouter un membre
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserImport(true)
+                  setUserImportResult(null)
+                  setUserImportFile(null)
+                  setUserImportDryRun(true)
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/20"
+              >
+                Import Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowForm(true); setForm(EMPTY_MEMBRE_FORM) }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-900/40 transition hover:brightness-110 active:scale-[0.98]"
+              >
+                <FaPlus className="h-4 w-4" aria-hidden />
+                Ajouter un membre
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -1600,10 +2092,23 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-200 to-slate-100 text-3xl shadow-inner">👥</div>
           <p className="font-semibold text-slate-700">Aucun membre rattaché</p>
           <p className="mt-1 text-sm text-slate-500">Créez un premier compte pour cet établissement.</p>
+          {canCreateStaffAccount && (
+            <button
+              type="button"
+              onClick={() => { setShowForm(true); setForm(EMPTY_MEMBRE_FORM) }}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2 text-sm font-bold text-white hover:bg-cyan-700"
+            >
+              <FaPlus className="h-4 w-4" aria-hidden />
+              Ajouter un membre
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map(m => (
+          {filtered.map(m => {
+            const manageable = canManageMembre(user, m)
+            const isSelf = Number(user?.id) === Number(m.id)
+            return (
             <div
               key={m.id}
               className={`group relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md ${
@@ -1631,12 +2136,17 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
                   )}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className={`text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${ROLE_COLORS[m.role] || 'bg-gray-100 text-gray-600'}`}>
-                      {ROLES_STAFF.find(r => r.val === m.role)?.label || m.role}
+                      {roleLabel(m.role, roleOptionsAll)}
                     </span>
                     {m.id === responsable_id && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
                         <FaUserTie className="h-3 w-3" aria-hidden />
-                        Désigné resp.
+                        Resp. pédagogique
+                      </span>
+                    )}
+                    {m.id === admin_etablissement_id && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-800 ring-1 ring-indigo-200">
+                        Admin étab.
                       </span>
                     )}
                     {m.actif === false && (
@@ -1648,6 +2158,11 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                {isSelf && user?.role === 'admin_etablissement' && (
+                  <p className="w-full text-xs text-slate-500">Votre propre compte ne peut pas être modifié ici.</p>
+                )}
+                {manageable && (
+                  <>
                 <button
                   type="button"
                   onClick={() => openEdit(m)}
@@ -1675,6 +2190,8 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
                     Réactiver
                   </button>
                 )}
+                  </>
+                )}
                 {canDeleteStaffPermanently && (
                   <button
                     type="button"
@@ -1688,12 +2205,75 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
                 )}
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
       {filtered.length === 0 && membres.length > 0 && (
         <p className="text-center text-sm text-slate-500">Aucun membre ne correspond à votre recherche.</p>
+      )}
+
+      {showUserImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
+          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-4">
+              <h3 className="text-lg font-bold text-slate-900">Import Excel des membres</h3>
+              <button type="button" onClick={() => setShowUserImport(false)} className="text-2xl text-slate-400 hover:text-slate-700" aria-label="Fermer">×</button>
+            </div>
+            <div className="space-y-4 p-5">
+              <p className="text-sm text-slate-600">
+                Colonnes : prenom, nom, email, role, telephone, adresse, service. Validation ligne par ligne avant création.
+              </p>
+              <button type="button" onClick={downloadUserImportTemplate} className="btn-secondary w-full text-sm">
+                Télécharger le modèle Excel
+              </button>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="input-field"
+                onChange={(e) => setUserImportFile(e.target.files?.[0] || null)}
+              />
+              {userImportResult && (
+                <div className={`rounded-xl border p-3 text-sm ${userImportResult.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}>
+                  <p className="font-semibold">
+                    {userImportDryRun ? 'Validation' : 'Import'} — {userImportResult.summary?.valid_rows ?? 0} valide(s),{' '}
+                    {userImportResult.summary?.invalid_rows ?? userImportResult.errors?.length ?? 0} erreur(s)
+                    {!userImportDryRun && userImportResult.summary?.created != null ? `, ${userImportResult.summary.created} créé(s)` : ''}
+                  </p>
+                  {Array.isArray(userImportResult.errors) && userImportResult.errors.length > 0 && (
+                    <ul className="mt-2 max-h-40 list-disc overflow-y-auto pl-5 text-xs">
+                      {userImportResult.errors.slice(0, 40).map((err, i) => (
+                        <li key={`${err.row}-${err.field}-${i}`}>
+                          Ligne {err.row}{err.field ? ` (${err.field})` : ''} : {err.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button type="button" onClick={() => setShowUserImport(false)} className="btn-secondary flex-1">Fermer</button>
+                <button
+                  type="button"
+                  disabled={userImporting || !userImportFile}
+                  onClick={() => runUserImport(true)}
+                  className="btn-secondary flex-1 disabled:opacity-40"
+                >
+                  {userImporting && userImportDryRun ? 'Validation…' : 'Valider'}
+                </button>
+                <button
+                  type="button"
+                  disabled={userImporting || !userImportFile || !(userImportResult?.ok && userImportDryRun)}
+                  onClick={() => runUserImport(false)}
+                  className="btn-primary flex-1 disabled:opacity-40"
+                >
+                  {userImporting && !userImportDryRun ? 'Import…' : 'Importer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {showForm && (
@@ -1711,25 +2291,26 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
                 <div><L>Nom *</L><input className="input-field" value={form.nom} onChange={up('nom')} required /></div>
               </div>
               <p className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                Le <strong>matricule</strong> est généré automatiquement (préfixe lié à l’établissement).
+                Le <strong>matricule</strong> est généré automatiquement. Pas de date de naissance ni de photo à la création :
+                le membre les complète librement dans « Mon profil » après connexion.
               </p>
-              <div><L>Date de naissance *</L><input className="input-field" type="date" value={form.date_naissance} onChange={up('date_naissance')} required /></div>
               <div><L>Email *</L><input className="input-field" type="email" value={form.email} onChange={up('email')} required /></div>
               <div>
-                <L>Téléphone *</L>
-                <input className="input-field" type="tel" value={form.telephone} onChange={up('telephone')} required />
-                <p className="mt-1 text-xs text-slate-500">Unique sur toute la plateforme.</p>
+                <L>Téléphone</L>
+                <input className="input-field" type="tel" value={form.telephone} onChange={up('telephone')} />
+                <p className="mt-1 text-xs text-slate-500">Optionnel à la création — unique s’il est renseigné.</p>
               </div>
+              <div><L>Service / fonction</L><input className="input-field" value={form.service} onChange={up('service')} placeholder="Optionnel" /></div>
               <div><L>Adresse</L><input className="input-field" value={form.adresse} onChange={up('adresse')} placeholder="Optionnel" /></div>
-              <div><L>Mot de passe *</L><input className="input-field" type="password" value={form.mot_de_passe} onChange={up('mot_de_passe')} required minLength={6} /></div>
+              <div><L>Mot de passe initial *</L><input className="input-field" type="password" value={form.mot_de_passe} onChange={up('mot_de_passe')} required minLength={6} /></div>
               <div><L>Confirmer *</L><input className="input-field" type="password" value={form.mot_de_passe_confirmation} onChange={up('mot_de_passe_confirmation')} required minLength={6} /></div>
-              <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                Première connexion : changement de mot de passe obligatoire.
+              <p className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                Un e-mail d’activation avec lien pour définir le mot de passe est envoyé automatiquement (SMTP).
               </p>
               <div>
                 <L>Rôle *</L>
                 <select className="input-field" value={form.role} onChange={up('role')} required>
-                  {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
+                  {roleOptions.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
@@ -1775,7 +2356,9 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
               <div>
                 <L>Rôle *</L>
                 <select className="input-field" value={editForm.role} onChange={upEdit('role')} required>
-                  {ROLES_STAFF.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
+                  {(roleOptions.some(r => r.val === editForm.role) ? roleOptions : [...roleOptions, { val: editForm.role, label: roleLabel(editForm.role, roleOptionsAll) }]).map(r => (
+                    <option key={r.val} value={r.val}>{r.label}</option>
+                  ))}
                 </select>
               </div>
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
@@ -1851,72 +2434,180 @@ export function TabMembres({ etabId, membres: init, responsable_id }) {
           </form>
         </div>
       )}
+
+      {(user?.role === 'admin_etablissement' || user?.role === 'admin') && (
+        <DonneesBackupPanel className="mt-2" />
+      )}
     </div>
   )
 }
-
 // ═══════════════════════════════════════════════════════════════════════
-// Onglet 5 — Responsable
+// Onglet — Responsables & administrateur établissement
 // ═══════════════════════════════════════════════════════════════════════
-function TabResponsable({ etabId, responsable: initResp, membres }) {
+function TabResponsable({
+  etabId,
+  responsable: initResp,
+  adminEtab: initAdmin,
+  membres,
+  onUpdated,
+  isPlatformAdmin,
+}) {
   const [responsable, setResponsable] = useState(initResp)
-  const [selectedId, setSelectedId] = useState(initResp?.id ? String(initResp.id) : '')
-  const [saving, setSaving] = useState(false)
+  const [adminEtab, setAdminEtab] = useState(initAdmin)
+  const [selectedRespId, setSelectedRespId] = useState(initResp?.id ? String(initResp.id) : '')
+  const [selectedAdminId, setSelectedAdminId] = useState(initAdmin?.id ? String(initAdmin.id) : '')
+  const [savingResp, setSavingResp] = useState(false)
+  const [savingAdmin, setSavingAdmin] = useState(false)
 
-  const eligibles = membres.filter(m => m.role === 'responsable' && m.actif !== false)
+  const eligibles = staffEligiblesDesignation(membres)
+  const [adminCandidates, setAdminCandidates] = useState(eligibles)
 
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      await axios.put(`/api/etablissements/${etabId}/responsable`, { utilisateur_id: selectedId || null })
-      const found = membres.find(m => String(m.id) === selectedId) || null
-      setResponsable(found)
-      toast.success(selectedId ? 'Responsable désigné.' : 'Responsable retiré.')
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Erreur.')
-    } finally { setSaving(false) }
+  useEffect(() => {
+    setAdminCandidates(eligibles)
+    if (!isPlatformAdmin) return
+    let cancelled = false
+    axios
+      .get('/api/admin/utilisateurs')
+      .then(({ data }) => {
+        if (cancelled) return
+        const list = Array.isArray(data) ? data : data?.utilisateurs || []
+        const others = list.filter(
+          (u) =>
+            u.role === 'admin_etablissement' &&
+            u.actif !== false &&
+            !eligibles.some((e) => Number(e.id) === Number(u.id)),
+        )
+        setAdminCandidates([...eligibles, ...others])
+      })
+      .catch(() => {
+        if (!cancelled) setAdminCandidates(eligibles)
+      })
+    return () => { cancelled = true }
+  }, [etabId, isPlatformAdmin, membres])
+
+  useEffect(() => {
+    setResponsable(initResp)
+    setSelectedRespId(initResp?.id ? String(initResp.id) : '')
+  }, [initResp])
+
+  useEffect(() => {
+    setAdminEtab(initAdmin)
+    setSelectedAdminId(initAdmin?.id ? String(initAdmin.id) : '')
+  }, [initAdmin])
+
+  const refreshEtab = async () => {
+    const { data } = await axios.get(`/api/etablissements/${etabId}`)
+    setResponsable(data.responsable || null)
+    setAdminEtab(data.admin_etablissement || null)
+    setSelectedRespId(data.responsable?.id ? String(data.responsable.id) : '')
+    setSelectedAdminId(data.admin_etablissement?.id ? String(data.admin_etablissement.id) : '')
+    onUpdated?.(data)
+    return data
   }
 
-  return (
-    <div className="max-w-lg space-y-6">
-      <div className="card bg-blue-50 border-blue-100">
-        <p className="font-semibold text-blue-900 mb-1">Responsable actuel</p>
-        {responsable ? (
-          <div className="flex items-center gap-3 mt-2">
-            <div className="w-10 h-10 rounded-full bg-teal-500 text-white font-bold text-sm flex items-center justify-center">
-              {(responsable.prenom?.[0] || '?')}{(responsable.nom?.[0] || '')}
-            </div>
-            <div>
-              <p className="font-semibold text-gray-800">{responsable.prenom} {responsable.nom}</p>
-              <p className="text-xs text-gray-400">{responsable.email} · {responsable.role}</p>
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500 mt-1">Aucun responsable désigné.</p>
-        )}
-      </div>
+  const handleSaveResp = async () => {
+    setSavingResp(true)
+    try {
+      await axios.put(`/api/etablissements/${etabId}/responsable`, { utilisateur_id: selectedRespId || null })
+      await refreshEtab()
+      toast.success(selectedRespId ? 'Responsable pédagogique désigné.' : 'Responsable pédagogique retiré.')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur.')
+    } finally { setSavingResp(false) }
+  }
 
+  const handleSaveAdmin = async () => {
+    setSavingAdmin(true)
+    try {
+      const { data } = await axios.put(`/api/etablissements/${etabId}/admin-etablissement`, {
+        utilisateur_id: selectedAdminId || null,
+      })
+      await refreshEtab()
+      toast.success(data.message || (selectedAdminId ? 'Administrateur désigné.' : 'Administrateur retiré.'))
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur.')
+    } finally { setSavingAdmin(false) }
+  }
+
+  const renderDesignationBlock = ({
+    title,
+    hint,
+    current,
+    emptyLabel,
+    selectedId,
+    setSelectedId,
+    onSave,
+    saving,
+    cardClass,
+    options = eligibles,
+  }) => (
+    <div className="space-y-4">
+      <div className={`card ${cardClass}`}>
+        <p className="font-semibold mb-1">{title}</p>
+        <PersonCard person={current} emptyLabel={emptyLabel} />
+      </div>
       <div>
-        <p className="font-semibold text-gray-800 mb-3">Désigner un responsable</p>
-        {eligibles.length === 0 ? (
+        <p className="font-semibold text-gray-800 mb-1">Changer la désignation</p>
+        <p className="text-xs text-gray-500 mb-3">{hint}</p>
+        {options.length === 0 ? (
           <div className="p-4 bg-amber-50 rounded-xl text-sm text-amber-700">
-            ⚠ Créez d&apos;abord un membre avec le rôle <strong>Responsable pédagogique</strong>.
+            ⚠ Ajoutez d&apos;abord un membre du staff actif (onglet <strong>Membres</strong>).
           </div>
         ) : (
           <>
-            <select className="input-field mb-4" value={selectedId} onChange={e => setSelectedId(e.target.value)}>
-              <option value="">-- Aucun responsable --</option>
-              {eligibles.map(m => (
-                <option key={m.id} value={String(m.id)}>{m.prenom} {m.nom} ({m.role})</option>
+            <select className="input-field mb-4" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
+              <option value="">-- Aucune désignation --</option>
+              {options.map((m) => (
+                <option key={m.id} value={String(m.id)}>
+                  {m.prenom} {m.nom} ({ROLE_LABELS[m.role] || m.role}
+                  {m.etablissement_id && Number(m.etablissement_id) !== Number(etabId)
+                    ? ' · autre étab.'
+                    : ''}
+                  )
+                </option>
               ))}
             </select>
-            <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-40">
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2 disabled:opacity-40"
+            >
               {saving ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : null}
               Enregistrer
             </button>
           </>
         )}
       </div>
+    </div>
+  )
+
+  return (
+    <div className="max-w-2xl space-y-10">
+      {isPlatformAdmin && renderDesignationBlock({
+        title: 'Administrateur établissement',
+        hint: 'Gère le staff et l’identité de l’établissement. Un administrateur par établissement ; la même personne peut aussi administrer un autre établissement (présentiel et FAD).',
+        current: adminEtab,
+        emptyLabel: 'Aucun administrateur établissement désigné.',
+        selectedId: selectedAdminId,
+        setSelectedId: setSelectedAdminId,
+        onSave: handleSaveAdmin,
+        saving: savingAdmin,
+        cardClass: 'bg-indigo-50 border-indigo-100',
+        options: adminCandidates,
+      })}
+
+      {renderDesignationBlock({
+        title: 'Responsable pédagogique',
+        hint: 'Droits pédagogiques (dossiers, proforma, etc.) en plus de son rôle principal. Tout membre staff actif peut être désigné.',
+        current: responsable,
+        emptyLabel: 'Aucun responsable pédagogique désigné.',
+        selectedId: selectedRespId,
+        setSelectedId: setSelectedRespId,
+        onSave: handleSaveResp,
+        saving: savingResp,
+        cardClass: 'bg-blue-50 border-blue-100',
+      })}
     </div>
   )
 }
@@ -1928,10 +2619,11 @@ const TABS_ALL = [
   { id: 'identite', label: 'Identité', Icon: FaUniversity },
   { id: 'filieres', label: 'Filières', Icon: FaBook },
   { id: 'formations', label: 'Formations', Icon: FaGraduationCap },
+  { id: 'flyers', label: 'Flyers', Icon: FaFileInvoice },
   { id: 'acceptes', label: 'Acceptés', Icon: FaCheckCircle },
   { id: 'factures', label: 'Factures', Icon: FaFileInvoice },
   { id: 'membres', label: 'Membres', Icon: FaUsers },
-  { id: 'responsable', label: 'Responsable', Icon: FaUserTie },
+  { id: 'responsable', label: 'Responsables', Icon: FaUserTie },
 ]
 
 export default function AdminEtablissementDetail() {
@@ -2018,7 +2710,7 @@ export default function AdminEtablissementDetail() {
                 style={{ borderColor: `${primary}35` }}
               >
                 {etab.logo_url ? (
-                  <img src={etab.logo_url} alt="" className="w-full h-full object-contain p-1" />
+                  <img src={mediaUrl(etab.logo_url)} alt="" className="w-full h-full object-contain p-1" />
                 ) : (
                   <span className="text-2xl sm:text-3xl font-black" style={{ color: primary }}>
                     {String(etab.nom || '?')[0]}
@@ -2115,6 +2807,9 @@ export default function AdminEtablissementDetail() {
             onRefreshFormations={refreshFormationsOnly}
           />
         )}
+        {tab === 'flyers' && (
+          <TabFlyers etabId={etab.id} filieres={etab.filieres || []} />
+        )}
         {tab === 'acceptes' && (
           <TabAcceptesParFormation etabId={etab.id} />
         )}
@@ -2122,10 +2817,23 @@ export default function AdminEtablissementDetail() {
           <TabFacturesEtab etabId={etab.id} />
         )}
         {tab === 'membres' && (
-          <TabMembres etabId={etab.id} membres={etab.membres || []} responsable_id={etab.responsable_id} />
+          <TabMembres
+            etabId={etab.id}
+            membres={etab.membres || []}
+            responsable_id={etab.responsable_id}
+            admin_etablissement_id={etab.admin_etablissement_id}
+            onEtabRefresh={load}
+          />
         )}
         {tab === 'responsable' && (
-          <TabResponsable etabId={etab.id} responsable={etab.responsable} membres={etab.membres || []} />
+          <TabResponsable
+            etabId={etab.id}
+            responsable={etab.responsable}
+            adminEtab={etab.admin_etablissement}
+            membres={etab.membres || []}
+            isPlatformAdmin={user?.role === 'admin'}
+            onUpdated={(data) => setEtab((prev) => (prev ? { ...prev, ...data } : data))}
+          />
         )}
           </div>
         </div>

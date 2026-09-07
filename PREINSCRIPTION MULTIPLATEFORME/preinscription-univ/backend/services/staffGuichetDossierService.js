@@ -65,9 +65,8 @@ function creerDossierGuichet({ staffUser, body }) {
   const isProformaGuichet = typeDoc === 'proforma';
 
   if (!isProformaGuichet) {
+    // Date / lieu de naissance : facultatifs même pour une préinscription guichet.
     const required = [
-      'date_naissance',
-      'lieu_naissance',
       'nationalite',
       'adresse',
       'dernier_diplome',
@@ -164,7 +163,8 @@ function creerDossierGuichet({ staffUser, body }) {
     date_naissance: body.date_naissance ? String(body.date_naissance).trim() : null,
     lieu_naissance: body.lieu_naissance ? String(body.lieu_naissance).trim() : null,
     nationalite: body.nationalite ? String(body.nationalite).trim() : null,
-    pays_residence: String(body.pays_residence || '').trim() || null,
+    pays_origine: String(body.pays_origine || body.pays_residence || '').trim() || null,
+    pays_residence: String(body.pays_residence || body.pays_origine || '').trim() || null,
     telephone,
     adresse: body.adresse ? String(body.adresse).trim() : null,
     type_piece: String(body.type_piece || '').trim() || null,

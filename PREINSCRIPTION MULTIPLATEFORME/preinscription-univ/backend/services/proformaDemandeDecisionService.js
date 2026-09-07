@@ -5,6 +5,14 @@ const db = require('../database/db');
 const { buildLignesForfaitAnnuel, getDureeMoisEffectif } = require('../utils/formationTarifs');
 const { demandeProformaJustificatifsComplets } = require('../utils/proformaJustificatifsCheck');
 const { createUserNotification } = require('../utils/notificationService');
+const { notifyProformaDecision } = require('../utils/transactionalEmail');
+const { dateEcheanceFacture } = require('../utils/factureValidite');
+const { snapshotFromFormation } = require('../utils/etablissementSnapshot');
+
+function defaultAnneeAcademique() {
+  const year = new Date().getFullYear();
+  return `${year}-${year + 1}`;
+}
 
 function buildFactureDemandeFromFormation(demande, formation, opts = {}) {
   const tarif = buildLignesForfaitAnnuel(formation);
@@ -25,8 +33,10 @@ function buildFactureDemandeFromFormation(demande, formation, opts = {}) {
     demande.facture?.numero && !String(demande.facture.numero).includes('undefined')
       ? demande.facture.numero
       : `FACT-PUB-${year}-${String(demande.id).padStart(5, '0')}`;
+  const annee_academique = demande.annee_academique || `${year}-${year + 1}`;
   return {
     numero,
+    annee_academique,
     lignes,
     lignes_frais_supplementaires: tarif.lignes_supplementaires,
     montant_supplementaires_hors_forfait: tarif.montant_supplementaires,
@@ -34,11 +44,19 @@ function buildFactureDemandeFromFormation(demande, formation, opts = {}) {
     tva: 0,
     montant_ttc: montantHT,
     remise: Number.isFinite(remise) && remise > 0 ? Math.min(remise, tarif.montant_ht) : 0,
-    validite_jusqu_au: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    validite_jusqu_au: dateEcheanceFacture(new Date().toISOString()),
   };
 }
 
-function proformaDemandeDecision({ demandeId, userId, decision, motif_refus }) {
+function parseAvecCachet(value) {
+  if (value === false || value === 0) return false;
+  if (value === true || value === 1) return true;
+  const s = String(value ?? '').trim().toLowerCase();
+  if (s === 'false' || s === '0' || s === 'non' || s === 'sans') return false;
+  return true;
+}
+
+async function proformaDemandeDecision({ demandeId, userId, decision, motif_refus, avec_cachet = true }) {
   const id = parseInt(String(demandeId), 10);
   if (!Number.isFinite(id)) {
     return { ok: false, status: 400, message: 'Identifiant de demande invalide.' };
@@ -55,11 +73,14 @@ function proformaDemandeDecision({ demandeId, userId, decision, motif_refus }) {
   }
 
   if (decision === 'accepter' && !demandeProformaJustificatifsComplets(demande)) {
+    const msgPublic =
+      'Acceptation impossible : pièce d’identité et dernier diplôme requis pour une demande sans compte.';
+    const msgCompte =
+      'Acceptation impossible : les trois justificatifs (diplôme, relevé de notes, document formation) doivent être présents.';
     return {
       ok: false,
       status: 400,
-      message:
-        'Acceptation impossible : les trois justificatifs (diplôme, relevé de notes, document formation) doivent être présents sur la demande.',
+      message: demande.source === 'public_distant' ? msgPublic : msgCompte,
     };
   }
 
@@ -89,6 +110,7 @@ function proformaDemandeDecision({ demandeId, userId, decision, motif_refus }) {
     }
 
     const updated = db.get('demandes_proforma').find({ id }).value();
+    await notifyProformaDecision(updated, 'refusee');
     return { ok: true, message: 'Demande refusée.', demande: updated };
   }
 
@@ -96,12 +118,14 @@ function proformaDemandeDecision({ demandeId, userId, decision, motif_refus }) {
   if (!formation) return { ok: false, status: 404, message: 'Formation introuvable.' };
 
   const facture = buildFactureDemandeFromFormation(demande, formation);
+  const factureAvecCachet = parseAvecCachet(avec_cachet);
 
   db.get('demandes_proforma')
     .find({ id })
     .assign({
       statut: 'acceptee',
       facture,
+      facture_avec_cachet: factureAvecCachet,
       lettre_preinscription: null,
       acceptee_le: new Date().toISOString(),
       acceptee_par: userId,
@@ -121,11 +145,23 @@ function proformaDemandeDecision({ demandeId, userId, decision, motif_refus }) {
   }
 
   const updated = db.get('demandes_proforma').find({ id }).value();
+  const emailEnvoye = await notifyProformaDecision(updated, 'acceptee');
+
+  const msgBase =
+    demande.etudiant_id != null
+      ? 'Demande acceptée. La facture proforma est disponible sur l’espace candidat'
+      : 'Demande acceptée. La facture proforma est disponible via le lien public';
+  const msgEmail = emailEnvoye
+    ? ' et un e-mail a été envoyé au candidat.'
+    : updated.email
+      ? ' (e-mail non envoyé : vérifiez la configuration SMTP).'
+      : '.';
+
   return {
     ok: true,
-    message:
-      'Demande acceptée. La facture proforma et l’attestation de préinscription sont disponibles pour le candidat sur son espace (même compte).',
+    message: `${msgBase}${msgEmail}`,
     demande: updated,
+    email_envoye: emailEnvoye,
   };
 }
 
@@ -134,7 +170,7 @@ function proformaDemandeDecision({ demandeId, userId, decision, motif_refus }) {
  * Mode principal : saisie libre (personne qui se présente) — pas de compte requis.
  * Mode facultatif : etudiant_id pour lier un compte existant.
  */
-function creerProformaPourEtudiant({
+async function creerProformaPourEtudiant({
   staffUser,
   etudiantId,
   formationId,
@@ -142,6 +178,8 @@ function creerProformaPourEtudiant({
   nom: nomIn,
   telephone: telIn,
   email: emailIn,
+  adresse: adresseIn,
+  annee_academique: anneeIn,
   remise,
   buildEtabSnapshot,
 }) {
@@ -187,6 +225,8 @@ function creerProformaPourEtudiant({
   const email = String(emailIn != null ? emailIn : etudiant?.email || '')
     .trim()
     .toLowerCase();
+  const adresse = String(adresseIn != null ? adresseIn : etudiant?.adresse || '').trim();
+  const annee_academique = String(anneeIn || '').trim() || defaultAnneeAcademique();
 
   if (!prenom || !nom) {
     return { ok: false, status: 400, message: 'Nom et prénom obligatoires.' };
@@ -210,6 +250,8 @@ function creerProformaPourEtudiant({
     nom,
     email: email || '',
     telephone,
+    adresse: adresse || null,
+    annee_academique,
     niveau: null,
     type_formation: formation.type,
     formation_id: fid,
@@ -223,7 +265,9 @@ function creerProformaPourEtudiant({
     details: null,
     type_payeur: 'etudiant',
     payeur: null,
-    etablissement_snapshot: typeof buildEtabSnapshot === 'function' ? buildEtabSnapshot(etab) : null,
+    etablissement_snapshot: typeof buildEtabSnapshot === 'function'
+      ? buildEtabSnapshot(etab)
+      : snapshotFromFormation(formation),
     justificatifs: null,
     statut: 'en_attente',
     facture: null,
@@ -249,6 +293,8 @@ function creerProformaPourEtudiant({
       meta: { demande_id: id, reference, statut: 'acceptee' },
     });
   }
+
+  await notifyProformaDecision(demande, 'generee');
 
   return {
     ok: true,

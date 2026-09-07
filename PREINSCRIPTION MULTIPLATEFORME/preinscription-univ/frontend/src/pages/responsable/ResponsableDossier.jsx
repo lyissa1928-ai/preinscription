@@ -44,6 +44,7 @@ export default function ResponsableDossier() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [emailSending, setEmailSending] = useState(null)
   const [decision, setDecision] = useState({ statut: '', motif_rejet: '' })
 
   useEffect(() => {
@@ -97,12 +98,31 @@ export default function ResponsableDossier() {
   }
   if (!data) return null
 
-  const { dossier, documents: docsRaw, formation } = data
+  const { dossier, documents: docsRaw, formation, facture } = data
   const documents = Array.isArray(docsRaw) ? docsRaw : []
   const photoDoc = primaryPhotoDocumentFromList(documents)
   const allowedTransitions = ALLOWED_TRANSITIONS[dossier.statut || 'en_attente'] || ['en_attente']
 
   const isAccepte = isDossierAcceptePourDocuments(dossier.statut)
+  const hasFacture = Boolean(facture?.numero || dossier.facture_id)
+
+  const sendDocEmail = async (kind) => {
+    setEmailSending(kind)
+    try {
+      const path =
+        kind === 'lettre'
+          ? 'envoyer-lettre-email'
+          : kind === 'attestation'
+            ? 'envoyer-attestation-email'
+            : 'envoyer-facture-email'
+      const { data: res } = await axios.post(`/api/responsable/dossiers/${id}/${path}`)
+      toast.success(res.message || 'E-mail envoyé.')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Envoi impossible.')
+    } finally {
+      setEmailSending(null)
+    }
+  }
 
   const showChatterCandidat =
     user?.role === 'responsable' &&
@@ -229,43 +249,67 @@ export default function ResponsableDossier() {
           Documents officiels
         </h3>
         <p className="mb-4 text-xs leading-relaxed text-emerald-800/90">
-          Préinscription acceptée : attestation (et lettre uniquement pour un candidat étranger en ligne).
+          Préinscription acceptée : lettre, attestation et facture proforma (si émise) sont disponibles ci-dessous.
         </p>
         <div className="flex flex-col gap-2.5">
           {dossier?.source !== 'staff' && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Link
+                to={`/lettre/${id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-900/15 transition hover:bg-emerald-700 hover:shadow-lg"
+              >
+                Lettre de préinscription
+              </Link>
+              <button
+                type="button"
+                disabled={emailSending === 'lettre'}
+                onClick={() => sendDocEmail('lettre')}
+                className="rounded-xl border border-emerald-300 bg-white px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
+              >
+                {emailSending === 'lettre' ? 'Envoi…' : 'Envoyer par e-mail'}
+              </button>
+            </div>
+          )}
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Link
-              to={`/lettre/${id}`}
+              to={`/attestation/${id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-900/15 transition hover:bg-emerald-700 hover:shadow-lg"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-indigo-600 bg-white px-4 py-3 text-sm font-semibold text-indigo-800 shadow-sm transition hover:border-indigo-700 hover:bg-indigo-50"
             >
-              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                />
-              </svg>
-              Lettre de préinscription
+              Attestation de préinscription
             </Link>
+            <button
+              type="button"
+              disabled={emailSending === 'attestation'}
+              onClick={() => sendDocEmail('attestation')}
+              className="rounded-xl border border-indigo-300 bg-white px-4 py-3 text-sm font-semibold text-indigo-800 hover:bg-indigo-50 disabled:opacity-50"
+            >
+              {emailSending === 'attestation' ? 'Envoi…' : 'Envoyer par e-mail'}
+            </button>
+          </div>
+          {hasFacture && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Link
+                to={`/facture/${id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-blue-600 bg-white px-4 py-3 text-sm font-semibold text-blue-800 shadow-sm transition hover:bg-blue-50"
+              >
+                Facture {facture?.numero ? `(${facture.numero})` : ''}
+              </Link>
+              <button
+                type="button"
+                disabled={emailSending === 'facture'}
+                onClick={() => sendDocEmail('facture')}
+                className="rounded-xl border border-blue-300 bg-white px-4 py-3 text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:opacity-50"
+              >
+                {emailSending === 'facture' ? 'Envoi…' : 'Envoyer par e-mail'}
+              </button>
+            </div>
           )}
-          <Link
-            to={`/attestation/${id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-xl border-2 border-indigo-600 bg-white px-4 py-3 text-sm font-semibold text-indigo-800 shadow-sm transition hover:border-indigo-700 hover:bg-indigo-50"
-          >
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-              />
-            </svg>
-            Attestation de préinscription
-          </Link>
         </div>
       </div>
     )
@@ -345,6 +389,7 @@ export default function ResponsableDossier() {
                   ['Matricule (compte)', dossier.matricule || '—'],
                   ['Email', dossier.email || '—'],
                   ['Téléphone', dossier.telephone || '—'],
+                  ['Pays d\'origine', dossier.pays_origine || dossier.pays_residence || '—'],
                   ['Nationalité', dossier.nationalite || '—'],
                   ['Date de naissance', dossier.date_naissance ? new Date(dossier.date_naissance).toLocaleDateString('fr-FR') : '—'],
                   ['Lieu de naissance', dossier.lieu_naissance || '—'],

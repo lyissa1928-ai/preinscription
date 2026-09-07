@@ -31,6 +31,7 @@ const EMPTY = {
   date_naissance: '',
   lieu_naissance: '',
   nationalite: '',
+  pays_origine: '',
   pays_residence: '',
   adresse: '',
   telephone: '',
@@ -56,9 +57,13 @@ export default function StaffPreinscriptionGuichet() {
   const natureFacture = normalizeTypeDocument(searchParams.get('nature'))
   const isProforma = !isFactureDefinitive(natureFacture)
   const isAdmin = user?.role === 'admin'
+  const isFadStaff = user?.role === 'responsable_fad' || user?.role === 'agent_fad'
+  const isPresentielStaff = user?.role === 'responsable'
   const [etablissements, setEtablissements] = useState([])
   const [etabId, setEtabId] = useState(isAdmin ? '' : user?.etablissement_id ?? '')
-  const [modeFormation, setModeFormation] = useState('') // presentiel | en_ligne
+  const [modeFormation, setModeFormation] = useState(
+    isFadStaff ? 'en_ligne' : isPresentielStaff ? 'presentiel' : '',
+  ) // presentiel | en_ligne
   const [allFormations, setAllFormations] = useState([])
   const [niveauFilter, setNiveauFilter] = useState('')
   const [formationId, setFormationId] = useState('')
@@ -77,21 +82,27 @@ export default function StaffPreinscriptionGuichet() {
   useEffect(() => {
     if (!etabId) {
       setAllFormations([])
-      setModeFormation('')
+      if (!isFadStaff && !isPresentielStaff) setModeFormation('')
       setNiveauFilter('')
       setFormationId('')
       setTarif(null)
       return
     }
+    if (isFadStaff) setModeFormation('en_ligne')
+    else if (isPresentielStaff) setModeFormation('presentiel')
     axios
       .get(`/api/formations?etablissement_id=${etabId}`)
-      .then(({ data }) => setAllFormations((data || []).filter((f) => f.actif !== false)))
+      .then(({ data }) => {
+        let list = (data || []).filter((f) => f.actif !== false)
+        if (isFadStaff) list = list.filter((f) => f.type === 'en_ligne')
+        else if (isPresentielStaff) list = list.filter((f) => f.type !== 'en_ligne')
+        setAllFormations(list)
+      })
       .catch(() => setAllFormations([]))
-    setModeFormation('')
     setNiveauFilter('')
     setFormationId('')
     setTarif(null)
-  }, [etabId])
+  }, [etabId, isFadStaff, isPresentielStaff])
 
   const formationsDuMode = useMemo(() => {
     if (!modeFormation) return []
@@ -161,6 +172,14 @@ export default function StaffPreinscriptionGuichet() {
       toast.error('Téléphone obligatoire.')
       return
     }
+    if (isProforma && !form.adresse?.trim()) {
+      toast.error('Adresse physique obligatoire.')
+      return
+    }
+    if (isProforma && !form.annee_academique?.trim()) {
+      toast.error('Année académique obligatoire.')
+      return
+    }
     if (isProforma && form.type_payeur === 'organisation' && !form.destinataire.trim()) {
       toast.error('Indiquez le destinataire (entreprise, État ou organisation).')
       return
@@ -221,7 +240,7 @@ export default function StaffPreinscriptionGuichet() {
             </Link>
           </div>
           <p className="text-xs text-slate-500">
-            Pas de lettre de préinscription pour une saisie au guichet (visiteur). La lettre est réservée aux candidats étrangers acceptés en ligne.
+            Pas de lettre pour une saisie au guichet (visiteur). La lettre est disponible pour les préinscriptions en ligne acceptées.
           </p>
           {facture?.numero && (
             <p className="text-xs text-slate-500">
@@ -268,11 +287,14 @@ export default function StaffPreinscriptionGuichet() {
             </p>
           )}
           <div>
-            <p className="mb-2 text-sm font-semibold text-slate-800">Choisissez le mode *</p>
+            <p className="mb-2 text-sm font-semibold text-slate-800">
+              {isFadStaff ? 'Mode FAD (formations à distance uniquement)' : isPresentielStaff ? 'Mode présentiel' : 'Choisissez le mode *'}
+            </p>
             <div className="grid gap-3 sm:grid-cols-2">
+              {!isFadStaff && (
               <button
                 type="button"
-                disabled={!etabId}
+                disabled={!etabId || isPresentielStaff}
                 onClick={() => setModeFormation('presentiel')}
                 className={`rounded-xl border-2 px-4 py-4 text-left transition ${
                   modeFormation === 'presentiel'
@@ -283,9 +305,11 @@ export default function StaffPreinscriptionGuichet() {
                 <span className="block text-base font-bold text-slate-900">Formation en présentiel</span>
                 <span className="mt-1 block text-xs text-slate-500">Cours sur site</span>
               </button>
+              )}
+              {!isPresentielStaff && (
               <button
                 type="button"
-                disabled={!etabId}
+                disabled={!etabId || isFadStaff}
                 onClick={() => setModeFormation('en_ligne')}
                 className={`rounded-xl border-2 px-4 py-4 text-left transition ${
                   modeFormation === 'en_ligne'
@@ -296,6 +320,7 @@ export default function StaffPreinscriptionGuichet() {
                 <span className="block text-base font-bold text-slate-900">Formation en ligne</span>
                 <span className="mt-1 block text-xs text-slate-500">Formation à distance (FAD)</span>
               </button>
+              )}
             </div>
           </div>
         </Panel>
@@ -360,7 +385,13 @@ export default function StaffPreinscriptionGuichet() {
 
         <Panel title="3. Identité du bénéficiaire" bodyClassName="p-6">
           {isProforma ? (
-            <IdentiteBeneficiaireProforma form={form} up={up} />
+            <IdentiteBeneficiaireProforma
+              form={form}
+              up={up}
+              addressRequired
+              showAnneeAcademique
+              anneeAcademiqueRequired
+            />
           ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -380,12 +411,14 @@ export default function StaffPreinscriptionGuichet() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold">Date de naissance *</label>
+              <label className="mb-1 block text-sm font-semibold">Date de naissance</label>
               <input type="date" className="input-field" value={form.date_naissance} onChange={up('date_naissance')} />
+              <p className="mt-1 text-xs text-slate-500">Facultatif</p>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold">Lieu de naissance *</label>
+              <label className="mb-1 block text-sm font-semibold">Lieu de naissance</label>
               <input className="input-field" value={form.lieu_naissance} onChange={up('lieu_naissance')} />
+              <p className="mt-1 text-xs text-slate-500">Facultatif</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold">Nationalité *</label>
@@ -402,8 +435,16 @@ export default function StaffPreinscriptionGuichet() {
               </datalist>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold">Pays de résidence</label>
-              <input className="input-field" value={form.pays_residence} onChange={up('pays_residence')} />
+              <label className="mb-1 block text-sm font-semibold">Pays d&apos;origine</label>
+              <input
+                className="input-field"
+                value={form.pays_origine || form.pays_residence}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setForm((p) => ({ ...p, pays_origine: v, pays_residence: v }))
+                }}
+                placeholder="Ex. Sénégal"
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold">Téléphone *</label>

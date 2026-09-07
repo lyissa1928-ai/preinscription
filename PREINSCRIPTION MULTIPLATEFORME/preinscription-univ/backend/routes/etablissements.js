@@ -14,16 +14,25 @@ const { publicAssetUrl } = require('../utils/publicAssetUrl');
 const { logAudit } = require('../utils/auditLog');
 const { verifyDiskFile, unlinkQuiet } = require('../utils/verifyUploadedFile');
 const { optionalClamScanFile } = require('../utils/optionalClamScan');
-const { computePrixAnnuel, normalizeFraisSupplementaires } = require('../utils/formationTarifs');
+const { computePrixAnnuel, normalizeFraisSupplementaires, normalizeElementsFacturation } = require('../utils/formationTarifs');
 const { syncStoredFactureById } = require('../services/factureService');
 const { isFactureSupprimee } = require('../utils/factureVisibility');
 const { stripEtabSensitiveFields } = require('../utils/etablissementSanitize');
+const { purgeUserPersonalData } = require('../utils/purgeUserPersonalData');
+const {
+  parseUserImportBuffer,
+  buildUsersTemplateWorkbook,
+  importUsersRows,
+} = require('../utils/userImportExcel');
 const { actsAsResponsable } = require('../utils/userFonctions');
 const {
   canManageEtabMembres,
+  canEditEtabIdentite,
   rolesCreatablesMembres,
   canManageTargetMembre,
   isPlatformAdmin,
+  isAdminEtablissement,
+  userAdministersEtablissement,
   ROLE_ADMIN_ETABLISSEMENT,
 } = require('../utils/staffRoles');
 const {
@@ -31,6 +40,7 @@ const {
   designateAdminEtablissement,
   enforceSingleAdminEtablissement,
   pickAdminPublic,
+  promotePatchToAdminEtab,
 } = require('../utils/adminEtablissement');
 const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
 const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
@@ -60,7 +70,7 @@ function formationAvecPrixRecalcule(formation) {
 }
 
 /**
- * Admin, ou responsable (rôle / fonction désignée) de l’établissement :id / :etabId.
+ * Admin, responsable présentiel, ou responsable/agent FAD (écriture limitée FAD).
  * Journalisé (audit) pour l’administrateur.
  * Important : préférer :etabId quand la route a aussi :id (id formation), sinon parseInt('batch') → NaN.
  */
@@ -71,25 +81,56 @@ function etabPedagogieWrite(req, res, next) {
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
   }
-  if (Number(req.user.etablissement_id) !== etabId) {
+  if (Number(req.user.etablissement_id) !== etabId && !userAdministersEtablissement(req.user, etabId)) {
     return res.status(403).json({ message: 'Vous ne pouvez modifier que les formations de votre établissement.' });
   }
-  if (actsAsResponsable(req.user)) {
+  // FAD d’abord : un responsable_fad désigné « responsable » ne doit jamais basculer en scope présentiel.
+  if (req.user.role === 'responsable_fad' || req.user.role === 'agent_fad') {
+    req.pedagogieScope = 'fad';
+    return next();
+  }
+  if (isAdminEtablissement(req.user)) {
+    req.pedagogieScope = 'all';
+    return next();
+  }
+  if (actsAsResponsable(req.user) || req.user.role === 'responsable') {
+    req.pedagogieScope = 'presentiel';
     return next();
   }
   return res.status(403).json({
-    message: 'Accès réservé à l’administrateur ou au responsable pédagogique de cet établissement.',
+    message: 'Accès réservé à l’administrateur, à l’administrateur d’établissement ou au responsable (présentiel / FAD).',
   });
+}
+
+/** Bloque écriture hors périmètre FAD / présentiel. */
+function assertFormationTypeForWriter(req, type) {
+  const scope = req.pedagogieScope;
+  if (!scope || scope === 'all' || req.user.role === 'admin' || isAdminEtablissement(req.user)) return null;
+  const t = type === 'en_ligne' ? 'en_ligne' : 'presentiel';
+  if (scope === 'fad' && t !== 'en_ligne') {
+    return 'Le staff FAD ne peut gérer que les formations à distance (en ligne).';
+  }
+  if (scope === 'presentiel' && t === 'en_ligne') {
+    return 'Le responsable présentiel ne peut pas gérer les formations FAD.';
+  }
+  return null;
+}
+
+/** Type imposé par le scope (FAD → toujours en_ligne). */
+function resolveForcedTypeForScope(req, requestedType) {
+  if (req.pedagogieScope === 'fad') return 'en_ligne';
+  if (req.pedagogieScope === 'presentiel') return 'presentiel';
+  return normalizeFormationType(requestedType || '');
 }
 
 /** Liste / export / suppression factures : admin ou staff rattaché à l’établissement. */
 function etabFacturesAccess(req, res, next) {
-  if (req.user.role === 'admin') return next();
+  if (req.user.role === 'admin' || req.user.role === 'directeur') return next();
   const etabId = parseInt(req.params.id, 10);
   if (Number.isNaN(etabId)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
   }
-  const roles = ['responsable', 'comptable', 'agent_admin', 'controleur_qualite', 'admin_etablissement'];
+  const roles = ['responsable', 'responsable_fad', 'agent_fad', 'comptable', 'agent_admin', 'controleur_qualite', 'admin_etablissement'];
   if (
     (roles.includes(req.user.role) || actsAsResponsable(req.user)) &&
     Number(req.user.etablissement_id) === etabId
@@ -112,7 +153,7 @@ function etabMembresManageAccess(req, res, next) {
   }
   if (canManageEtabMembres(req.user, etabId)) return next();
   return res.status(403).json({
-    message: 'Accès réservé à l’administrateur plateforme ou à l’administrateur de cet établissement.',
+    message: 'Accès réservé à l’administrateur plateforme, à l’administrateur d’établissement ou au Responsable FAD (agents FAD).',
   });
 }
 
@@ -653,7 +694,10 @@ function maybeUploadCreateFiles(req, res, next) {
 router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
   const {
     nom, type, description, couleur_primaire, couleur_secondaire, adresse, telephone, email_contact, site_web,
-    ninea, rc, arrete, compte_bancaire, banque, iban, swift, signataire_nom, signataire_fonction
+    adresse_fad, telephone_fad, email_contact_fad,
+    ninea, rc, arrete, compte_bancaire, banque, iban, swift,
+    banque_fad, compte_bancaire_fad, iban_fad, swift_fad,
+    signataire_nom, signataire_fonction
   } = req.body;
   if (!nom || !nom.trim()) return res.status(400).json({ message: 'Le nom de l\'établissement est obligatoire.' });
   if (!type) return res.status(400).json({ message: 'Le type est obligatoire.' });
@@ -680,6 +724,9 @@ router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
     adresse: (adresse || '').trim(),
     telephone: (telephone || '').trim(),
     email_contact: (email_contact || '').trim(),
+    adresse_fad: (adresse_fad || '').trim(),
+    telephone_fad: (telephone_fad || '').trim(),
+    email_contact_fad: (email_contact_fad || '').trim(),
     site_web: (site_web || '').trim(),
     ninea: (ninea || '').trim(),
     rc: (rc || '').trim(),
@@ -688,6 +735,10 @@ router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
     banque: (banque || '').trim(),
     iban: (iban || '').trim(),
     swift: (swift || '').trim(),
+    banque_fad: (banque_fad || '').trim(),
+    compte_bancaire_fad: (compte_bancaire_fad || '').trim(),
+    iban_fad: (iban_fad || '').trim(),
+    swift_fad: (swift_fad || '').trim(),
     signataire_nom: (signataire_nom || '').trim(),
     signataire_fonction: (signataire_fonction || '').trim(),
     responsable_id: null,
@@ -696,14 +747,22 @@ router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
   };
 
   db.get('etablissements').push(etab).write();
-  res.status(201).json(etab);
+  const created = db.get('etablissements').find({ id }).value();
+  res.status(201).json({
+    ...created,
+    logo_url: publicAssetUrl(req, created.logo_url),
+    cachet_url: publicAssetUrl(req, created.cachet_url),
+  });
 });
 
-// POST /api/etablissements/:id/upload — upload logo/cachet séparé
-router.post('/:id/upload', adminOnly, upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'cachet', maxCount: 1 }]), async (req, res) => {
+// POST /api/etablissements/:id/upload — logo/cachet (admin plateforme ou admin de cet établissement)
+router.post('/:id/upload', authMiddleware, upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'cachet', maxCount: 1 }]), async (req, res) => {
   const id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  if (!canEditEtabIdentite(req.user, id)) {
+    return res.status(403).json({ message: 'Accès refusé : vous ne pouvez modifier que l’identité de votre établissement.' });
+  }
   if (req.files) {
     const ve = await verifyEtabUploadFiles(req.files);
     if (!ve.ok) return res.status(400).json({ message: ve.message || 'Fichier invalide.' });
@@ -712,7 +771,16 @@ router.post('/:id/upload', adminOnly, upload.fields([{ name: 'logo', maxCount: 1
   if (req.files?.logo?.[0])   updates.logo_url   = `/uploads/etablissements/${req.files.logo[0].filename}`;
   if (req.files?.cachet?.[0]) updates.cachet_url = `/uploads/etablissements/${req.files.cachet[0].filename}`;
   db.get('etablissements').find({ id }).assign(updates).write();
-  res.json(db.get('etablissements').find({ id }).value());
+  const updated = db.get('etablissements').find({ id }).value();
+  logAudit(req, 'etablissement_identite_fichiers', 'etablissement', id, {
+    champs: Object.keys(updates),
+    by_admin_etab: isAdminEtablissement(req.user),
+  });
+  res.json({
+    ...updated,
+    logo_url: publicAssetUrl(req, updated.logo_url),
+    cachet_url: publicAssetUrl(req, updated.cachet_url),
+  });
 });
 
 // ─── Préinscriptions acceptées, par formation (dérivé des dossiers) ─────────
@@ -1356,12 +1424,19 @@ router.get('/:id/factures', etabFacturesAccess, (req, res) => {
       date_emission: f.date_emission,
       date_echeance: f.date_echeance,
       montant_ttc: f.montant_ttc,
+      montant_total_a_payer: f.montant_total_a_payer,
+      montant_ht: f.montant_ht,
       statut: f.statut,
       dossier_statut,
       attestation_disponible,
       lettre_disponible,
       etudiant_snapshot: f.etudiant_snapshot,
       formation_snapshot: f.formation_snapshot,
+      etablissement_snapshot: f.etablissement_snapshot,
+      lignes: f.lignes,
+      lignes_supplementaires: f.lignes_supplementaires,
+      type_payeur: f.type_payeur,
+      payeur: f.payeur,
       etablissement_id: etabId,
       etablissement_nom: etab.nom,
     };
@@ -1375,15 +1450,42 @@ router.get('/:id/factures', etabFacturesAccess, (req, res) => {
   });
 });
 
+// GET /api/etablissements/:id/rapports-hebdomadaires — admin étab. / admin / directeur
+router.get('/:id/rapports-hebdomadaires', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const etab = db.get('etablissements').find({ id }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  const role = req.user.role;
+  const ok =
+    role === 'admin' ||
+    role === 'directeur' ||
+    (role === ROLE_ADMIN_ETABLISSEMENT && Number(req.user.etablissement_id) === id);
+  if (!ok) return res.status(403).json({ message: 'Accès refusé.' });
+
+  const list = (db.get('rapports_hebdomadaires').value() || []).slice().reverse().slice(0, 26);
+  const filtered = list.map((batch) => ({
+    ...batch,
+    files: (batch.files || []).filter((f) => Number(f.etablissement_id) === id),
+    directeur_compare: role === 'admin' || role === 'directeur' ? batch.directeur_compare : undefined,
+  })).filter((b) => (b.files || []).length > 0 || b.directeur_compare);
+
+  res.json(filtered);
+});
+
 // GET /api/etablissements/:id — détail complet
 router.get('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
-  // Admin : tous les établissements ; autres rôles : uniquement leur rattachement
-  const accesTousEtabs = req.user.role === 'admin';
-  if (!accesTousEtabs && Number(req.user.etablissement_id) !== id) {
+  // Admin / Directeur : tous ; admin étab. multi (présentiel+FAD) ; autres : leur rattachement
+  const accesTousEtabs = req.user.role === 'admin' || req.user.role === 'directeur';
+  const { userAdministersEtablissement } = require('../utils/staffRoles');
+  if (
+    !accesTousEtabs &&
+    Number(req.user.etablissement_id) !== id &&
+    !userAdministersEtablissement(req.user, id)
+  ) {
     return res.status(403).json({ message: 'Accès refusé.' });
   }
 
@@ -1399,10 +1501,21 @@ router.get('/:id', (req, res) => {
       nb_formations_en_ligne: actives.filter((x) => x.type === 'en_ligne').length,
     };
   });
-  const formations = (db.get('formations').value() || []).filter((f) => f.etablissement_id === id).map((f) => {
+  let formations = (db.get('formations').value() || []).filter((f) => f.etablissement_id === id).map((f) => {
     const filiere = db.get('filieres').find({ id: f.filiere_id }).value();
     return { ...f, filiere_nom: filiere?.nom || null };
   });
+  // Isolation FAD / présentiel aussi sur le détail établissement
+  if (req.user.role === 'responsable_fad' || req.user.role === 'agent_fad') {
+    formations = formations.filter((f) => f.type === 'en_ligne');
+  } else if (
+    (req.user.role === 'responsable' || actsAsResponsable(req.user))
+    && req.user.role !== 'admin'
+    && req.user.role !== 'admin_etablissement'
+    && !isAdminEtablissement(req.user)
+  ) {
+    formations = formations.filter((f) => f.type !== 'en_ligne');
+  }
   const membres = (db.get('utilisateurs').value() || [])
     .filter((u) => u.etablissement_id === id && isEtabStaffMember(u))
     .map((u) => ({
@@ -1443,23 +1556,67 @@ router.get('/:id', (req, res) => {
   });
 });
 
-// PUT /api/etablissements/:id — modifier (JSON uniquement)
-router.put('/:id', adminOnly, (req, res) => {
+// PUT /api/etablissements/:id — identité (admin plateforme ou admin de cet établissement)
+router.put('/:id', authMiddleware, (req, res) => {
   const id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  if (!canEditEtabIdentite(req.user, id)) {
+    return res.status(403).json({ message: 'Accès refusé : vous ne pouvez modifier que l’identité de votre établissement.' });
+  }
 
   const updates = {};
   const fields = [
     'nom', 'type', 'description', 'couleur_primaire', 'couleur_secondaire',
     'adresse', 'telephone', 'email_contact', 'site_web',
+    'adresse_fad', 'telephone_fad', 'email_contact_fad',
     'ninea', 'rc', 'arrete', 'compte_bancaire',
-    'banque', 'iban', 'swift', 'signataire_nom', 'signataire_fonction'
+    'banque', 'iban', 'swift',
+    'banque_fad', 'compte_bancaire_fad', 'iban_fad', 'swift_fad',
+    'signataire_nom', 'signataire_fonction'
   ];
   fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
 
   db.get('etablissements').find({ id }).assign(updates).write();
-  res.json(db.get('etablissements').find({ id }).value());
+  logAudit(req, 'etablissement_identite_modifiee', 'etablissement', id, {
+    champs: Object.keys(updates),
+    by_admin_etab: isAdminEtablissement(req.user),
+  });
+  const after = db.get('etablissements').find({ id }).value();
+  res.json({
+    ...after,
+    logo_url: publicAssetUrl(req, after.logo_url),
+    cachet_url: publicAssetUrl(req, after.cachet_url),
+  });
+});
+
+// DELETE /api/etablissements/:id/media/:kind — supprimer logo ou cachet
+router.delete('/:id/media/:kind', authMiddleware, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const kind = String(req.params.kind || '').toLowerCase();
+  if (!['logo', 'cachet'].includes(kind)) {
+    return res.status(400).json({ message: 'Type de média invalide (logo ou cachet).' });
+  }
+  const etab = db.get('etablissements').find({ id }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  if (!canEditEtabIdentite(req.user, id)) {
+    return res.status(403).json({ message: 'Accès refusé.' });
+  }
+  const field = kind === 'logo' ? 'logo_url' : 'cachet_url';
+  const prev = etab[field];
+  if (prev) {
+    const disk = resolveEtabLogoDiskPath(prev);
+    if (disk) unlinkQuiet(disk);
+  }
+  db.get('etablissements').find({ id }).assign({ [field]: null }).write();
+  logAudit(req, 'etablissement_media_supprime', 'etablissement', id, { kind });
+  const updated = db.get('etablissements').find({ id }).value();
+  res.json({
+    ...updated,
+    logo_url: publicAssetUrl(req, updated.logo_url),
+    cachet_url: publicAssetUrl(req, updated.cachet_url),
+    message: kind === 'logo' ? 'Logo supprimé.' : 'Cachet supprimé.',
+  });
 });
 
 // DELETE /api/etablissements/:id — désactiver
@@ -1521,7 +1678,14 @@ router.put('/:id/responsable', adminOnly, (req, res) => {
     nouveau_responsable_id: designe ? designe.id : null,
     role_principal_designe: designe ? designe.role : null,
   });
-  res.json({ message: designe ? 'Responsable désigné.' : 'Responsable retiré.' });
+  const responsable = designe
+    ? db.get('utilisateurs').find({ id: designe.id }).pick(['id', 'prenom', 'nom', 'email', 'role']).value()
+    : null;
+  res.json({
+    message: designe ? 'Responsable pédagogique désigné.' : 'Responsable pédagogique retiré.',
+    responsable,
+    responsable_id: designe ? designe.id : null,
+  });
 });
 
 // PUT /api/etablissements/:id/admin-etablissement — désigner l’unique admin établissement (admin plateforme).
@@ -1651,10 +1815,24 @@ router.delete('/:etabId/filieres/:id', etabPedagogieWrite, (req, res) => {
 // GET /api/etablissements/:id/formations
 router.get('/:id/formations', (req, res) => {
   const etablissement_id = parseInt(req.params.id);
-  const formations = (db.get('formations').value() || []).filter((f) => f.etablissement_id === etablissement_id).map((f) => {
+  let formations = (db.get('formations').value() || []).filter((f) => f.etablissement_id === etablissement_id).map((f) => {
     const filiere = db.get('filieres').find({ id: f.filiere_id }).value();
     return { ...f, filiere_nom: filiere?.nom || null };
   });
+  // Filtre modalité si staff authentifié (FAD vs présentiel)
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const { verifyAccessToken } = require('../utils/jwtHelpers');
+      const decoded = verifyAccessToken(authHeader.split(' ')[1]);
+      const u = db.get('utilisateurs').find({ id: decoded.id }).value();
+      if (u && (u.role === 'responsable_fad' || u.role === 'agent_fad')) {
+        formations = formations.filter((f) => f.type === 'en_ligne');
+      } else if (u && (u.role === 'responsable' || actsAsResponsable(u)) && u.role !== 'admin' && u.role !== 'admin_etablissement') {
+        formations = formations.filter((f) => f.type !== 'en_ligne');
+      }
+    }
+  } catch { /* public catalogue : pas de filtre rôle */ }
   res.json(formations);
 });
 
@@ -1665,17 +1843,32 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
   const {
-    filiere_id, titre, type, niveau, niveau_requis, duree, description,
+    filiere_id, titre, type, niveau, niveau_requis, duree, description, debouches,
     ville, places,
     frais_inscription, mensualite, frais_soutenance, autres_frais,
     duree_mois, frais_supplementaires,
     frais_bibliotheque, frais_epi,
+    nombre_annees,
     nombre_photos_preinscription,
+    libelles_champs,
+    elements_facturation,
   } = req.body;
 
   if (!titre || !type || !filiere_id) return res.status(400).json({ message: 'Titre, type et filière obligatoires.' });
+  if (!niveau || String(niveau).trim() === '') {
+    return res.status(400).json({ message: 'Le niveau d’étude est obligatoire.' });
+  }
+  const { isNiveauActifValide, normalizeNiveauLibelle } = require('../utils/niveauxEtude');
+  if (!isNiveauActifValide(db, niveau)) {
+    return res.status(400).json({
+      message: 'Niveau d’étude invalide ou désactivé. Choisissez un niveau dans la liste administrateur.',
+    });
+  }
+  const niveauNorm = normalizeNiveauLibelle(db, niveau);
   const normalizedType = normalizeFormationType(type);
   if (!['presentiel', 'en_ligne'].includes(normalizedType)) return res.status(400).json({ message: 'Type invalide.' });
+  const scopeErr = assertFormationTypeForWriter(req, normalizedType);
+  if (scopeErr) return res.status(403).json({ message: scopeErr });
 
   const fid = parseInt(filiere_id);
   const filiere = db.get('filieres').find({ id: fid, etablissement_id }).value();
@@ -1690,6 +1883,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
   const autresFraisN = parseInt(autres_frais, 10) || 0;
   const dureeMoisN = parseDureeMoisInput(duree_mois);
   const fraisSupp = normalizeFraisSupplementaires(frais_supplementaires);
+  const elementsFact = normalizeElementsFacturation(elements_facturation);
   if (![placesN, fraisInscriptionN, mensualiteN, fraisSoutenanceN, fraisBibN, fraisEpiN, autresFraisN].every(isNonNegativeInt)) {
     return res.status(400).json({ message: 'Les champs numériques doivent être des entiers positifs ou nuls.' });
   }
@@ -1702,11 +1896,13 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
   const id = db.nextId('formations');
   let formation = {
     id, etablissement_id, filiere_id: fid,
-    titre: String(titre).trim(), type: normalizedType, niveau: niveau || '',
+    titre: String(titre).trim(), type: normalizedType, niveau: niveauNorm,
     niveau_requis: niveau_requis || '',
     duree: duree || '',
     duree_mois: dureeMoisN,
+    nombre_annees: parseInt(nombre_annees, 10) || 0,
     description: description || '',
+    debouches: debouches || '',
     ville: null,
     places: 0,
     frais_inscription: fraisInscriptionN,
@@ -1716,6 +1912,8 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
     frais_epi: fraisEpiN,
     autres_frais: autresFraisN,
     frais_supplementaires: fraisSupp,
+    libelles_champs: libelles_champs && typeof libelles_champs === 'object' ? libelles_champs : {},
+    elements_facturation: elementsFact,
     nombre_photos_preinscription: nPhotos,
     actif: true,
     created_at: new Date().toISOString()
@@ -1738,7 +1936,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
 // GET /api/etablissements/:id/formations/template.xlsx?type=presentiel|en_ligne&columns=JSON
 router.get('/:id/formations/template.xlsx', etabPedagogieWrite, async (req, res) => {
   const etablissement_id = parseInt(req.params.id, 10);
-  const forcedType = normalizeFormationType(req.query.type || '');
+  let forcedType = resolveForcedTypeForScope(req, req.query.type || '');
   if (Number.isNaN(etablissement_id)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
   }
@@ -1747,6 +1945,8 @@ router.get('/:id/formations/template.xlsx', etabPedagogieWrite, async (req, res)
       message: 'Précisez ?type=presentiel ou ?type=en_ligne.',
     });
   }
+  const scopeErrTpl = assertFormationTypeForWriter(req, forcedType);
+  if (scopeErrTpl) return res.status(403).json({ message: scopeErrTpl });
   const etab = db.get('etablissements').find({ id: etablissement_id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
@@ -1769,7 +1969,7 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
   const etablissement_id = parseInt(req.params.id, 10);
   const filiereId = parseInt(req.params.filiereId, 10);
   const dryRun = ['1', 'true', 'yes', 'oui'].includes(String(req.query.dry_run || '').toLowerCase());
-  const forcedType = normalizeFormationType(req.query.type || '');
+  let forcedType = resolveForcedTypeForScope(req, req.query.type || '');
   if (Number.isNaN(etablissement_id) || Number.isNaN(filiereId)) {
     return res.status(400).json({ message: 'Identifiant établissement/filière invalide.' });
   }
@@ -1778,6 +1978,8 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
       message: 'Précisez le mode via ?type=presentiel ou ?type=en_ligne (templates séparés pour éviter les erreurs).',
     });
   }
+  const scopeErrImport = assertFormationTypeForWriter(req, forcedType);
+  if (scopeErrImport) return res.status(403).json({ message: scopeErrImport });
   if (!req.file) return res.status(400).json({ message: 'Fichier Excel (.xlsx) requis (champ file).' });
 
   const etab = db.get('etablissements').find({ id: etablissement_id }).value();
@@ -1829,7 +2031,9 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
     const niveau = String(data.niveau || '').trim();
     const niveau_requis = String(data.niveau_requis || '').trim();
     const description = String(data.description || '').trim();
+    const debouches = String(data.debouches || '').trim();
     const duree_mois = toInt(data.duree_mois, 0);
+    const nombre_annees = toInt(data.nombre_annees, 0);
     const frais_inscription = toInt(data.frais_inscription, 0);
     const mensualite = toInt(data.mensualite, 0);
     const frais_soutenance = toInt(data.frais_soutenance, 0);
@@ -1861,7 +2065,9 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
       niveau_requis,
       duree: duree_mois > 0 ? (duree_mois === 12 ? '12 mois (1 an)' : `${duree_mois} mois`) : '',
       duree_mois: duree_mois || 0,
+      nombre_annees: nombre_annees || 0,
       description,
+      debouches,
       ville: null,
       places: 0,
       frais_inscription,
@@ -1929,15 +2135,15 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
   }
 
   const allowed = new Set([
-    'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree',
-    'description', 'ville', 'places',
+    'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree', 'nombre_annees',
+    'description', 'debouches', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
     'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
-    'frais_bibliotheque', 'frais_epi',
+    'frais_bibliotheque', 'frais_epi', 'libelles_champs', 'elements_facturation',
   ]);
   const numericFields = new Set([
     'filiere_id', 'places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'duree_mois',
-    'frais_bibliotheque', 'frais_epi',
+    'frais_bibliotheque', 'frais_epi', 'nombre_annees',
   ]);
 
   const updated = [];
@@ -2005,7 +2211,15 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
     // Sans id => création d'une nouvelle formation depuis le tableau batch.
     if (Number.isNaN(id)) {
       const titre = String(updates.titre || '').trim();
-      const type = updates.type || 'presentiel';
+      let type = updates.type || (req.pedagogieScope === 'fad' ? 'en_ligne' : 'presentiel');
+      type = normalizeFormationType(type);
+      if (req.pedagogieScope === 'fad') type = 'en_ligne';
+      if (req.pedagogieScope === 'presentiel') type = 'presentiel';
+      const scopeErrCreate = assertFormationTypeForWriter(req, type);
+      if (scopeErrCreate) {
+        errors.push({ index: idx, message: scopeErrCreate });
+        return;
+      }
       const filiere_id = updates.filiere_id;
       if (!titre || !filiere_id) {
         errors.push({ index: idx, message: 'Nouvelle ligne invalide: titre et filière obligatoires.' });
@@ -2058,6 +2272,26 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
       errors.push({ index: idx, id, message: 'Formation introuvable pour cet établissement.' });
       return;
     }
+    const effectiveType = updates.type !== undefined
+      ? normalizeFormationType(updates.type)
+      : normalizeFormationType(current.type);
+    if (req.pedagogieScope === 'fad') {
+      updates.type = 'en_ligne';
+    } else if (req.pedagogieScope === 'presentiel' && updates.type === 'en_ligne') {
+      errors.push({ index: idx, id, message: 'Le responsable présentiel ne peut pas gérer les formations FAD.' });
+      return;
+    }
+    const scopeErrUpd = assertFormationTypeForWriter(req, req.pedagogieScope === 'fad' ? 'en_ligne' : effectiveType);
+    if (scopeErrUpd) {
+      errors.push({ index: idx, id, message: scopeErrUpd });
+      return;
+    }
+    // Interdire de toucher une formation hors périmètre
+    const scopeErrCurrent = assertFormationTypeForWriter(req, current.type);
+    if (scopeErrCurrent) {
+      errors.push({ index: idx, id, message: scopeErrCurrent });
+      return;
+    }
     if (updates.type === 'en_ligne' && updates.ville === undefined) updates.ville = null;
     if (updates.type === 'presentiel' && updates.ville === null) updates.ville = current.ville || '';
 
@@ -2096,17 +2330,25 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
   }
 
   const fields = [
-    'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree',
-    'description', 'ville', 'places',
+    'filiere_id', 'titre', 'type', 'niveau', 'niveau_requis', 'duree', 'nombre_annees',
+    'description', 'debouches', 'ville', 'places',
     'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'actif',
     'duree_mois', 'frais_supplementaires', 'nombre_photos_preinscription',
-    'frais_bibliotheque', 'frais_epi',
+    'frais_bibliotheque', 'frais_epi', 'libelles_champs', 'elements_facturation',
   ];
   const updates = {};
   fields.forEach(f => {
     if (req.body[f] === undefined) return;
     if (f === 'frais_supplementaires') {
       updates[f] = normalizeFraisSupplementaires(req.body[f]);
+      return;
+    }
+    if (f === 'elements_facturation') {
+      updates[f] = normalizeElementsFacturation(req.body[f]);
+      return;
+    }
+    if (f === 'libelles_champs') {
+      updates[f] = req.body[f] && typeof req.body[f] === 'object' ? req.body[f] : {};
       return;
     }
     if (f === 'duree_mois') {
@@ -2125,6 +2367,23 @@ router.put('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
     if (!['presentiel', 'en_ligne'].includes(updates.type)) {
       return res.status(400).json({ message: 'Type invalide.' });
     }
+  }
+  {
+    const effectiveType = updates.type !== undefined ? updates.type : formation.type;
+    const scopeErr = assertFormationTypeForWriter(req, effectiveType);
+    if (scopeErr) return res.status(403).json({ message: scopeErr });
+  }
+  if (updates.niveau !== undefined) {
+    if (!String(updates.niveau || '').trim()) {
+      return res.status(400).json({ message: 'Le niveau d’étude est obligatoire.' });
+    }
+    const { isNiveauActifValide, normalizeNiveauLibelle } = require('../utils/niveauxEtude');
+    if (!isNiveauActifValide(db, updates.niveau)) {
+      return res.status(400).json({
+        message: 'Niveau d’étude invalide ou désactivé.',
+      });
+    }
+    updates.niveau = normalizeNiveauLibelle(db, updates.niveau);
   }
   const numericFields = ['places', 'frais_inscription', 'mensualite', 'frais_soutenance', 'autres_frais', 'duree_mois'];
   for (const f of numericFields) {
@@ -2176,6 +2435,11 @@ router.post('/:etabId/formations/delete-batch', etabPedagogieWrite, (req, res) =
       skipped.push(id);
       return;
     }
+    const scopeErrDel = assertFormationTypeForWriter(req, formation.type);
+    if (scopeErrDel) {
+      skipped.push(id);
+      return;
+    }
     if (hard) {
       detachFormationReferences(id);
       db.get('formations').remove({ id }).write();
@@ -2216,6 +2480,8 @@ router.delete('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
   if (!formation || Number(formation.etablissement_id) !== etabId) {
     return res.status(404).json({ message: 'Formation introuvable.' });
   }
+  const scopeErrDelOne = assertFormationTypeForWriter(req, formation.type);
+  if (scopeErrDelOne) return res.status(403).json({ message: scopeErrDelOne });
 
   // Mode production: suppression non destructive par défaut.
   // Suppression définitive: ?hard=true (admin uniquement).
@@ -2256,7 +2522,7 @@ router.delete('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
 // GET /api/etablissements/:id/membres
 router.get('/:id/membres', etabMembresManageAccess, (req, res) => {
   const etablissement_id = parseInt(req.params.id);
-  const membres = db.get('utilisateurs')
+  let membres = db.get('utilisateurs')
     .filter((u) => u.etablissement_id === etablissement_id && isEtabStaffMember(u))
     .map(u => ({
       id: u.id,
@@ -2271,22 +2537,86 @@ router.get('/:id/membres', etabMembresManageAccess, (req, res) => {
       created_at: u.created_at,
     }))
     .value();
+  // Responsable FAD : uniquement les Agents FAD
+  if (req.user.role === 'responsable_fad') {
+    membres = membres.filter((m) => m.role === 'agent_fad');
+  }
   res.json(membres);
 });
 
+// GET /api/etablissements/:id/membres/import/template — modèle Excel import membres staff
+router.get('/:id/membres/import/template', etabMembresManageAccess, async (req, res) => {
+  const etablissement_id = parseInt(req.params.id, 10);
+  if (Number.isNaN(etablissement_id)) {
+    return res.status(400).json({ message: 'Identifiant établissement invalide.' });
+  }
+  const etab = db.get('etablissements').find({ id: etablissement_id }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  try {
+    const wb = await buildUsersTemplateWorkbook();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="template-membres-etab-${etablissement_id}.xlsx"`);
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Impossible de générer le modèle.' });
+  }
+});
+
+// POST /api/etablissements/:id/membres/import?dry_run=1 — import Excel/CSV membres
+router.post('/:id/membres/import', etabMembresManageAccess, csvUpload.single('file'), async (req, res) => {
+  const etablissement_id = parseInt(req.params.id, 10);
+  if (Number.isNaN(etablissement_id)) {
+    return res.status(400).json({ message: 'Identifiant établissement invalide.' });
+  }
+  const etab = db.get('etablissements').find({ id: etablissement_id }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+
+  const dryRunRaw = req.query.dry_run ?? req.body?.dry_run ?? '1';
+  const dryRun = !['0', 'false', 'no', 'non'].includes(String(dryRunRaw).toLowerCase());
+
+  if (!req.file) {
+    return res.status(400).json({ message: 'Fichier Excel (.xlsx) ou CSV requis (champ file).' });
+  }
+
+  let parsed;
+  try {
+    parsed = await parseUserImportBuffer(req.file.buffer, req.file.originalname);
+  } catch (err) {
+    return res.status(400).json({ message: err.message || 'Impossible de lire le fichier.' });
+  }
+  if (parsed.error) {
+    return res.status(400).json({ message: parsed.error });
+  }
+
+  const allowedRoles = rolesCreatablesMembres(req.user);
+  const result = await importUsersRows({
+    rows: parsed.rows,
+    allowedRoles,
+    forcedEtabId: etablissement_id,
+    dryRun,
+    actorId: req.user.id,
+  });
+
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  return res.json(result);
+});
+
 // POST /api/etablissements/:id/membres — créer un compte membre (admin ou responsable étab.)
-router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
+router.post('/:id/membres', etabMembresManageAccess, async (req, res) => {
   const etablissement_id = parseInt(req.params.id);
   const etab = db.get('etablissements').find({ id: etablissement_id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
   const {
     prenom, nom, email, mot_de_passe, mot_de_passe_confirmation, role,
-    date_naissance, telephone, adresse,
+    date_naissance, telephone, adresse, service, fonction,
   } = req.body;
-  if (!prenom || !nom || !email || !mot_de_passe || !role || !date_naissance || !telephone) {
+  if (!prenom || !nom || !email || !mot_de_passe || !role) {
     return res.status(400).json({
-      message: 'Champs obligatoires : prénom, nom, email, date de naissance, téléphone, mot de passe, rôle.',
+      message: 'Champs obligatoires : prénom, nom, email, mot de passe, rôle.',
     });
   }
   if (mot_de_passe !== mot_de_passe_confirmation) {
@@ -2310,17 +2640,20 @@ router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
   const exist = db.get('utilisateurs').find({ email: emailNorm }).value();
   if (exist) return res.status(400).json({ message: 'Email déjà utilisé.' });
 
-  const telTrim = String(telephone).trim();
-  const telNorm = normalizeTelephoneForUniqueness(telTrim);
-  if (telNorm.length < 8) {
-    return res.status(400).json({
-      message: 'Numéro de téléphone invalide ou trop court (minimum 8 chiffres).',
-    });
-  }
-  if (telephoneTaken(telNorm, null)) {
-    return res.status(409).json({ message: 'Ce numéro de téléphone est déjà associé à un autre compte.' });
+  const telTrim = telephone != null && String(telephone).trim() ? String(telephone).trim() : '';
+  if (telTrim) {
+    const telNorm = normalizeTelephoneForUniqueness(telTrim);
+    if (telNorm.length < 8) {
+      return res.status(400).json({
+        message: 'Numéro de téléphone invalide ou trop court (minimum 8 chiffres).',
+      });
+    }
+    if (telephoneTaken(telNorm, null)) {
+      return res.status(409).json({ message: 'Ce numéro de téléphone est déjà associé à un autre compte.' });
+    }
   }
 
+  const serviceVal = String(service || fonction || '').trim();
   const hash = bcrypt.hashSync(mot_de_passe, 10);
   const id = db.nextId('utilisateurs');
   const user = {
@@ -2332,11 +2665,15 @@ router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
     date_naissance: date_naissance ? String(date_naissance).trim() : null,
     telephone: telTrim,
     adresse: adresse ? String(adresse).trim() : '',
+    service: serviceVal || '',
+    fonction: serviceVal || '',
     mot_de_passe: hash,
     role,
     etablissement_id,
     actif: true,
     must_change_password: true,
+    must_complete_profile: false,
+    photo_url: null,
     login_attempts: 0,
     is_locked: false,
     lock_until: null,
@@ -2358,6 +2695,15 @@ router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
     actor_scope: isPlatformAdmin(req.user) ? 'platform' : 'admin_etablissement',
     admin_etablissement_remplace: demotedPrevious,
   });
+
+  let emailSent = false;
+  try {
+    const { sendStaffInviteEmail } = require('../utils/staffInviteEmail');
+    emailSent = await sendStaffInviteEmail(user);
+  } catch (e) {
+    console.warn('[etab] invitation staff non envoyée:', e.message);
+  }
+
   res.status(201).json({
     id,
     prenom: user.prenom,
@@ -2368,9 +2714,10 @@ router.post('/:id/membres', etabMembresManageAccess, (req, res) => {
     etablissement_id,
     actif: true,
     must_change_password: true,
+    email_invite_sent: emailSent,
     message: demotedPrevious
-      ? 'Compte créé. L’ancien administrateur d’établissement a été remplacé automatiquement.'
-      : undefined,
+      ? 'Compte créé. L’ancien administrateur d’établissement a été remplacé. E-mail d’activation envoyé si SMTP est configuré.'
+      : `Compte créé. Un e-mail d’activation a été envoyé${emailSent ? '' : ' (SMTP indisponible)'}.`,
   });
 });
 
@@ -2409,7 +2756,14 @@ router.put('/:etabId/membres/:id', etabMembresManageAccess, (req, res) => {
           : 'Vous ne pouvez pas attribuer ce rôle.',
       });
     }
-    updates.role = role;
+    if (role === ROLE_ADMIN_ETABLISSEMENT && user.role !== ROLE_ADMIN_ETABLISSEMENT) {
+      Object.assign(updates, promotePatchToAdminEtab(user));
+    } else if (user.role === ROLE_ADMIN_ETABLISSEMENT && role !== ROLE_ADMIN_ETABLISSEMENT) {
+      updates.role = role;
+      updates.role_before_admin_etab = null;
+    } else {
+      updates.role = role;
+    }
   }
   if (actif !== undefined) updates.actif = !!actif;
   if (prenom !== undefined) updates.prenom = String(prenom).trim();
@@ -2524,8 +2878,63 @@ router.post('/:etabId/membres/:id/supprimer-definitif', adminOnly, (req, res) =>
       message: 'Saisissez l’adresse e-mail exacte du compte pour confirmer la suppression définitive.',
     });
   }
-  db.get('utilisateurs').remove({ id }).write();
+  purgeUserPersonalData(id);
+  logAudit(req, 'membre_staff_hard_delete', 'etablissement', etabId, { membre_id: id });
   res.json({ message: 'Compte supprimé définitivement.' });
+});
+
+const {
+  exportEtablissementData,
+  restoreEtablissementData,
+  getManifestForRole,
+} = require('../utils/userDataExport');
+const {
+  buildUserDataZip,
+  sendZipDownload,
+  handleBackupUpload,
+  isRestoreConfirmed,
+  parseUploadedBackupZip,
+} = require('../utils/backupZip');
+
+// GET /api/etablissements/:id/donnees/export — sauvegarde ZIP de l'établissement
+router.get('/:id/donnees/export', etabMembresManageAccess, (req, res) => {
+  const etabId = parseInt(req.params.id, 10);
+  const data = exportEtablissementData(etabId);
+  if (!data) return res.status(404).json({ message: 'Établissement introuvable.' });
+  const manifest = getManifestForRole('admin_etablissement');
+  const { buffer, filename } = buildUserDataZip(data, {
+    included: manifest.included,
+    excluded: manifest.excluded,
+  });
+  logAudit(req, 'export_donnees_etablissement', 'etablissement', etabId, {
+    scope: 'etablissement',
+    etablissement_id: etabId,
+    format: 'zip',
+    filename,
+  });
+  return sendZipDownload(res, buffer, filename);
+});
+
+// POST /api/etablissements/:id/donnees/restore — fusion additive depuis ZIP
+router.post('/:id/donnees/restore', etabMembresManageAccess, handleBackupUpload('backup'), (req, res) => {
+  const etabId = parseInt(req.params.id, 10);
+  if (!isRestoreConfirmed(req.body)) {
+    return res.status(400).json({ message: 'Confirmation requise (confirm=true).' });
+  }
+  try {
+    const parsed = parseUploadedBackupZip(req.file.buffer);
+    if (parsed.kind !== 'donnees') {
+      return res.status(400).json({ message: 'ZIP établissement attendu (donnees.json).' });
+    }
+    const { preBackup, stats } = restoreEtablissementData(etabId, parsed.payload, req);
+    return res.json({
+      message: 'Restauration terminée depuis le ZIP. Données fusionnées par identifiant.',
+      pre_backup: preBackup,
+      stats,
+    });
+  } catch (e) {
+    return res.status(400).json({ message: e.message });
+  }
 });
 
 module.exports = router;

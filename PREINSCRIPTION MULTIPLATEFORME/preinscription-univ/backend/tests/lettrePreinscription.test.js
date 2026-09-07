@@ -28,14 +28,14 @@ describe('lettre vs attestation', () => {
     );
   });
 
-  it('refuse la lettre pour un Sénégalais', () => {
+  it('autorise la lettre pour un Sénégalais accepté en ligne', () => {
     assert.equal(
       canIssueLettrePreinscription({
         statut: 'accepte',
         etudiant_id: 12,
         nationalite: 'Sénégalaise',
       }),
-      false,
+      true,
     );
   });
 

@@ -1,17 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
-const { authMiddleware, staffLettreAttestation, staffProformaDecision, staffDossierDecision, staffGuichet } = require('../middleware/auth');
+const { authMiddleware, staffLettreAttestation, staffProformaView, staffProformaDecision, staffDossierDecision, staffGuichet } = require('../middleware/auth');
 const { proformaDemandeDecision, creerProformaPourEtudiant } = require('../services/proformaDemandeDecisionService');
 const { genererOuRecupererFactureDossier } = require('../services/factureService');
-const { snapshotFromEtab, snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
+const { snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
 const { logAudit } = require('../utils/auditLog');
 const { DOSSIER_STATUSES, canTransitionDossierStatus, requiresRejectionComment } = require('../utils/dossierWorkflow');
 const { createUserNotification } = require('../utils/notificationService');
-const { buildAttestationPayloadForDossier } = require('../utils/buildAttestationPayload');
+const { notifyDossierStatutChange, notifyFactureDossierGeneree, notifyLettrePreinscriptionEmail, notifyAttestationEmail, notifyFactureDossierLinkEmail } = require('../utils/transactionalEmail');
+const { buildAttestationPayloadForDossier, buildAttestationPayloadForDemandeProforma } = require('../utils/buildAttestationPayload');
 const { canIssueOfficialDocs } = require('../utils/canIssueOfficialDocs');
 const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
 const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
+const { filterDossiersAffichables, assertDossierAffichable } = require('../utils/dossierVisibility');
 const { primaryPhotoDocumentFromList } = require('../utils/preinscriptionDocumentRules');
 
 // ─── Lettres / attestations (staff établissement, même périmètre que facture dossier) ─
@@ -27,7 +29,7 @@ router.get('/lettre/:dossierId', authMiddleware, staffLettreAttestation, (req, r
   if (!canIssueLettrePreinscription(dossier)) {
     return res.status(403).json({
       message:
-        'La lettre de préinscription est réservée aux candidats étrangers acceptés ayant déposé une demande en ligne.',
+        'La lettre de préinscription est réservée aux candidats acceptés ayant déposé une demande en ligne avec un compte étudiant.',
     });
   }
 
@@ -82,18 +84,35 @@ router.get('/attestation/:dossierId', authMiddleware, staffLettreAttestation, (r
   res.json(built.body);
 });
 
+router.get('/attestation-demande/:demandeId', authMiddleware, staffLettreAttestation, (req, res) => {
+  const id = parseInt(String(req.params.demandeId), 10);
+  if (Number.isNaN(id)) return res.status(400).json({ message: 'Identifiant de demande invalide' });
+  const demande = db.get('demandes_proforma').find({ id }).value();
+  if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
+  if (!assertDemandePourResponsable(req, demande)) {
+    return res.status(403).json({ message: 'Cette demande ne concerne pas votre établissement.' });
+  }
+  const built = buildAttestationPayloadForDemandeProforma(id);
+  if (built.error) {
+    return res.status(built.error.status).json({ message: built.error.message });
+  }
+  res.json(built.body);
+});
+
 // ─── DEMANDES PROFORMA (staff établissement + admin — avant le guard responsable seul) ─
-router.get('/demandes-proforma', authMiddleware, staffProformaDecision, (req, res) => {
+router.get('/demandes-proforma', authMiddleware, staffProformaView, (req, res) => {
   const { statut, type, page = 1, limit = 15 } = req.query;
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
 
   let demandes = db.get('demandes_proforma').value();
-  const formationIds = getEtabFormationIds(req) || [];
+  const formationIds = getEtabFadFormationIds(req) || [];
   const etabId = req.user.role === 'admin' ? null : req.user.etablissement_id;
   if (etabId) {
     demandes = demandes.filter((d) => demandeAppartientAEtablissement(d, etabId, formationIds));
   }
+  const { filterDemandesParModaliteRole } = require('../utils/fadRoles');
+  demandes = filterDemandesParModaliteRole(req.user, demandes);
 
   if (statut) demandes = demandes.filter((d) => d.statut === statut);
   if (type) demandes = demandes.filter((d) => d.type_formation === type);
@@ -109,7 +128,7 @@ router.get('/demandes-proforma', authMiddleware, staffProformaDecision, (req, re
   });
 });
 
-router.put('/demandes-proforma/:id/statut', authMiddleware, staffProformaDecision, (req, res) => {
+router.put('/demandes-proforma/:id/statut', authMiddleware, staffProformaView, (req, res) => {
   const { statut } = req.body;
   if (!['nouvelle', 'vue', 'traitee', 'en_attente'].includes(statut)) {
     return res.status(400).json({
@@ -130,7 +149,7 @@ router.put('/demandes-proforma/:id/statut', authMiddleware, staffProformaDecisio
 });
 
 // POST /api/responsable/demandes-proforma/creer — proforma (responsable, comptable, admin)
-router.post('/demandes-proforma/creer', authMiddleware, staffProformaDecision, (req, res) => {
+router.post('/demandes-proforma/creer', authMiddleware, staffProformaDecision, async (req, res) => {
   const {
     etudiant_id,
     formation_id,
@@ -138,9 +157,11 @@ router.post('/demandes-proforma/creer', authMiddleware, staffProformaDecision, (
     nom,
     telephone,
     email,
+    adresse,
+    annee_academique,
     remise,
   } = req.body || {};
-  const result = creerProformaPourEtudiant({
+  const result = await creerProformaPourEtudiant({
     staffUser: req.user,
     etudiantId: etudiant_id,
     formationId: formation_id,
@@ -148,8 +169,9 @@ router.post('/demandes-proforma/creer', authMiddleware, staffProformaDecision, (
     nom,
     telephone,
     email,
+    adresse,
+    annee_academique,
     remise,
-    buildEtabSnapshot: snapshotFromEtab,
   });
   if (!result.ok) return res.status(result.status).json({ message: result.message });
 
@@ -251,7 +273,7 @@ router.get('/etudiants', authMiddleware, staffProformaDecision, (req, res) => {
   });
 });
 
-router.put('/demandes-proforma/:id/decision', authMiddleware, staffProformaDecision, (req, res) => {
+router.put('/demandes-proforma/:id/decision', authMiddleware, staffProformaDecision, async (req, res) => {
   const id = parseInt(req.params.id);
   const demande = db.get('demandes_proforma').find({ id }).value();
   if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
@@ -259,17 +281,108 @@ router.put('/demandes-proforma/:id/decision', authMiddleware, staffProformaDecis
     return res.status(403).json({ message: 'Cette demande ne concerne pas votre établissement.' });
   }
 
-  const { decision, motif_refus } = req.body;
-  const result = proformaDemandeDecision({
+  const { decision, motif_refus, avec_cachet } = req.body;
+  const result = await proformaDemandeDecision({
     demandeId: id,
     userId: req.user.id,
     decision,
     motif_refus,
+    avec_cachet,
   });
   if (!result.ok) {
     return res.status(result.status).json({ message: result.message });
   }
-  res.json({ message: result.message, demande: result.demande });
+  res.json({ message: result.message, demande: result.demande, email_envoye: result.email_envoye });
+});
+
+// POST /api/responsable/demandes-proforma/:id/envoyer-email — renvoyer le lien facture au candidat
+router.post('/demandes-proforma/:id/envoyer-email', authMiddleware, staffProformaDecision, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const demande = db.get('demandes_proforma').find({ id }).value();
+  if (!demande) return res.status(404).json({ message: 'Demande introuvable' });
+  if (!assertDemandePourResponsable(req, demande)) {
+    return res.status(403).json({ message: 'Cette demande ne concerne pas votre établissement.' });
+  }
+  if (demande.statut !== 'acceptee' || !demande.facture?.numero) {
+    return res.status(400).json({ message: 'La facture proforma doit être générée avant l’envoi par e-mail.' });
+  }
+  if (!demande.email) {
+    return res.status(400).json({ message: 'Aucune adresse e-mail sur cette demande.' });
+  }
+  const { notifyProformaDecision } = require('../utils/transactionalEmail');
+  const ok = await notifyProformaDecision(demande, 'acceptee');
+  if (!ok) {
+    return res.status(503).json({ message: 'Envoi impossible (SMTP non configuré ou adresse invalide).' });
+  }
+  res.json({ message: `Facture proforma envoyée à ${demande.email}.` });
+});
+
+// POST /api/responsable/dossiers/:id/envoyer-lettre-email — envoi manuel lien lettre
+router.post('/dossiers/:id/envoyer-lettre-email', authMiddleware, staffDossierDecision, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const dossier = db.get('dossiers').find({ id }).value();
+  if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
+  if (!assertDossierPourResponsable(req, dossier)) {
+    return res.status(403).json({ message: 'Ce dossier ne concerne pas votre établissement.' });
+  }
+  if (!canIssueLettrePreinscription(dossier)) {
+    return res.status(400).json({ message: 'Lettre non disponible pour ce dossier.' });
+  }
+  if (!dossier.etudiant_id) {
+    return res.status(400).json({ message: 'Aucun compte étudiant associé.' });
+  }
+  const ok = await notifyLettrePreinscriptionEmail(dossier);
+  if (!ok) {
+    return res.status(503).json({ message: 'Envoi impossible (SMTP non configuré ou adresse invalide).' });
+  }
+  res.json({ message: 'E-mail de lettre de préinscription envoyé.' });
+});
+
+// POST /api/responsable/dossiers/:id/envoyer-attestation-email — envoi manuel lien attestation
+router.post('/dossiers/:id/envoyer-attestation-email', authMiddleware, staffDossierDecision, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const dossier = db.get('dossiers').find({ id }).value();
+  if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
+  if (!assertDossierPourResponsable(req, dossier)) {
+    return res.status(403).json({ message: 'Ce dossier ne concerne pas votre établissement.' });
+  }
+  if (!canIssueOfficialDocs(dossier)) {
+    return res.status(400).json({ message: 'Attestation non disponible pour ce dossier.' });
+  }
+  if (!dossier.etudiant_id) {
+    return res.status(400).json({ message: 'Aucun compte étudiant associé.' });
+  }
+  const ok = await notifyAttestationEmail(dossier);
+  if (!ok) {
+    return res.status(503).json({ message: 'Envoi impossible (SMTP non configuré ou adresse invalide).' });
+  }
+  res.json({ message: 'E-mail d’attestation envoyé.' });
+});
+
+// POST /api/responsable/dossiers/:id/envoyer-facture-email — envoi manuel lien facture dossier
+router.post('/dossiers/:id/envoyer-facture-email', authMiddleware, staffDossierDecision, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const dossier = db.get('dossiers').find({ id }).value();
+  if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
+  if (!assertDossierPourResponsable(req, dossier)) {
+    return res.status(403).json({ message: 'Ce dossier ne concerne pas votre établissement.' });
+  }
+  const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
+  if (!isDossierAcceptePourLettre(dossier.statut)) {
+    return res.status(400).json({ message: 'Facture disponible uniquement pour un dossier accepté.' });
+  }
+  const facture = genererOuRecupererFactureDossier(id);
+  if (!facture) {
+    return res.status(400).json({ message: 'Impossible de générer la facture pour ce dossier.' });
+  }
+  if (!dossier.etudiant_id) {
+    return res.status(400).json({ message: 'Aucun compte étudiant associé.' });
+  }
+  const ok = await notifyFactureDossierLinkEmail(dossier, facture);
+  if (!ok) {
+    return res.status(503).json({ message: 'Envoi impossible (SMTP non configuré ou adresse invalide).' });
+  }
+  res.json({ message: 'E-mail de facture proforma envoyé.', facture: { id: facture.id, numero: facture.numero } });
 });
 
 router.use(authMiddleware, staffDossierDecision);
@@ -278,10 +391,28 @@ router.use(authMiddleware, staffDossierDecision);
 
 const {
   getFormationIdsForEtab,
+  getFadFormationIdsForEtab,
+  dossierEstFad,
   dossierAppartientAEtablissement: dossierScope,
   demandeAppartientAEtablissement: demandeScope,
   buildFormationsMap,
 } = require('../utils/etablissementScope');
+
+/** Pour responsable_fad / agent_fad : uniquement les formations FAD. */
+function getEtabFadFormationIds(req) {
+  if (req.user.role === 'admin') return null;
+  const formations = db.get('formations').value();
+  if (req.user.role === 'responsable_fad' || req.user.role === 'agent_fad') {
+    return getFadFormationIdsForEtab(formations, req.user.etablissement_id);
+  }
+  return getFormationIdsForEtab(formations, req.user.etablissement_id);
+}
+
+/** Vérifie accès dossier pour staff FAD : dossier FAD + établissement. */
+function assertDossierAccessFad(req, dossier) {
+  if (req.user.role !== 'responsable_fad' && req.user.role !== 'agent_fad') return true;
+  return dossierEstFad(dossier);
+}
 
 function getEtabFormationIds(req) {
   const etabId = req.user.role === 'admin' ? null : req.user.etablissement_id;
@@ -296,7 +427,15 @@ function dossierAppartientAEtablissement(dossier, etabId) {
 
 function assertDossierPourResponsable(req, dossier) {
   if (req.user.role === 'admin') return true;
-  return dossierAppartientAEtablissement(dossier, req.user.etablissement_id);
+  if (!dossierAppartientAEtablissement(dossier, req.user.etablissement_id)) return false;
+  // Staff FAD : dossiers FAD uniquement
+  if (!assertDossierAccessFad(req, dossier)) return false;
+  // Staff présentiel : exclure FAD
+  const { isFadOnlyUser, userPeutVoirDossierParModalite } = require('../utils/fadRoles');
+  if (!isFadOnlyUser(req.user) && req.user.role !== 'admin_etablissement') {
+    if (!userPeutVoirDossierParModalite(req.user, dossier)) return false;
+  }
+  return true;
 }
 
 function demandeAppartientAEtablissement(demande, etabId, formationIds) {
@@ -305,8 +444,10 @@ function demandeAppartientAEtablissement(demande, etabId, formationIds) {
 
 function assertDemandePourResponsable(req, demande) {
   if (req.user.role === 'admin') return true;
-  const fIds = getEtabFormationIds(req) || [];
-  return demandeAppartientAEtablissement(demande, req.user.etablissement_id, fIds);
+  const fIds = getEtabFadFormationIds(req) || [];
+  if (!demandeAppartientAEtablissement(demande, req.user.etablissement_id, fIds)) return false;
+  const { userPeutVoirDemandeParModalite } = require('../utils/fadRoles');
+  return userPeutVoirDemandeParModalite(req.user, demande);
 }
 
 // ─── DOSSIERS ────────────────────────────────────────────────────────────────
@@ -316,23 +457,29 @@ router.get('/dossiers', (req, res) => {
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
 
-  const formationIds = getEtabFormationIds(req);
+  const formationIds = getEtabFadFormationIds(req);
+  const isFadOnly = req.user.role === 'responsable_fad' || req.user.role === 'agent_fad';
+  const { filterDossiersParModaliteRole } = require('../utils/fadRoles');
 
   let dossiers = db.get('dossiers').value();
   const utilisateurs = db.get('utilisateurs').value();
+  dossiers = filterDossiersAffichables(dossiers, utilisateurs);
 
   if (formationIds !== null) {
     dossiers = dossiers.filter(d => dossierAppartientAEtablissement(d, req.user.etablissement_id));
   }
+  // Périmètre FAD / présentiel selon le rôle
+  dossiers = filterDossiersParModaliteRole(req.user, dossiers);
 
   dossiers = dossiers.map(d => {
     const u = utilisateurs.find(u => u.id === d.etudiant_id) || {};
-    return { ...d, nom: u.nom, prenom: u.prenom, email: u.email };
+    const identite = resolveCandidatIdentite(d, u);
+    return { ...d, ...identite };
   });
 
   if (type === 'fad' || type === 'en_ligne') {
     dossiers = dossiers.filter(d => d.type_formation === 'en_ligne');
-  } else if (type === 'presentiel') {
+  } else if (type === 'presentiel' && !isFadOnly) {
     dossiers = dossiers.filter(d => d.type_formation === 'presentiel');
   }
   if (statut) dossiers = dossiers.filter(d => d.statut === statut);
@@ -462,17 +609,22 @@ router.get('/dossiers/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const dossier = db.get('dossiers').find({ id }).value();
   if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
+  const vis = assertDossierAffichable(dossier, db.get('utilisateurs').value());
+  if (!vis.ok) return res.status(vis.status).json({ message: vis.message });
   if (!assertDossierPourResponsable(req, dossier)) {
     return res.status(403).json({ message: 'Ce dossier ne concerne pas votre établissement.' });
   }
 
   const u = db.get('utilisateurs').find({ id: dossier.etudiant_id }).value() || {};
-  const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
   const identite = resolveCandidatIdentite(dossier, u);
   const documents = db.get('documents').filter({ dossier_id: id }).value();
   const formation = db.get('formations').find({ id: dossier.formation_id }).value();
   const factureRow = db.get('factures').find({ dossier_id: id }).value() || null;
-  const facture = factureRow ? genererOuRecupererFactureDossier(id) : null;
+  const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
+  const facture =
+    (isDossierAcceptePourLettre(dossier.statut) && dossier.formation_id)
+      ? genererOuRecupererFactureDossier(id)
+      : (factureRow ? genererOuRecupererFactureDossier(id) : null);
 
   res.json({
     dossier: {
@@ -494,7 +646,7 @@ router.get('/dossiers/:id', (req, res) => {
   });
 });
 
-router.put('/dossiers/:id/statut', (req, res) => {
+router.put('/dossiers/:id/statut', async (req, res) => {
   const { statut, motif_rejet } = req.body;
   if (!statut || !DOSSIER_STATUSES.includes(statut)) {
     return res.status(400).json({ message: 'Statut invalide.' });
@@ -542,6 +694,9 @@ router.put('/dossiers/:id/statut', (req, res) => {
       meta: { dossier_id: dossier.id, numero_dossier: dossier.numero_dossier, statut },
     });
   }
+  const dossierAfter = { ...dossier, ...updateData };
+  await notifyDossierStatutChange(dossierAfter, statut);
+
   logAudit(req, 'update_status', 'dossier', id, {
     from: dossier.statut,
     to: statut,
@@ -554,6 +709,18 @@ router.put('/dossiers/:id/statut', (req, res) => {
   let facture = null;
   if (statut === 'accepte') {
     facture = genererOuRecupererFactureDossier(id);
+    if (facture) {
+      await notifyFactureDossierGeneree(dossierAfter, facture);
+      if (dossier.etudiant_id) {
+        createUserNotification(dossier.etudiant_id, {
+          type: 'facture',
+          title: 'Facture proforma disponible',
+          message: `La facture ${facture.numero} a été générée pour le dossier ${dossier.numero_dossier}.`,
+          link: `/facture/${id}`,
+          meta: { dossier_id: id, facture_id: facture.id, numero: facture.numero },
+        });
+      }
+    }
   }
 
   res.json({

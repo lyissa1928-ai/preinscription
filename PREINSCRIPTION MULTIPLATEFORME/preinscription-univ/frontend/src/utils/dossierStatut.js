@@ -9,14 +9,12 @@ export function isDossierAcceptePourDocuments(statut) {
 }
 
 /**
- * Lettre : candidats étrangers, compte + préinscription en ligne, dossier accepté.
- * (Pas pour les walk-in / source staff.)
+ * Lettre : dossiers en ligne acceptés (hors saisie guichet / source staff).
  */
-export function canShowLettrePreinscription(dossier, inferIsForeigner) {
+export function canShowLettrePreinscription(dossier) {
   if (!dossier) return false
   if (dossier.source === 'staff') return false
   if (!dossier.etudiant_id) return false
   if (!isDossierAcceptePourDocuments(dossier.statut)) return false
-  if (typeof inferIsForeigner !== 'function') return false
-  return inferIsForeigner(dossier.nationalite) === true
+  return true
 }

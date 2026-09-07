@@ -6,7 +6,7 @@ const path = require('path');
 const db = require('../database/db');
 const { unlinkQuiet, detectDossierMagicFormat } = require('../utils/verifyUploadedFile');
 const { authMiddleware } = require('../middleware/auth');
-const { snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
+const { snapshotFromFormation, snapshotFromEtablissementId, snapshotFromEtab } = require('../utils/etablissementSnapshot');
 const { rateLimit, getClientIp } = require('../utils/rateLimit');
 const { logSecurityEvent } = require('../utils/securityEvent');
 const {
@@ -31,6 +31,7 @@ const { canIssueOfficialDocs } = require('../utils/canIssueOfficialDocs');
 const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
 const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
 const { genererOuRecupererFactureDossier } = require('../services/factureService');
+const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
 const { getDureeMoisEffectif } = require('../utils/formationTarifs');
 
 const uploadsStudentDir = path.join(__dirname, '../uploads');
@@ -67,29 +68,11 @@ const uploadPhotoOnly = multer({
 
 const dossierUploadFields = DOSSIER_UPLOAD_FIELD_NAMES.map((name) => ({ name, maxCount: 1 }));
 
-const proformaJustificatifFields = [
-  { name: 'justificatif_diplome', maxCount: 1 },
-  { name: 'justificatif_releve', maxCount: 1 },
-  { name: 'justificatif_formation', maxCount: 1 },
-];
-
-function cleanupProformaUploads(files) {
-  if (!files) return;
-  Object.values(files).forEach((arr) => {
-    if (arr?.[0]?.path) unlinkQuiet(arr[0].path);
-  });
-}
-
-function persistProformaJustificatif(file, demandeId, kind) {
-  const ext = path.extname(file.originalname || '').toLowerCase();
-  const safe = ['.pdf', '.jpg', '.jpeg', '.png'].includes(ext) ? ext : '.pdf';
-  const dir = path.join(__dirname, '../uploads/proforma-justificatifs');
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const base = `demande-${demandeId}-${kind}${safe}`;
-  const dest = path.join(dir, base);
-  fs.renameSync(file.path, dest);
-  return `proforma-justificatifs/${base}`;
-}
+const {
+  proformaJustificatifFieldsCompte,
+  cleanupProformaUploads,
+  persistProformaJustificatif,
+} = require('../utils/proformaUpload');
 
 const proformaSubmitLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -176,11 +159,11 @@ router.post(
     const useEnterprise = recaptchaEnterpriseConfigured();
     const recSecret = recaptchaSecret();
     const recToken = String(req.body?.recaptcha_token || '').trim();
-    if (!recToken) {
-      logSecurityEvent(req, 'recaptcha_missing_token', { endpoint: '/api/etudiant/dossier' }, 'warning');
-      return abortUploads(400, { message: 'reCAPTCHA requis.' });
-    }
     if (useEnterprise || recSecret) {
+      if (!recToken) {
+        logSecurityEvent(req, 'recaptcha_missing_token', { endpoint: '/api/etudiant/dossier' }, 'warning');
+        return abortUploads(400, { message: 'reCAPTCHA requis.' });
+      }
       const recResult = useEnterprise
         ? await verifyRecaptchaEnterpriseWithDetails(recToken)
         : await verifyRecaptchaTokenWithDetails(recToken, getClientIp(req), recSecret);
@@ -193,16 +176,13 @@ router.post(
         return abortUploads(400, { message: 'reCAPTCHA invalide ou expiré. Réessayez.' });
       }
     } else {
-      logSecurityEvent(req, 'dossier_captcha_not_configured', { endpoint: '/api/etudiant/dossier' }, 'error');
-      return abortUploads(503, {
-        message: 'Soumission temporairement indisponible (reCAPTCHA non configuré sur le serveur).',
-      });
+      logSecurityEvent(req, 'dossier_captcha_skipped_not_configured', { endpoint: '/api/etudiant/dossier' }, 'info');
     }
   }
 
   const {
     formation_id, annee_academique, date_naissance, lieu_naissance,
-    nationalite, telephone, adresse, dernier_diplome, etablissement_origine, mention, annee_obtention,
+    nationalite, pays_origine, pays_residence, telephone, adresse, dernier_diplome, etablissement_origine, mention, annee_obtention,
     numero_passeport,
   } = req.body;
 
@@ -316,6 +296,8 @@ router.post(
     document_rule_profile: documentRuleProfile,
     annee_academique,
     date_naissance, lieu_naissance, nationalite, telephone, adresse,
+    pays_origine: (pays_origine || pays_residence || '').toString().trim() || null,
+    pays_residence: (pays_residence || pays_origine || '').toString().trim() || null,
     dernier_diplome, etablissement_origine, mention: mention || null,
     annee_obtention: parseInt(annee_obtention),
     ...(passeportTrim ? { numero_passeport: passeportTrim } : {}),
@@ -327,6 +309,9 @@ router.post(
     created_at: now, updated_at: now
   };
   db.get('dossiers').push(dossier).write();
+
+  const { notifyDossierStatutChange } = require('../utils/transactionalEmail');
+  await notifyDossierStatutChange(dossier, 'en_attente');
 
   for (const [type, meta] of Object.entries(securedByField)) {
     const docId = db.nextId('documents');
@@ -349,9 +334,25 @@ router.post(
 function packDossierPayload(dossier) {
   const documents = db.get('documents').filter({ dossier_id: dossier.id }).value();
   const formation = db.get('formations').find({ id: dossier.formation_id }).value();
-  const factureRow = db.get('factures').find({ dossier_id: dossier.id }).value() || null;
-  const facture = factureRow ? genererOuRecupererFactureDossier(dossier.id) : null;
-  return { dossier, documents, formation, facture };
+  const accepte = isDossierAcceptePourLettre(dossier.statut);
+  let facture = null;
+  if (accepte && dossier.formation_id) {
+    facture = genererOuRecupererFactureDossier(dossier.id);
+  } else {
+    const factureRow = db.get('factures').find({ dossier_id: dossier.id }).value() || null;
+    if (factureRow) facture = genererOuRecupererFactureDossier(dossier.id);
+  }
+  return {
+    dossier,
+    documents,
+    formation,
+    facture,
+    documents_officiels: {
+      facture: accepte,
+      attestation: accepte,
+      lettre: canIssueLettrePreinscription(dossier),
+    },
+  };
 }
 
 // GET /api/etudiant/dossiers — toutes les candidatures de l'étudiant (plusieurs formations possibles)
@@ -496,7 +497,7 @@ router.post(
   authMiddleware,
   proformaSubmitLimiter,
   (req, res, next) => {
-    upload.fields(proformaJustificatifFields)(req, res, (err) => {
+    upload.fields(proformaJustificatifFieldsCompte)(req, res, (err) => {
       if (err) {
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(400).json({ message: 'Chaque document est limité à 2 Mo.' });
@@ -532,12 +533,36 @@ router.post(
       return res.status(400).json({ message: 'Numéro de téléphone valide obligatoire (au moins 8 caractères).' });
     }
 
+    const dateNaissanceBody = String(req.body.date_naissance || '').trim();
+    const dateNaissance = dateNaissanceBody || (user.date_naissance ? String(user.date_naissance).trim() : '');
+    if (!dateNaissance) {
+      cleanupProformaUploads(req.files);
+      return res.status(400).json({
+        message: 'La date de naissance est obligatoire pour une demande de facture proforma (profil ou formulaire).',
+      });
+    }
+    const lieuNaissance = String(req.body.lieu_naissance || user.lieu_naissance || '').trim() || null;
+
+    // Enrichir le profil étudiant si la date manquait
+    if (!user.date_naissance && dateNaissanceBody) {
+      db.get('utilisateurs').find({ id: user.id }).assign({
+        date_naissance: dateNaissanceBody,
+        ...(lieuNaissance ? { lieu_naissance: lieuNaissance } : {}),
+        updated_at: new Date().toISOString(),
+      }).write();
+    }
+
     const {
       type_formation, formation_id, etablissement_id, niveau, details,
+      adresse: adresseBody, annee_academique: anneeBody,
       type_payeur,
       payeur_nom, payeur_prenom, payeur_relation, payeur_telephone,
       payeur_org_nom, payeur_org_ninea, payeur_org_contact,
     } = req.body;
+
+    const adresse = String(adresseBody || user.adresse || '').trim() || null;
+    const year = new Date().getFullYear();
+    const annee_academique = String(anneeBody || '').trim() || `${year}-${year + 1}`;
 
     if (!type_formation || !formation_id) {
       cleanupProformaUploads(req.files);
@@ -582,20 +607,13 @@ router.post(
       });
     }
     const etab = db.get('etablissements').find({ id: etabId }).value();
-    const etablissement_snapshot = etab
+    const baseSnap = snapshotFromEtab(etab, { type: type_formation });
+    const etablissement_snapshot = baseSnap
       ? {
-          nom: etab.nom,
-          type: etab.type,
-          adresse: etab.adresse || '',
-          telephone: etab.telephone || '',
-          email_contact: etab.email_contact || '',
-          site_web: etab.site_web || '',
-          logo_url: publicAssetUrl(req, etab.logo_url),
-          cachet_url: publicAssetUrl(req, etab.cachet_url),
-          couleur_primaire: etab.couleur_primaire || '#1e40af',
-          couleur_secondaire: etab.couleur_secondaire || '#3b82f6',
-          ninea: etab.ninea || '',
-          compte_bancaire: etab.compte_bancaire || '',
+          ...baseSnap,
+          type: etab?.type,
+          logo_url: publicAssetUrl(req, etab?.logo_url),
+          cachet_url: publicAssetUrl(req, etab?.cachet_url),
         }
       : null;
 
@@ -622,6 +640,10 @@ router.post(
       nom: String(user.nom || '').trim(),
       email: String(user.email || '').trim().toLowerCase(),
       telephone,
+      adresse,
+      annee_academique,
+      date_naissance: dateNaissance,
+      lieu_naissance: lieuNaissance,
       niveau: niveau ? String(niveau).trim() : null,
       type_formation,
       formation_id: parseInt(formation_id, 10),
@@ -723,7 +745,7 @@ router.get('/lettre/:dossierId', authMiddleware, (req, res) => {
   if (!canIssueLettrePreinscription(dossier)) {
     return res.status(403).json({
       message:
-        'La lettre de préinscription est réservée aux candidats étrangers acceptés ayant déposé une demande en ligne.',
+        'La lettre de préinscription est réservée aux candidats acceptés ayant déposé une demande en ligne avec un compte étudiant.',
     });
   }
 

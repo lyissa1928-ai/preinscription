@@ -50,6 +50,14 @@ const {
   publicAppUrl,
   isSmtpConfigured,
 } = require('../utils/mail');
+const {
+  findUserByEmail,
+  issuePasswordResetCode,
+  consumeValidResetCode,
+  invalidateResetCode,
+  sendResetCodeEmail,
+} = require('../utils/passwordResetCode');
+const { sendAccountActivatedEmail } = require('../utils/transactionalEmail');
 
 function newSecureToken() {
   return crypto.randomBytes(32).toString('hex');
@@ -156,9 +164,18 @@ function buildPublicEtablissementPayload(etab, req) {
 }
 
 function buildPublicUserPayload(user, req) {
+  const { administeredEtablissementIds } = require('../utils/staffRoles');
+  const adminIds = administeredEtablissementIds(user);
   const etab = user.etablissement_id
     ? db.get('etablissements').find({ id: user.etablissement_id }).value()
     : null;
+  const etablissementsAdministres = adminIds
+    .map((id) => {
+      const e = db.get('etablissements').find({ id }).value();
+      if (!e) return null;
+      return { id: e.id, nom: e.nom, type: e.type || null };
+    })
+    .filter(Boolean);
   return {
     id: user.id,
     nom: user.nom,
@@ -170,11 +187,16 @@ function buildPublicUserPayload(user, req) {
     fonctions: getFonctions(user),
     matricule: user.matricule || null,
     etablissement_id: user.etablissement_id || null,
+    administre_etablissement_ids: adminIds,
+    etablissements_administres: etablissementsAdministres,
     etablissement_nom: etab?.nom || null,
     etablissement_couleur: etab?.couleur_primaire || null,
     etablissement_logo: publicAssetUrl(req, etab?.logo_url) || null,
     etablissement: buildPublicEtablissementPayload(etab, req),
     must_change_password: user.must_change_password === true,
+    must_complete_profile: false,
+    photo_url: publicAssetUrl(req, user.photo_url) || null,
+    service: user.service || user.fonction || '',
   };
 }
 
@@ -188,6 +210,7 @@ function buildMeResponse(user, req) {
     date_naissance: user.date_naissance ?? null,
     email_verified_at: user.email_verified_at || null,
     actif: user.actif !== false,
+    fonction: user.fonction || user.service || '',
   };
 }
 
@@ -235,10 +258,8 @@ router.post('/inscription', inscriptionLimiter, async (req, res) => {
         return res.status(400).json({ message: 'reCAPTCHA invalide ou expiré. Cochez à nouveau la case et réessayez.' });
       }
     } else {
-      logSecurityEvent(req, 'inscription_captcha_not_configured', { endpoint: '/api/auth/inscription' }, 'error');
-      return res.status(503).json({
-        message: 'Inscription temporairement indisponible (reCAPTCHA non configuré sur le serveur).',
-      });
+      // Pas de clés Google → inscription autorisée (honeypot + rate-limit restent actifs)
+      logSecurityEvent(req, 'inscription_captcha_skipped_not_configured', { endpoint: '/api/auth/inscription' }, 'info');
     }
   }
 
@@ -443,10 +464,20 @@ router.post('/connexion', loginLimiter, (req, res) => {
   clearLoginLockout(req, emailNorm);
   clearAccountLockOnSuccess(user.id);
 
-  res.json({
+  const payload = {
     message: 'Connexion réussie',
     ...buildAuthTokensResponse(user, req),
+  };
+
+  // Alerte de connexion (notif + e-mail) — ne bloque pas la réponse
+  setImmediate(() => {
+    try {
+      const { notifySuccessfulLogin } = require('../utils/loginAlert');
+      notifySuccessfulLogin(user, req).catch(() => {});
+    } catch { /* ignore */ }
   });
+
+  res.json(payload);
 });
 
 // POST /api/auth/refresh — renouvellement access token (refresh token rotatif)
@@ -552,6 +583,7 @@ router.post('/changer-mot-de-passe-obligatoire', authMiddleware, (req, res) => {
   db.get('utilisateurs').find({ id: user.id }).assign({
     mot_de_passe: hash,
     must_change_password: false,
+    must_complete_profile: false,
     password_changed_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).write();
@@ -559,6 +591,7 @@ router.post('/changer-mot-de-passe-obligatoire', authMiddleware, (req, res) => {
 
   const updated = db.get('utilisateurs').find({ id: user.id }).value();
   revokeAllRefreshTokensForUser(updated.id);
+  sendAccountActivatedEmail(updated).catch(() => {});
   res.json({
     message: 'Mot de passe mis à jour. Vous pouvez continuer.',
     ...buildAuthTokensResponse(updated, req),
@@ -593,7 +626,7 @@ router.get('/me', (req, res) => {
 router.post('/reinitialiser-mot-de-passe-matricule', resetPwdLimiter, async (req, res) => {
   const generic = {
     message:
-      'Si un compte étudiant existe avec ce matricule, un e-mail de réinitialisation vient d’être envoyé à l’adresse associée au compte.',
+      'Si un compte étudiant existe avec ce matricule, un code de réinitialisation vient d’être envoyé à l’adresse e-mail du compte (valable 15 minutes, usage unique).',
   };
 
   const m = normalizeMatricule(req.body?.matricule);
@@ -616,28 +649,8 @@ router.post('/reinitialiser-mot-de-passe-matricule', resetPwdLimiter, async (req
     return res.json(generic);
   }
 
-  const tok = newSecureToken();
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    password_reset_token: tok,
-    password_reset_expires: Date.now() + 60 * 60 * 1000,
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const url = `${publicAppUrl()}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(tok)}`;
-  await sendMail({
-    to: user.email,
-    subject: 'Réinitialisation de votre mot de passe — UniPortail',
-    text:
-      `Bonjour ${user.prenom},\n\n` +
-      `Une réinitialisation de mot de passe a été demandée avec votre matricule (${user.matricule}).\n` +
-      `Pour choisir un nouveau mot de passe, ouvrez ce lien (valide 1 h) :\n${url}\n\n` +
-      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.`,
-    html:
-      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
-      `<p>Une réinitialisation de mot de passe a été demandée avec votre matricule (${escapeHtml(user.matricule)}).</p>` +
-      `<p><a href="${url}">Choisir un nouveau mot de passe</a> (lien valide 1 h)</p>` +
-      `<p style="font-size:12px;color:#64748b;">Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>`,
-  });
+  const issued = issuePasswordResetCode(user);
+  await sendResetCodeEmail(user, issued.code);
 
   logSecurityEvent(req, 'auth_reset_matricule_email_sent', { user_id: user.id }, 'info');
   res.json(generic);
@@ -668,6 +681,7 @@ router.post('/verifier-email', verifyEmailLimiter, async (req, res) => {
 
   const updated = db.get('utilisateurs').find({ id: user.id }).value();
   clearAccountLockOnSuccess(user.id);
+  sendAccountActivatedEmail(updated).catch(() => {});
   res.json({
     message: 'Adresse e-mail confirmée. Vous êtes connecté.',
     ...buildAuthTokensResponse(updated, req),
@@ -717,227 +731,62 @@ router.post('/renvoyer-email-verification', resendVerifyLimiter, async (req, res
   });
 });
 
-// POST /api/auth/mot-de-passe-oublie-email — envoi lien (étudiants)
+// POST /api/auth/mot-de-passe-oublie-email — envoi d’un code à usage unique
 router.post('/mot-de-passe-oublie-email', forgotEmailLimiter, async (req, res) => {
   const emailNorm = normalizeEmail(String(req.body?.email || ''));
   const generic = {
     message:
-      'Si un compte étudiant existe avec cette adresse, un e-mail de réinitialisation vient d’être envoyé.',
+      'Si un compte existe avec cette adresse, un code de réinitialisation vient d’être envoyé. Il est valable 15 minutes et ne peut être utilisé qu’une seule fois.',
   };
-  if (!passwordResetEmailEnabled() || !emailNorm) {
-    return res.json(generic);
+  if (!emailNorm) {
+    return res.status(400).json({ message: 'Indiquez l’adresse e-mail de votre compte.' });
+  }
+  if (!passwordResetEmailEnabled()) {
+    return res.status(503).json({
+      code: 'EMAIL_RESET_DISABLED',
+      message: 'L’envoi d’e-mails n’est pas disponible pour le moment. Contactez votre établissement.',
+    });
   }
 
-  const user = db.get('utilisateurs').find({ email: emailNorm }).value();
-  if (!user || user.role !== 'etudiant' || user.actif === false) {
-    return res.json(generic);
+  const user = findUserByEmail(emailNorm);
+  if (user && user.actif !== false && user.email) {
+    const issued = issuePasswordResetCode(user);
+    await sendResetCodeEmail(user, issued.code);
   }
-
-  const tok = newSecureToken();
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    password_reset_token: tok,
-    password_reset_expires: Date.now() + 60 * 60 * 1000,
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const url = `${publicAppUrl()}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(tok)}`;
-  await sendMail({
-    to: emailNorm,
-    subject: 'Réinitialisation de votre mot de passe — UniPortail',
-    text:
-      `Bonjour ${user.prenom},\n\n` +
-      `Pour choisir un nouveau mot de passe, ouvrez ce lien (valide 1 h) :\n${url}\n\n` +
-      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.`,
-    html:
-      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
-      `<p><a href="${url}">Choisir un nouveau mot de passe</a> (lien valide 1 h)</p>` +
-      `<p style="font-size:12px;color:#64748b;">Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>`,
-  });
 
   res.json(generic);
 });
 
-// POST /api/auth/reinitialiser-mot-de-passe-email
-router.post('/reinitialiser-mot-de-passe-email', resetEmailApplyLimiter, (req, res) => {
-  const token = String(req.body?.token || '').trim();
-  const { nouveau_mot_de_passe, confirmation } = req.body;
-  if (!token || !nouveau_mot_de_passe || !confirmation) {
-    return res.status(400).json({ message: 'Token, nouveau mot de passe et confirmation requis.' });
-  }
-  if (nouveau_mot_de_passe !== confirmation) {
-    return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
-  }
-  const vp = validatePasswordPolicy(nouveau_mot_de_passe);
-  if (!vp.ok) {
-    return res.status(400).json({ message: vp.message, code: 'PASSWORD_POLICY' });
-  }
-
-  const user = (db.get('utilisateurs').value() || []).find((u) => u.password_reset_token === token);
-  if (!user || user.role !== 'etudiant') {
-    logSecurityEvent(req, 'auth_reset_email_bad_token', {}, 'warning');
-    return res.status(400).json({ message: 'Lien invalide ou expiré.' });
-  }
-  if (!user.password_reset_expires || Date.now() > user.password_reset_expires) {
-    return res.status(400).json({ message: 'Lien expiré. Demandez une nouvelle réinitialisation.' });
-  }
-
+function applyNewPasswordAndLogin(req, res, user, nouveau_mot_de_passe) {
   const hash = bcrypt.hashSync(nouveau_mot_de_passe, 10);
   db.get('utilisateurs').find({ id: user.id }).assign({
     mot_de_passe: hash,
     password_reset_token: null,
+    password_reset_code_hash: null,
     password_reset_expires: null,
     must_change_password: false,
     password_changed_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).write();
-
+  invalidateResetCode(user.id);
   const updated = db.get('utilisateurs').find({ id: user.id }).value();
   clearAccountLockOnSuccess(user.id);
   revokeAllRefreshTokensForUser(updated.id);
-  res.json({
+  sendAccountActivatedEmail(updated).catch(() => {});
+  return res.json({
     message: 'Mot de passe mis à jour. Vous êtes connecté.',
     ...buildAuthTokensResponse(updated, req),
   });
-});
+}
 
-// GET /api/auth/options-public — pour le front (affichage liens)
-router.get('/options-public', (req, res) => {
-  res.json({
-    email_verification_enabled: emailVerificationEnabled(),
-    password_reset_email_enabled: passwordResetEmailEnabled(),
-    smtp_configured: isSmtpConfigured(),
-  });
-});
-
-// POST /api/auth/verifier-email — lien reçu par e-mail
-router.post('/verifier-email', async (req, res) => {
+// POST /api/auth/reinitialiser-mot-de-passe-email — code (ou ancien lien token)
+router.post('/reinitialiser-mot-de-passe-email', resetEmailApplyLimiter, (req, res) => {
   const token = String(req.body?.token || '').trim();
-  if (!token) return res.status(400).json({ message: 'Lien invalide (token manquant).' });
-
-  const user = (db.get('utilisateurs').value() || []).find((u) => u.email_verify_token === token);
-  if (!user) {
-    return res.status(400).json({ message: 'Lien invalide ou déjà utilisé.' });
-  }
-  if (user.email_verify_expires && Date.now() > user.email_verify_expires) {
-    return res.status(400).json({
-      code: 'VERIFY_EXPIRED',
-      message: 'Ce lien a expiré. Demandez un nouvel e-mail de confirmation depuis la page de connexion.',
-    });
-  }
-
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    email_verified_at: new Date().toISOString(),
-    email_verify_token: null,
-    email_verify_expires: null,
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const updated = db.get('utilisateurs').find({ id: user.id }).value();
-  clearAccountLockOnSuccess(user.id);
-  const { token: jwt } = signPayload({
-    id: updated.id,
-    email: updated.email,
-    role: updated.role,
-    nom: updated.nom,
-    prenom: updated.prenom,
-    etablissement_id: updated.etablissement_id || null,
-  });
-  res.json({
-    message: 'Adresse e-mail confirmée. Vous êtes connecté.',
-    token: jwt,
-    utilisateur: buildPublicUserPayload(updated, req),
-  });
-});
-
-// POST /api/auth/renvoyer-email-verification
-router.post('/renvoyer-email-verification', resendVerifyLimiter, async (req, res) => {
   const emailNorm = normalizeEmail(String(req.body?.email || ''));
-  if (!emailNorm) {
-    return res.status(400).json({ message: 'Adresse e-mail requise.' });
-  }
-  const user = db.get('utilisateurs').find({ email: emailNorm }).value();
-  if (!user || user.role !== 'etudiant') {
-    return res.json({
-      message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
-    });
-  }
-  if (user.email_verified_at || !user.email_verify_token) {
-    return res.json({
-      message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
-    });
-  }
-
-  const tok = newSecureToken();
-  const exp = Date.now() + 48 * 60 * 60 * 1000;
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    email_verify_token: tok,
-    email_verify_expires: exp,
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const url = `${publicAppUrl()}/verifier-email?token=${encodeURIComponent(tok)}`;
-  await sendMail({
-    to: emailNorm,
-    subject: 'Confirmez votre adresse e-mail — UniPortail',
-    text:
-      `Bonjour ${user.prenom},\n\nPour activer votre compte :\n${url}\n\nLe lien expire dans 48 heures.`,
-    html:
-      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
-      `<p><a href="${url}">Confirmer mon e-mail</a></p>` +
-      `<p style="font-size:12px;color:#64748b;">Expire dans 48 h.</p>`,
-  });
-
-  res.json({
-    message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
-  });
-});
-
-// POST /api/auth/mot-de-passe-oublie-email — envoi lien (étudiants)
-router.post('/mot-de-passe-oublie-email', forgotEmailLimiter, async (req, res) => {
-  const emailNorm = normalizeEmail(String(req.body?.email || ''));
-  const generic = {
-    message:
-      'Si un compte étudiant existe avec cette adresse, un e-mail de réinitialisation vient d’être envoyé.',
-  };
-  if (!passwordResetEmailEnabled() || !emailNorm) {
-    return res.json(generic);
-  }
-
-  const user = db.get('utilisateurs').find({ email: emailNorm }).value();
-  if (!user || user.role !== 'etudiant' || user.actif === false) {
-    return res.json(generic);
-  }
-
-  const tok = newSecureToken();
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    password_reset_token: tok,
-    password_reset_expires: Date.now() + 60 * 60 * 1000,
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const url = `${publicAppUrl()}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(tok)}`;
-  await sendMail({
-    to: emailNorm,
-    subject: 'Réinitialisation de votre mot de passe — UniPortail',
-    text:
-      `Bonjour ${user.prenom},\n\n` +
-      `Pour choisir un nouveau mot de passe, ouvrez ce lien (valide 1 h) :\n${url}\n\n` +
-      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.`,
-    html:
-      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
-      `<p><a href="${url}">Choisir un nouveau mot de passe</a> (lien valide 1 h)</p>` +
-      `<p style="font-size:12px;color:#64748b;">Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>`,
-  });
-
-  res.json(generic);
-});
-
-// POST /api/auth/reinitialiser-mot-de-passe-email
-router.post('/reinitialiser-mot-de-passe-email', (req, res) => {
-  const token = String(req.body?.token || '').trim();
+  const codeRaw = String(req.body?.code || '').replace(/\s/g, '');
   const { nouveau_mot_de_passe, confirmation } = req.body;
-  if (!token || !nouveau_mot_de_passe || !confirmation) {
-    return res.status(400).json({ message: 'Token, nouveau mot de passe et confirmation requis.' });
+  if (!nouveau_mot_de_passe || !confirmation) {
+    return res.status(400).json({ message: 'Nouveau mot de passe et confirmation requis.' });
   }
   if (nouveau_mot_de_passe !== confirmation) {
     return res.status(400).json({ message: 'Les mots de passe ne correspondent pas.' });
@@ -947,40 +796,30 @@ router.post('/reinitialiser-mot-de-passe-email', (req, res) => {
     return res.status(400).json({ message: vp.message, code: 'PASSWORD_POLICY' });
   }
 
+  if (emailNorm && codeRaw) {
+    const checked = consumeValidResetCode(emailNorm, codeRaw);
+    if (!checked.ok) {
+      logSecurityEvent(req, 'auth_reset_email_bad_code', { code: checked.code }, 'warning');
+      return res.status(400).json({ code: checked.code, message: checked.message });
+    }
+    return applyNewPasswordAndLogin(req, res, checked.user, nouveau_mot_de_passe);
+  }
+
+  if (!token) {
+    return res.status(400).json({
+      message: 'Saisissez l’e-mail du compte et le code reçu, puis le nouveau mot de passe.',
+    });
+  }
+
   const user = (db.get('utilisateurs').value() || []).find((u) => u.password_reset_token === token);
-  if (!user || user.role !== 'etudiant') {
+  if (!user) {
     logSecurityEvent(req, 'auth_reset_email_bad_token', {}, 'warning');
-    return res.status(400).json({ message: 'Lien invalide ou expiré.' });
+    return res.status(400).json({ message: 'Code ou lien invalide.' });
   }
   if (!user.password_reset_expires || Date.now() > user.password_reset_expires) {
-    return res.status(400).json({ message: 'Lien expiré. Demandez une nouvelle réinitialisation.' });
+    return res.status(400).json({ code: 'EXPIRED', message: 'Ce code a expiré. Demandez un nouveau code.' });
   }
-
-  const hash = bcrypt.hashSync(nouveau_mot_de_passe, 10);
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    mot_de_passe: hash,
-    password_reset_token: null,
-    password_reset_expires: null,
-    must_change_password: false,
-    password_changed_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const updated = db.get('utilisateurs').find({ id: user.id }).value();
-  clearAccountLockOnSuccess(user.id);
-  const { token: jwt } = signPayload({
-    id: updated.id,
-    email: updated.email,
-    role: updated.role,
-    nom: updated.nom,
-    prenom: updated.prenom,
-    etablissement_id: updated.etablissement_id || null,
-  });
-  res.json({
-    message: 'Mot de passe mis à jour. Vous êtes connecté.',
-    token: jwt,
-    utilisateur: buildPublicUserPayload(updated, req),
-  });
+  return applyNewPasswordAndLogin(req, res, user, nouveau_mot_de_passe);
 });
 
 // GET /api/auth/options-public — pour le front (affichage liens)
@@ -1059,6 +898,8 @@ router.put('/profil', authMiddleware, (req, res) => {
   const telephone = trimStr(req.body?.telephone);
   const adresse = trimStr(req.body?.adresse);
   const date_naissance = req.body?.date_naissance != null ? String(req.body.date_naissance).trim() || null : undefined;
+  const service = req.body?.service != null ? String(req.body.service).trim() : undefined;
+  const fonction = req.body?.fonction != null ? String(req.body.fonction).trim() : undefined;
 
   if (!prenom || !nom) {
     return res.status(400).json({ message: 'Prénom et nom sont obligatoires.' });
@@ -1078,12 +919,115 @@ router.put('/profil', authMiddleware, (req, res) => {
     updated_at: new Date().toISOString(),
   };
   if (date_naissance !== undefined) patch.date_naissance = date_naissance;
+  if (service !== undefined) patch.service = service;
+  if (fonction !== undefined) patch.fonction = fonction;
+
+  const { staffNeedsProfileCompletion } = require('../utils/staffProfile');
+  const merged = { ...user, ...patch };
+  if (!staffNeedsProfileCompletion(merged)) {
+    patch.must_complete_profile = false;
+  }
 
   db.get('utilisateurs').find({ id: user.id }).assign(patch).write();
   const updated = db.get('utilisateurs').find({ id: user.id }).value();
   return res.json({
     message: 'Profil mis à jour.',
     utilisateur: buildMeResponse(updated, req),
+  });
+});
+
+// ─── Activation : complétion profil staff (naissance + photo) ────────────────
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+
+const profilePhotoDir = path.join(__dirname, '..', 'uploads', 'profils');
+if (!fs.existsSync(profilePhotoDir)) fs.mkdirSync(profilePhotoDir, { recursive: true });
+
+const profilePhotoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, profilePhotoDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+      const safe = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext) ? ext : '.jpg';
+      cb(null, `u${req.user.id}-${Date.now()}${safe}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!String(file.mimetype || '').startsWith('image/')) {
+      return cb(new Error('Fichier image requis.'));
+    }
+    cb(null, true);
+  },
+});
+
+// POST /api/auth/profil/photo — photo de profil (optionnelle, Mon profil)
+router.post('/profil/photo', authMiddleware, (req, res) => {
+  profilePhotoUpload.single('photo')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ message: err.message || 'Upload impossible.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: 'Fichier photo requis (champ « photo »).' });
+    }
+    const user = db.get('utilisateurs').find({ id: req.user.id }).value();
+    if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+
+    const rel = `/uploads/profils/${req.file.filename}`;
+    db.get('utilisateurs').find({ id: user.id }).assign({
+      photo_url: rel,
+      must_complete_profile: false,
+      updated_at: new Date().toISOString(),
+    }).write();
+    const updated = db.get('utilisateurs').find({ id: user.id }).value();
+    return res.json({
+      message: 'Photo de profil enregistrée.',
+      photo_url: publicAssetUrl(req, rel),
+      utilisateur: buildMeResponse(updated, req),
+    });
+  });
+});
+
+// Alias historique
+router.post('/completer-profil-staff/photo', authMiddleware, (req, res) => {
+  profilePhotoUpload.single('photo')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ message: err.message || 'Upload impossible.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: 'Fichier photo requis (champ « photo »).' });
+    }
+    const user = db.get('utilisateurs').find({ id: req.user.id }).value();
+    if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+    const rel = `/uploads/profils/${req.file.filename}`;
+    db.get('utilisateurs').find({ id: user.id }).assign({
+      photo_url: rel,
+      must_complete_profile: false,
+      updated_at: new Date().toISOString(),
+    }).write();
+    const updated = db.get('utilisateurs').find({ id: user.id }).value();
+    return res.json({
+      message: 'Photo de profil enregistrée.',
+      photo_url: publicAssetUrl(req, rel),
+      utilisateur: buildMeResponse(updated, req),
+    });
+  });
+});
+
+// POST /api/auth/completer-profil-staff — obsolète : n’impose plus naissance/photo
+router.post('/completer-profil-staff', authMiddleware, (req, res) => {
+  const user = db.get('utilisateurs').find({ id: req.user.id }).value();
+  if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+  db.get('utilisateurs').find({ id: user.id }).assign({
+    must_complete_profile: false,
+    updated_at: new Date().toISOString(),
+  }).write();
+  const updated = db.get('utilisateurs').find({ id: user.id }).value();
+  return res.json({
+    message: 'Vous pouvez accéder à la plateforme. Complétez votre profil depuis Mon profil si vous le souhaitez.',
+    utilisateur: buildMeResponse(updated, req),
+    ...buildAuthTokensResponse(updated, req),
   });
 });
 
@@ -1117,6 +1061,75 @@ router.put('/mot-de-passe', authMiddleware, (req, res) => {
   }).write();
   revokeAllRefreshTokensForUser(user.id);
   return res.json({ message: 'Mot de passe mis à jour. Reconnectez-vous sur les autres appareils si besoin.' });
+});
+
+const {
+  exportForUser,
+  getBackupEndpointsForUser,
+  getManifestForRole,
+  restoreUserProfileData,
+} = require('../utils/userDataExport');
+const { logAudit } = require('../utils/auditLog');
+const {
+  buildUserDataZip,
+  sendZipDownload,
+  handleBackupUpload,
+  isRestoreConfirmed,
+  parseUploadedBackupZip,
+} = require('../utils/backupZip');
+
+// GET /api/auth/mes-donnees/manifest — périmètre export/restauration selon le rôle
+router.get('/mes-donnees/manifest', authMiddleware, (req, res) => {
+  return res.json(getBackupEndpointsForUser(req.user));
+});
+
+// GET /api/auth/mes-donnees/export — archive ZIP
+router.get('/mes-donnees/export', authMiddleware, (req, res) => {
+  if (req.user.role === 'admin') {
+    return res.status(400).json({
+      message: 'Utilisez Maintenance ou GET /api/admin/backup/export pour une sauvegarde complète.',
+    });
+  }
+  const data = exportForUser(req.user);
+  if (!data) return res.status(404).json({ message: 'Rien à exporter.' });
+  const manifest = getManifestForRole(req.user.role);
+  const { buffer, filename } = buildUserDataZip(data, {
+    included: manifest.included,
+    excluded: manifest.excluded,
+  });
+  logAudit(req, 'export_donnees_utilisateur', 'utilisateur', req.user.id, {
+    export_type: data._exportType,
+    scope: req.user.role,
+    format: 'zip',
+    filename,
+  });
+  return sendZipDownload(res, buffer, filename);
+});
+
+// POST /api/auth/mes-donnees/restore — restauration depuis ZIP
+router.post('/mes-donnees/restore', authMiddleware, handleBackupUpload('backup'), (req, res) => {
+  if (req.user.role === 'admin' || req.user.role === 'admin_etablissement') {
+    return res.status(400).json({
+      message: 'Utilisez la restauration établissement (page Équipe) ou plateforme (Maintenance).',
+    });
+  }
+  if (!isRestoreConfirmed(req.body)) {
+    return res.status(400).json({ message: 'Confirmation requise (confirm=true).' });
+  }
+  try {
+    const parsed = parseUploadedBackupZip(req.file.buffer);
+    if (parsed.kind !== 'donnees') {
+      return res.status(400).json({ message: 'ZIP utilisateur attendu (donnees.json).' });
+    }
+    const result = restoreUserProfileData(req.user, parsed.payload);
+    logAudit(req, 'restauration_profil_utilisateur', 'utilisateur', req.user.id, {
+      pre_backup: result.preBackup,
+      format: 'zip',
+    });
+    return res.json({ message: result.message, pre_backup: result.preBackup });
+  } catch (e) {
+    return res.status(400).json({ message: e.message });
+  }
 });
 
 module.exports = router;

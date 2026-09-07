@@ -1,16 +1,25 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
+import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
 import DocumentDownloadBar from '../components/DocumentDownloadBar'
-const fmtDate = (d) =>
-  new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+import { getRoleHome } from '../utils/smartBack'
+
+const STAFF_EMAIL_ROLES = [
+  'admin', 'admin_etablissement', 'responsable', 'responsable_fad',
+  'agent_fad', 'comptable', 'agent_admin', 'controleur_qualite',
+]
+
+const fmtDate = (d) => {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+}
 
 /**
- * Lettre de préinscription — modèle unique, administratif et professionnel.
- * Alimentée par les données du dossier / établissement / formation.
+ * Lettre de préinscription — vraie lettre administrative A4 (pas une fiche dashboard).
  */
 export default function LettrePreinscription() {
   const { dossierId } = useParams()
@@ -19,6 +28,7 @@ export default function LettrePreinscription() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const documentRef = useRef(null)
+
   useEffect(() => {
     if (authLoading) return
     setLoading(true)
@@ -31,9 +41,8 @@ export default function LettrePreinscription() {
       .catch((err) => {
         const msg = err.response?.data?.message
         if (msg) setError(msg)
-        else if (err.code === 'ERR_NETWORK') {
-          setError('Impossible de joindre l’API. Vérifiez que le backend est démarré.')
-        } else setError(err.message || 'Erreur de chargement')
+        else if (err.code === 'ERR_NETWORK') setError("Impossible de joindre l'API.")
+        else setError(err.message || 'Erreur de chargement')
       })
       .finally(() => setLoading(false))
   }, [dossierId, user?.role, authLoading])
@@ -63,8 +72,8 @@ export default function LettrePreinscription() {
       <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <h2 className="text-lg font-bold text-slate-900">Lettre indisponible</h2>
-          <p className="mt-2 text-sm text-slate-500">{error || 'Données incompletes.'}</p>
-          <Link to="/dashboard" className="btn-primary mt-6 inline-block">Retour</Link>
+          <p className="mt-2 text-sm text-slate-500">{error || 'Données incomplètes.'}</p>
+          <Link to={getRoleHome(user?.role)} className="btn-primary mt-6 inline-block">Retour</Link>
         </div>
       </div>
     )
@@ -72,74 +81,130 @@ export default function LettrePreinscription() {
 
   const { dossier, formation, etablissement: etab, lettre_extensions: ext = {} } = data
   const etudiant = data.etudiant || {}
-  const logoSrc = mediaUrl(etab?.logo_url)
   const photoSrc = mediaUrl(data.photo_url)
+  const logoSrc = mediaUrl(etab?.logo_url)
   const year = new Date().getFullYear()
   const refLettre = ext.reference_lettre || `LPI-${year}-${String(dossier.id).padStart(5, '0')}`
   const formationTitre = formation?.titre || dossier?.filiere || '—'
   const typeLabel = dossier.type_formation === 'en_ligne' || formation?.type === 'en_ligne'
-    ? 'Formation à distance (FAD)'
-    : 'Formation en présentiel'
+    ? 'formation à distance (FAD)'
+    : 'formation en présentiel'
   const annee = dossier.annee_academique || `${year}-${year + 1}`
-  const ville = etab?.adresse?.split(',').pop()?.trim() || 'Dakar'
+  const ville = etab?.ville || etab?.adresse?.split(',').pop()?.trim() || 'Dakar'
   const prenom = (etudiant.prenom || dossier.prenom || '').trim()
   const nom = (etudiant.nom || dossier.nom || '').trim().toUpperCase()
+  const dateNaissance = dossier.date_naissance || etudiant.date_naissance || null
+  const lieuNaissance = dossier.lieu_naissance || etudiant.lieu_naissance || null
+  const nin = dossier.numero_piece || dossier.numero_passeport || ext.numero_passeport || etudiant.numero_piece || null
+  const adresse = dossier.adresse || etudiant.adresse || null
+  const paysOrigine = dossier.pays_origine || dossier.pays_residence || dossier.nationalite || etudiant.nationalite || null
+  const email = etudiant.email || dossier.email || null
+  const primary = etab?.couleur_primaire || '#1e3a8a'
+  const secondary = etab?.couleur_secondaire || '#0f172a'
+  const niveau = ext.niveau || formation?.niveau
+
+  const identityLines = [
+    ['Nom complet', `${prenom} ${nom}`],
+    dateNaissance && ['Date de naissance', `${fmtDate(dateNaissance)}${lieuNaissance ? ` — ${lieuNaissance}` : ''}`],
+    nin && ['NIN / Passeport', nin],
+    email && ['Courriel', email],
+    adresse && ['Adresse', adresse],
+    paysOrigine && ['Nationalité / Pays', paysOrigine],
+  ].filter(Boolean)
+
+  const formationLines = [
+    ['Formation', formationTitre],
+    niveau && ['Niveau', niveau],
+    ['Modalité', typeLabel],
+    ['Année académique', annee],
+    formation?.duree && ['Durée', formation.duree],
+  ].filter(Boolean)
 
   return (
-    <div className="lettre-print-scope min-h-screen bg-slate-200 px-4 py-8">
+    <div className="lettre-print-scope min-h-screen bg-slate-200 px-3 py-6 sm:px-4 sm:py-8">
       <DocumentDownloadBar
         documentRef={documentRef}
         filename={`${refLettre}.pdf`}
+        primaryColor={primary}
+        backFallback={getRoleHome(user?.role)}
+        onSendEmail={
+          STAFF_EMAIL_ROLES.includes(user?.role)
+            ? async () => {
+                const { data: res } = await axios.post(`/api/responsable/dossiers/${dossierId}/envoyer-lettre-email`)
+                toast.success(res.message || 'Lettre envoyée par e-mail.')
+              }
+            : undefined
+        }
       />
+
+      <div className="a4-preview-stage">
       <article
         ref={documentRef}
-        className="print-page mx-auto max-w-[210mm] bg-white px-10 py-10 text-[13px] leading-relaxed text-slate-800 shadow-xl sm:px-14 sm:py-12"
+        className="a4-sheet a4-sheet--single print-page relative flex flex-col bg-white text-[11px] leading-[1.45] text-slate-800 shadow-xl"
       >
-        {/* En-tête établissement */}
-        <header className="lettre-print-header-root flex items-start justify-between gap-6 border-b-2 border-slate-800 pb-5">
-          <div className="flex min-w-0 items-start gap-4">
-            {logoSrc ? (
-              <img src={logoSrc} alt="" className="h-16 w-16 shrink-0 object-contain" />
+        <header className="relative border-b border-slate-300 px-[14mm] pb-2.5 pt-[9mm]">
+          <div className="absolute right-[14mm] top-[9mm] border border-slate-400 bg-white p-[1px]">
+            {photoSrc ? (
+              <img src={photoSrc} alt="Photo du candidat" className="h-[22mm] w-[17mm] object-cover" />
             ) : (
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded border border-slate-300 bg-slate-50 text-sm font-bold text-slate-600">
+              <div className="flex h-[22mm] w-[17mm] items-center justify-center bg-slate-50 text-[7px] text-slate-400">
+                Photo
+              </div>
+            )}
+          </div>
+
+          <div className="mx-auto flex max-w-[130mm] flex-col items-center pr-[22mm] text-center">
+            {logoSrc ? (
+              <img src={logoSrc} alt="" className="mb-1 h-[12mm] w-[12mm] object-contain" />
+            ) : (
+              <div
+                className="mb-1 flex h-[11mm] w-[11mm] items-center justify-center text-[10px] font-bold text-white"
+                style={{ background: primary }}
+              >
                 {(etab?.nom || 'ET').slice(0, 2).toUpperCase()}
               </div>
             )}
-            <div className="min-w-0">
-              <p className="text-base font-bold uppercase tracking-wide text-slate-900">
-                {etab?.nom || 'Établissement'}
+            <p
+              className="text-[11.5px] font-bold uppercase tracking-[0.1em]"
+              style={{ color: primary }}
+            >
+              {etab?.nom || 'Établissement'}
+            </p>
+            {etab?.description && (
+              <p className="mt-0.5 line-clamp-2 text-[8px] italic text-slate-500">{etab.description}</p>
+            )}
+            <div className="mt-1 space-y-0 text-[8px] leading-snug text-slate-600">
+              {etab?.adresse && <p>{etab.adresse}</p>}
+              <p>
+                {[etab?.telephone && `Tél. ${etab.telephone}`, etab?.email_contact].filter(Boolean).join(' · ')}
               </p>
-              <div className="mt-1 space-y-0.5 text-[11px] text-slate-600">
-                {etab?.adresse && <p>{etab.adresse}</p>}
-                {(etab?.telephone || etab?.email_contact) && (
-                  <p>
-                    {[etab.telephone && `Tél. ${etab.telephone}`, etab.email_contact].filter(Boolean).join(' · ')}
-                  </p>
-                )}
-                {(etab?.ninea || etab?.site_web) && (
-                  <p>
-                    {[etab.ninea && `NINEA ${etab.ninea}`, etab.site_web].filter(Boolean).join(' · ')}
-                  </p>
-                )}
-              </div>
+              {(etab?.ninea || etab?.rc || etab?.arrete) && (
+                <p className="text-[7.5px] text-slate-500">
+                  {[
+                    etab.ninea && `NINEA ${etab.ninea}`,
+                    etab.rc && `RC ${etab.rc}`,
+                    etab.arrete && `Arrêté : ${etab.arrete}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' — ')}
+                </p>
+              )}
             </div>
           </div>
-          {photoSrc && (
-            <img
-              src={photoSrc}
-              alt=""
-              className="h-24 w-20 shrink-0 object-cover border border-slate-300"
-            />
-          )}
         </header>
 
-        {/* Références + lieu/date */}
-        <div className="mt-6 flex flex-wrap items-start justify-between gap-4 text-[12px]">
+        <div className="flex justify-between gap-4 px-[14mm] pt-2.5 text-[10px]">
           <div className="space-y-0.5">
-            <p><span className="text-slate-500">Référence :</span> <strong className="font-mono">{refLettre}</strong></p>
-            <p><span className="text-slate-500">N° dossier :</span> <strong className="font-mono">{dossier.numero_dossier}</strong></p>
+            <p>
+              N/Réf. : <strong className="font-mono">{refLettre}</strong>
+            </p>
+            <p>
+              Dossier : <strong className="font-mono">{dossier.numero_dossier}</strong>
+            </p>
             {ext.matricule_candidat && (
-              <p><span className="text-slate-500">Matricule :</span> <strong className="font-mono">{ext.matricule_candidat}</strong></p>
+              <p>
+                Matricule : <strong className="font-mono">{ext.matricule_candidat}</strong>
+              </p>
             )}
           </div>
           <p className="text-right">
@@ -147,134 +212,107 @@ export default function LettrePreinscription() {
           </p>
         </div>
 
-        {/* Titre */}
-        <h1 className="mt-8 text-center text-lg font-bold uppercase tracking-[0.12em] text-slate-900 underline decoration-slate-800 underline-offset-4">
+        <h1
+          className="mx-[14mm] mt-3 border-b pb-1 text-center text-[11.5px] font-bold uppercase tracking-[0.14em]"
+          style={{ color: secondary, borderColor: primary }}
+        >
           Lettre de préinscription
         </h1>
 
-        {/* Destinataire */}
-        <div className="mt-8">
-          <p className="font-semibold">
-            Madame, Monsieur {prenom} {nom},
+        <div className="flex flex-1 flex-col px-[14mm] py-2.5">
+          <p className="font-semibold text-[11px]">Madame, Monsieur {prenom} {nom},</p>
+
+          <p className="mt-2 text-[10.5px]">
+            <span className="font-semibold">Objet :</span> Confirmation de préinscription — {formationTitre} — année
+            académique {annee}
           </p>
-        </div>
 
-        {/* Objet */}
-        <p className="mt-5">
-          <span className="font-semibold">Objet :</span>{' '}
-          Confirmation de préinscription — {formationTitre} — année académique {annee}
-        </p>
-
-        {/* Corps */}
-        <div className="mt-6 space-y-4 text-justify">
-          <p>
-            Nous avons le plaisir de vous informer que votre demande de préinscription pour
-            l’année académique <strong>{annee}</strong> a été <strong>acceptée</strong> par
-            notre commission pédagogique.
-          </p>
-          <p>
-            Vous êtes ainsi préinscrit(e) à la formation <strong>{formationTitre}</strong>
-            {' '}({typeLabel})
-            {formation?.duree ? <>, pour une durée de <strong>{formation.duree}</strong></> : null}.
-          </p>
-          <p>
-            Cette lettre confirme votre place sous réserve de la finalisation administrative
-            et financière de votre inscription, conformément au règlement de l’établissement.
-            Les modalités de paiement figurent sur la facture proforma qui vous a été
-            (ou sera) communiquée.
-          </p>
-        </div>
-
-        {/* Tableau récapitulatif simple */}
-        <table className="mt-8 w-full border-collapse border border-slate-300 text-[12px]">
-          <tbody>
-            <tr className="border-b border-slate-300">
-              <td className="w-1/3 bg-slate-50 px-3 py-2 font-semibold text-slate-600">Candidat</td>
-              <td className="px-3 py-2 font-medium">{prenom} {nom}</td>
-            </tr>
-            <tr className="border-b border-slate-300">
-              <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Courriel</td>
-              <td className="px-3 py-2">{etudiant.email || dossier.email || '—'}</td>
-            </tr>
-            {dossier.date_naissance && (
-              <tr className="border-b border-slate-300">
-                <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Date de naissance</td>
-                <td className="px-3 py-2">{fmtDate(dossier.date_naissance)}</td>
-              </tr>
-            )}
-            {ext.numero_passeport && (
-              <tr className="border-b border-slate-300">
-                <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Passeport / pièce</td>
-                <td className="px-3 py-2 font-mono">{ext.numero_passeport}</td>
-              </tr>
-            )}
-            {(ext.nationalite || dossier.nationalite) && (
-              <tr className="border-b border-slate-300">
-                <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Nationalité</td>
-                <td className="px-3 py-2">{ext.nationalite || dossier.nationalite}</td>
-              </tr>
-            )}
-            <tr className="border-b border-slate-300">
-              <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Formation</td>
-              <td className="px-3 py-2 font-medium">{formationTitre}</td>
-            </tr>
-            {(ext.niveau || formation?.niveau) && (
-              <tr className="border-b border-slate-300">
-                <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Niveau</td>
-                <td className="px-3 py-2">{ext.niveau || formation?.niveau}</td>
-              </tr>
-            )}
-            <tr className="border-b border-slate-300">
-              <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Type</td>
-              <td className="px-3 py-2">{typeLabel}</td>
-            </tr>
-            <tr>
-              <td className="bg-slate-50 px-3 py-2 font-semibold text-slate-600">Année académique</td>
-              <td className="px-3 py-2">{annee}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* Formalités */}
-        <div className="mt-6">
-          <p className="font-semibold">Formalités à accomplir :</p>
-          <ol className="mt-2 list-decimal space-y-1 pl-5">
-            <li>Régler les frais selon la facture proforma.</li>
-            <li>Déposer les pièces justificatives originales auprès du service scolarité.</li>
-            <li>Conserver la présente lettre jusqu’à l’inscription définitive.</li>
-          </ol>
-        </div>
-
-        <p className="mt-6">
-          Nous vous souhaitons la bienvenue au sein de notre établissement et restons
-          à votre disposition pour toute information complémentaire.
-        </p>
-
-        <p className="mt-4">
-          Veuillez agréer, Madame, Monsieur, l’expression de nos salutations distinguées.
-        </p>
-
-        {/* Signature */}
-        <div className="mt-10 flex justify-end">
-          <CachetScolarite cachetUrl={etab?.cachet_url} className="w-56" />
-        </div>
-
-        {/* Pied */}
-        <footer className="mt-12 border-t border-slate-300 pt-3 text-center text-[10px] text-slate-500">
-          <p>
-            Document émis électroniquement le {fmtDate(new Date())} · Réf. {refLettre}
-            {' '}· Ne constitue pas une inscription définitive.
-          </p>
-          {etab?.nom && (
-            <p className="mt-0.5">
-              {etab.nom}
-              {etab.email_contact || etab.telephone
-                ? ` · ${[etab.email_contact, etab.telephone].filter(Boolean).join(' · ')}`
-                : ''}
+          <div className="mt-2.5 space-y-2 text-justify text-[10.5px]">
+            <p>
+              Nous avons le plaisir de vous informer que votre demande de préinscription pour l&apos;année académique{' '}
+              <strong>{annee}</strong> a été <strong>acceptée</strong> par notre commission pédagogique.
             </p>
-          )}
+            <p>
+              Vous êtes ainsi préinscrit(e) à la formation <strong>{formationTitre}</strong>
+              {niveau ? <> ({niveau})</> : null}, en {typeLabel}
+              {formation?.duree ? (
+                <>
+                  , pour une durée de <strong>{formation.duree}</strong>
+                </>
+              ) : null}
+              .
+            </p>
+            {formation?.description ? (
+              <p className="text-[9.5px] text-slate-600">
+                <span className="font-semibold text-slate-700">Description :</span> {formation.description}
+              </p>
+            ) : null}
+            <p>
+              La présente lettre confirme votre place sous réserve de la finalisation administrative et financière de
+              votre inscription. Les modalités de paiement figurent sur la facture proforma qui vous a été ou vous sera
+              communiquée.
+            </p>
+          </div>
+
+          <div className="mt-3 border border-slate-300">
+            <p className="border-b border-slate-300 bg-slate-50 px-2.5 py-1 text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-600">
+              Récapitulatif
+            </p>
+            <div className="a4-grid-2 divide-x divide-slate-200 text-[9.5px]">
+              <div className="divide-y divide-slate-100">
+                {identityLines.map(([k, v]) => (
+                  <div key={k} className="flex gap-2 px-2.5 py-1">
+                    <span className="w-[26mm] shrink-0 text-slate-500">{k}</span>
+                    <span className="min-w-0 font-medium text-slate-900 break-words">{v}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="divide-y divide-slate-100">
+                {formationLines.map(([k, v]) => (
+                  <div key={k} className="flex gap-2 px-2.5 py-1">
+                    <span className="w-[26mm] shrink-0 capitalize text-slate-500">{k}</span>
+                    <span className="min-w-0 font-medium text-slate-900 break-words">{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-2.5">
+            <p className="font-semibold text-[10.5px]">Formalités à accomplir :</p>
+            <ol className="mt-0.5 list-decimal space-y-0.5 pl-5 text-[10px]">
+              <li>Régler les frais selon la facture proforma.</li>
+              <li>Déposer les pièces justificatives originales auprès du service de la scolarité.</li>
+              <li>Conserver la présente lettre jusqu&apos;à l&apos;inscription définitive.</li>
+            </ol>
+          </div>
+
+          <p className="mt-2.5 text-[10.5px]">
+            Nous vous souhaitons la bienvenue au sein de notre établissement et restons à votre disposition pour toute
+            information complémentaire.
+          </p>
+
+          <p className="mt-2 text-[10.5px]">
+            Veuillez agréer, Madame, Monsieur, l&apos;expression de nos salutations distinguées.
+          </p>
+
+          <div className="mt-4 flex justify-end">
+            <CachetScolarite cachetUrl={etab?.cachet_url} className="w-40" />
+          </div>
+        </div>
+
+        <footer className="mt-auto border-t border-slate-300 px-[14mm] py-1.5 text-center text-[7.5px] leading-snug text-slate-500">
+          <p>
+            Document émis électroniquement le {fmtDate(new Date())} · Réf. {refLettre} · Ne constitue pas une
+            inscription définitive.
+          </p>
+          <p className="mt-0.5">
+            {[etab?.nom, etab?.email_contact, etab?.telephone].filter(Boolean).join(' · ')}
+          </p>
         </footer>
+        <div className="h-[1.5px] w-full" style={{ background: primary }} />
       </article>
+      </div>
     </div>
   )
 }
