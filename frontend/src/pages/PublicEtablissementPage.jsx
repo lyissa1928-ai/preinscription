@@ -406,9 +406,9 @@ export default function PublicEtablissementPage() {
                         {f.nombre_annees > 0 && (
                           <p className="mt-1 text-xs text-gray-600">Durée : {f.nombre_annees} an(s)</p>
                         )}
-                        {f.description && <p className="mt-2 text-xs text-gray-500 line-clamp-3">{f.description}</p>}
+                        {f.description && <p className="mt-2 text-xs text-gray-500 whitespace-pre-wrap">{f.description}</p>}
                         {f.debouches && (
-                          <p className="mt-2 text-xs text-slate-600">
+                          <p className="mt-2 text-xs text-slate-600 whitespace-pre-wrap">
                             <span className="font-semibold text-slate-700">Débouchés :</span> {f.debouches}
                           </p>
                         )}

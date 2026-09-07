@@ -18,6 +18,7 @@ export default function FactureView() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [loadError, setLoadError] = useState(null)
+  const [avecCachet, setAvecCachet] = useState(true)
 
   useEffect(() => {
     setLoading(true)
@@ -124,6 +125,10 @@ export default function FactureView() {
   const eb = mergeEtab(facture.etablissement_snapshot || {}, etabLive)
   const primary = eb.couleur_primaire || '#1e40af'
   const { rows, totalAPayer } = buildDisplayRows(facture, fo)
+  const showCachet =
+    avecCachet &&
+    facture.facture_avec_cachet !== false &&
+    !!eb.cachet_url
 
   return (
     <div className="lettre-print-scope min-h-screen bg-slate-200 px-4 py-8">
@@ -133,6 +138,18 @@ export default function FactureView() {
         primaryColor={primary}
         backFallback={home}
       />
+
+      <div className="mx-auto mb-4 flex max-w-[210mm] flex-wrap items-center justify-end gap-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm">
+        <span className="font-semibold text-slate-700">Cachet sur le PDF :</span>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input type="radio" name="cachet_view" checked={avecCachet} onChange={() => setAvecCachet(true)} />
+          Avec cachet
+        </label>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input type="radio" name="cachet_view" checked={!avecCachet} onChange={() => setAvecCachet(false)} />
+          Sans cachet
+        </label>
+      </div>
 
       <div className="a4-preview-stage">
         <FactureDocument
@@ -159,6 +176,7 @@ export default function FactureView() {
           }}
           rows={rows}
           totalAPayer={totalAPayer}
+          showCachet={showCachet}
         />
       </div>
     </div>

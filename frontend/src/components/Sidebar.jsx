@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { mediaUrl } from '../utils/mediaUrl'
 import { actsAsResponsable } from '../utils/roles'
 import { getUserBrandColor, normalizeBrandColor } from '../utils/etabTheme'
+import NotificationsBell from './NotificationsBell'
 
 const BRAND_IMAGE = new URL('../../img/image-multisite.jpg', import.meta.url).href
 
@@ -60,7 +61,6 @@ const MENUS = {
       isActive: (loc) => loc.pathname === '/admin' && new URLSearchParams(loc.search).get('tab') !== 'conditions',
     },
     { label: 'Dossiers', to: '/admin/dossiers', icon: ICONS.dossiers },
-    { label: 'Demandes proforma', to: '/admin/proforma', icon: ICONS.demandesListe },
     { label: 'Établissements', to: '/admin/etablissements', icon: ICONS.etablissements },
     { label: 'Utilisateurs', to: '/admin/utilisateurs', icon: ICONS.users },
     { label: 'Niveaux d’étude', to: '/admin/niveaux-etude', icon: ICONS.pedago },
@@ -86,7 +86,6 @@ const MENUS = {
     },
     { label: 'Établissements', to: '/admin/etablissements', icon: ICONS.etablissements },
     { label: 'Dossiers', to: '/admin/dossiers', icon: ICONS.dossiers },
-    { label: 'Demandes proforma', to: '/admin/proforma', icon: ICONS.demandesListe },
     { label: 'Factures', to: '/admin/factures-etablissement', icon: ICONS.finance },
     { label: 'Rapports hebdo', to: '/admin/rapports-hebdo', icon: ICONS.stats },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
@@ -98,9 +97,8 @@ const MENUS = {
     { label: 'Équipe & comptes', to: '/mon-etablissement/equipe', icon: ICONS.users, exact: true },
     { label: 'Filières & formations', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
     { label: 'Dossiers & acceptation', to: '/responsable', icon: ICONS.dossiers },
-    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
-    { label: 'Guichet / factures', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
+    { label: 'Guichet', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Acceptés par formation', to: '/mon-etablissement/acceptes-par-formation', icon: ICONS.dossiers },
     { label: 'Rapports hebdo', to: '/mon-etablissement/rapports-hebdo', icon: ICONS.stats },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
@@ -117,11 +115,10 @@ const MENUS = {
         loc.pathname === '/responsable'
         && new URLSearchParams(loc.search).get('tab') !== 'conditions',
     },
-    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
     { label: 'Guichet', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Formations', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
-    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   responsable_fad: [
@@ -135,12 +132,11 @@ const MENUS = {
         loc.pathname === '/responsable'
         && new URLSearchParams(loc.search).get('tab') !== 'conditions',
     },
-    { label: 'Demandes proforma FAD', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
     { label: 'Guichet FAD', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Formations FAD', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
     { label: 'Agents FAD', to: '/responsable/agents-fad', icon: ICONS.users },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
-    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   agent_fad: [
@@ -154,33 +150,30 @@ const MENUS = {
         loc.pathname === '/responsable'
         && new URLSearchParams(loc.search).get('tab') !== 'conditions',
     },
-    { label: 'Demandes proforma FAD', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
     { label: 'Guichet FAD', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Formations FAD', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
-    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   agent_admin: [
     { label: 'Tableau de bord', to: '/agent-admin', icon: ICONS.dashboard, exact: true },
     { label: 'Guichet', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
-    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
-    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   comptable: [
     { label: 'Tableau de bord', to: '/comptable', icon: ICONS.dashboard, exact: true },
-    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
-    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.dossiers },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
   ],
   controleur_qualite: [
     { label: 'Tableau de bord', to: '/qualite', icon: ICONS.dashboard, exact: true },
-    { label: 'Demandes proforma', to: '/responsable/demandes-proforma', icon: ICONS.demandesListe },
+    { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Mon établissement', to: '/mon-etablissement', icon: ICONS.etablissements },
     { label: 'Mon profil', to: '/profil', icon: ICONS.identifiants },
@@ -310,19 +303,25 @@ export default function Sidebar() {
           </Link>
         )}
         {!isMobile && (
-          <button
-            onClick={() => setCollapsed(c => !c)}
-            className="ml-auto p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors flex-shrink-0"
-          >
-            <svg className={`w-4 h-4 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            </svg>
-          </button>
+          <div className="ml-auto flex items-center gap-1 flex-shrink-0">
+            {!collapsed && <NotificationsBell />}
+            <button
+              onClick={() => setCollapsed(c => !c)}
+              className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+            >
+              <svg className={`w-4 h-4 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
+          </div>
         )}
         {isMobile && (
-          <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10 text-white/70">
-            {ICONS.close}
-          </button>
+          <div className="ml-auto flex items-center gap-1">
+            <NotificationsBell />
+            <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10 text-white/70">
+              {ICONS.close}
+            </button>
+          </div>
         )}
       </div>
 
@@ -400,6 +399,7 @@ export default function Sidebar() {
           <span className="font-bold text-sm text-white">UniPortail</span>
         </Link>
         <div className="ml-auto flex items-center gap-2">
+          <NotificationsBell />
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs ${brand ? '' : cfg.badge}`}
             style={badgeStyle}

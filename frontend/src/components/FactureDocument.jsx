@@ -42,6 +42,8 @@ export default function FactureDocument({
   formation = {},
   rows = [],
   totalAPayer = 0,
+  /** Afficher le cachet institutionnel (défaut : oui si URL présente). */
+  showCachet = true,
 }) {
   const primary = etab?.couleur_primaire || '#1e3a8a'
   const secondary = etab?.couleur_secondaire || '#334155'
@@ -338,10 +340,17 @@ export default function FactureDocument({
             ) : null}
           </div>
           <div className="w-[52mm] shrink-0 text-center">
-            <CachetScolarite
-              cachetUrl={etab?.cachet_url}
-              className="!text-[10px] [&_img]:!my-1.5 [&_img]:!max-h-[22mm] [&_p]:!tracking-[0.12em]"
-            />
+            {showCachet ? (
+              <CachetScolarite
+                cachetUrl={etab?.cachet_url}
+                className="!text-[10px] [&_img]:!my-1.5 [&_img]:!max-h-[22mm] [&_p]:!tracking-[0.12em]"
+              />
+            ) : (
+              <div className="text-center">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-600">La scolarité</p>
+                <p className="mt-3 text-[9px] italic text-slate-400">Sans cachet</p>
+              </div>
+            )}
           </div>
         </section>
       </div>

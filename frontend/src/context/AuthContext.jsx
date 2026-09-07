@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import {
   getAccessToken,
@@ -10,6 +10,7 @@ import {
 import { SESSION_EXPIRED_EVENT } from '../lib/setupAuthInterceptors'
 import { applyEtabTheme, clearEtabTheme, getUserBrandColor } from '../utils/etabTheme'
 import { stripAppBasePath, withAppBase } from '../utils/appBasePath'
+import { useIdleSession } from '../hooks/useIdleSession'
 
 const AuthContext = createContext(null)
 
@@ -120,7 +121,7 @@ export function AuthProvider({ children }) {
     setUser(userData)
   }
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     const token = getAccessToken()
     const refresh = getRefreshToken()
     try {
@@ -138,7 +139,12 @@ export function AuthProvider({ children }) {
     delete axios.defaults.headers.common['Authorization']
     clearEtabTheme()
     setUser(null)
-  }
+    if (typeof window !== 'undefined' && !isPublicPath(window.location.pathname)) {
+      window.location.assign(withAppBase('/connexion'))
+    }
+  }, [])
+
+  useIdleSession(!!user && !loading, logout)
 
   const refreshUser = async () => {
     const { data } = await axios.get('/api/auth/me')

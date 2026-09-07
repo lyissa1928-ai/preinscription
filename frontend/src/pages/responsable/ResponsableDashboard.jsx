@@ -106,10 +106,20 @@ function BarChart({ items }) {
 
 export default function ResponsableDashboard() {
   const { user } = useAuth()
+  const isFadOnly = user?.role === 'responsable_fad' || user?.role === 'agent_fad'
+  const isPresentielOnly = user?.role === 'responsable'
+  const ongletsVisibles = useMemo(() => {
+    if (isFadOnly) return ONGLETS.filter((o) => o.key === 'fad' || o.key === 'conditions')
+    if (isPresentielOnly) return ONGLETS.filter((o) => o.key === 'presentiel' || o.key === 'conditions')
+    return ONGLETS
+  }, [isFadOnly, isPresentielOnly])
   const [searchParams, setSearchParams] = useSearchParams()
-  const [onglet, setOnglet] = useState(() =>
-    searchParams.get('tab') === 'conditions' ? 'conditions' : 'fad',
-  )
+  const [onglet, setOnglet] = useState(() => {
+    if (searchParams.get('tab') === 'conditions') return 'conditions'
+    if (isFadOnly) return 'fad'
+    if (isPresentielOnly) return 'presentiel'
+    return 'fad'
+  })
   const [stats, setStats] = useState(null)
   const [dossiers, setDossiers] = useState([])
   const [pagination, setPagination] = useState({})
@@ -256,7 +266,7 @@ export default function ResponsableDashboard() {
       </Panel>
 
       <div className="mb-3 flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-        {ONGLETS.map((o) => (
+        {ongletsVisibles.map((o) => (
           <button
             key={o.key}
             type="button"

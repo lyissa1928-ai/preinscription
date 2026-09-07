@@ -20,7 +20,6 @@ import {
   AdminUsers,
   AdminEtablissements,
   AdminEtablissementDetail,
-  AdminProforma,
   AdminFacturesEtabPage,
   AdminAuditLogs,
   AdminChatbotStats,
@@ -245,7 +244,7 @@ function AppRoutes() {
         <Route path="/admin/utilisateurs" element={<PrivateRoute roles={['admin']}><AdminUsers /></PrivateRoute>} />
         <Route path="/admin/etablissements" element={<PrivateRoute roles={['admin', 'directeur']}><AdminEtablissements /></PrivateRoute>} />
         <Route path="/admin/etablissements/:id" element={<PrivateRoute roles={['admin', 'directeur']}><AdminEtablissementDetail /></PrivateRoute>} />
-        <Route path="/admin/proforma" element={<PrivateRoute roles={['admin', 'directeur']}><AdminProforma /></PrivateRoute>} />
+        <Route path="/admin/proforma" element={<PrivateRoute roles={['admin', 'directeur']}><Navigate to="/admin/factures-etablissement" replace /></PrivateRoute>} />
         <Route path="/admin/factures-etablissement" element={<PrivateRoute roles={['admin', 'directeur']}><AdminFacturesEtabPage /></PrivateRoute>} />
         <Route path="/admin/audit-logs" element={<PrivateRoute roles={['admin']}><AdminAuditLogs /></PrivateRoute>} />
         <Route path="/admin/chatbot" element={<PrivateRoute roles={['admin']}><AdminChatbotStats /></PrivateRoute>} />

@@ -45,6 +45,8 @@ export default function FormationExcelGrid({
   filieres,
   initialFiliereId,
   initialType = 'presentiel',
+  /** Force le mode (FAD / présentiel) — masque le sélecteur */
+  lockedType = null,
   /** 'create' | 'edit' */
   variant = 'create',
   /** Formations existantes (édition lot) */
@@ -54,8 +56,9 @@ export default function FormationExcelGrid({
   onColumnsChange,
 }) {
   const isEdit = variant === 'edit'
+  const effectiveInitial = lockedType || initialType
   const [filiereId, setFiliereId] = useState(String(initialFiliereId || ''))
-  const [mode, setMode] = useState(initialType === 'en_ligne' ? 'en_ligne' : 'presentiel')
+  const [mode, setMode] = useState(effectiveInitial === 'en_ligne' ? 'en_ligne' : 'presentiel')
   const [columns, setColumns] = useState(() => loadColumnState(etabId))
   const [computedVisible, setComputedVisible] = useState(() => ({
     _solde: true,
@@ -82,20 +85,21 @@ export default function FormationExcelGrid({
     if (!open) return
     setColumns(loadColumnState(etabId))
     setFiliereId(String(initialFiliereId || ''))
-    setMode(initialType === 'en_ligne' ? 'en_ligne' : 'presentiel')
+    setMode((lockedType || initialType) === 'en_ligne' ? 'en_ligne' : 'presentiel')
     if (isEdit && Array.isArray(initialRows) && initialRows.length > 0) {
       setRows(initialRows.map((f) => formationToGridRow(f)))
     } else if (!isEdit) {
+      const t = lockedType || initialType
       setRows([
-        emptyGridRow(initialFiliereId, initialType),
-        emptyGridRow(initialFiliereId, initialType),
-        emptyGridRow(initialFiliereId, initialType),
+        emptyGridRow(initialFiliereId, t),
+        emptyGridRow(initialFiliereId, t),
+        emptyGridRow(initialFiliereId, t),
       ])
     }
     setSel(null)
     // initialRows volontairement omis des deps : chargé une fois à l’ouverture
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, etabId, initialFiliereId, initialType, isEdit])
+  }, [open, etabId, initialFiliereId, initialType, lockedType, isEdit])
 
   useEffect(() => {
     saveColumnState(etabId, columns)
@@ -297,7 +301,8 @@ export default function FormationExcelGrid({
     )
     const payload = filled.map((r) => {
       const mois = parseInt(r.duree_mois, 10) || 0
-      const rowType = r.type === 'en_ligne' ? 'en_ligne' : (isEdit ? (r.type || 'presentiel') : mode)
+      const rowType = lockedType
+        || (r.type === 'en_ligne' ? 'en_ligne' : (isEdit ? (r.type || 'presentiel') : mode))
       return {
         ...(r.id != null ? { id: r.id } : {}),
         filiere_id: parseInt(r.filiere_id || filiereId, 10),
@@ -380,26 +385,32 @@ export default function FormationExcelGrid({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-600">Mode *</label>
-                <div className="flex gap-1 rounded-xl bg-white p-1 ring-1 ring-slate-200">
-                  {[
-                    { val: 'presentiel', label: 'Présentiel' },
-                    { val: 'en_ligne', label: 'En ligne (FAD)' },
-                  ].map(({ val, label }) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => {
-                        setMode(val)
-                        setRows((prev) => prev.map((r) => ({ ...r, type: val })))
-                      }}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                        mode === val ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                {lockedType ? (
+                  <p className="rounded-xl bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-800 ring-1 ring-indigo-100">
+                    {lockedType === 'en_ligne' ? 'En ligne (FAD) uniquement' : 'Présentiel uniquement'}
+                  </p>
+                ) : (
+                  <div className="flex gap-1 rounded-xl bg-white p-1 ring-1 ring-slate-200">
+                    {[
+                      { val: 'presentiel', label: 'Présentiel' },
+                      { val: 'en_ligne', label: 'En ligne (FAD)' },
+                    ].map(({ val, label }) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => {
+                          setMode(val)
+                          setRows((prev) => prev.map((r) => ({ ...r, type: val })))
+                        }}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                          mode === val ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -521,11 +532,16 @@ export default function FormationExcelGrid({
                         <td className="px-1 py-0.5">
                           <select
                             className="input-field w-full py-1 text-xs"
-                            value={r.type || 'presentiel'}
+                            value={lockedType || r.type || 'presentiel'}
+                            disabled={!!lockedType}
                             onChange={(e) => updateCell(ri, 'type', e.target.value)}
                           >
-                            <option value="presentiel">Présentiel</option>
-                            <option value="en_ligne">En ligne</option>
+                            {(!lockedType || lockedType === 'presentiel') && (
+                              <option value="presentiel">Présentiel</option>
+                            )}
+                            {(!lockedType || lockedType === 'en_ligne') && (
+                              <option value="en_ligne">En ligne</option>
+                            )}
                           </select>
                         </td>
                       </>

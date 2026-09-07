@@ -594,6 +594,13 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
   }, [init])
 
   useEffect(() => {
+    if (lockedType) {
+      setFiltreType(lockedType)
+      setImportMode(lockedType)
+    }
+  }, [lockedType])
+
+  useEffect(() => {
     axios
       .get('/api/niveaux-etude')
       .then(({ data }) => setNiveaux(Array.isArray(data) ? data : []))
@@ -912,7 +919,8 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       toast.error('Sélectionnez une filière avant l’import.')
       return
     }
-    if (!importMode) {
+    const modeImport = lockedType || importMode
+    if (!modeImport) {
       toast.error('Choisissez le mode : présentiel ou en ligne.')
       return
     }
@@ -927,7 +935,7 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
       const fd = new FormData()
       fd.append('file', importFile)
       const { data } = await axios.post(
-        `/api/etablissements/${etabId}/formations/import/${selectedFiliereId}?dry_run=${importDryRun}&type=${importMode}&columns=${encodeURIComponent(JSON.stringify(columns))}`,
+        `/api/etablissements/${etabId}/formations/import/${selectedFiliereId}?dry_run=${importDryRun}&type=${modeImport}&columns=${encodeURIComponent(JSON.stringify(columns))}`,
         fd
       )
       setImportResult(data)
@@ -1017,12 +1025,20 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
             </select>
             <select
               className="input-field min-w-[160px] rounded-xl border-slate-200 bg-white py-2 text-sm shadow-sm"
-              value={filtreType}
-              onChange={(e) => setFiltreType(e.target.value)}
+              value={lockedType || filtreType}
+              onChange={(e) => {
+                if (lockedType) return
+                setFiltreType(e.target.value)
+              }}
+              disabled={!!lockedType}
             >
-              <option value="">Tous les modes</option>
-              <option value="presentiel">Présentiel</option>
-              <option value="en_ligne">À distance (FAD)</option>
+              {!lockedType && <option value="">Tous les modes</option>}
+              {(!lockedType || lockedType === 'presentiel') && (
+                <option value="presentiel">Présentiel</option>
+              )}
+              {(!lockedType || lockedType === 'en_ligne') && (
+                <option value="en_ligne">À distance (FAD)</option>
+              )}
             </select>
             <select
               className="input-field min-w-[160px] rounded-xl border-slate-200 bg-white py-2 text-sm shadow-sm"
@@ -1309,11 +1325,11 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                 </div>
                 <div className="col-span-2">
                   <L>Description</L>
-                  <textarea className="input-field" rows={2} value={form.description} onChange={up('description')} placeholder="Présentation de la formation (contenu pédagogique, objectifs…)" />
+                  <textarea className="input-field min-h-[120px]" rows={6} value={form.description} onChange={up('description')} placeholder="Présentation de la formation (contenu pédagogique, objectifs…) — aucune limite de longueur." />
                 </div>
                 <div className="col-span-2">
                   <L>Débouchés professionnels</L>
-                  <textarea className="input-field" rows={2} value={form.debouches || ''} onChange={up('debouches')} placeholder="Métiers et secteurs accessibles après la formation…" />
+                  <textarea className="input-field min-h-[120px]" rows={6} value={form.debouches || ''} onChange={up('debouches')} placeholder="Métiers et secteurs accessibles après la formation… — aucune limite de longueur." />
                 </div>
 
                 {/* Tarification */}
@@ -1629,39 +1645,49 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
                 </div>
                 <div>
                   <L>Mode du template *</L>
-                  <div className="flex gap-1 rounded-xl bg-slate-50 p-1 ring-1 ring-slate-200">
-                    {[
-                      { val: 'presentiel', label: 'Présentiel' },
-                      { val: 'en_ligne', label: 'En ligne' },
-                    ].map(({ val, label }) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setImportMode(val)}
-                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition ${
-                          importMode === val ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-white'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                  {lockedType ? (
+                    <p className="rounded-xl bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-800 ring-1 ring-indigo-100">
+                      {lockedType === 'en_ligne' ? 'À distance (FAD) uniquement' : 'Présentiel uniquement'}
+                    </p>
+                  ) : (
+                    <div className="flex gap-1 rounded-xl bg-slate-50 p-1 ring-1 ring-slate-200">
+                      {[
+                        { val: 'presentiel', label: 'Présentiel' },
+                        { val: 'en_ligne', label: 'En ligne' },
+                      ].map(({ val, label }) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setImportMode(val)}
+                          className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition ${
+                            importMode === val ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-white'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               {!selectedFiliereId && (
                 <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  Sélectionnez une filière et le mode (présentiel ou en ligne) pour synchroniser l’import.
+                  Sélectionnez une filière{lockedType ? '' : ' et le mode (présentiel ou en ligne)'} pour synchroniser l’import.
                 </div>
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap gap-3">
-                  <button type="button" onClick={() => downloadTemplate('presentiel')} className="text-sm text-blue-600 hover:underline">
-                    Template Excel présentiel (.xlsx)
-                  </button>
-                  <button type="button" onClick={() => downloadTemplate('en_ligne')} className="text-sm text-emerald-700 hover:underline">
-                    Template Excel en ligne (.xlsx)
-                  </button>
+                  {(!lockedType || lockedType === 'presentiel') && (
+                    <button type="button" onClick={() => downloadTemplate('presentiel')} className="text-sm text-blue-600 hover:underline">
+                      Template Excel présentiel (.xlsx)
+                    </button>
+                  )}
+                  {(!lockedType || lockedType === 'en_ligne') && (
+                    <button type="button" onClick={() => downloadTemplate('en_ligne')} className="text-sm text-emerald-700 hover:underline">
+                      Template Excel en ligne / FAD (.xlsx)
+                    </button>
+                  )}
                 </div>
                 <label className="text-sm text-gray-700 flex items-center gap-2">
                   <input type="checkbox" checked={importDryRun} onChange={(e) => setImportDryRun(e.target.checked)} />
@@ -1722,7 +1748,8 @@ export function TabFormations({ etabId, formations: init, filieres, onRefreshFil
         etabId={etabId}
         filieres={filieres}
         initialFiliereId={filtreFiliere || (filieres[0] ? String(filieres[0].id) : '')}
-        initialType={filtreType === 'en_ligne' ? 'en_ligne' : 'presentiel'}
+        initialType={lockedType || (filtreType === 'en_ligne' ? 'en_ligne' : 'presentiel')}
+        lockedType={lockedType}
         variant={excelGridVariant}
         initialRows={excelGridVariant === 'edit' ? excelEditRows : null}
         onSubmit={handleExcelGridSubmit}

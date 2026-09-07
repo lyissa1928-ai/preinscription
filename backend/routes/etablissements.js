@@ -78,12 +78,17 @@ function etabPedagogieWrite(req, res, next) {
   if (Number(req.user.etablissement_id) !== etabId && !userAdministersEtablissement(req.user, etabId)) {
     return res.status(403).json({ message: 'Vous ne pouvez modifier que les formations de votre établissement.' });
   }
-  if (isAdminEtablissement(req.user) || actsAsResponsable(req.user)) {
-    req.pedagogieScope = 'presentiel';
-    return next();
-  }
+  // FAD d’abord : un responsable_fad désigné « responsable » ne doit jamais basculer en scope présentiel.
   if (req.user.role === 'responsable_fad' || req.user.role === 'agent_fad') {
     req.pedagogieScope = 'fad';
+    return next();
+  }
+  if (isAdminEtablissement(req.user)) {
+    req.pedagogieScope = 'all';
+    return next();
+  }
+  if (actsAsResponsable(req.user) || req.user.role === 'responsable') {
+    req.pedagogieScope = 'presentiel';
     return next();
   }
   return res.status(403).json({
@@ -94,7 +99,7 @@ function etabPedagogieWrite(req, res, next) {
 /** Bloque écriture hors périmètre FAD / présentiel. */
 function assertFormationTypeForWriter(req, type) {
   const scope = req.pedagogieScope;
-  if (!scope || req.user.role === 'admin' || isAdminEtablissement(req.user)) return null;
+  if (!scope || scope === 'all' || req.user.role === 'admin' || isAdminEtablissement(req.user)) return null;
   const t = type === 'en_ligne' ? 'en_ligne' : 'presentiel';
   if (scope === 'fad' && t !== 'en_ligne') {
     return 'Le staff FAD ne peut gérer que les formations à distance (en ligne).';
@@ -103,6 +108,13 @@ function assertFormationTypeForWriter(req, type) {
     return 'Le responsable présentiel ne peut pas gérer les formations FAD.';
   }
   return null;
+}
+
+/** Type imposé par le scope (FAD → toujours en_ligne). */
+function resolveForcedTypeForScope(req, requestedType) {
+  if (req.pedagogieScope === 'fad') return 'en_ligne';
+  if (req.pedagogieScope === 'presentiel') return 'presentiel';
+  return normalizeFormationType(requestedType || '');
 }
 
 /** Liste / export / suppression factures : admin ou staff rattaché à l’établissement. */
@@ -1473,10 +1485,21 @@ router.get('/:id', (req, res) => {
       nb_formations_en_ligne: actives.filter((x) => x.type === 'en_ligne').length,
     };
   });
-  const formations = (db.get('formations').value() || []).filter((f) => f.etablissement_id === id).map((f) => {
+  let formations = (db.get('formations').value() || []).filter((f) => f.etablissement_id === id).map((f) => {
     const filiere = db.get('filieres').find({ id: f.filiere_id }).value();
     return { ...f, filiere_nom: filiere?.nom || null };
   });
+  // Isolation FAD / présentiel aussi sur le détail établissement
+  if (req.user.role === 'responsable_fad' || req.user.role === 'agent_fad') {
+    formations = formations.filter((f) => f.type === 'en_ligne');
+  } else if (
+    (req.user.role === 'responsable' || actsAsResponsable(req.user))
+    && req.user.role !== 'admin'
+    && req.user.role !== 'admin_etablissement'
+    && !isAdminEtablissement(req.user)
+  ) {
+    formations = formations.filter((f) => f.type !== 'en_ligne');
+  }
   const membres = (db.get('utilisateurs').value() || [])
     .filter((u) => u.etablissement_id === id && isEtabStaffMember(u))
     .map((u) => ({
@@ -1894,7 +1917,7 @@ router.post('/:id/formations', etabPedagogieWrite, (req, res) => {
 // GET /api/etablissements/:id/formations/template.xlsx?type=presentiel|en_ligne&columns=JSON
 router.get('/:id/formations/template.xlsx', etabPedagogieWrite, async (req, res) => {
   const etablissement_id = parseInt(req.params.id, 10);
-  const forcedType = normalizeFormationType(req.query.type || '');
+  let forcedType = resolveForcedTypeForScope(req, req.query.type || '');
   if (Number.isNaN(etablissement_id)) {
     return res.status(400).json({ message: 'Identifiant établissement invalide.' });
   }
@@ -1903,6 +1926,8 @@ router.get('/:id/formations/template.xlsx', etabPedagogieWrite, async (req, res)
       message: 'Précisez ?type=presentiel ou ?type=en_ligne.',
     });
   }
+  const scopeErrTpl = assertFormationTypeForWriter(req, forcedType);
+  if (scopeErrTpl) return res.status(403).json({ message: scopeErrTpl });
   const etab = db.get('etablissements').find({ id: etablissement_id }).value();
   if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
 
@@ -1925,7 +1950,7 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
   const etablissement_id = parseInt(req.params.id, 10);
   const filiereId = parseInt(req.params.filiereId, 10);
   const dryRun = ['1', 'true', 'yes', 'oui'].includes(String(req.query.dry_run || '').toLowerCase());
-  const forcedType = normalizeFormationType(req.query.type || '');
+  let forcedType = resolveForcedTypeForScope(req, req.query.type || '');
   if (Number.isNaN(etablissement_id) || Number.isNaN(filiereId)) {
     return res.status(400).json({ message: 'Identifiant établissement/filière invalide.' });
   }
@@ -1934,6 +1959,8 @@ router.post('/:id/formations/import/:filiereId', etabPedagogieWrite, csvUpload.s
       message: 'Précisez le mode via ?type=presentiel ou ?type=en_ligne (templates séparés pour éviter les erreurs).',
     });
   }
+  const scopeErrImport = assertFormationTypeForWriter(req, forcedType);
+  if (scopeErrImport) return res.status(403).json({ message: scopeErrImport });
   if (!req.file) return res.status(400).json({ message: 'Fichier Excel (.xlsx) requis (champ file).' });
 
   const etab = db.get('etablissements').find({ id: etablissement_id }).value();
@@ -2165,7 +2192,15 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
     // Sans id => création d'une nouvelle formation depuis le tableau batch.
     if (Number.isNaN(id)) {
       const titre = String(updates.titre || '').trim();
-      const type = updates.type || 'presentiel';
+      let type = updates.type || (req.pedagogieScope === 'fad' ? 'en_ligne' : 'presentiel');
+      type = normalizeFormationType(type);
+      if (req.pedagogieScope === 'fad') type = 'en_ligne';
+      if (req.pedagogieScope === 'presentiel') type = 'presentiel';
+      const scopeErrCreate = assertFormationTypeForWriter(req, type);
+      if (scopeErrCreate) {
+        errors.push({ index: idx, message: scopeErrCreate });
+        return;
+      }
       const filiere_id = updates.filiere_id;
       if (!titre || !filiere_id) {
         errors.push({ index: idx, message: 'Nouvelle ligne invalide: titre et filière obligatoires.' });
@@ -2216,6 +2251,26 @@ router.put('/:etabId/formations/batch', etabPedagogieWrite, (req, res) => {
     const current = db.get('formations').find({ id }).value();
     if (!current || Number(current.etablissement_id) !== etabId) {
       errors.push({ index: idx, id, message: 'Formation introuvable pour cet établissement.' });
+      return;
+    }
+    const effectiveType = updates.type !== undefined
+      ? normalizeFormationType(updates.type)
+      : normalizeFormationType(current.type);
+    if (req.pedagogieScope === 'fad') {
+      updates.type = 'en_ligne';
+    } else if (req.pedagogieScope === 'presentiel' && updates.type === 'en_ligne') {
+      errors.push({ index: idx, id, message: 'Le responsable présentiel ne peut pas gérer les formations FAD.' });
+      return;
+    }
+    const scopeErrUpd = assertFormationTypeForWriter(req, req.pedagogieScope === 'fad' ? 'en_ligne' : effectiveType);
+    if (scopeErrUpd) {
+      errors.push({ index: idx, id, message: scopeErrUpd });
+      return;
+    }
+    // Interdire de toucher une formation hors périmètre
+    const scopeErrCurrent = assertFormationTypeForWriter(req, current.type);
+    if (scopeErrCurrent) {
+      errors.push({ index: idx, id, message: scopeErrCurrent });
       return;
     }
     if (updates.type === 'en_ligne' && updates.ville === undefined) updates.ville = null;
@@ -2361,6 +2416,11 @@ router.post('/:etabId/formations/delete-batch', etabPedagogieWrite, (req, res) =
       skipped.push(id);
       return;
     }
+    const scopeErrDel = assertFormationTypeForWriter(req, formation.type);
+    if (scopeErrDel) {
+      skipped.push(id);
+      return;
+    }
     if (hard) {
       detachFormationReferences(id);
       db.get('formations').remove({ id }).write();
@@ -2401,6 +2461,8 @@ router.delete('/:etabId/formations/:id', etabPedagogieWrite, (req, res) => {
   if (!formation || Number(formation.etablissement_id) !== etabId) {
     return res.status(404).json({ message: 'Formation introuvable.' });
   }
+  const scopeErrDelOne = assertFormationTypeForWriter(req, formation.type);
+  if (scopeErrDelOne) return res.status(403).json({ message: scopeErrDelOne });
 
   // Mode production: suppression non destructive par défaut.
   // Suppression définitive: ?hard=true (admin uniquement).

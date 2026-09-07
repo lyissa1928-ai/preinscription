@@ -129,6 +129,7 @@ app.use('/api/formations', require('./routes/formations'));
 app.use('/api/niveaux-etude', require('./routes/niveauxEtude'));
 app.use('/api/responsable-fad', require('./routes/responsableFadAgents'));
 app.use('/api/factures', require('./routes/factures'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/chatbot', require('./routes/chatbot')); // Orientation IA (RAG) — distinct du chat humain
 
