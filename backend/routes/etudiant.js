@@ -6,7 +6,7 @@ const path = require('path');
 const db = require('../database/db');
 const { unlinkQuiet, detectDossierMagicFormat } = require('../utils/verifyUploadedFile');
 const { authMiddleware } = require('../middleware/auth');
-const { snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
+const { snapshotFromFormation, snapshotFromEtablissementId, snapshotFromEtab } = require('../utils/etablissementSnapshot');
 const { rateLimit, getClientIp } = require('../utils/rateLimit');
 const { logSecurityEvent } = require('../utils/securityEvent');
 const {
@@ -182,7 +182,7 @@ router.post(
 
   const {
     formation_id, annee_academique, date_naissance, lieu_naissance,
-    nationalite, telephone, adresse, dernier_diplome, etablissement_origine, mention, annee_obtention,
+    nationalite, pays_origine, pays_residence, telephone, adresse, dernier_diplome, etablissement_origine, mention, annee_obtention,
     numero_passeport,
   } = req.body;
 
@@ -296,6 +296,8 @@ router.post(
     document_rule_profile: documentRuleProfile,
     annee_academique,
     date_naissance, lieu_naissance, nationalite, telephone, adresse,
+    pays_origine: (pays_origine || pays_residence || '').toString().trim() || null,
+    pays_residence: (pays_residence || pays_origine || '').toString().trim() || null,
     dernier_diplome, etablissement_origine, mention: mention || null,
     annee_obtention: parseInt(annee_obtention),
     ...(passeportTrim ? { numero_passeport: passeportTrim } : {}),
@@ -552,10 +554,15 @@ router.post(
 
     const {
       type_formation, formation_id, etablissement_id, niveau, details,
+      adresse: adresseBody, annee_academique: anneeBody,
       type_payeur,
       payeur_nom, payeur_prenom, payeur_relation, payeur_telephone,
       payeur_org_nom, payeur_org_ninea, payeur_org_contact,
     } = req.body;
+
+    const adresse = String(adresseBody || user.adresse || '').trim() || null;
+    const year = new Date().getFullYear();
+    const annee_academique = String(anneeBody || '').trim() || `${year}-${year + 1}`;
 
     if (!type_formation || !formation_id) {
       cleanupProformaUploads(req.files);
@@ -600,20 +607,13 @@ router.post(
       });
     }
     const etab = db.get('etablissements').find({ id: etabId }).value();
-    const etablissement_snapshot = etab
+    const baseSnap = snapshotFromEtab(etab, { type: type_formation });
+    const etablissement_snapshot = baseSnap
       ? {
-          nom: etab.nom,
-          type: etab.type,
-          adresse: etab.adresse || '',
-          telephone: etab.telephone || '',
-          email_contact: etab.email_contact || '',
-          site_web: etab.site_web || '',
-          logo_url: publicAssetUrl(req, etab.logo_url),
-          cachet_url: publicAssetUrl(req, etab.cachet_url),
-          couleur_primaire: etab.couleur_primaire || '#1e40af',
-          couleur_secondaire: etab.couleur_secondaire || '#3b82f6',
-          ninea: etab.ninea || '',
-          compte_bancaire: etab.compte_bancaire || '',
+          ...baseSnap,
+          type: etab?.type,
+          logo_url: publicAssetUrl(req, etab?.logo_url),
+          cachet_url: publicAssetUrl(req, etab?.cachet_url),
         }
       : null;
 
@@ -640,6 +640,8 @@ router.post(
       nom: String(user.nom || '').trim(),
       email: String(user.email || '').trim().toLowerCase(),
       telephone,
+      adresse,
+      annee_academique,
       date_naissance: dateNaissance,
       lieu_naissance: lieuNaissance,
       niveau: niveau ? String(niveau).trim() : null,
@@ -743,7 +745,7 @@ router.get('/lettre/:dossierId', authMiddleware, (req, res) => {
   if (!canIssueLettrePreinscription(dossier)) {
     return res.status(403).json({
       message:
-        'La lettre de préinscription est réservée aux candidats étrangers acceptés ayant déposé une demande en ligne.',
+        'La lettre de préinscription est réservée aux candidats acceptés ayant déposé une demande en ligne avec un compte étudiant.',
     });
   }
 

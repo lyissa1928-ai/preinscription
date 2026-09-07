@@ -191,6 +191,11 @@ export default function FactureDocument({
             {etudiant.telephone && (
               <p className="text-[10.5px] text-slate-600">Tél. {etudiant.telephone}</p>
             )}
+            {(etudiant.adresse || etudiant.adresse_physique) && (
+              <p className="mt-1 text-[10.5px] leading-snug text-slate-600 break-words">
+                {etudiant.adresse || etudiant.adresse_physique}
+              </p>
+            )}
             {!definitive && facture?.type_payeur === 'organisation' && facture?.payeur?.org_nom && (
               <p className="mt-1.5 text-[10.5px] font-semibold text-slate-800">
                 Destinataire : {facture.payeur.org_nom}

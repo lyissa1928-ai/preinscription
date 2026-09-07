@@ -49,12 +49,35 @@ function seedDefaultNiveaux(db) {
   return { seeded: rows.length, total: rows.length };
 }
 
-function listNiveaux(db, { actifsOnly = false } = {}) {
+function listNiveaux(db, { actifsOnly = false, etablissementId = null, scopeEtabId = null } = {}) {
   ensureNiveauxCollection(db);
   let list = [...(db.get('niveaux_etude').value() || [])];
   if (actifsOnly) list = list.filter((n) => n.actif !== false);
+  if (scopeEtabId != null) {
+    const eid = Number(scopeEtabId);
+    list = list.filter(
+      (n) => n.etablissement_id == null || Number(n.etablissement_id) === eid,
+    );
+  } else if (etablissementId != null) {
+    const eid = Number(etablissementId);
+    list = list.filter(
+      (n) => n.etablissement_id == null || Number(n.etablissement_id) === eid,
+    );
+  }
   list.sort((a, b) => (a.ordre || 0) - (b.ordre || 0) || String(a.libelle).localeCompare(String(b.libelle)));
   return list;
+}
+
+function isGlobalNiveau(row) {
+  return row && (row.etablissement_id == null || row.etablissement_id === '');
+}
+
+function canManageNiveau(user, row) {
+  if (!user || !row) return false;
+  if (user.role === 'admin') return true;
+  if (user.role !== 'admin_etablissement') return false;
+  if (isGlobalNiveau(row)) return false;
+  return Number(row.etablissement_id) === Number(user.etablissement_id);
 }
 
 function findNiveauByLibelleOrCode(db, value) {
@@ -85,4 +108,6 @@ module.exports = {
   findNiveauByLibelleOrCode,
   isNiveauActifValide,
   normalizeNiveauLibelle,
+  isGlobalNiveau,
+  canManageNiveau,
 };

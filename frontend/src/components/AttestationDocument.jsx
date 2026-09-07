@@ -1,6 +1,5 @@
 /**
- * Attestation de préinscription — certificat A4 sur une seule page.
- * Branding établissement conservé (couleurs, logo, cachet, contacts).
+ * Attestation de préinscription — certificat A4 compact sur une seule page.
  */
 import CachetScolarite from './CachetScolarite'
 import { mediaUrl } from '../utils/mediaUrl'
@@ -39,14 +38,14 @@ export default function AttestationDocument({
   return (
     <article
       ref={documentRef}
-      className="a4-sheet a4-sheet--single print-page relative box-border flex flex-col bg-white p-[8mm] text-slate-800 shadow-xl"
+      className="a4-sheet a4-sheet--single print-page relative box-border flex flex-col bg-white p-[6mm] text-slate-800 shadow-xl"
     >
       <div
-        className="relative flex min-h-0 flex-1 flex-col border-[1.5px] p-[4mm]"
+        className="relative flex flex-col border-[1.5px] p-[3mm]"
         style={{ borderColor: secondary }}
       >
         <div
-          className="relative flex min-h-0 flex-1 flex-col border px-[9mm] py-[6mm]"
+          className="relative flex flex-col border px-[8mm] py-[4mm]"
           style={{ borderColor: `${primary}99` }}
         >
           {logoSrc ? (
@@ -54,25 +53,22 @@ export default function AttestationDocument({
               src={logoSrc}
               alt=""
               aria-hidden
-              className="pointer-events-none absolute left-1/2 top-[40%] h-[70mm] w-[70mm] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.04]"
+              className="pointer-events-none absolute left-1/2 top-[38%] h-[55mm] w-[55mm] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.04]"
             />
           ) : null}
 
           <header className="relative z-[1] flex flex-col items-center text-center">
             {logoSrc ? (
-              <img src={logoSrc} alt="" className="mb-1.5 h-[13mm] w-[13mm] object-contain" />
+              <img src={logoSrc} alt="" className="mb-1 h-[11mm] w-[11mm] object-contain" />
             ) : (
               <div
-                className="mb-1.5 flex h-[12mm] w-[12mm] items-center justify-center text-xs font-bold text-white"
+                className="mb-1 flex h-[10mm] w-[10mm] items-center justify-center text-xs font-bold text-white"
                 style={{ background: primary }}
               >
                 {(etab?.nom || 'ET').slice(0, 2).toUpperCase()}
               </div>
             )}
-            <p
-              className="text-[11px] font-bold uppercase tracking-[0.16em]"
-              style={{ color: primary }}
-            >
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: primary }}>
               {etab?.nom || 'Établissement'}
             </p>
             <div className="mt-0.5 max-w-[145mm] text-[8px] leading-snug text-slate-500">
@@ -85,24 +81,24 @@ export default function AttestationDocument({
             )}
           </header>
 
-          <div className="relative z-[1] mx-auto mt-3 h-px w-[40mm]" style={{ background: primary }} />
+          <div className="relative z-[1] mx-auto mt-2 h-px w-[36mm]" style={{ background: primary }} />
 
           <h1
-            className="relative z-[1] mt-3 text-center text-[13px] font-bold uppercase tracking-[0.18em]"
+            className="relative z-[1] mt-2 text-center text-[12.5px] font-bold uppercase tracking-[0.16em]"
             style={{ color: secondary, fontFamily: 'Georgia, "Times New Roman", Times, serif' }}
           >
             Attestation de préinscription
           </h1>
 
-          <p className="relative z-[1] mt-1.5 text-center text-[9px] text-slate-500">
+          <p className="relative z-[1] mt-1 text-center text-[9px] text-slate-500">
             Réf. <span className="font-mono font-semibold text-slate-700">{refAtt}</span>
             {' · '}Émise le {emitDate}
             {anneeAcademique ? ` · Année académique ${anneeAcademique}` : ''}
           </p>
 
-          <section className="relative z-[1] my-5 flex min-h-0 flex-1 flex-col justify-center px-1">
+          <section className="relative z-[1] mt-3 px-1">
             <p
-              className="text-center text-[12.5px] font-medium leading-[1.65] text-slate-800"
+              className="text-center text-[12px] font-medium leading-[1.55] text-slate-800"
               style={{ fontFamily: 'Georgia, "Times New Roman", Times, serif' }}
             >
               {texteCorps || (
@@ -119,13 +115,8 @@ export default function AttestationDocument({
                 </>
               )}
             </p>
-            {texteOfficiel ? (
-              <p className="mx-auto mt-3 max-w-[145mm] text-center text-[9.5px] leading-relaxed text-slate-500">
-                {texteOfficiel}
-              </p>
-            ) : null}
 
-            <div className="mx-auto mt-5 w-full max-w-[150mm] border-y border-slate-300 py-2 text-center text-[10px] leading-relaxed text-slate-700">
+            <div className="mx-auto mt-3 w-full max-w-[150mm] border-y border-slate-300 py-2 text-center text-[10px] leading-relaxed text-slate-700">
               <p>
                 <strong>{nomComplet}</strong>
                 {email ? ` · ${email}` : ''}
@@ -142,12 +133,12 @@ export default function AttestationDocument({
             </div>
           </section>
 
-          <section className="relative z-[1] mt-auto flex items-end justify-between gap-4 pt-2">
+          <section className="relative z-[1] mt-4 flex items-end justify-between gap-4">
             <div>
               <p className="text-[10px] text-slate-600">
                 Fait à {lieu}, le {emitDate}
               </p>
-              <div className="mt-2">
+              <div className="mt-1.5">
                 <CachetScolarite cachetUrl={etab?.cachet_url} />
               </div>
             </div>

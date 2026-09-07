@@ -197,6 +197,82 @@ async function notifyDocumentAttention(userId, { title, reference, link, extra }
   });
 }
 
+/**
+ * E-mail « compte activé » — une seule fois par compte.
+ * @returns {Promise<boolean>}
+ */
+async function sendAccountActivatedEmail(user) {
+  if (!user?.id || !user.email) return false;
+  if (user.account_activated_email_sent_at) return false;
+  if (user.actif === false) return false;
+
+  const isStudent = user.role === 'etudiant';
+  if (isStudent && !user.email_verified_at) return false;
+  if (!isStudent && user.must_change_password === true) return false;
+
+  const prenom = String(user.prenom || '').trim();
+
+  const sent = await sendActionEmail({
+    to: user.email,
+    prenom,
+    action: 'Compte activé',
+    statut: 'opérationnel',
+    date: new Date().toISOString(),
+    reference: user.matricule || user.email,
+    referenceLabel: 'Identifiant',
+    link: '/dashboard',
+    extra: 'Votre compte UniPortail est maintenant actif. Vous pouvez vous connecter et accéder à vos services.',
+  });
+
+  if (sent) {
+    db.get('utilisateurs').find({ id: user.id }).assign({
+      account_activated_email_sent_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).write();
+  }
+  return sent;
+}
+
+async function notifyLettrePreinscriptionEmail(dossier) {
+  if (!dossier?.etudiant_id) return false;
+  return emailUserId(dossier.etudiant_id, {
+    action: 'Lettre de préinscription',
+    statut: 'disponible',
+    date: new Date().toISOString(),
+    reference: dossier.numero_dossier || dossier.id,
+    referenceLabel: 'N° dossier',
+    link: dossier.id ? `/lettre/${dossier.id}` : '/dashboard',
+    extra: 'Votre lettre de préinscription est disponible. Consultez-la via le lien ci-dessous.',
+  });
+}
+
+async function notifyAttestationEmail(dossier) {
+  if (!dossier?.etudiant_id) return false;
+  return emailUserId(dossier.etudiant_id, {
+    action: 'Attestation de préinscription',
+    statut: 'disponible',
+    date: new Date().toISOString(),
+    reference: dossier.numero_dossier || dossier.id,
+    referenceLabel: 'N° dossier',
+    link: dossier.id ? `/attestation/${dossier.id}` : '/dashboard',
+    extra: 'Votre attestation est disponible sur la plateforme.',
+  });
+}
+
+async function notifyFactureDossierLinkEmail(dossier, facture) {
+  if (!dossier?.etudiant_id) return false;
+  const numero = facture?.numero || dossier.numero_dossier;
+  return emailUserId(dossier.etudiant_id, {
+    action: 'Facture proforma',
+    statut: 'disponible',
+    date: facture?.date_emission || new Date().toISOString(),
+    reference: numero,
+    referenceLabel: 'N° facture',
+    link: dossier.id ? `/facture/${dossier.id}` : '/dashboard',
+    extra: 'Consultez et téléchargez votre facture proforma via le lien ci-dessous.',
+  });
+}
+
 module.exports = {
   sendActionEmail,
   emailUserId,
@@ -204,5 +280,9 @@ module.exports = {
   notifyFactureDossierGeneree,
   notifyProformaDecision,
   notifyDocumentAttention,
+  sendAccountActivatedEmail,
+  notifyLettrePreinscriptionEmail,
+  notifyAttestationEmail,
+  notifyFactureDossierLinkEmail,
   fmtDate,
 };

@@ -1,11 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
+import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import DocumentDownloadBar from '../components/DocumentDownloadBar'
 import AttestationDocument from '../components/AttestationDocument'
 import { resolveAffichageCandidat, resolveFormationAffichage } from '../utils/attestationDisplay'
 import { getRoleHome } from '../utils/smartBack'
+
+const STAFF_EMAIL_ROLES = [
+  'admin', 'admin_etablissement', 'responsable', 'responsable_fad',
+  'agent_fad', 'comptable', 'agent_admin', 'controleur_qualite',
+]
 
 export default function AttestationPreinscription() {
   const { dossierId } = useParams()
@@ -108,6 +114,14 @@ export default function AttestationPreinscription() {
         primaryColor={primary}
         backFallback={getRoleHome(user?.role)}
         className="mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3"
+        onSendEmail={
+          STAFF_EMAIL_ROLES.includes(user?.role)
+            ? async () => {
+                const { data: res } = await axios.post(`/api/responsable/dossiers/${dossierId}/envoyer-attestation-email`)
+                toast.success(res.message || 'Attestation envoyée par e-mail.')
+              }
+            : undefined
+        }
       />
       <div className="a4-preview-stage">
       <AttestationDocument

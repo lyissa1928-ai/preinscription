@@ -31,6 +31,7 @@ const EMPTY = {
   date_naissance: '',
   lieu_naissance: '',
   nationalite: '',
+  pays_origine: '',
   pays_residence: '',
   adresse: '',
   telephone: '',
@@ -171,6 +172,14 @@ export default function StaffPreinscriptionGuichet() {
       toast.error('Téléphone obligatoire.')
       return
     }
+    if (isProforma && !form.adresse?.trim()) {
+      toast.error('Adresse physique obligatoire.')
+      return
+    }
+    if (isProforma && !form.annee_academique?.trim()) {
+      toast.error('Année académique obligatoire.')
+      return
+    }
     if (isProforma && form.type_payeur === 'organisation' && !form.destinataire.trim()) {
       toast.error('Indiquez le destinataire (entreprise, État ou organisation).')
       return
@@ -231,7 +240,7 @@ export default function StaffPreinscriptionGuichet() {
             </Link>
           </div>
           <p className="text-xs text-slate-500">
-            Pas de lettre de préinscription pour une saisie au guichet (visiteur). La lettre est réservée aux candidats étrangers acceptés en ligne.
+            Pas de lettre pour une saisie au guichet (visiteur). La lettre est disponible pour les préinscriptions en ligne acceptées.
           </p>
           {facture?.numero && (
             <p className="text-xs text-slate-500">
@@ -376,7 +385,13 @@ export default function StaffPreinscriptionGuichet() {
 
         <Panel title="3. Identité du bénéficiaire" bodyClassName="p-6">
           {isProforma ? (
-            <IdentiteBeneficiaireProforma form={form} up={up} />
+            <IdentiteBeneficiaireProforma
+              form={form}
+              up={up}
+              addressRequired
+              showAnneeAcademique
+              anneeAcademiqueRequired
+            />
           ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -420,8 +435,16 @@ export default function StaffPreinscriptionGuichet() {
               </datalist>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold">Pays de résidence</label>
-              <input className="input-field" value={form.pays_residence} onChange={up('pays_residence')} />
+              <label className="mb-1 block text-sm font-semibold">Pays d&apos;origine</label>
+              <input
+                className="input-field"
+                value={form.pays_origine || form.pays_residence}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setForm((p) => ({ ...p, pays_origine: v, pays_residence: v }))
+                }}
+                placeholder="Ex. Sénégal"
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold">Téléphone *</label>

@@ -18,6 +18,12 @@ const { computePrixAnnuel, normalizeFraisSupplementaires, normalizeElementsFactu
 const { syncStoredFactureById } = require('../services/factureService');
 const { isFactureSupprimee } = require('../utils/factureVisibility');
 const { stripEtabSensitiveFields } = require('../utils/etablissementSanitize');
+const { purgeUserPersonalData } = require('../utils/purgeUserPersonalData');
+const {
+  parseUserImportBuffer,
+  buildUsersTemplateWorkbook,
+  importUsersRows,
+} = require('../utils/userImportExcel');
 const { actsAsResponsable } = require('../utils/userFonctions');
 const {
   canManageEtabMembres,
@@ -688,7 +694,10 @@ function maybeUploadCreateFiles(req, res, next) {
 router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
   const {
     nom, type, description, couleur_primaire, couleur_secondaire, adresse, telephone, email_contact, site_web,
-    ninea, rc, arrete, compte_bancaire, banque, iban, swift, signataire_nom, signataire_fonction
+    adresse_fad, telephone_fad, email_contact_fad,
+    ninea, rc, arrete, compte_bancaire, banque, iban, swift,
+    banque_fad, compte_bancaire_fad, iban_fad, swift_fad,
+    signataire_nom, signataire_fonction
   } = req.body;
   if (!nom || !nom.trim()) return res.status(400).json({ message: 'Le nom de l\'établissement est obligatoire.' });
   if (!type) return res.status(400).json({ message: 'Le type est obligatoire.' });
@@ -715,6 +724,9 @@ router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
     adresse: (adresse || '').trim(),
     telephone: (telephone || '').trim(),
     email_contact: (email_contact || '').trim(),
+    adresse_fad: (adresse_fad || '').trim(),
+    telephone_fad: (telephone_fad || '').trim(),
+    email_contact_fad: (email_contact_fad || '').trim(),
     site_web: (site_web || '').trim(),
     ninea: (ninea || '').trim(),
     rc: (rc || '').trim(),
@@ -723,6 +735,10 @@ router.post('/', adminOnly, maybeUploadCreateFiles, async (req, res) => {
     banque: (banque || '').trim(),
     iban: (iban || '').trim(),
     swift: (swift || '').trim(),
+    banque_fad: (banque_fad || '').trim(),
+    compte_bancaire_fad: (compte_bancaire_fad || '').trim(),
+    iban_fad: (iban_fad || '').trim(),
+    swift_fad: (swift_fad || '').trim(),
     signataire_nom: (signataire_nom || '').trim(),
     signataire_fonction: (signataire_fonction || '').trim(),
     responsable_id: null,
@@ -1553,8 +1569,11 @@ router.put('/:id', authMiddleware, (req, res) => {
   const fields = [
     'nom', 'type', 'description', 'couleur_primaire', 'couleur_secondaire',
     'adresse', 'telephone', 'email_contact', 'site_web',
+    'adresse_fad', 'telephone_fad', 'email_contact_fad',
     'ninea', 'rc', 'arrete', 'compte_bancaire',
-    'banque', 'iban', 'swift', 'signataire_nom', 'signataire_fonction'
+    'banque', 'iban', 'swift',
+    'banque_fad', 'compte_bancaire_fad', 'iban_fad', 'swift_fad',
+    'signataire_nom', 'signataire_fonction'
   ];
   fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
 
@@ -2525,6 +2544,66 @@ router.get('/:id/membres', etabMembresManageAccess, (req, res) => {
   res.json(membres);
 });
 
+// GET /api/etablissements/:id/membres/import/template — modèle Excel import membres staff
+router.get('/:id/membres/import/template', etabMembresManageAccess, async (req, res) => {
+  const etablissement_id = parseInt(req.params.id, 10);
+  if (Number.isNaN(etablissement_id)) {
+    return res.status(400).json({ message: 'Identifiant établissement invalide.' });
+  }
+  const etab = db.get('etablissements').find({ id: etablissement_id }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+  try {
+    const wb = await buildUsersTemplateWorkbook();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="template-membres-etab-${etablissement_id}.xlsx"`);
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Impossible de générer le modèle.' });
+  }
+});
+
+// POST /api/etablissements/:id/membres/import?dry_run=1 — import Excel/CSV membres
+router.post('/:id/membres/import', etabMembresManageAccess, csvUpload.single('file'), async (req, res) => {
+  const etablissement_id = parseInt(req.params.id, 10);
+  if (Number.isNaN(etablissement_id)) {
+    return res.status(400).json({ message: 'Identifiant établissement invalide.' });
+  }
+  const etab = db.get('etablissements').find({ id: etablissement_id }).value();
+  if (!etab) return res.status(404).json({ message: 'Établissement introuvable.' });
+
+  const dryRunRaw = req.query.dry_run ?? req.body?.dry_run ?? '1';
+  const dryRun = !['0', 'false', 'no', 'non'].includes(String(dryRunRaw).toLowerCase());
+
+  if (!req.file) {
+    return res.status(400).json({ message: 'Fichier Excel (.xlsx) ou CSV requis (champ file).' });
+  }
+
+  let parsed;
+  try {
+    parsed = await parseUserImportBuffer(req.file.buffer, req.file.originalname);
+  } catch (err) {
+    return res.status(400).json({ message: err.message || 'Impossible de lire le fichier.' });
+  }
+  if (parsed.error) {
+    return res.status(400).json({ message: parsed.error });
+  }
+
+  const allowedRoles = rolesCreatablesMembres(req.user);
+  const result = await importUsersRows({
+    rows: parsed.rows,
+    allowedRoles,
+    forcedEtabId: etablissement_id,
+    dryRun,
+    actorId: req.user.id,
+  });
+
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  return res.json(result);
+});
+
 // POST /api/etablissements/:id/membres — créer un compte membre (admin ou responsable étab.)
 router.post('/:id/membres', etabMembresManageAccess, async (req, res) => {
   const etablissement_id = parseInt(req.params.id);
@@ -2799,7 +2878,8 @@ router.post('/:etabId/membres/:id/supprimer-definitif', adminOnly, (req, res) =>
       message: 'Saisissez l’adresse e-mail exacte du compte pour confirmer la suppression définitive.',
     });
   }
-  db.get('utilisateurs').remove({ id }).write();
+  purgeUserPersonalData(id);
+  logAudit(req, 'membre_staff_hard_delete', 'etablissement', etabId, { membre_id: id });
   res.json({ message: 'Compte supprimé définitivement.' });
 });
 

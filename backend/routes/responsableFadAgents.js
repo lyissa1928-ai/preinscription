@@ -13,6 +13,7 @@ const {
   telephoneTaken,
 } = require('../utils/userIdentity');
 const { logAudit } = require('../utils/auditLog');
+const { purgeUserPersonalData } = require('../utils/purgeUserPersonalData');
 
 const fadResponsableOnly = (req, res, next) => {
   if (req.user?.role === 'responsable_fad' || req.user?.role === 'admin') return next();
@@ -201,7 +202,7 @@ router.delete('/agents/:id', (req, res) => {
     return res.status(403).json({ message: 'Hors de votre établissement.' });
   }
   if (String(req.query.hard) === '1' && req.user.role === 'admin') {
-    db.get('utilisateurs').remove({ id }).write();
+    purgeUserPersonalData(id);
     return res.json({ message: 'Agent FAD supprimé définitivement.', id });
   }
   db.get('utilisateurs').find({ id }).assign({

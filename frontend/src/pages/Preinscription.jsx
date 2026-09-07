@@ -184,7 +184,7 @@ export default function Preinscription() {
   const [form, setForm] = useState({
     formation_id: formationId || '',
     annee_academique: `2025-2026`,
-    date_naissance: '', lieu_naissance: '', nationalite: '', telephone: '', adresse: '',
+    date_naissance: '', lieu_naissance: '', nationalite: '', pays_origine: '', telephone: '', adresse: '',
     dernier_diplome: '', etablissement_origine: '', mention: '', annee_obtention: '',
     numero_passeport: '',
   })
@@ -311,7 +311,7 @@ export default function Preinscription() {
 
   const canNext = () => {
     if (step === 0) return !!form.formation_id
-    if (step === 1) return form.date_naissance && form.lieu_naissance && form.nationalite && form.telephone && form.adresse
+    if (step === 1) return form.date_naissance && form.lieu_naissance && form.nationalite && form.pays_origine && form.telephone && form.adresse
     if (step === 2) return form.dernier_diplome && form.etablissement_origine && form.annee_obtention
     return true
   }
@@ -684,12 +684,12 @@ export default function Preinscription() {
                         required
                       />
                     </div>
-                    <div className="sm:col-span-2">
+                    <div>
                       <label htmlFor="prein-nationalite" className="label-field">
                         Nationalité <span className="text-red-500">*</span>
                       </label>
                       <p className="text-xs text-slate-500 mb-2 leading-snug">
-                        Indiquez l’adjectif usuel (ex. « Sénégalaise »). Choisissez une suggestion ou saisissez une autre nationalité ; en cas de double nationalité, indiquez la principale.
+                        Adjectif usuel (ex. « Sénégalaise »). En cas de double nationalité, indiquez la principale.
                       </p>
                       <div className="relative">
                         <FaGlobe className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 text-slate-400 text-sm" aria-hidden />
@@ -710,6 +710,20 @@ export default function Preinscription() {
                           <option key={n} value={n} />
                         ))}
                       </datalist>
+                    </div>
+                    <div>
+                      <label htmlFor="prein-pays-origine" className="label-field">
+                        Pays d&apos;origine <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="prein-pays-origine"
+                        type="text"
+                        className="input-field"
+                        placeholder="Ex. Sénégal, France, Côte d’Ivoire…"
+                        value={form.pays_origine}
+                        onChange={up('pays_origine')}
+                        required
+                      />
                     </div>
                     <div className="sm:col-span-2">
                       <label htmlFor="prein-passeport" className="label-field">

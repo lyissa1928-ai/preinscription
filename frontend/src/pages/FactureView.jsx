@@ -8,6 +8,16 @@ import { buildDisplayRows } from '../utils/factureDisplayRows'
 import { useAuth } from '../context/AuthContext'
 import { getRoleHome } from '../utils/smartBack'
 
+const STAFF_EMAIL_ROLES = [
+  'admin', 'admin_etablissement', 'responsable', 'responsable_fad',
+  'agent_fad', 'comptable', 'agent_admin', 'controleur_qualite',
+]
+
+function pickFadOrPres(live, fadKey, presKey, enLigne) {
+  if (enLigne && live?.[fadKey]) return live[fadKey]
+  return live?.[presKey] || ''
+}
+
 export default function FactureView() {
   const { dossierId } = useParams()
   const { user } = useAuth()
@@ -77,23 +87,31 @@ export default function FactureView() {
     }
   }, [facture])
 
-  const mergeEtab = (snap = {}, live = null) => ({
-    ...snap,
-    email_contact: snap.email_contact || live?.email_contact || '',
-    telephone: snap.telephone || live?.telephone || '',
-    rc: snap.rc || live?.rc || '',
-    arrete: snap.arrete || live?.arrete || '',
-    compte_bancaire: snap.compte_bancaire || live?.compte_bancaire || live?.iban || '',
-    iban: snap.iban || live?.iban || '',
-    swift: snap.swift || live?.swift || '',
-    ninea: snap.ninea || live?.ninea || '',
-    adresse: snap.adresse || live?.adresse || '',
-    cachet_url: snap.cachet_url || live?.cachet_url || null,
-    logo_url: snap.logo_url || live?.logo_url || null,
-    nom: snap.nom || live?.nom || '',
-    couleur_primaire: snap.couleur_primaire || live?.couleur_primaire,
-    couleur_secondaire: snap.couleur_secondaire || live?.couleur_secondaire,
-  })
+  const mergeEtab = (snap = {}, live = null, formationType = '') => {
+    const enLigne = formationType === 'en_ligne'
+    return {
+      ...snap,
+      email_contact: snap.email_contact || pickFadOrPres(live, 'email_contact_fad', 'email_contact', enLigne) || '',
+      telephone: snap.telephone || pickFadOrPres(live, 'telephone_fad', 'telephone', enLigne) || '',
+      rc: snap.rc || live?.rc || '',
+      arrete: snap.arrete || live?.arrete || '',
+      compte_bancaire:
+        snap.compte_bancaire
+        || pickFadOrPres(live, 'compte_bancaire_fad', 'compte_bancaire', enLigne)
+        || live?.iban
+        || '',
+      iban: snap.iban || pickFadOrPres(live, 'iban_fad', 'iban', enLigne) || '',
+      swift: snap.swift || pickFadOrPres(live, 'swift_fad', 'swift', enLigne) || '',
+      ninea: snap.ninea || live?.ninea || '',
+      adresse: snap.adresse || pickFadOrPres(live, 'adresse_fad', 'adresse', enLigne) || '',
+      banque: snap.banque || pickFadOrPres(live, 'banque_fad', 'banque', enLigne) || '',
+      cachet_url: snap.cachet_url || live?.cachet_url || null,
+      logo_url: snap.logo_url || live?.logo_url || null,
+      nom: snap.nom || live?.nom || '',
+      couleur_primaire: snap.couleur_primaire || live?.couleur_primaire,
+      couleur_secondaire: snap.couleur_secondaire || live?.couleur_secondaire,
+    }
+  }
 
   if (loading || generating) {
     return (
@@ -122,13 +140,20 @@ export default function FactureView() {
 
   const et = facture.etudiant_snapshot || {}
   const fo = facture.formation_snapshot || {}
-  const eb = mergeEtab(facture.etablissement_snapshot || {}, etabLive)
+  const eb = mergeEtab(facture.etablissement_snapshot || {}, etabLive, fo.type)
   const primary = eb.couleur_primaire || '#1e40af'
   const { rows, totalAPayer } = buildDisplayRows(facture, fo)
   const showCachet =
     avecCachet &&
     facture.facture_avec_cachet !== false &&
     !!eb.cachet_url
+
+  const canSendEmail = STAFF_EMAIL_ROLES.includes(user?.role)
+
+  const sendFactureEmail = async () => {
+    const { data } = await axios.post(`/api/responsable/dossiers/${dossierId}/envoyer-facture-email`)
+    toast.success(data.message || 'Facture envoyée par e-mail.')
+  }
 
   return (
     <div className="lettre-print-scope min-h-screen bg-slate-200 px-4 py-8">
@@ -137,6 +162,7 @@ export default function FactureView() {
         filename={`${facture.numero || 'facture'}.pdf`}
         primaryColor={primary}
         backFallback={home}
+        onSendEmail={canSendEmail ? sendFactureEmail : undefined}
       />
 
       <div className="mx-auto mb-4 flex max-w-[210mm] flex-wrap items-center justify-end gap-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm">

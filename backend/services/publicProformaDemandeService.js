@@ -4,22 +4,22 @@ const { publicAssetUrl } = require('../utils/publicAssetUrl');
 const { getDureeMoisEffectif } = require('../utils/formationTarifs');
 const { cleanupProformaUploads, persistProformaJustificatif } = require('../utils/proformaUpload');
 const { notifyEtabStaff } = require('../utils/notifyEtabStaff');
+const { snapshotFromEtab } = require('../utils/etablissementSnapshot');
 
-function buildEtabSnapshot(req, etab) {
+function defaultAnneeAcademique() {
+  const year = new Date().getFullYear();
+  return `${year}-${year + 1}`;
+}
+
+function buildEtabSnapshot(req, etab, typeFormation) {
   if (!etab) return null;
+  const snap = snapshotFromEtab(etab, { type: typeFormation });
+  if (!snap) return null;
   return {
-    nom: etab.nom,
+    ...snap,
     type: etab.type,
-    adresse: etab.adresse || '',
-    telephone: etab.telephone || '',
-    email_contact: etab.email_contact || '',
-    site_web: etab.site_web || '',
     logo_url: publicAssetUrl(req, etab.logo_url),
     cachet_url: publicAssetUrl(req, etab.cachet_url),
-    couleur_primaire: etab.couleur_primaire || '#1e40af',
-    couleur_secondaire: etab.couleur_secondaire || '#3b82f6',
-    ninea: etab.ninea || '',
-    compte_bancaire: etab.compte_bancaire || '',
   };
 }
 
@@ -53,6 +53,8 @@ function createPublicDemandeProforma({ req, body, files }) {
   const nom = String(body.nom || '').trim() || '—';
   const email = String(body.email || '').trim().toLowerCase();
   const telephone = String(body.telephone || '').trim() || null;
+  const adresse = String(body.adresse || '').trim() || null;
+  const annee_academique = String(body.annee_academique || '').trim() || defaultAnneeAcademique();
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     cleanupProformaUploads(filesIn);
@@ -125,6 +127,8 @@ function createPublicDemandeProforma({ req, body, files }) {
     nom,
     email,
     telephone,
+    adresse,
+    annee_academique,
     niveau: body.niveau ? String(body.niveau).trim() : null,
     type_formation,
     formation_id: fid,
@@ -145,7 +149,7 @@ function createPublicDemandeProforma({ req, body, files }) {
             contact: String(body.payeur_org_contact || '').trim(),
           }
         : null,
-    etablissement_snapshot: buildEtabSnapshot(req, etab),
+    etablissement_snapshot: buildEtabSnapshot(req, etab, type_formation),
     justificatifs: {
       identite: identiteRel,
       diplome: diplomeRel,

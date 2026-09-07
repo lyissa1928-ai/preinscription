@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const db = require('../database/db');
 
 /** Admins actifs, en excluant certains ids (ex. suppressions / désactivations en cours). */
@@ -38,6 +39,17 @@ const { resolveCandidatIdentite } = require('../utils/candidatIdentite');
 const { filterDossiersAffichables, assertDossierAffichable } = require('../utils/dossierVisibility');
 const { parsePagination, wantsPagination, paginateArray } = require('../utils/pagination');
 const { STAFF_ROLES: STAFF_ROLES_CANON, ROLE_DIRECTEUR } = require('../utils/staffRoles');
+const { purgeUserPersonalData } = require('../utils/purgeUserPersonalData');
+const {
+  parseUserImportBuffer,
+  buildUsersTemplateWorkbook,
+  importUsersRows,
+} = require('../utils/userImportExcel');
+
+const userImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 },
+});
 
 const ROLES_STAFF_ADMIN = [...STAFF_ROLES_CANON];
 const ROLES_VALIDES_ADMIN = [...STAFF_ROLES_CANON, 'etudiant'];
@@ -559,6 +571,58 @@ router.get('/utilisateurs', (req, res) => {
   });
 });
 
+// GET /api/admin/utilisateurs/import/template — modèle Excel import staff
+router.get('/utilisateurs/import/template', adminSensitiveLimiter, async (req, res) => {
+  try {
+    const wb = await buildUsersTemplateWorkbook();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="template-utilisateurs-staff.xlsx"');
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Impossible de générer le modèle.' });
+  }
+});
+
+// POST /api/admin/utilisateurs/import?dry_run=1 — import Excel/CSV (validation par défaut)
+router.post('/utilisateurs/import', adminSensitiveLimiter, userImportUpload.single('file'), async (req, res) => {
+  const dryRunRaw = req.query.dry_run ?? req.body?.dry_run ?? '1';
+  const dryRun = !['0', 'false', 'no', 'non'].includes(String(dryRunRaw).toLowerCase());
+
+  if (!req.file) {
+    return res.status(400).json({ message: 'Fichier Excel (.xlsx) ou CSV requis (champ file).' });
+  }
+
+  let parsed;
+  try {
+    parsed = await parseUserImportBuffer(req.file.buffer, req.file.originalname);
+  } catch (err) {
+    return res.status(400).json({ message: err.message || 'Impossible de lire le fichier.' });
+  }
+  if (parsed.error) {
+    return res.status(400).json({ message: parsed.error });
+  }
+
+  const forcedEtabRaw = req.body?.etablissement_id ?? req.query?.etablissement_id;
+  const forcedEtabId = forcedEtabRaw != null && String(forcedEtabRaw).trim() !== ''
+    ? parseInt(String(forcedEtabRaw), 10)
+    : null;
+  const allowedRoles = ROLES_STAFF_ADMIN.filter((r) => r !== 'etudiant');
+
+  const result = await importUsersRows({
+    rows: parsed.rows,
+    allowedRoles,
+    forcedEtabId: Number.isFinite(forcedEtabId) ? forcedEtabId : null,
+    dryRun,
+    actorId: req.user.id,
+  });
+
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  return res.json(result);
+});
+
 // POST /api/admin/utilisateurs/bulk-action — Actions par lot
 // DOIT être défini AVANT /:id pour éviter le conflit de route
 router.post('/utilisateurs/bulk-action', adminSensitiveLimiter, (req, res) => {
@@ -586,7 +650,7 @@ router.post('/utilisateurs/bulk-action', adminSensitiveLimiter, (req, res) => {
         message: `Pour confirmer, saisissez exactement : ${expected}`,
       });
     }
-    ids.forEach(id => db.get('utilisateurs').remove({ id: parseInt(id) }).write());
+    ids.forEach(id => purgeUserPersonalData(parseInt(id, 10)));
     return res.json({ message: `${ids.length} compte(s) supprimé(s) définitivement.` });
   }
 
@@ -950,7 +1014,7 @@ router.delete('/utilisateurs/:id/supprimer', adminSensitiveLimiter, (req, res) =
     }
   }
 
-  db.get('utilisateurs').remove({ id }).write();
+  purgeUserPersonalData(id);
   res.json({ message: 'Compte supprimé définitivement.' });
 });
 

@@ -195,6 +195,9 @@ function FormulaireDemandeProformaPublic({ etablissements, initialEtablissementI
     type_formation: '',
     formation_id: '',
     email: '',
+    telephone: '',
+    adresse: '',
+    annee_academique: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
   })
   const [files, setFiles] = useState({ identite: null, diplome: null })
   const [formations, setFormations] = useState([])
@@ -259,6 +262,14 @@ function FormulaireDemandeProformaPublic({ etablissements, initialEtablissementI
       toast.error('Indiquez une adresse e-mail valide (pour recevoir la facture proforma).')
       return
     }
+    if (!String(form.adresse || '').trim()) {
+      toast.error('L’adresse physique est obligatoire.')
+      return
+    }
+    if (!String(form.annee_academique || '').trim()) {
+      toast.error('Indiquez l’année académique.')
+      return
+    }
     if (!files.identite || !files.diplome) {
       toast.error('Carte d’identité / NIN / passeport (JPG ou PNG) et dernier diplôme sont obligatoires.')
       return
@@ -272,6 +283,9 @@ function FormulaireDemandeProformaPublic({ etablissements, initialEtablissementI
     try {
       const fd = new FormData()
       fd.append('email', form.email.trim())
+      if (form.telephone?.trim()) fd.append('telephone', form.telephone.trim())
+      fd.append('adresse', String(form.adresse).trim())
+      fd.append('annee_academique', String(form.annee_academique).trim())
       fd.append('type_formation', form.type_formation)
       fd.append('formation_id', form.formation_id)
       fd.append('etablissement_id', form.etablissement_id)
@@ -348,7 +362,7 @@ function FormulaireDemandeProformaPublic({ etablissements, initialEtablissementI
       )}
 
       <div className="border-t border-gray-200 pt-3">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Votre e-mail</p>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Coordonnées</p>
         <LBL required>E-mail (réception de la facture)</LBL>
         <input
           type="email"
@@ -358,6 +372,20 @@ function FormulaireDemandeProformaPublic({ etablissements, initialEtablissementI
           required
           placeholder="exemple@email.com"
         />
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div>
+            <LBL>Téléphone</LBL>
+            <input type="tel" className="input-field" value={form.telephone || ''} onChange={up('telephone')} />
+          </div>
+          <div>
+            <LBL required>Année académique</LBL>
+            <input className="input-field" value={form.annee_academique || ''} onChange={up('annee_academique')} required placeholder="2025-2026" />
+          </div>
+        </div>
+        <div className="mt-3">
+          <LBL required>Adresse physique</LBL>
+          <textarea className="input-field min-h-[72px]" value={form.adresse || ''} onChange={up('adresse')} required />
+        </div>
       </div>
 
       <div className="border-t border-gray-200 pt-3">
@@ -478,6 +506,8 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
     email: user?.email || '',
     date_naissance: user?.date_naissance ? String(user.date_naissance).slice(0, 10) : '',
     lieu_naissance: user?.lieu_naissance || '',
+    adresse: user?.adresse || '',
+    annee_academique: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
   })
   const [files, setFiles] = useState({ diplome: null, releve: null, formation: null })
   const [formations, setFormations] = useState([])
@@ -514,6 +544,7 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
         ? String(user.date_naissance).slice(0, 10)
         : (p.date_naissance || ''),
       lieu_naissance: user.lieu_naissance || p.lieu_naissance || '',
+      adresse: p.adresse || user.adresse || '',
     }))
   }, [user])
 
@@ -573,10 +604,20 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
       toast.error('La date de naissance est obligatoire pour la demande de facture proforma.')
       return
     }
+    if (!String(form.adresse || '').trim()) {
+      toast.error('L’adresse physique est obligatoire.')
+      return
+    }
+    if (!String(form.annee_academique || '').trim()) {
+      toast.error('Indiquez l’année académique.')
+      return
+    }
     setLoading(true)
     try {
       const fd = new FormData()
       fd.append('telephone', form.telephone.trim())
+      fd.append('adresse', String(form.adresse).trim())
+      fd.append('annee_academique', String(form.annee_academique).trim())
       fd.append('type_formation', form.type_formation)
       fd.append('formation_id', form.formation_id)
       fd.append('etablissement_id', form.etablissement_id)
@@ -624,6 +665,9 @@ function FormulaireDemandeProforma({ etablissements, initialEtablissementId, use
         up={up}
         identityReadOnly
         birthDateRequired={birthDateRequired}
+        addressRequired
+        showAnneeAcademique
+        anneeAcademiqueRequired
       />
       {birthFromProfile && (
         <p className="text-xs text-emerald-700 -mt-2">

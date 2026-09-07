@@ -7,6 +7,12 @@ const { demandeProformaJustificatifsComplets } = require('../utils/proformaJusti
 const { createUserNotification } = require('../utils/notificationService');
 const { notifyProformaDecision } = require('../utils/transactionalEmail');
 const { dateEcheanceFacture } = require('../utils/factureValidite');
+const { snapshotFromFormation } = require('../utils/etablissementSnapshot');
+
+function defaultAnneeAcademique() {
+  const year = new Date().getFullYear();
+  return `${year}-${year + 1}`;
+}
 
 function buildFactureDemandeFromFormation(demande, formation, opts = {}) {
   const tarif = buildLignesForfaitAnnuel(formation);
@@ -172,6 +178,8 @@ async function creerProformaPourEtudiant({
   nom: nomIn,
   telephone: telIn,
   email: emailIn,
+  adresse: adresseIn,
+  annee_academique: anneeIn,
   remise,
   buildEtabSnapshot,
 }) {
@@ -217,6 +225,8 @@ async function creerProformaPourEtudiant({
   const email = String(emailIn != null ? emailIn : etudiant?.email || '')
     .trim()
     .toLowerCase();
+  const adresse = String(adresseIn != null ? adresseIn : etudiant?.adresse || '').trim();
+  const annee_academique = String(anneeIn || '').trim() || defaultAnneeAcademique();
 
   if (!prenom || !nom) {
     return { ok: false, status: 400, message: 'Nom et prénom obligatoires.' };
@@ -240,6 +250,8 @@ async function creerProformaPourEtudiant({
     nom,
     email: email || '',
     telephone,
+    adresse: adresse || null,
+    annee_academique,
     niveau: null,
     type_formation: formation.type,
     formation_id: fid,
@@ -253,7 +265,9 @@ async function creerProformaPourEtudiant({
     details: null,
     type_payeur: 'etudiant',
     payeur: null,
-    etablissement_snapshot: typeof buildEtabSnapshot === 'function' ? buildEtabSnapshot(etab) : null,
+    etablissement_snapshot: typeof buildEtabSnapshot === 'function'
+      ? buildEtabSnapshot(etab)
+      : snapshotFromFormation(formation),
     justificatifs: null,
     statut: 'en_attente',
     facture: null,

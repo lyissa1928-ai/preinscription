@@ -8,7 +8,7 @@ import StatutBadge from '../components/StatutBadge'
 import PreinscriptionConditionsBlock from '../components/PreinscriptionConditionsBlock'
 import { DashboardPage, DashboardHero, Panel, DashboardSpinner } from '../components/dashboard/DashboardChrome'
 import { isDossierAcceptePourDocuments, canShowLettrePreinscription } from '../utils/dossierStatut'
-import { primaryPhotoDocumentFromList, inferIsForeignerFromNationalite } from '../utils/preinscriptionDocumentRules'
+import { primaryPhotoDocumentFromList } from '../utils/preinscriptionDocumentRules'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n)
 const fmtDate = (d) =>
@@ -163,7 +163,7 @@ function ModalDetail({ open, onClose, type, payload }) {
               <Link to={`/attestation/${dossier.id}`} className="text-xs font-bold bg-indigo-600 text-white px-3 py-2 rounded-lg" onClick={onClose}>
                 Attestation
               </Link>
-              {canShowLettrePreinscription(dossier, inferIsForeignerFromNationalite) && (
+              {canShowLettrePreinscription(dossier) && (
                 <Link to={`/lettre/${dossier.id}`} className="text-xs font-bold bg-emerald-600 text-white px-3 py-2 rounded-lg" onClick={onClose}>
                   Lettre
                 </Link>
@@ -186,7 +186,7 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
   const canEditPhoto = dossier.statut === 'en_attente' || dossier.statut === 'en_cours'
   const [photoBusy, setPhotoBusy] = useState(false)
   const photoInputRef = useRef(null)
-  const showLettre = canShowLettrePreinscription(dossier, inferIsForeignerFromNationalite)
+  const showLettre = canShowLettrePreinscription(dossier)
   const accepted = isDossierAcceptePourDocuments(dossier.statut)
   const statutCfg = STATUT_CONFIG[dossier.statut] || { color: 'border-slate-200 bg-slate-50', icon: '📋', msg: '' }
 
@@ -332,8 +332,7 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
         ) : (
           <>
             <p className="ui-section-sub">
-              Candidature acceptée — téléchargez vos documents administratifs
-              {showLettre ? ' (lettre réservée aux candidats étrangers éligibles).' : '.'}
+              Candidature acceptée — téléchargez vos documents administratifs (lettre, attestation, facture proforma).
             </p>
             <div className="ui-action-bar">
               <Link to={`/facture/${dossier.id}`} className="ui-doc-btn">
@@ -759,7 +758,7 @@ export default function EtudiantDashboard() {
                   const { dossier, formation } = row
                   const ld = labelDossierStatut(dossier.statut)
                   const accepted = isDossierAcceptePourDocuments(dossier.statut)
-                  const showLettre = canShowLettrePreinscription(dossier, inferIsForeignerFromNationalite)
+                  const showLettre = canShowLettrePreinscription(dossier)
                   return (
                     <Fragment key={dossier.id}>
                       <tr

@@ -66,6 +66,7 @@ export default function AdminDossier() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [genFacture, setGenFacture] = useState(false)
+  const [emailSending, setEmailSending] = useState(null)
   const [decision, setDecision] = useState({ statut: '', commentaire: '' })
 
   useEffect(() => {
@@ -149,6 +150,25 @@ export default function AdminDossier() {
   const isAccepte = isDossierAcceptePourDocuments(dossier.statut)
   const photoDoc = primaryPhotoDocumentFromList(documents)
   const nomComplet = formatNomComplet(dossier)
+  const hasFacture = Boolean(facture?.numero || dossier.facture_id)
+
+  const sendDocEmail = async (kind) => {
+    setEmailSending(kind)
+    try {
+      const path =
+        kind === 'lettre'
+          ? 'envoyer-lettre-email'
+          : kind === 'attestation'
+            ? 'envoyer-attestation-email'
+            : 'envoyer-facture-email'
+      const { data: res } = await axios.post(`/api/responsable/dossiers/${id}/${path}`)
+      toast.success(res.message || 'E-mail envoyé.')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Envoi impossible.')
+    } finally {
+      setEmailSending(null)
+    }
+  }
 
   const decisionBlock = (
     <div className="bg-gradient-to-br from-slate-50/90 via-white to-indigo-50/30 px-5 py-5 sm:px-6 sm:py-6">
@@ -233,27 +253,67 @@ export default function AdminDossier() {
         Documents officiels
       </h3>
       <p className="mb-4 text-xs leading-relaxed text-emerald-800/90">
-        Attestation disponible. Lettre réservée aux candidats étrangers acceptés en ligne.
+        Préinscription acceptée : lettre, attestation et facture (si émise) disponibles ci-dessous.
       </p>
       <div className="flex flex-col gap-2.5">
         {dossier.source !== 'staff' && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Link
+              to={`/lettre/${id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-700"
+            >
+              Lettre de préinscription
+            </Link>
+            <button
+              type="button"
+              disabled={emailSending === 'lettre'}
+              onClick={() => sendDocEmail('lettre')}
+              className="rounded-xl border border-emerald-300 bg-white px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
+            >
+              {emailSending === 'lettre' ? 'Envoi…' : 'Envoyer par e-mail'}
+            </button>
+          </div>
+        )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Link
-            to={`/lettre/${id}`}
+            to={`/attestation/${id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-700"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-indigo-600 bg-white px-4 py-3 text-sm font-semibold text-indigo-800 shadow-sm transition hover:bg-indigo-50"
           >
-            Lettre de préinscription
+            Attestation de préinscription
           </Link>
+          <button
+            type="button"
+            disabled={emailSending === 'attestation'}
+            onClick={() => sendDocEmail('attestation')}
+            className="rounded-xl border border-indigo-300 bg-white px-4 py-3 text-sm font-semibold text-indigo-800 hover:bg-indigo-50 disabled:opacity-50"
+          >
+            {emailSending === 'attestation' ? 'Envoi…' : 'Envoyer par e-mail'}
+          </button>
+        </div>
+        {hasFacture && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Link
+              to={`/facture/${id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-blue-600 bg-white px-4 py-3 text-sm font-semibold text-blue-800 shadow-sm transition hover:bg-blue-50"
+            >
+              Facture {facture?.numero ? `(${facture.numero})` : ''}
+            </Link>
+            <button
+              type="button"
+              disabled={emailSending === 'facture'}
+              onClick={() => sendDocEmail('facture')}
+              className="rounded-xl border border-blue-300 bg-white px-4 py-3 text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:opacity-50"
+            >
+              {emailSending === 'facture' ? 'Envoi…' : 'Envoyer par e-mail'}
+            </button>
+          </div>
         )}
-        <Link
-          to={`/attestation/${id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 rounded-xl border-2 border-indigo-600 bg-white px-4 py-3 text-sm font-semibold text-indigo-800 shadow-sm transition hover:bg-indigo-50"
-        >
-          Attestation de préinscription
-        </Link>
       </div>
     </div>
   )
@@ -380,6 +440,7 @@ export default function AdminDossier() {
                   ['Matricule (compte)', dossier.matricule || '—'],
                   ['Email', dossier.email || '—'],
                   ['Téléphone', dossier.telephone || '—'],
+                  ['Pays d\'origine', dossier.pays_origine || dossier.pays_residence || '—'],
                   ['Nationalité', dossier.nationalite || '—'],
                   ['Date de naissance', formatDateFr(dossier.date_naissance)],
                   ['Lieu de naissance', dossier.lieu_naissance || '—'],

@@ -96,6 +96,7 @@ const MENUS = {
     { label: 'Flyers publics', to: '/mon-etablissement/flyers', icon: ICONS.dossiers },
     { label: 'Équipe & comptes', to: '/mon-etablissement/equipe', icon: ICONS.users, exact: true },
     { label: 'Filières & formations', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
+    { label: 'Niveaux d’étude', to: '/mon-etablissement/niveaux-etude', icon: ICONS.pedago },
     { label: 'Dossiers & acceptation', to: '/responsable', icon: ICONS.dossiers },
     { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
     { label: 'Guichet', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
@@ -134,6 +135,7 @@ const MENUS = {
     },
     { label: 'Guichet FAD', to: '/responsable/preinscription-guichet', icon: ICONS.finance },
     { label: 'Formations FAD', to: '/responsable/gestion-etablissement', icon: ICONS.formations },
+    { label: 'Coordonnées FAD', to: '/mon-etablissement/identite', icon: ICONS.identifiants },
     { label: 'Agents FAD', to: '/responsable/agents-fad', icon: ICONS.users },
     { label: 'Messages', to: '/chat', icon: ICONS.chat },
     { label: 'Factures', to: '/mon-etablissement/factures', icon: ICONS.finance },
@@ -380,7 +382,7 @@ export default function Sidebar() {
   return (
     <>
       {/* ── Sidebar desktop ───────────────────────────────────── */}
-      <aside data-no-print className={`hidden md:flex flex-col flex-shrink-0 h-screen sticky top-0 transition-all duration-200 ${collapsed ? 'w-16' : 'w-60'}`}>
+      <aside data-no-print className={`hidden md:flex flex-col flex-shrink-0 h-screen sticky top-0 transition-all duration-200 min-w-0 ${collapsed ? 'w-16' : 'w-60'}`}>
         <SidebarContent />
       </aside>
 

@@ -141,7 +141,9 @@ function TabIdentite({ etab, onUpdated }) {
         'nom', 'type', 'description', 'couleur_primaire', 'couleur_secondaire',
         'adresse', 'telephone', 'email_contact', 'site_web',
         'ninea', 'rc', 'arrete', 'compte_bancaire',
-        'banque', 'iban', 'swift', 'signataire_nom', 'signataire_fonction'
+        'banque', 'iban', 'swift', 'signataire_nom', 'signataire_fonction',
+        'adresse_fad', 'telephone_fad', 'email_contact_fad',
+        'banque_fad', 'compte_bancaire_fad', 'iban_fad', 'swift_fad',
       ]
       const payload = {}
       fields.forEach(f => { payload[f] = form[f] || '' })
@@ -192,6 +194,40 @@ function TabIdentite({ etab, onUpdated }) {
         <div className="md:col-span-2">
           <L>Adresse</L>
           <input className="input-field" value={form.adresse || ''} onChange={up('adresse')} />
+        </div>
+        <div className="md:col-span-2 border-t border-slate-200 pt-4">
+          <p className="mb-3 text-sm font-bold text-slate-800">Coordonnées FAD (formation à distance)</p>
+        </div>
+        <div className="md:col-span-2">
+          <L>Adresse FAD</L>
+          <input className="input-field" value={form.adresse_fad || ''} onChange={up('adresse_fad')} />
+        </div>
+        <div>
+          <L>Téléphone FAD</L>
+          <input className="input-field" value={form.telephone_fad || ''} onChange={up('telephone_fad')} />
+        </div>
+        <div>
+          <L>Email contact FAD</L>
+          <input className="input-field" type="email" value={form.email_contact_fad || ''} onChange={up('email_contact_fad')} />
+        </div>
+        <div>
+          <L>Banque FAD</L>
+          <input className="input-field" value={form.banque_fad || ''} onChange={up('banque_fad')} placeholder="Optionnel" />
+        </div>
+        <div>
+          <L>Compte bancaire FAD</L>
+          <input className="input-field" value={form.compte_bancaire_fad || ''} onChange={up('compte_bancaire_fad')} placeholder="Optionnel" />
+        </div>
+        <div>
+          <L>IBAN FAD</L>
+          <input className="input-field" value={form.iban_fad || ''} onChange={up('iban_fad')} placeholder="Optionnel" />
+        </div>
+        <div>
+          <L>SWIFT FAD</L>
+          <input className="input-field" value={form.swift_fad || ''} onChange={up('swift_fad')} placeholder="Optionnel" />
+        </div>
+        <div className="md:col-span-2 border-t border-slate-200 pt-2">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Conformité & présentiel</p>
         </div>
         <div>
           <L>NINEA</L>
@@ -1793,6 +1829,11 @@ export function TabMembres({ etabId, membres: init, responsable_id, admin_etabli
   const [permanentFor, setPermanentFor] = useState(null)
   const [confirmEmail, setConfirmEmail] = useState('')
   const [permanentSaving, setPermanentSaving] = useState(false)
+  const [showUserImport, setShowUserImport] = useState(false)
+  const [userImportFile, setUserImportFile] = useState(null)
+  const [userImporting, setUserImporting] = useState(false)
+  const [userImportDryRun, setUserImportDryRun] = useState(true)
+  const [userImportResult, setUserImportResult] = useState(null)
 
   useEffect(() => {
     setMembres(init || [])
@@ -1921,6 +1962,55 @@ export function TabMembres({ etabId, membres: init, responsable_id, admin_etabli
     } finally { setPermanentSaving(false) }
   }
 
+  const downloadUserImportTemplate = async () => {
+    try {
+      const { data } = await axios.get(`/api/etablissements/${etabId}/membres/import/template`, { responseType: 'blob' })
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'modele-import-membres.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Impossible de télécharger le modèle.')
+    }
+  }
+
+  const runUserImport = async (dryRun) => {
+    if (!userImportFile) {
+      toast.error('Choisissez un fichier Excel ou CSV.')
+      return
+    }
+    setUserImporting(true)
+    setUserImportResult(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', userImportFile)
+      const { data } = await axios.post(
+        `/api/etablissements/${etabId}/membres/import?dry_run=${dryRun ? '1' : '0'}`,
+        fd,
+      )
+      setUserImportResult(data)
+      setUserImportDryRun(dryRun)
+      if (!dryRun && data.ok) {
+        toast.success(`${data.summary?.created || 0} compte(s) créé(s).`)
+        onEtabRefresh?.()
+        axios.get(`/api/etablissements/${etabId}`).then(({ data: et }) => {
+          if (Array.isArray(et.membres)) setMembres(et.membres)
+        }).catch(() => {})
+      } else if (dryRun && data.ok) {
+        toast.success('Validation OK — vous pouvez importer.')
+      } else if (!data.ok) {
+        toast.error(`${data.summary?.invalid_rows || data.errors?.length || 0} ligne(s) en erreur.`)
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Import impossible.')
+      setUserImportResult(err.response?.data || null)
+    } finally {
+      setUserImporting(false)
+    }
+  }
+
   const actifs = membres.filter(m => m.actif !== false).length
 
   return (
@@ -1954,14 +2044,28 @@ export function TabMembres({ etabId, membres: init, responsable_id, admin_etabli
             </div>
           </div>
           {canCreateStaffAccount && (
-            <button
-              type="button"
-              onClick={() => { setShowForm(true); setForm(EMPTY_MEMBRE_FORM) }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-900/40 transition hover:brightness-110 active:scale-[0.98]"
-            >
-              <FaPlus className="h-4 w-4" aria-hidden />
-              Ajouter un membre
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserImport(true)
+                  setUserImportResult(null)
+                  setUserImportFile(null)
+                  setUserImportDryRun(true)
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/20"
+              >
+                Import Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowForm(true); setForm(EMPTY_MEMBRE_FORM) }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-900/40 transition hover:brightness-110 active:scale-[0.98]"
+              >
+                <FaPlus className="h-4 w-4" aria-hidden />
+                Ajouter un membre
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -2108,6 +2212,68 @@ export function TabMembres({ etabId, membres: init, responsable_id, admin_etabli
 
       {filtered.length === 0 && membres.length > 0 && (
         <p className="text-center text-sm text-slate-500">Aucun membre ne correspond à votre recherche.</p>
+      )}
+
+      {showUserImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
+          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-4">
+              <h3 className="text-lg font-bold text-slate-900">Import Excel des membres</h3>
+              <button type="button" onClick={() => setShowUserImport(false)} className="text-2xl text-slate-400 hover:text-slate-700" aria-label="Fermer">×</button>
+            </div>
+            <div className="space-y-4 p-5">
+              <p className="text-sm text-slate-600">
+                Colonnes : prenom, nom, email, role, telephone, adresse, service. Validation ligne par ligne avant création.
+              </p>
+              <button type="button" onClick={downloadUserImportTemplate} className="btn-secondary w-full text-sm">
+                Télécharger le modèle Excel
+              </button>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="input-field"
+                onChange={(e) => setUserImportFile(e.target.files?.[0] || null)}
+              />
+              {userImportResult && (
+                <div className={`rounded-xl border p-3 text-sm ${userImportResult.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}>
+                  <p className="font-semibold">
+                    {userImportDryRun ? 'Validation' : 'Import'} — {userImportResult.summary?.valid_rows ?? 0} valide(s),{' '}
+                    {userImportResult.summary?.invalid_rows ?? userImportResult.errors?.length ?? 0} erreur(s)
+                    {!userImportDryRun && userImportResult.summary?.created != null ? `, ${userImportResult.summary.created} créé(s)` : ''}
+                  </p>
+                  {Array.isArray(userImportResult.errors) && userImportResult.errors.length > 0 && (
+                    <ul className="mt-2 max-h-40 list-disc overflow-y-auto pl-5 text-xs">
+                      {userImportResult.errors.slice(0, 40).map((err, i) => (
+                        <li key={`${err.row}-${err.field}-${i}`}>
+                          Ligne {err.row}{err.field ? ` (${err.field})` : ''} : {err.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button type="button" onClick={() => setShowUserImport(false)} className="btn-secondary flex-1">Fermer</button>
+                <button
+                  type="button"
+                  disabled={userImporting || !userImportFile}
+                  onClick={() => runUserImport(true)}
+                  className="btn-secondary flex-1 disabled:opacity-40"
+                >
+                  {userImporting && userImportDryRun ? 'Validation…' : 'Valider'}
+                </button>
+                <button
+                  type="button"
+                  disabled={userImporting || !userImportFile || !(userImportResult?.ok && userImportDryRun)}
+                  onClick={() => runUserImport(false)}
+                  className="btn-primary flex-1 disabled:opacity-40"
+                >
+                  {userImporting && !userImportDryRun ? 'Import…' : 'Importer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {showForm && (

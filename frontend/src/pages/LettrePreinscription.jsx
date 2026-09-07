@@ -1,11 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
+import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { mediaUrl } from '../utils/mediaUrl'
 import CachetScolarite from '../components/CachetScolarite'
 import DocumentDownloadBar from '../components/DocumentDownloadBar'
 import { getRoleHome } from '../utils/smartBack'
+
+const STAFF_EMAIL_ROLES = [
+  'admin', 'admin_etablissement', 'responsable', 'responsable_fad',
+  'agent_fad', 'comptable', 'agent_admin', 'controleur_qualite',
+]
 
 const fmtDate = (d) => {
   if (!d) return '—'
@@ -91,7 +97,7 @@ export default function LettrePreinscription() {
   const lieuNaissance = dossier.lieu_naissance || etudiant.lieu_naissance || null
   const nin = dossier.numero_piece || dossier.numero_passeport || ext.numero_passeport || etudiant.numero_piece || null
   const adresse = dossier.adresse || etudiant.adresse || null
-  const paysOrigine = dossier.pays_residence || dossier.nationalite || etudiant.nationalite || null
+  const paysOrigine = dossier.pays_origine || dossier.pays_residence || dossier.nationalite || etudiant.nationalite || null
   const email = etudiant.email || dossier.email || null
   const primary = etab?.couleur_primaire || '#1e3a8a'
   const secondary = etab?.couleur_secondaire || '#0f172a'
@@ -121,6 +127,14 @@ export default function LettrePreinscription() {
         filename={`${refLettre}.pdf`}
         primaryColor={primary}
         backFallback={getRoleHome(user?.role)}
+        onSendEmail={
+          STAFF_EMAIL_ROLES.includes(user?.role)
+            ? async () => {
+                const { data: res } = await axios.post(`/api/responsable/dossiers/${dossierId}/envoyer-lettre-email`)
+                toast.success(res.message || 'Lettre envoyée par e-mail.')
+              }
+            : undefined
+        }
       />
 
       <div className="a4-preview-stage">

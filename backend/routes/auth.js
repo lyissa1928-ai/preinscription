@@ -57,6 +57,7 @@ const {
   invalidateResetCode,
   sendResetCodeEmail,
 } = require('../utils/passwordResetCode');
+const { sendAccountActivatedEmail } = require('../utils/transactionalEmail');
 
 function newSecureToken() {
   return crypto.randomBytes(32).toString('hex');
@@ -590,6 +591,7 @@ router.post('/changer-mot-de-passe-obligatoire', authMiddleware, (req, res) => {
 
   const updated = db.get('utilisateurs').find({ id: user.id }).value();
   revokeAllRefreshTokensForUser(updated.id);
+  sendAccountActivatedEmail(updated).catch(() => {});
   res.json({
     message: 'Mot de passe mis à jour. Vous pouvez continuer.',
     ...buildAuthTokensResponse(updated, req),
@@ -679,6 +681,7 @@ router.post('/verifier-email', verifyEmailLimiter, async (req, res) => {
 
   const updated = db.get('utilisateurs').find({ id: user.id }).value();
   clearAccountLockOnSuccess(user.id);
+  sendAccountActivatedEmail(updated).catch(() => {});
   res.json({
     message: 'Adresse e-mail confirmée. Vous êtes connecté.',
     ...buildAuthTokensResponse(updated, req),
@@ -769,6 +772,7 @@ function applyNewPasswordAndLogin(req, res, user, nouveau_mot_de_passe) {
   const updated = db.get('utilisateurs').find({ id: user.id }).value();
   clearAccountLockOnSuccess(user.id);
   revokeAllRefreshTokensForUser(updated.id);
+  sendAccountActivatedEmail(updated).catch(() => {});
   return res.json({
     message: 'Mot de passe mis à jour. Vous êtes connecté.',
     ...buildAuthTokensResponse(updated, req),
@@ -824,80 +828,6 @@ router.get('/options-public', (req, res) => {
     email_verification_enabled: emailVerificationEnabled(),
     password_reset_email_enabled: passwordResetEmailEnabled(),
     smtp_configured: isSmtpConfigured(),
-  });
-});
-
-// POST /api/auth/verifier-email — lien reçu par e-mail
-router.post('/verifier-email', async (req, res) => {
-  const token = String(req.body?.token || '').trim();
-  if (!token) return res.status(400).json({ message: 'Lien invalide (token manquant).' });
-
-  const user = (db.get('utilisateurs').value() || []).find((u) => u.email_verify_token === token);
-  if (!user) {
-    return res.status(400).json({ message: 'Lien invalide ou déjà utilisé.' });
-  }
-  if (user.email_verify_expires && Date.now() > user.email_verify_expires) {
-    return res.status(400).json({
-      code: 'VERIFY_EXPIRED',
-      message: 'Ce lien a expiré. Demandez un nouvel e-mail de confirmation depuis la page de connexion.',
-    });
-  }
-
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    email_verified_at: new Date().toISOString(),
-    email_verify_token: null,
-    email_verify_expires: null,
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const updated = db.get('utilisateurs').find({ id: user.id }).value();
-  clearAccountLockOnSuccess(user.id);
-  res.json({
-    message: 'Adresse e-mail confirmée. Vous êtes connecté.',
-    ...buildAuthTokensResponse(updated, req),
-  });
-});
-
-// POST /api/auth/renvoyer-email-verification
-router.post('/renvoyer-email-verification', resendVerifyLimiter, async (req, res) => {
-  const emailNorm = normalizeEmail(String(req.body?.email || ''));
-  if (!emailNorm) {
-    return res.status(400).json({ message: 'Adresse e-mail requise.' });
-  }
-  const user = db.get('utilisateurs').find({ email: emailNorm }).value();
-  if (!user || user.role !== 'etudiant') {
-    return res.json({
-      message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
-    });
-  }
-  if (user.email_verified_at || !user.email_verify_token) {
-    return res.json({
-      message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
-    });
-  }
-
-  const tok = newSecureToken();
-  const exp = Date.now() + 48 * 60 * 60 * 1000;
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    email_verify_token: tok,
-    email_verify_expires: exp,
-    updated_at: new Date().toISOString(),
-  }).write();
-
-  const url = `${publicAppUrl()}/verifier-email?token=${encodeURIComponent(tok)}`;
-  await sendMail({
-    to: emailNorm,
-    subject: 'Confirmez votre adresse e-mail — UniPortail',
-    text:
-      `Bonjour ${user.prenom},\n\nPour activer votre compte :\n${url}\n\nLe lien expire dans 48 heures.`,
-    html:
-      `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
-      `<p><a href="${url}">Confirmer mon e-mail</a></p>` +
-      `<p style="font-size:12px;color:#64748b;">Expire dans 48 h.</p>`,
-  });
-
-  res.json({
-    message: 'Si un compte existe avec cette adresse et qu’une confirmation est nécessaire, un e-mail vient d’être envoyé.',
   });
 });
 

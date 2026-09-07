@@ -4,11 +4,11 @@ const db = require('../database/db');
 const { authMiddleware, staffLettreAttestation, staffProformaView, staffProformaDecision, staffDossierDecision, staffGuichet } = require('../middleware/auth');
 const { proformaDemandeDecision, creerProformaPourEtudiant } = require('../services/proformaDemandeDecisionService');
 const { genererOuRecupererFactureDossier } = require('../services/factureService');
-const { snapshotFromEtab, snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
+const { snapshotFromFormation, snapshotFromEtablissementId } = require('../utils/etablissementSnapshot');
 const { logAudit } = require('../utils/auditLog');
 const { DOSSIER_STATUSES, canTransitionDossierStatus, requiresRejectionComment } = require('../utils/dossierWorkflow');
 const { createUserNotification } = require('../utils/notificationService');
-const { notifyDossierStatutChange, notifyFactureDossierGeneree } = require('../utils/transactionalEmail');
+const { notifyDossierStatutChange, notifyFactureDossierGeneree, notifyLettrePreinscriptionEmail, notifyAttestationEmail, notifyFactureDossierLinkEmail } = require('../utils/transactionalEmail');
 const { buildAttestationPayloadForDossier, buildAttestationPayloadForDemandeProforma } = require('../utils/buildAttestationPayload');
 const { canIssueOfficialDocs } = require('../utils/canIssueOfficialDocs');
 const { canIssueLettrePreinscription } = require('../utils/canIssueLettrePreinscription');
@@ -29,7 +29,7 @@ router.get('/lettre/:dossierId', authMiddleware, staffLettreAttestation, (req, r
   if (!canIssueLettrePreinscription(dossier)) {
     return res.status(403).json({
       message:
-        'La lettre de préinscription est réservée aux candidats étrangers acceptés ayant déposé une demande en ligne.',
+        'La lettre de préinscription est réservée aux candidats acceptés ayant déposé une demande en ligne avec un compte étudiant.',
     });
   }
 
@@ -157,6 +157,8 @@ router.post('/demandes-proforma/creer', authMiddleware, staffProformaDecision, a
     nom,
     telephone,
     email,
+    adresse,
+    annee_academique,
     remise,
   } = req.body || {};
   const result = await creerProformaPourEtudiant({
@@ -167,8 +169,9 @@ router.post('/demandes-proforma/creer', authMiddleware, staffProformaDecision, a
     nom,
     telephone,
     email,
+    adresse,
+    annee_academique,
     remise,
-    buildEtabSnapshot: snapshotFromEtab,
   });
   if (!result.ok) return res.status(result.status).json({ message: result.message });
 
@@ -312,6 +315,74 @@ router.post('/demandes-proforma/:id/envoyer-email', authMiddleware, staffProform
     return res.status(503).json({ message: 'Envoi impossible (SMTP non configuré ou adresse invalide).' });
   }
   res.json({ message: `Facture proforma envoyée à ${demande.email}.` });
+});
+
+// POST /api/responsable/dossiers/:id/envoyer-lettre-email — envoi manuel lien lettre
+router.post('/dossiers/:id/envoyer-lettre-email', authMiddleware, staffDossierDecision, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const dossier = db.get('dossiers').find({ id }).value();
+  if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
+  if (!assertDossierPourResponsable(req, dossier)) {
+    return res.status(403).json({ message: 'Ce dossier ne concerne pas votre établissement.' });
+  }
+  if (!canIssueLettrePreinscription(dossier)) {
+    return res.status(400).json({ message: 'Lettre non disponible pour ce dossier.' });
+  }
+  if (!dossier.etudiant_id) {
+    return res.status(400).json({ message: 'Aucun compte étudiant associé.' });
+  }
+  const ok = await notifyLettrePreinscriptionEmail(dossier);
+  if (!ok) {
+    return res.status(503).json({ message: 'Envoi impossible (SMTP non configuré ou adresse invalide).' });
+  }
+  res.json({ message: 'E-mail de lettre de préinscription envoyé.' });
+});
+
+// POST /api/responsable/dossiers/:id/envoyer-attestation-email — envoi manuel lien attestation
+router.post('/dossiers/:id/envoyer-attestation-email', authMiddleware, staffDossierDecision, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const dossier = db.get('dossiers').find({ id }).value();
+  if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
+  if (!assertDossierPourResponsable(req, dossier)) {
+    return res.status(403).json({ message: 'Ce dossier ne concerne pas votre établissement.' });
+  }
+  if (!canIssueOfficialDocs(dossier)) {
+    return res.status(400).json({ message: 'Attestation non disponible pour ce dossier.' });
+  }
+  if (!dossier.etudiant_id) {
+    return res.status(400).json({ message: 'Aucun compte étudiant associé.' });
+  }
+  const ok = await notifyAttestationEmail(dossier);
+  if (!ok) {
+    return res.status(503).json({ message: 'Envoi impossible (SMTP non configuré ou adresse invalide).' });
+  }
+  res.json({ message: 'E-mail d’attestation envoyé.' });
+});
+
+// POST /api/responsable/dossiers/:id/envoyer-facture-email — envoi manuel lien facture dossier
+router.post('/dossiers/:id/envoyer-facture-email', authMiddleware, staffDossierDecision, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const dossier = db.get('dossiers').find({ id }).value();
+  if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
+  if (!assertDossierPourResponsable(req, dossier)) {
+    return res.status(403).json({ message: 'Ce dossier ne concerne pas votre établissement.' });
+  }
+  const { isDossierAcceptePourLettre } = require('../utils/dossierLettreEligible');
+  if (!isDossierAcceptePourLettre(dossier.statut)) {
+    return res.status(400).json({ message: 'Facture disponible uniquement pour un dossier accepté.' });
+  }
+  const facture = genererOuRecupererFactureDossier(id);
+  if (!facture) {
+    return res.status(400).json({ message: 'Impossible de générer la facture pour ce dossier.' });
+  }
+  if (!dossier.etudiant_id) {
+    return res.status(400).json({ message: 'Aucun compte étudiant associé.' });
+  }
+  const ok = await notifyFactureDossierLinkEmail(dossier, facture);
+  if (!ok) {
+    return res.status(503).json({ message: 'Envoi impossible (SMTP non configuré ou adresse invalide).' });
+  }
+  res.json({ message: 'E-mail de facture proforma envoyé.', facture: { id: facture.id, numero: facture.numero } });
 });
 
 router.use(authMiddleware, staffDossierDecision);

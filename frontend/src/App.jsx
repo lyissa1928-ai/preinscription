@@ -182,7 +182,7 @@ function AppRoutes() {
           </PrivateRoute>
         } />
         <Route path="/mon-etablissement/identite" element={
-          <PrivateRoute roles={['admin_etablissement']}>
+          <PrivateRoute roles={['admin_etablissement', 'responsable_fad']}>
             <StaffEtabIdentite />
           </PrivateRoute>
         } />
@@ -252,6 +252,7 @@ function AppRoutes() {
         <Route path="/admin/maintenance" element={<PrivateRoute roles={['admin']}><AdminMaintenance /></PrivateRoute>} />
         <Route path="/admin/runtime-monitoring" element={<PrivateRoute roles={['admin']}><AdminRuntimeMonitoring /></PrivateRoute>} />
         <Route path="/admin/niveaux-etude" element={<PrivateRoute roles={['admin']}><AdminNiveauxEtude /></PrivateRoute>} />
+        <Route path="/mon-etablissement/niveaux-etude" element={<PrivateRoute roles={['admin_etablissement']}><AdminNiveauxEtude etabOnly /></PrivateRoute>} />
         <Route path="/admin/rapports-hebdo" element={<PrivateRoute roles={['admin', 'directeur']}><AdminRapportsHebdo /></PrivateRoute>} />
         <Route path="/mon-etablissement/rapports-hebdo" element={<PrivateRoute roles={['admin_etablissement']}><AdminRapportsHebdo etabOnly /></PrivateRoute>} />
       </Route>

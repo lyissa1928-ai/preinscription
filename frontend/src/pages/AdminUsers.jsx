@@ -86,7 +86,62 @@ export default function AdminUsers() {
   const [deleteEmailInput, setDeleteEmailInput] = useState('')
   const [bulkAction, setBulkAction] = useState(null)           // 'desactiver' | 'reactiver' | 'supprimer'
   const [bulkPhrase, setBulkPhrase] = useState('')
-  const [resetResult, setResetResult] = useState(null)         // { label, password }
+  // Import Excel
+  const [showImport, setShowImport] = useState(false)
+  const [importFile, setImportFile] = useState(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  const [importEtabId, setImportEtabId] = useState('')
+
+  const downloadTemplate = async () => {
+    try {
+      const { data } = await axios.get('/api/admin/utilisateurs/import/template', { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([data]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'template-utilisateurs-staff.xlsx'
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success('Modèle téléchargé.')
+    } catch {
+      toast.error('Impossible de télécharger le modèle.')
+    }
+  }
+
+  const runImport = async (dryRun) => {
+    if (!importFile) {
+      toast.error('Sélectionnez un fichier Excel ou CSV.')
+      return
+    }
+    setImportLoading(true)
+    setImportResult(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', importFile)
+      if (importEtabId) fd.append('etablissement_id', importEtabId)
+      const { data } = await axios.post(`/api/admin/utilisateurs/import?dry_run=${dryRun ? '1' : '0'}`, fd)
+      setImportResult(data)
+      if (data.ok) {
+        toast.success(
+          dryRun
+            ? `${data.summary?.valid_rows ?? 0} ligne(s) valide(s) — confirmez l’import.`
+            : `${data.summary?.created ?? 0} compte(s) créé(s).`
+        )
+        if (!dryRun) {
+          setImportFile(null)
+          loadUsers()
+        }
+      } else {
+        toast.error(`${data.errors?.length ?? 0} erreur(s) détectée(s). Corrigez le fichier.`)
+      }
+    } catch (err) {
+      const payload = err.response?.data
+      if (payload?.errors) setImportResult(payload)
+      toast.error(payload?.message || 'Import impossible.')
+    } finally {
+      setImportLoading(false)
+    }
+  }
 
   const loadUsers = (role = filtreRole, targetPage = page) => {
     setLoading(true)
@@ -336,11 +391,123 @@ export default function AdminUsers() {
             <p className="text-gray-500 mt-0.5">{pagination.total} compte{pagination.total !== 1 ? 's' : ''} · {etablissements.length} établissement{etablissements.length !== 1 ? 's' : ''}</p>
           </div>
           {isAdmin && (
-            <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
-              + Créer un compte staff
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowImport((v) => !v); setImportResult(null) }}
+                className="btn-secondary flex items-center gap-2"
+              >
+                📥 Import Excel
+              </button>
+              <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+                + Créer un compte staff
+              </button>
+            </div>
           )}
         </div>
+
+        {showImport && isAdmin && (
+          <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm p-5 mb-5 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Import utilisateurs (Excel / CSV)</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Téléchargez le modèle, remplissez-le, puis validez (dry-run) avant de créer les comptes.
+                </p>
+              </div>
+              <button type="button" onClick={downloadTemplate} className="btn-secondary text-sm shrink-0">
+                Télécharger le modèle
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Fichier *</label>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="block w-full text-sm"
+                  onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null) }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Forcer établissement (optionnel)</label>
+                <select className="input-field" value={importEtabId} onChange={(e) => setImportEtabId(e.target.value)}>
+                  <option value="">— Depuis le fichier —</option>
+                  {etablissements.map((e) => (
+                    <option key={e.id} value={e.id}>{e.nom}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={importLoading || !importFile}
+                onClick={() => runImport(true)}
+                className="btn-secondary text-sm disabled:opacity-40"
+              >
+                {importLoading ? 'Validation…' : 'Valider (dry-run)'}
+              </button>
+              <button
+                type="button"
+                disabled={importLoading || !importFile || !importResult?.ok}
+                onClick={() => {
+                  if (!window.confirm('Créer définitivement les comptes valides ?')) return
+                  runImport(false)
+                }}
+                className="btn-primary text-sm disabled:opacity-40"
+              >
+                Confirmer l’import
+              </button>
+            </div>
+            {importResult && (
+              <div className={`rounded-xl border p-4 text-sm ${importResult.ok ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+                <p className="font-semibold text-gray-900">
+                  {importResult.dry_run ? 'Résultat validation' : 'Résultat import'}
+                  {importResult.summary && (
+                    <span className="ml-2 font-normal text-gray-600">
+                      — {importResult.summary.valid_rows ?? 0} valide(s)
+                      {importResult.summary.skipped ? ` · ${importResult.summary.skipped} ignoré(s) (doublon email)` : ''}
+                      {!importResult.dry_run && importResult.summary.created != null ? ` · ${importResult.summary.created} créé(s)` : ''}
+                    </span>
+                  )}
+                </p>
+                {importResult.errors?.length > 0 && (
+                  <div className="mt-3 max-h-48 overflow-auto overflow-x-auto">
+                    <table className="w-full min-w-[420px] text-xs">
+                      <thead>
+                        <tr className="text-left text-gray-500 border-b">
+                          <th className="py-1 pr-2">Ligne</th>
+                          <th className="py-1 pr-2">Champ</th>
+                          <th className="py-1">Erreur</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importResult.errors.map((err, i) => (
+                          <tr key={i} className="border-b border-red-100">
+                            <td className="py-1 pr-2 font-mono">{err.row}</td>
+                            <td className="py-1 pr-2">{err.field}</td>
+                            <td className="py-1 text-red-800">{err.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {importResult.created?.length > 0 && (
+                  <ul className="mt-2 text-xs text-emerald-900 space-y-0.5">
+                    {importResult.created.map((c) => (
+                      <li key={c.id || c.email}>
+                        {c.email} — {c.matricule} ({c.role})
+                        {c.email_invite_sent === false && ' · e-mail non envoyé'}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Barre de filtres */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5 space-y-3">
