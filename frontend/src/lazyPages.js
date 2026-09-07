@@ -1,4 +1,4 @@
-import { lazy } from 'react'
+import { lazyWithRetry as lazy } from './utils/lazyWithRetry'
 
 /** Pages chargées à la demande — réduit le JS initial (voir App.jsx + Suspense). */
 export const Register = lazy(() => import('./pages/Register'))

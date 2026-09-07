@@ -10,9 +10,28 @@ import { resolveApiBaseUrl } from './utils/resolveApiBaseUrl'
 import { setupAuthInterceptors } from './lib/setupAuthInterceptors'
 import { getRouterBasename } from './utils/appBasePath'
 import { loadAndApplySiteBranding } from './utils/applySiteBranding'
+import {
+  clearChunkReloadFlag,
+  isChunkLoadError,
+  tryReloadOnceForStaleChunk,
+} from './utils/chunkLoadRecovery'
 import './index.css'
 import './lettre-print-additive.css'
 import './a4-document.css'
+
+/** Boot réussi → on peut recharger une fois au prochain déploiement. */
+clearChunkReloadFlag()
+
+/** Retire le marqueur anti-cache `_v` de l’URL après reload forcé. */
+try {
+  const u = new URL(window.location.href)
+  if (u.searchParams.has('_v')) {
+    u.searchParams.delete('_v')
+    window.history.replaceState({}, '', `${u.pathname}${u.search}${u.hash}`)
+  }
+} catch {
+  /* ignore */
+}
 
 const apiBase = resolveApiBaseUrl()
 if (apiBase) {
@@ -24,6 +43,10 @@ setupAuthInterceptors()
 loadAndApplySiteBranding()
 
 window.addEventListener('error', (ev) => {
+  const msg = ev.message || ''
+  if (isChunkLoadError({ message: msg }) || /Loading chunk|dynamically imported/i.test(msg)) {
+    if (tryReloadOnceForStaleChunk()) return
+  }
   reportClientError({
     type: 'window-error',
     message: ev.message,
@@ -35,25 +58,10 @@ window.addEventListener('error', (ev) => {
 
 window.addEventListener('unhandledrejection', (ev) => {
   const r = ev.reason
-  reportClientError({
-    type: 'unhandledrejection',
-    message: r?.message != null ? String(r.message) : String(r),
-    stack: r?.stack,
-  })
-})
-
-window.addEventListener('error', (ev) => {
-  reportClientError({
-    type: 'window-error',
-    message: ev.message,
-    filename: ev.filename,
-    lineno: ev.lineno,
-    colno: ev.colno,
-  })
-})
-
-window.addEventListener('unhandledrejection', (ev) => {
-  const r = ev.reason
+  if (isChunkLoadError(r)) {
+    ev.preventDefault?.()
+    if (tryReloadOnceForStaleChunk()) return
+  }
   reportClientError({
     type: 'unhandledrejection',
     message: r?.message != null ? String(r.message) : String(r),

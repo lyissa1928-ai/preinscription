@@ -162,6 +162,12 @@ EOF
 write_config_site frontend/dist/config-site.js
 write_config_site frontend/public/config-site.js
 
+# index.html : cache-bust explicite (si reverse-proxy cache encore)
+if [[ -f frontend/dist/index.html ]]; then
+  touch frontend/dist/index.html
+  echo "    index.html touché (évite cache CDN/proxy)"
+fi
+
 echo ">>> 7/8 Redémarrage API (migrations schéma au démarrage)..."
 if pm2 describe uniportail-api >/dev/null 2>&1; then
   pm2 restart uniportail-api
