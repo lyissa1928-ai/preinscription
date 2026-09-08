@@ -1,7 +1,7 @@
 /**
- * Alerte de connexion réussie (notification in-app + e-mail best-effort).
+ * Alerte de connexion — e-mail best-effort uniquement.
+ * Les notifications internes (cloche) sont désactivées pour ces opérations.
  */
-const { createUserNotification } = require('./notificationService');
 const { sendMail, isSmtpConfigured } = require('./mail');
 const { getClientIp } = require('./rateLimit');
 
@@ -18,6 +18,8 @@ function summarizeUserAgent(ua) {
  */
 async function notifySuccessfulLogin(user, req) {
   if (!user?.id) return;
+
+  // Notifications internes (in-app) désactivées — priorité aux e-mails métier (activation / reset MDP).
   const now = new Date();
   const dateStr = now.toLocaleDateString('fr-FR', {
     weekday: 'long',
@@ -37,18 +39,6 @@ async function notifySuccessfulLogin(user, req) {
   if (device) lines.push(`Appareil / navigateur : ${device}`);
 
   const message = `Nouvelle connexion à votre compte UniPortail.\n${lines.join('\n')}`;
-
-  createUserNotification(user.id, {
-    type: 'security_login',
-    title: 'Alerte de connexion',
-    message: lines.join(' · '),
-    link: '/profil',
-    meta: {
-      at: now.toISOString(),
-      ip,
-      user_agent: device,
-    },
-  });
 
   if (!user.email || !isSmtpConfigured()) return;
   try {

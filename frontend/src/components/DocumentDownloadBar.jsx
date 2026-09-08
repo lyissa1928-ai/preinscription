@@ -18,6 +18,8 @@ export default function DocumentDownloadBar({
   /** Callback async pour envoi manuel par e-mail (staff uniquement). */
   onSendEmail,
   sendEmailLabel = 'Envoyer par e-mail',
+  /** PDF à hauteur du contenu (attestation — pas de blanc sous le cadre). */
+  fitContent = false,
 }) {
   const [busy, setBusy] = useState(false)
   const [emailBusy, setEmailBusy] = useState(false)
@@ -31,7 +33,7 @@ export default function DocumentDownloadBar({
     }
     setBusy(true)
     try {
-      await downloadDocumentPdf(el, filename)
+      await downloadDocumentPdf(el, filename, { fitContent })
       toast.success('PDF téléchargé.')
     } catch {
       toast.error('Impossible de générer le PDF.')

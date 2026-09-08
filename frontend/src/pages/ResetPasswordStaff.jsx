@@ -1,20 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { FaIdCard, FaPhone, FaKey, FaShieldAlt } from 'react-icons/fa'
+import { FaIdCard, FaPhone, FaEnvelope, FaShieldAlt } from 'react-icons/fa'
 import AuthCinematicBackground from '../components/AuthCinematicBackground'
 
 export default function ResetPasswordStaff() {
   const [matricule, setMatricule] = useState('')
   const [telephone, setTelephone] = useState('')
   const [loading, setLoading] = useState(false)
-  const [tempPassword, setTempPassword] = useState('')
+  const [done, setDone] = useState(false)
   const [emailHint, setEmailHint] = useState('')
 
   const submit = async (e) => {
     e.preventDefault()
-    setTempPassword('')
+    setDone(false)
+    setEmailHint('')
     if (!matricule.trim() || !telephone.trim()) {
       toast.error('Matricule et téléphone requis.')
       return
@@ -25,9 +26,9 @@ export default function ResetPasswordStaff() {
         matricule: matricule.trim(),
         telephone: telephone.trim(),
       })
-      setTempPassword(data.mot_de_passe_temporaire || '')
-      setEmailHint(data.email || '')
-      toast.success('Mot de passe temporaire généré')
+      setDone(true)
+      setEmailHint(data.email_hint || '')
+      toast.success(data.message || 'E-mail de réinitialisation envoyé.')
     } catch (err) {
       toast.error(err.response?.data?.message || 'Réinitialisation impossible')
     } finally {
@@ -47,7 +48,7 @@ export default function ResetPasswordStaff() {
             Mot de passe oublié — Personnel
           </h1>
           <p className="mt-2 text-sm text-blue-100/95">
-            Indiquez votre matricule et le téléphone enregistré sur votre compte.
+            Indiquez votre matricule et le téléphone enregistré. Un lien sécurisé sera envoyé par e-mail (aucun mot de passe en clair).
           </p>
         </div>
 
@@ -75,18 +76,21 @@ export default function ResetPasswordStaff() {
             />
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full disabled:opacity-50">
-            {loading ? 'Génération…' : 'Générer un nouveau mot de passe'}
+            {loading ? 'Envoi…' : 'Recevoir le lien par e-mail'}
           </button>
 
-          {tempPassword && (
+          {done && (
             <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
               <p className="flex items-center gap-2 text-sm font-bold text-emerald-900">
-                <FaKey /> Mot de passe temporaire
+                <FaEnvelope /> E-mail envoyé
               </p>
-              <p className="mt-2 break-all font-mono text-lg font-black text-emerald-950">{tempPassword}</p>
-              {emailHint && <p className="mt-1 text-xs text-emerald-800">Compte : {emailHint}</p>}
+              {emailHint && (
+                <p className="mt-2 text-sm text-emerald-800">
+                  Destinataire : <span className="font-mono font-semibold">{emailHint}</span>
+                </p>
+              )}
               <p className="mt-2 text-xs text-emerald-800">
-                Connectez-vous avec ce mot de passe, puis changez-le immédiatement.
+                Ouvrez le lien reçu (valable 15 minutes) pour définir votre nouveau mot de passe. Aucun mot de passe n’est affiché ici.
               </p>
               <Link to="/connexion" className="mt-3 inline-block text-sm font-bold text-emerald-900 underline">
                 Aller à la connexion →

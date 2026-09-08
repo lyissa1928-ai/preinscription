@@ -1,6 +1,5 @@
 /**
  * Templates documents officiels A4 — indépendants du responsive UI.
- * Une page A4 : hauteur fixée 297 mm.
  */
 
 .a4-preview-stage {
@@ -23,9 +22,17 @@
   print-color-adjust: exact;
 }
 
-/* Documents officiels : format A4, hauteur libre si le contenu dépasse (descriptions longues) */
+/* Hauteur = contenu (attestation) — aucun étirement A4 */
+.a4-sheet--fit {
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible;
+}
+
+/* Factures / lettres : hauteur libre selon contenu */
 .a4-sheet--single {
-  min-height: 297mm !important;
+  min-height: 0 !important;
   height: auto !important;
   max-height: none !important;
   overflow: visible;
@@ -79,8 +86,9 @@
     margin: 0 !important;
   }
 
+  .a4-sheet--fit,
   .a4-sheet--single {
-    min-height: 297mm !important;
+    min-height: 0 !important;
     height: auto !important;
     max-height: none !important;
     overflow: visible;

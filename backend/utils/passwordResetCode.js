@@ -22,17 +22,21 @@ function findUserByEmail(emailNorm) {
   );
 }
 
+/**
+ * Émet un code OTP + un token lien (aucun mot de passe en clair).
+ */
 function issuePasswordResetCode(user) {
   const email = String(user.email || '').trim().toLowerCase();
   const code = generateNumericCode();
+  const token = crypto.randomBytes(32).toString('hex');
   const expires = Date.now() + CODE_TTL_MS;
   db.get('utilisateurs').find({ id: user.id }).assign({
     password_reset_code_hash: hashResetCode(email, code),
+    password_reset_token: token,
     password_reset_expires: expires,
-    password_reset_token: null,
     updated_at: new Date().toISOString(),
   }).write();
-  return { code, expires, email };
+  return { code, token, expires, email };
 }
 
 function consumeValidResetCode(emailNorm, codeRaw) {
@@ -47,6 +51,7 @@ function consumeValidResetCode(emailNorm, codeRaw) {
     db.get('utilisateurs').find({ id: user.id }).assign({
       password_reset_code_hash: null,
       password_reset_expires: null,
+      password_reset_token: null,
       updated_at: new Date().toISOString(),
     }).write();
     return { ok: false, code: 'EXPIRED', message: 'Ce code a expiré. Demandez un nouveau code.' };
@@ -70,26 +75,46 @@ function invalidateResetCode(userId) {
   }).write();
 }
 
-async function sendResetCodeEmail(user, code) {
-  if (!isSmtpConfigured()) return false;
+/**
+ * E-mail de réinitialisation : lien token + code (jamais de MDP en clair).
+ * @returns {Promise<boolean>}
+ */
+async function sendResetCodeEmail(user, code, token) {
+  if (!isSmtpConfigured()) {
+    console.warn('[mail] reset: SMTP non configuré — e-mail non envoyé');
+    return false;
+  }
   const minutes = Math.round(CODE_TTL_MS / 60000);
-  const url = `${publicAppUrl()}/mot-de-passe-oublie-email`;
+  const base = publicAppUrl();
+  const formUrl = `${base}/mot-de-passe-oublie-email`;
+  const linkUrl = token
+    ? `${base}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(token)}`
+    : formUrl;
+  const prenom = String(user.prenom || '').replace(/</g, '');
+
   return sendMail({
     to: user.email,
-    subject: 'Code de réinitialisation de mot de passe — UniPortail',
+    subject: 'Réinitialisation de votre mot de passe — UniPortail',
     text:
-      `Bonjour ${user.prenom || ''},\n\n` +
-      `Votre code de réinitialisation est : ${code}\n\n` +
-      `Il est valable ${minutes} minutes et ne peut être utilisé qu’une seule fois.\n` +
-      `Saisissez-le sur : ${url}\n\n` +
+      `Bonjour ${prenom},\n\n` +
+      `Une demande de réinitialisation de mot de passe a été faite pour votre compte UniPortail.\n\n` +
+      `Ouvrez ce lien sécurisé (valable ${minutes} minutes) pour définir un nouveau mot de passe :\n` +
+      `${linkUrl}\n\n` +
+      `Ou saisissez ce code à usage unique sur ${formUrl} :\n` +
+      `${code}\n\n` +
+      `Aucun mot de passe n’est envoyé par e-mail.\n` +
       `Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.`,
     html:
-      `<p>Bonjour ${String(user.prenom || '').replace(/</g, '')},</p>` +
-      `<p>Votre code de réinitialisation est :</p>` +
+      `<p>Bonjour <strong>${prenom}</strong>,</p>` +
+      `<p>Une demande de réinitialisation de mot de passe a été faite pour votre compte <strong>UniPortail</strong>.</p>` +
+      `<p><a href="${linkUrl}" style="display:inline-block;padding:12px 20px;background:#1e40af;color:#fff;border-radius:8px;text-decoration:none;font-weight:600">` +
+      `Définir mon nouveau mot de passe</a></p>` +
+      `<p style="font-size:13px;color:#64748b">Lien valable <strong>${minutes} minutes</strong>.</p>` +
+      `<p>Ou code à usage unique :</p>` +
       `<p style="font-size:28px;letter-spacing:0.35em;font-weight:700">${code}</p>` +
-      `<p>Valable <strong>${minutes} minutes</strong>, usage unique.</p>` +
-      `<p>Saisissez-le ici : <a href="${url}">${url}</a></p>` +
-      `<p style="font-size:12px;color:#64748b">Si vous n’avez pas demandé ce code, ignorez ce message.</p>`,
+      `<p style="font-size:13px">Saisir le code : <a href="${formUrl}">${formUrl}</a></p>` +
+      `<p style="font-size:12px;color:#64748b">Aucun mot de passe n’est envoyé par e-mail. ` +
+      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.</p>`,
   });
 }
 

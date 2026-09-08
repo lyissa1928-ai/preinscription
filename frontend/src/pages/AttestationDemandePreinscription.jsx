@@ -99,6 +99,7 @@ export default function AttestationDemandePreinscription() {
         primaryColor={primary}
         backFallback={getRoleHome(user?.role)}
         className="mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3"
+        fitContent
       />
       <div className="a4-preview-stage">
       <AttestationDocument

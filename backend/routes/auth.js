@@ -629,7 +629,7 @@ router.get('/me', (req, res) => {
 router.post('/reinitialiser-mot-de-passe-matricule', resetPwdLimiter, async (req, res) => {
   const generic = {
     message:
-      'Si un compte étudiant existe avec ce matricule, un code de réinitialisation vient d’être envoyé à l’adresse e-mail du compte (valable 15 minutes, usage unique).',
+      'Si un compte étudiant existe avec ce matricule, un e-mail de réinitialisation (lien sécurisé + code) vient d’être envoyé à l’adresse du compte (valable 15 minutes, usage unique).',
   };
 
   const m = normalizeMatricule(req.body?.matricule);
@@ -653,9 +653,12 @@ router.post('/reinitialiser-mot-de-passe-matricule', resetPwdLimiter, async (req
   }
 
   const issued = issuePasswordResetCode(user);
-  await sendResetCodeEmail(user, issued.code);
+  const sent = await sendResetCodeEmail(user, issued.code, issued.token);
+  if (!sent) {
+    console.error('[auth] reset matricule : échec SMTP (user_id=%s)', user.id);
+  }
 
-  logSecurityEvent(req, 'auth_reset_matricule_email_sent', { user_id: user.id }, 'info');
+  logSecurityEvent(req, 'auth_reset_matricule_email_sent', { user_id: user.id, smtp_ok: sent }, 'info');
   res.json(generic);
 });
 
@@ -739,7 +742,7 @@ router.post('/mot-de-passe-oublie-email', forgotEmailLimiter, async (req, res) =
   const emailNorm = normalizeEmail(String(req.body?.email || ''));
   const generic = {
     message:
-      'Si un compte existe avec cette adresse, un code de réinitialisation vient d’être envoyé. Il est valable 15 minutes et ne peut être utilisé qu’une seule fois.',
+      'Si un compte existe avec cette adresse, un e-mail de réinitialisation (lien sécurisé + code) vient d’être envoyé. Il est valable 15 minutes et ne peut être utilisé qu’une seule fois.',
   };
   if (!emailNorm) {
     return res.status(400).json({ message: 'Indiquez l’adresse e-mail de votre compte.' });
@@ -754,7 +757,10 @@ router.post('/mot-de-passe-oublie-email', forgotEmailLimiter, async (req, res) =
   const user = findUserByEmail(emailNorm);
   if (user && user.actif !== false && user.email) {
     const issued = issuePasswordResetCode(user);
-    await sendResetCodeEmail(user, issued.code);
+    const sent = await sendResetCodeEmail(user, issued.code, issued.token);
+    if (!sent) {
+      console.error('[auth] mot-de-passe-oublie-email : échec SMTP (user_id=%s)', user.id);
+    }
   }
 
   res.json(generic);
@@ -846,9 +852,8 @@ function phonesMatch(a, b) {
 }
 
 // POST /api/auth/reinitialiser-mot-de-passe-staff — public, personnel (hors étudiants)
-// Matricule + téléphone → mot de passe temporaire (changement obligatoire à la connexion).
-router.post('/reinitialiser-mot-de-passe-staff', resetPwdLimiter, (req, res) => {
-  const { generateTempPassword } = require('../utils/accountLock');
+// Matricule + téléphone → e-mail avec lien/token (jamais de MDP en clair).
+router.post('/reinitialiser-mot-de-passe-staff', resetPwdLimiter, async (req, res) => {
   const m = normalizeMatricule(req.body?.matricule);
   const tel = String(req.body?.telephone || '').trim();
   if (!m || m.length < 4) {
@@ -858,9 +863,6 @@ router.post('/reinitialiser-mot-de-passe-staff', resetPwdLimiter, (req, res) => 
     return res.status(400).json({ message: 'Numéro de téléphone invalide.' });
   }
 
-  const user = (db.get('utilisateurs').value() || []).find(
-    (u) => normalizeMatricule(u.matricule) === m,
-  );
   const failGeneric = () => {
     logSecurityEvent(req, 'auth_reset_staff_failed', { matricule: m }, 'warning');
     return res.status(400).json({
@@ -868,27 +870,45 @@ router.post('/reinitialiser-mot-de-passe-staff', resetPwdLimiter, (req, res) => 
     });
   };
 
+  if (!passwordResetEmailEnabled()) {
+    return res.status(503).json({
+      code: 'EMAIL_RESET_DISABLED',
+      message:
+        'La réinitialisation par e-mail est indisponible (SMTP). Contactez un administrateur.',
+    });
+  }
+
+  const user = (db.get('utilisateurs').value() || []).find(
+    (u) => normalizeMatricule(u.matricule) === m,
+  );
+
   if (!user || user.role === 'etudiant' || user.actif === false) return failGeneric();
   if (!phonesMatch(user.telephone, tel)) return failGeneric();
+  if (!user.email) {
+    return res.status(400).json({
+      message: 'Aucune adresse e-mail sur ce compte. Contactez un administrateur.',
+    });
+  }
 
-  const plain = generateTempPassword(12);
-  const hash = bcrypt.hashSync(plain, 10);
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    mot_de_passe: hash,
-    must_change_password: true,
-    login_attempts: 0,
-    is_locked: false,
-    lock_until: null,
-    password_reset_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }).write();
+  const issued = issuePasswordResetCode(user);
+  const sent = await sendResetCodeEmail(user, issued.code, issued.token);
+  if (!sent) {
+    console.error('[auth] reset staff : échec SMTP (user_id=%s)', user.id);
+    return res.status(502).json({
+      message: 'Impossible d’envoyer l’e-mail pour le moment. Réessayez plus tard ou contactez un administrateur.',
+    });
+  }
 
-  logSecurityEvent(req, 'auth_reset_staff_ok', { user_id: user.id, role: user.role }, 'warning');
+  logSecurityEvent(req, 'auth_reset_staff_email_ok', { user_id: user.id, role: user.role }, 'info');
+  const email = String(user.email);
+  const at = email.indexOf('@');
+  const hint = at > 2
+    ? `${email.slice(0, 2)}***${email.slice(at)}`
+    : '***';
   return res.json({
     message:
-      'Mot de passe temporaire généré. Connectez-vous puis changez-le immédiatement. Conservez-le en lieu sûr.',
-    mot_de_passe_temporaire: plain,
-    email: user.email,
+      'Un e-mail avec un lien sécurisé pour définir votre nouveau mot de passe vient d’être envoyé. Aucun mot de passe n’est communiqué en clair.',
+    email_hint: hint,
   });
 });
 

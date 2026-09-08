@@ -114,6 +114,7 @@ export default function AttestationPreinscription() {
         primaryColor={primary}
         backFallback={getRoleHome(user?.role)}
         className="mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3"
+        fitContent
         onSendEmail={
           STAFF_EMAIL_ROLES.includes(user?.role)
             ? async () => {

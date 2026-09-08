@@ -38,7 +38,7 @@ export default function AttestationDocument({
   return (
     <article
       ref={documentRef}
-      className="a4-sheet a4-sheet--single print-page relative box-border flex flex-col bg-white p-[6mm] text-slate-800 shadow-xl"
+      className="a4-sheet a4-sheet--fit print-page relative box-border flex flex-col bg-white p-[6mm] text-slate-800 shadow-xl"
     >
       <div
         className="relative flex flex-col border-[1.5px] p-[3mm]"

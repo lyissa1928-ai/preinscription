@@ -217,6 +217,20 @@ server.listen(PORT, () => {
       '[auth] AUTH_INSCRIPTION_BYPASS_CAPTCHA actif — aucune vérification captcha sur POST /api/auth/inscription (réservé au développement local).'
     );
   }
+  try {
+    const { isSmtpConfigured, passwordResetEmailEnabled, verifySmtp, smtpMetaForLogs } = require('./utils/mail');
+    if (!isSmtpConfigured()) {
+      console.warn('[mail] SMTP non configuré (SMTP_HOST + SMTP_FROM requis) — activation / mot de passe oublié par e-mail indisponibles.');
+    } else {
+      console.log('[mail] SMTP configuré:', smtpMetaForLogs(), '| reset e-mail:', passwordResetEmailEnabled() ? 'ON' : 'OFF');
+      verifySmtp().then((r) => {
+        if (r.ok) console.log('[mail] Vérification SMTP : OK');
+        else console.error('[mail] Vérification SMTP : ÉCHEC —', r.error);
+      }).catch((e) => console.error('[mail] Vérification SMTP :', e.message));
+    }
+  } catch (e) {
+    console.warn('[mail] Init SMTP ignorée:', e.message);
+  }
 });
 
 server.on('error', (err) => {
