@@ -74,27 +74,35 @@ export default function FactureView() {
   }, [dossierId, user?.role])
 
   useEffect(() => {
-    const snap = facture?.etablissement_snapshot
     if (!facture) return
-    const missing =
-      !snap?.adresse || !snap?.telephone || !snap?.email_contact || !snap?.arrete
-      || !snap?.rc || !(snap?.compte_bancaire || snap?.iban) || !snap?.swift
-    if (!missing) return
-    const tryIds = [facture?.etablissement_id, snap?.id, facture?.formation_snapshot?.etablissement_id].filter(Boolean)
-    const applyList = (data) => {
+    const snap = facture.etablissement_snapshot || {}
+    const tryIds = [
+      facture.etablissement_id,
+      snap.id,
+      facture.formation_snapshot?.etablissement_id,
+    ].filter((id) => id != null && id !== '')
+
+    const pickFromList = (data) => {
       const list = Array.isArray(data) ? data : []
-      const found = tryIds.length
-        ? list.find((e) => tryIds.some((id) => Number(e.id) === Number(id)))
-        : list.find((e) => e.nom && snap?.nom && e.nom === snap.nom)
-      if (found) setEtabLive(found)
+      return (
+        list.find((e) => tryIds.some((id) => Number(e.id) === Number(id)))
+        || list.find((e) => e.nom && snap.nom && e.nom === snap.nom)
+        || null
+      )
     }
-    if (tryIds.length) {
-      axios.get(`/api/etablissements/${tryIds[0]}`)
-        .then(({ data }) => setEtabLive(data))
-        .catch(() => axios.get('/api/etablissements').then(({ data }) => applyList(data)).catch(() => {}))
-    } else {
-      axios.get('/api/etablissements').then(({ data }) => applyList(data)).catch(() => {})
-    }
+
+    // Liste authentifiée : inclut cachet_url (souvent absent du snapshot ancien)
+    axios.get('/api/etablissements')
+      .then(({ data }) => {
+        const found = pickFromList(data)
+        if (found) setEtabLive(found)
+      })
+      .catch(() => {
+        if (!tryIds.length) return
+        axios.get(`/api/etablissements/${tryIds[0]}`)
+          .then(({ data }) => setEtabLive(data))
+          .catch(() => {})
+      })
   }, [facture])
 
   const mergeEtab = (snap = {}, live = null, formationType = '') => {
@@ -118,8 +126,9 @@ export default function FactureView() {
       ninea: snap.ninea || live?.ninea || '',
       adresse: snap.adresse || live?.adresse || '',
       banque: snap.banque || live?.banque || '',
-      cachet_url: snap.cachet_url || live?.cachet_url || null,
-      logo_url: snap.logo_url || live?.logo_url || null,
+      // Préférer le cachet / logo live (souvent plus à jour que le snapshot)
+      cachet_url: live?.cachet_url || snap.cachet_url || null,
+      logo_url: live?.logo_url || snap.logo_url || null,
       nom: snap.nom || live?.nom || '',
       couleur_primaire: snap.couleur_primaire || live?.couleur_primaire,
       couleur_secondaire: snap.couleur_secondaire || live?.couleur_secondaire,

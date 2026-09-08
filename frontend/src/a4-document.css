@@ -46,6 +46,11 @@
 .a4-sheet--capturing {
   transform: none !important;
   zoom: normal !important;
+  overflow: hidden !important;
+}
+
+.a4-sheet--capturing img {
+  background-color: transparent !important;
 }
 
 .a4-sheet .a4-row {

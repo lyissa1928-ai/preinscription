@@ -6,6 +6,54 @@ export const A4_WIDTH_MM = 210
 export const A4_HEIGHT_MM = 297
 
 /**
+ * Attend le chargement des <img> puis les convertit en data URL
+ * pour que html2canvas les peigne toujours dans le PDF (CORS / timing).
+ */
+async function prepareImagesForPdfCapture(element) {
+  const imgs = Array.from(element.querySelectorAll('img'))
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise((resolve) => {
+          if (!img.getAttribute('src')) return resolve()
+          if (img.complete && img.naturalWidth > 0) return resolve()
+          const done = () => resolve()
+          img.addEventListener('load', done, { once: true })
+          img.addEventListener('error', done, { once: true })
+          setTimeout(done, 8000)
+        }),
+    ),
+  )
+
+  await Promise.all(
+    imgs.map(async (img) => {
+      const src = img.currentSrc || img.src
+      if (!src || src.startsWith('data:')) return
+      try {
+        const res = await fetch(src, { credentials: 'same-origin', mode: 'cors' })
+        if (!res.ok) return
+        const blob = await res.blob()
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result)
+          reader.onerror = reject
+          reader.readAsDataURL(blob)
+        })
+        img.setAttribute('src', dataUrl)
+        await new Promise((resolve) => {
+          if (img.complete && img.naturalWidth > 0) return resolve()
+          img.addEventListener('load', resolve, { once: true })
+          img.addEventListener('error', resolve, { once: true })
+          setTimeout(resolve, 2000)
+        })
+      } catch {
+        /* conserve l’URL d’origine */
+      }
+    }),
+  )
+}
+
+/**
  * Capture un template A4 et produit un PDF.
  * @param {HTMLElement} element
  * @param {string} filename
@@ -49,6 +97,8 @@ export async function downloadDocumentPdf(element, filename = 'document.pdf', op
   try {
     if (document.fonts?.ready) await document.fonts.ready
   } catch { /* ignore */ }
+
+  await prepareImagesForPdfCapture(element)
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
 
   let canvas
@@ -59,6 +109,7 @@ export async function downloadDocumentPdf(element, filename = 'document.pdf', op
       allowTaint: true,
       logging: false,
       backgroundColor: '#ffffff',
+      imageTimeout: 15000,
       windowWidth: element.scrollWidth,
       windowHeight: element.scrollHeight,
       onclone: (_doc, cloned) => {
@@ -78,6 +129,7 @@ export async function downloadDocumentPdf(element, filename = 'document.pdf', op
         }
         cloned.style.transform = 'none'
         cloned.style.zoom = 'normal'
+        cloned.style.overflow = 'hidden'
       },
     })
   } finally {

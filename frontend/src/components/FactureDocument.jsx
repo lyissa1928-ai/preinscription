@@ -339,15 +339,15 @@ export default function FactureDocument({
           </section>
         ) : null}
 
-        {/* Espace flexible : pousse la validation en bas de page */}
-        <div className="min-h-[4mm] flex-1" aria-hidden />
+        {/* Espace flexible : pousse la validation au-dessus du pied de page */}
+        <div className="min-h-[3mm] flex-1" aria-hidden />
 
-        {/* Zone de validation institutionnelle */}
+        {/* Bas : validité → LA SCOLARITÉ → cachet (rien ne doit être coupé) */}
         <section
-          className="a4-row shrink-0 items-end justify-between gap-[6mm] border-t pt-[3.5mm]"
+          className="shrink-0 border-t pt-[3.5mm]"
           style={{ borderColor: headerBorder }}
         >
-          <div className="max-w-[58%] pb-1 text-[9px] leading-relaxed text-slate-500">
+          <div className="text-[9px] leading-relaxed text-slate-500">
             <p>
               {definitive
                 ? 'Facture définitive — document à conserver.'
@@ -357,25 +357,28 @@ export default function FactureDocument({
               <p className="mt-1">Valable jusqu’au {fmtDate(facture.date_echeance)}.</p>
             ) : null}
           </div>
-          <div className="w-[52mm] shrink-0 text-center">
-            {showCachet ? (
-              <CachetScolarite
-                cachetUrl={etab?.cachet_url}
-                className="!text-[10px] [&_img]:!my-1.5 [&_img]:!max-h-[22mm] [&_p]:!tracking-[0.12em]"
-              />
-            ) : (
-              <div className="text-center">
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-600">La scolarité</p>
-                <p className="mt-3 text-[9px] italic text-slate-400">Sans cachet</p>
-              </div>
-            )}
+          <div className="mt-[3.5mm] flex justify-end pb-[1mm]">
+            <div className="w-[58mm] shrink-0 overflow-visible text-center">
+              {showCachet ? (
+                <CachetScolarite
+                  cachetUrl={etab?.cachet_url}
+                  className="!text-[10px] [&_p]:!tracking-[0.12em]"
+                  imgClassName="!mt-1.5 !max-h-[24mm]"
+                />
+              ) : (
+                <div className="text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-600">La scolarité</p>
+                  <p className="mt-3 text-[9px] italic text-slate-400">Sans cachet</p>
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </div>
 
-      {/* Pied de page */}
+      {/* Pied de page — coordonnées institutionnelles */}
       <footer
-        className="mt-auto shrink-0 border-t px-[14mm] py-[2mm] text-center text-[8px] leading-snug text-slate-500"
+        className="shrink-0 border-t px-[14mm] pb-[3mm] pt-[2.5mm] text-center text-[8px] leading-snug text-slate-500"
         style={{ borderColor: headerBorder }}
       >
         {[nomEtab, etab?.email_contact, etab?.telephone, etab?.adresse].filter(Boolean).join(' · ')}

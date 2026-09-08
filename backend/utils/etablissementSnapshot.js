@@ -26,6 +26,7 @@ function snapshotFromEtab(etab, opts = {}) {
   if (!etab) return null;
   const enLigne = isEnLigneModality(opts);
   return {
+    id: etab.id,
     nom: etab.nom,
     logo_url: etab.logo_url || null,
     cachet_url: etab.cachet_url || null,

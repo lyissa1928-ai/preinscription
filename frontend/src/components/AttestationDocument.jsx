@@ -133,16 +133,19 @@ export default function AttestationDocument({
             </div>
           </section>
 
-          <section className="relative z-[1] mt-4 flex items-end justify-between gap-4">
-            <div>
+          <section className="relative z-[1] mt-[5mm] flex items-start justify-between gap-4">
+            <div className="min-w-0">
               <p className="text-[10px] text-slate-600">
                 Fait à {lieu}, le {emitDate}
               </p>
-              <div className="mt-1.5">
-                <CachetScolarite cachetUrl={etab?.cachet_url} />
+              <div className="mt-[4mm]">
+                <CachetScolarite
+                  cachetUrl={etab?.cachet_url}
+                  imgClassName="!mt-2 !max-h-[28mm]"
+                />
               </div>
             </div>
-            <p className="max-w-[50mm] text-right text-[7.5px] leading-snug text-slate-400">
+            <p className="max-w-[50mm] pt-1 text-right text-[7.5px] leading-snug text-slate-400">
               Document officiel — ne remplace pas l&apos;inscription définitive.
             </p>
           </section>
