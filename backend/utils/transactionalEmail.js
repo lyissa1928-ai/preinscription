@@ -1,13 +1,6 @@
 const db = require('../database/db');
-const { sendMail, publicAppUrl, isSmtpConfigured } = require('./mail');
-
-function escapeHtml(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+const { sendMail, publicAppUrlForEmail, isSmtpConfigured } = require('./mail');
+const { wrapTransactionalHtml, ctaButton, brandFooterText, escapeHtml } = require('./emailTemplates');
 
 function fmtDate(iso) {
   const d = iso ? new Date(iso) : new Date();
@@ -25,10 +18,15 @@ function resolveUserEmail(userId) {
 }
 
 function absoluteUrl(pathOrUrl) {
-  const base = publicAppUrl();
+  const base = publicAppUrlForEmail();
   const p = String(pathOrUrl || '').trim();
   if (!p) return base;
-  if (/^https?:\/\//i.test(p)) return p;
+  if (/^https?:\/\//i.test(p)) {
+    if (/^http:\/\//i.test(p) && !/localhost|127\.0\.0\.1/i.test(p)) {
+      return p.replace(/^http:\/\//i, 'https://');
+    }
+    return p;
+  }
   return `${base}${p.startsWith('/') ? p : `/${p}`}`;
 }
 
@@ -57,14 +55,14 @@ async function sendActionEmail({
   const when = fmtDate(date);
   const url = absoluteUrl(link);
   const refLine = reference ? `${referenceLabel} : ${reference}` : null;
-  const greeting = prenom ? `Bonjour ${prenom},` : 'Bonjour,';
+  const greetingName = prenom || '';
 
   const subject = statut
     ? `${action} — ${statut}${reference ? ` (${reference})` : ''}`
     : `${action}${reference ? ` — ${reference}` : ''}`;
 
   const textParts = [
-    greeting,
+    greetingName ? `Bonjour ${greetingName},` : 'Bonjour,',
     '',
     `Type d’action : ${action}`,
     statut ? `Statut : ${statut}` : null,
@@ -73,24 +71,34 @@ async function sendActionEmail({
     extra ? String(extra) : null,
     '',
     `Consulter : ${url}`,
-    '',
-    'Cet e-mail a été envoyé automatiquement par UniPortail.',
-  ].filter(Boolean);
+    brandFooterText(),
+  ].filter((x) => x != null && x !== '');
 
-  const html = `
-    <p>${escapeHtml(greeting)}</p>
-    <table style="border-collapse:collapse;font-family:sans-serif;font-size:14px;color:#0f172a">
-      <tr><td style="padding:4px 12px 4px 0;color:#64748b">Type d’action</td><td><strong>${escapeHtml(action)}</strong></td></tr>
-      ${statut ? `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Statut</td><td><strong>${escapeHtml(statut)}</strong></td></tr>` : ''}
-      <tr><td style="padding:4px 12px 4px 0;color:#64748b">Date</td><td>${escapeHtml(when)}</td></tr>
-      ${reference ? `<tr><td style="padding:4px 12px 4px 0;color:#64748b">${escapeHtml(referenceLabel)}</td><td><strong>${escapeHtml(String(reference))}</strong></td></tr>` : ''}
-    </table>
-    ${extra ? `<p>${escapeHtml(extra)}</p>` : ''}
-    <p><a href="${escapeHtml(url)}">Ouvrir dans la plateforme</a></p>
-    <p style="font-size:12px;color:#64748b">Si le lien ne s’ouvre pas, copiez : ${escapeHtml(url)}</p>
-  `;
+  const bodyHtml =
+    `<table style="border-collapse:collapse;font-size:14px;color:#0f172a;width:100%">` +
+    `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Type d’action</td><td><strong>${escapeHtml(action)}</strong></td></tr>` +
+    (statut ? `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Statut</td><td><strong>${escapeHtml(statut)}</strong></td></tr>` : '') +
+    `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Date</td><td>${escapeHtml(when)}</td></tr>` +
+    (reference
+      ? `<tr><td style="padding:4px 12px 4px 0;color:#64748b">${escapeHtml(referenceLabel)}</td><td><strong>${escapeHtml(String(reference))}</strong></td></tr>`
+      : '') +
+    `</table>` +
+    (extra ? `<p style="font-size:14px;color:#334155;line-height:1.55">${escapeHtml(extra)}</p>` : '') +
+    ctaButton(url, 'Ouvrir dans la plateforme');
 
-  return sendMail({ to: email, subject, text: textParts.join('\n'), html });
+  const html = wrapTransactionalHtml({
+    title: subject,
+    prenom: greetingName,
+    bodyHtml,
+  });
+
+  return sendMail({
+    to: email,
+    subject,
+    text: textParts.join('\n'),
+    html,
+    category: 'transactional',
+  });
 }
 
 async function emailUserId(userId, payload) {

@@ -33,6 +33,7 @@ async function main() {
     subject: 'Test SMTP UniPortail',
     text: 'Ceci est un e-mail de test UniPortail. Si vous le recevez, SMTP fonctionne.',
     html: '<p>Ceci est un e-mail de test <strong>UniPortail</strong>. Si vous le recevez, SMTP fonctionne.</p>',
+    category: 'test',
   });
   if (!ok) {
     console.error('SEND FAIL — voir logs ci-dessus');

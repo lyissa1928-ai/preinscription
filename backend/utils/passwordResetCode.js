@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const db = require('../database/db');
-const { sendMail, publicAppUrl, isSmtpConfigured } = require('./mail');
+const { sendMail, publicAppUrlForEmail, isSmtpConfigured } = require('./mail');
+const { wrapTransactionalHtml, ctaButton, brandFooterText, escapeHtml } = require('./emailTemplates');
 
 const CODE_TTL_MS = 15 * 60 * 1000;
 const CODE_DIGITS = 6;
@@ -85,36 +86,49 @@ async function sendResetCodeEmail(user, code, token) {
     return false;
   }
   const minutes = Math.round(CODE_TTL_MS / 60000);
-  const base = publicAppUrl();
+  const base = publicAppUrlForEmail();
   const formUrl = `${base}/mot-de-passe-oublie-email`;
   const linkUrl = token
     ? `${base}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(token)}`
     : formUrl;
-  const prenom = String(user.prenom || '').replace(/</g, '');
+  const prenom = String(user.prenom || '').trim();
+  const subject = 'Réinitialisation de votre mot de passe UniPortail';
+
+  const text =
+    `Bonjour ${prenom || ''},\n\n` +
+    `Une demande de réinitialisation de mot de passe a été faite pour votre compte UniPortail.\n\n` +
+    `Ouvrez ce lien sécurisé (valable ${minutes} minutes) pour définir un nouveau mot de passe :\n` +
+    `${linkUrl}\n\n` +
+    `Ou saisissez ce code à usage unique sur ${formUrl} :\n` +
+    `${code}\n\n` +
+    `Aucun mot de passe n’est envoyé par e-mail.\n` +
+    `Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.\n` +
+    brandFooterText();
+
+  const bodyHtml =
+    `<p style="margin:0 0 12px;font-size:15px;color:#0f172a;line-height:1.55">` +
+    `Une demande de réinitialisation de mot de passe a été faite pour votre compte <strong>UniPortail</strong>.</p>` +
+    ctaButton(linkUrl, 'Définir mon nouveau mot de passe') +
+    `<p style="font-size:13px;color:#64748b">Lien valable <strong>${minutes} minutes</strong> (usage unique).</p>` +
+    `<p style="margin:16px 0 8px;font-size:14px;color:#334155">Ou code à usage unique :</p>` +
+    `<p style="margin:0;font-size:26px;letter-spacing:0.28em;font-weight:700;color:#0f172a">${escapeHtml(code)}</p>` +
+    `<p style="font-size:13px;color:#64748b;margin-top:12px">Saisir le code : ` +
+    `<a href="${escapeHtml(formUrl)}" style="color:#1e40af">${escapeHtml(formUrl)}</a></p>` +
+    `<p style="font-size:13px;color:#64748b;line-height:1.5">Aucun mot de passe n’est envoyé par e-mail. ` +
+    `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.</p>`;
+
+  const html = wrapTransactionalHtml({
+    title: subject,
+    prenom,
+    bodyHtml,
+  });
 
   return sendMail({
     to: user.email,
-    subject: 'Réinitialisation de votre mot de passe — UniPortail',
-    text:
-      `Bonjour ${prenom},\n\n` +
-      `Une demande de réinitialisation de mot de passe a été faite pour votre compte UniPortail.\n\n` +
-      `Ouvrez ce lien sécurisé (valable ${minutes} minutes) pour définir un nouveau mot de passe :\n` +
-      `${linkUrl}\n\n` +
-      `Ou saisissez ce code à usage unique sur ${formUrl} :\n` +
-      `${code}\n\n` +
-      `Aucun mot de passe n’est envoyé par e-mail.\n` +
-      `Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.`,
-    html:
-      `<p>Bonjour <strong>${prenom}</strong>,</p>` +
-      `<p>Une demande de réinitialisation de mot de passe a été faite pour votre compte <strong>UniPortail</strong>.</p>` +
-      `<p><a href="${linkUrl}" style="display:inline-block;padding:12px 20px;background:#1e40af;color:#fff;border-radius:8px;text-decoration:none;font-weight:600">` +
-      `Définir mon nouveau mot de passe</a></p>` +
-      `<p style="font-size:13px;color:#64748b">Lien valable <strong>${minutes} minutes</strong>.</p>` +
-      `<p>Ou code à usage unique :</p>` +
-      `<p style="font-size:28px;letter-spacing:0.35em;font-weight:700">${code}</p>` +
-      `<p style="font-size:13px">Saisir le code : <a href="${formUrl}">${formUrl}</a></p>` +
-      `<p style="font-size:12px;color:#64748b">Aucun mot de passe n’est envoyé par e-mail. ` +
-      `Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.</p>`,
+    subject,
+    text,
+    html,
+    category: 'reset',
   });
 }
 

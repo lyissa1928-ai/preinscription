@@ -3,7 +3,8 @@
  */
 const crypto = require('crypto');
 const db = require('../database/db');
-const { sendMail, publicAppUrl, isSmtpConfigured } = require('./mail');
+const { sendMail, publicAppUrlForEmail, isSmtpConfigured, maskEmail } = require('./mail');
+const { wrapTransactionalHtml, ctaButton, brandFooterText, escapeHtml } = require('./emailTemplates');
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 jours
 
@@ -25,52 +26,61 @@ function issueStaffInviteToken(userId) {
  */
 async function sendStaffInviteEmail(user, opts = {}) {
   if (!user?.email) return false;
+  if (!isSmtpConfigured()) {
+    console.warn('[staff-invite] SMTP non configuré — e-mail non envoyé pour', maskEmail(user.email));
+    return false;
+  }
+
   const { token } = issueStaffInviteToken(user.id);
-  const base = publicAppUrl();
+  const base = publicAppUrlForEmail();
   const loginUrl = `${base}/connexion`;
   const activateUrl = `${base}/reinitialiser-mot-de-passe-email?token=${encodeURIComponent(token)}`;
   const days = Math.round(INVITE_TTL_MS / (24 * 60 * 60 * 1000));
-  const prenom = String(user.prenom || '').replace(/</g, '');
-  const matricule = String(user.matricule || '').replace(/</g, '');
-  const email = String(user.email || '').replace(/</g, '');
-  const role = String(user.role || '').replace(/</g, '');
+  const prenom = String(user.prenom || '').trim();
+  const matricule = String(user.matricule || '').trim();
+  const email = String(user.email || '').trim();
+  const role = String(user.role || '').trim();
+
+  const subject = 'Activez votre compte UniPortail';
 
   const text =
-    `Bonjour ${prenom},\n\n` +
-    `Un compte UniPortail a été créé pour vous.\n\n` +
+    `Bonjour ${prenom || ''},\n\n` +
+    `Un compte UniPortail a été créé pour vous par ESEBAT Digital Services.\n\n` +
     `Identifiant (e-mail) : ${email}\n` +
     (matricule ? `Matricule : ${matricule}\n` : '') +
     (role ? `Profil : ${role}\n` : '') +
-    `\nPour activer votre compte et définir votre mot de passe, ouvrez ce lien (valable ${days} jours) :\n` +
+    `\nPour activer votre compte et définir votre mot de passe, ouvrez ce lien sécurisé (valable ${days} jours) :\n` +
     `${activateUrl}\n\n` +
     `Ensuite, connectez-vous ici : ${loginUrl}\n\n` +
-    `Pour des raisons de sécurité, aucun mot de passe définitif n’est envoyé par e-mail.\n` +
-    `Vous pourrez compléter votre profil (photo, coordonnées, etc.) depuis « Mon profil » après connexion.\n`;
+    `Pour des raisons de sécurité, aucun mot de passe n’est envoyé par e-mail.\n` +
+    `Vous pourrez compléter votre profil depuis « Mon profil » après connexion.\n` +
+    brandFooterText();
 
-  const html =
-    `<p>Bonjour <strong>${prenom}</strong>,</p>` +
-    `<p>Un compte <strong>UniPortail</strong> a été créé pour vous.</p>` +
-    `<ul>` +
-    `<li><strong>Identifiant (e-mail)</strong> : ${email}</li>` +
-    (matricule ? `<li><strong>Matricule</strong> : ${matricule}</li>` : '') +
-    (role ? `<li><strong>Profil</strong> : ${role}</li>` : '') +
+  const bodyHtml =
+    `<p style="margin:0 0 12px;font-size:15px;color:#0f172a;line-height:1.55">` +
+    `Un compte <strong>UniPortail</strong> a été créé pour vous par ESEBAT Digital Services.</p>` +
+    `<ul style="margin:0 0 16px;padding-left:18px;font-size:14px;color:#334155;line-height:1.6">` +
+    `<li><strong>Identifiant</strong> : ${escapeHtml(email)}</li>` +
+    (matricule ? `<li><strong>Matricule</strong> : ${escapeHtml(matricule)}</li>` : '') +
+    (role ? `<li><strong>Profil</strong> : ${escapeHtml(role)}</li>` : '') +
     `</ul>` +
-    `<p><a href="${activateUrl}" style="display:inline-block;padding:12px 20px;background:#1e40af;color:#fff;border-radius:8px;text-decoration:none;font-weight:600">` +
-    `Activer mon compte et définir mon mot de passe</a></p>` +
-    `<p style="font-size:13px;color:#64748b">Lien valable <strong>${days} jours</strong>. Connexion ensuite : ` +
-    `<a href="${loginUrl}">${loginUrl}</a></p>` +
-    `<p style="font-size:12px;color:#64748b">Aucun mot de passe définitif n’est envoyé par e-mail. ` +
-    `Complétez votre profil librement depuis « Mon profil » après connexion.</p>`;
+    ctaButton(activateUrl, 'Activer mon compte et définir mon mot de passe') +
+    `<p style="font-size:13px;color:#64748b;line-height:1.5">Lien valable <strong>${days} jours</strong>. ` +
+    `Connexion ensuite : <a href="${escapeHtml(loginUrl)}" style="color:#1e40af">${escapeHtml(loginUrl)}</a></p>` +
+    `<p style="font-size:13px;color:#64748b;line-height:1.5">Aucun mot de passe n’est envoyé par e-mail.</p>`;
 
-  if (!isSmtpConfigured()) {
-    console.warn('[staff-invite] SMTP non configuré — e-mail non envoyé pour', email);
-    return false;
-  }
+  const html = wrapTransactionalHtml({
+    title: subject,
+    prenom,
+    bodyHtml,
+  });
+
   return sendMail({
     to: user.email,
-    subject: 'Activation de votre compte UniPortail',
+    subject,
     text,
     html,
+    category: 'activation',
   });
 }
 
