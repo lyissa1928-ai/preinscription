@@ -225,6 +225,61 @@ function markConversationRead(userId, conversationKeyStr) {
   }
 }
 
+/**
+ * Suppression GDPR : messages, conversations et lectures liés à l’utilisateur.
+ */
+function purgeUserFromChat(userId) {
+  const uid = Number(userId)
+  const { unlinkQuiet } = require('../utils/verifyUploadedFile')
+  const path = require('path')
+  const uploadsRoot = path.join(__dirname, '..', 'uploads')
+
+  const deleteAtt = (url) => {
+    if (!url) return
+    const s = String(url).replace(/\\/g, '/')
+    const idx = s.indexOf('/uploads/')
+    const rel = idx >= 0 ? s.slice(idx + '/uploads/'.length) : s.replace(/^uploads\//, '')
+    if (!rel || rel.includes('..')) return
+    try { unlinkQuiet(path.join(uploadsRoot, rel)) } catch { /* ignore */ }
+  }
+
+  return runWithDbLockSync(CHAT_PATH, () => {
+    const convs = chatDb.get('conversations').value() || []
+    const keysToDrop = new Set(
+      convs
+        .filter((c) => Array.isArray(c.participants) && c.participants.map(Number).includes(uid))
+        .map((c) => c.key),
+    )
+
+    const messages = chatDb.get('messages').value() || []
+    const keptMsgs = []
+    messages.forEach((m) => {
+      const drop =
+        Number(m.sender_id) === uid
+        || keysToDrop.has(m.conversation_key)
+      if (drop) {
+        deleteAtt(m.attachment_url)
+        return
+      }
+      keptMsgs.push(m)
+    })
+    chatDb.set('messages', keptMsgs).write()
+
+    chatDb.set(
+      'conversations',
+      convs.filter((c) => !keysToDrop.has(c.key)),
+    ).write()
+
+    const reads = chatDb.get('reads').value() || []
+    chatDb.set(
+      'reads',
+      reads.filter((r) => Number(r.user_id) !== uid && !keysToDrop.has(r.conversation_key)),
+    ).write()
+
+    return { conversations_removed: keysToDrop.size }
+  })
+}
+
 function unreadCountForConversation(userId, conversationKeyStr) {
   const uid = Number(userId)
   const read = getReadState(uid, conversationKeyStr)
@@ -250,4 +305,5 @@ module.exports = {
   getReadState,
   listAttachmentMessagesForEtablissement,
   pruneChatData,
+  purgeUserFromChat,
 }

@@ -131,6 +131,18 @@ function revokeAllRefreshTokensForUser(userId) {
   });
 }
 
+/** Suppression physique des refresh tokens d’un utilisateur (GDPR hard delete). */
+function deleteAllRefreshTokensForUser(userId) {
+  const uid = Number(userId);
+  withLock(() => {
+    const rows = sessionDb.get('refresh_tokens').value() || [];
+    const next = rows.filter((r) => Number(r.user_id) !== uid);
+    if (next.length !== rows.length) {
+      sessionDb.set('refresh_tokens', next).write();
+    }
+  });
+}
+
 function rotateRefreshToken(raw, userId) {
   revokeRefreshToken(raw);
   return createRefreshToken(userId);
@@ -172,6 +184,7 @@ module.exports = {
   validateRefreshToken,
   revokeRefreshToken,
   revokeAllRefreshTokensForUser,
+  deleteAllRefreshTokensForUser,
   rotateRefreshToken,
   persistRevokedJti,
   isJtiPersistentlyRevoked,
