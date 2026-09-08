@@ -6,13 +6,20 @@ function isEnLigneModality(opts) {
   return t === 'en_ligne' || t === 'fad' || t === 'distance';
 }
 
-function pickContactField(etab, fadKey, presKey, enLigne) {
+function str(v) {
+  return v != null ? String(v).trim() : '';
+}
+
+/**
+ * Sur facture FAD : téléphone + e-mail FAD (fallback présentiel si vide).
+ * Tout le reste (adresse, NINEA, RC, banque, IBAN…) = coordonnées présentiel / établissement.
+ */
+function pickFadPhoneOrEmail(etab, fadKey, presKey, enLigne) {
   if (enLigne) {
-    const fadVal = etab[fadKey];
-    if (fadVal != null && String(fadVal).trim() !== '') return String(fadVal).trim();
+    const fadVal = str(etab[fadKey]);
+    if (fadVal) return fadVal;
   }
-  const presVal = etab[presKey];
-  return presVal != null ? String(presVal).trim() : '';
+  return str(etab[presKey]);
 }
 
 function snapshotFromEtab(etab, opts = {}) {
@@ -24,17 +31,17 @@ function snapshotFromEtab(etab, opts = {}) {
     cachet_url: etab.cachet_url || null,
     couleur_primaire: etab.couleur_primaire || '#1e40af',
     couleur_secondaire: etab.couleur_secondaire || '#3b82f6',
-    adresse: pickContactField(etab, 'adresse_fad', 'adresse', enLigne),
-    telephone: pickContactField(etab, 'telephone_fad', 'telephone', enLigne),
-    email_contact: pickContactField(etab, 'email_contact_fad', 'email_contact', enLigne),
+    adresse: str(etab.adresse),
+    telephone: pickFadPhoneOrEmail(etab, 'telephone_fad', 'telephone', enLigne),
+    email_contact: pickFadPhoneOrEmail(etab, 'email_contact_fad', 'email_contact', enLigne),
     site_web: etab.site_web || '',
-    ninea: etab.ninea || '',
-    rc: etab.rc || '',
-    arrete: etab.arrete || '',
-    compte_bancaire: pickContactField(etab, 'compte_bancaire_fad', 'compte_bancaire', enLigne),
-    banque: pickContactField(etab, 'banque_fad', 'banque', enLigne),
-    iban: pickContactField(etab, 'iban_fad', 'iban', enLigne),
-    swift: pickContactField(etab, 'swift_fad', 'swift', enLigne),
+    ninea: str(etab.ninea),
+    rc: str(etab.rc),
+    arrete: str(etab.arrete),
+    compte_bancaire: str(etab.compte_bancaire),
+    banque: str(etab.banque),
+    iban: str(etab.iban),
+    swift: str(etab.swift),
     signataire_nom: etab.signataire_nom || '',
     signataire_fonction: etab.signataire_fonction || '',
   };

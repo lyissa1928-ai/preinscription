@@ -52,19 +52,25 @@ async function sendActionEmail({
     return false;
   }
 
+  const actionLabel = String(action || '').trim();
+  if (!actionLabel) {
+    console.error('[mail] sendActionEmail: action/objet manquant — e-mail non envoyé');
+    return false;
+  }
+
   const when = fmtDate(date);
   const url = absoluteUrl(link);
   const refLine = reference ? `${referenceLabel} : ${reference}` : null;
   const greetingName = prenom || '';
 
   const subject = statut
-    ? `${action} — ${statut}${reference ? ` (${reference})` : ''}`
-    : `${action}${reference ? ` — ${reference}` : ''}`;
+    ? `${actionLabel} — ${statut}${reference ? ` (${reference})` : ''}`
+    : `${actionLabel}${reference ? ` — ${reference}` : ''}`;
 
   const textParts = [
     greetingName ? `Bonjour ${greetingName},` : 'Bonjour,',
     '',
-    `Type d’action : ${action}`,
+    `Type d’action : ${actionLabel}`,
     statut ? `Statut : ${statut}` : null,
     `Date : ${when}`,
     refLine,
@@ -76,7 +82,7 @@ async function sendActionEmail({
 
   const bodyHtml =
     `<table style="border-collapse:collapse;font-size:14px;color:#0f172a;width:100%">` +
-    `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Type d’action</td><td><strong>${escapeHtml(action)}</strong></td></tr>` +
+    `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Type d’action</td><td><strong>${escapeHtml(actionLabel)}</strong></td></tr>` +
     (statut ? `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Statut</td><td><strong>${escapeHtml(statut)}</strong></td></tr>` : '') +
     `<tr><td style="padding:4px 12px 4px 0;color:#64748b">Date</td><td>${escapeHtml(when)}</td></tr>` +
     (reference
@@ -92,13 +98,14 @@ async function sendActionEmail({
     bodyHtml,
   });
 
-  return sendMail({
+  const result = await sendMail({
     to: email,
     subject,
     text: textParts.join('\n'),
     html,
     category: 'transactional',
   });
+  return result.ok;
 }
 
 async function emailUserId(userId, payload) {

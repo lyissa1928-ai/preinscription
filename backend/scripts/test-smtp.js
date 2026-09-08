@@ -28,18 +28,18 @@ async function main() {
     process.exit(0);
   }
 
-  const ok = await sendMail({
+  const result = await sendMail({
     to,
     subject: 'Test SMTP UniPortail',
     text: 'Ceci est un e-mail de test UniPortail. Si vous le recevez, SMTP fonctionne.',
     html: '<p>Ceci est un e-mail de test <strong>UniPortail</strong>. Si vous le recevez, SMTP fonctionne.</p>',
     category: 'test',
   });
-  if (!ok) {
-    console.error('SEND FAIL — voir logs ci-dessus');
+  if (!result.ok) {
+    console.error('SEND FAIL:', result.error, { accepted: result.accepted, rejected: result.rejected });
     process.exit(1);
   }
-  console.log('SEND OK →', to);
+  console.log('SEND OK →', to, '| messageId:', result.messageId);
   process.exit(0);
 }
 

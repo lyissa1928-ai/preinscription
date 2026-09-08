@@ -403,7 +403,8 @@ async function generateWeeklyRapportsForAllEtabs(refDate = new Date()) {
               { filename: xlsxName, path: xlsxAbs },
               { filename: pdfName, path: pdfAbs },
             ],
-          }).catch(() => false);
+            category: 'transactional',
+          });
         }
       }
     } catch (e) {
@@ -487,7 +488,8 @@ async function generateWeeklyRapportsForAllEtabs(refDate = new Date()) {
           text: `Bonjour,\n\nRapports hebdomadaires de tous les établissements (${periodLabel}).\nComparaison + fichiers PDF/Excel joints.\n`,
           html: `<p>Bonjour,</p><p>Rapports hebdomadaires multi-établissements (<strong>${periodLabel}</strong>).</p><p>Pièces jointes : comparaison Directeur + rapports par établissement (PDF et Excel).</p>`,
           attachments: attachments.slice(0, 40),
-        }).catch(() => false);
+          category: 'transactional',
+        });
       }
     }
   } catch (e) {

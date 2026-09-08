@@ -121,7 +121,9 @@ function genererOuRecupererFactureDossier(dossierId, options = {}) {
         (!cur.cachet_url && etabSnap.cachet_url) ||
         (!cur.logo_url && etabSnap.logo_url) ||
         (etabSnap.telephone && cur.telephone !== etabSnap.telephone) ||
+        (etabSnap.email_contact && cur.email_contact !== etabSnap.email_contact) ||
         (etabSnap.compte_bancaire && cur.compte_bancaire !== etabSnap.compte_bancaire) ||
+        (etabSnap.banque && cur.banque !== etabSnap.banque) ||
         (etabSnap.couleur_primaire && cur.couleur_primaire !== etabSnap.couleur_primaire);
       if (needMerge) {
         db.get('factures').find({ id: existing.id }).assign({

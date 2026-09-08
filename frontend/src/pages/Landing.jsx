@@ -66,8 +66,8 @@ const FEATURES = [
 const PARCOURS = [
   { step: '01', title: 'Explorer', text: 'Parcourez les établissements et les formations (conditions d’admission consultables publiquement).' },
   { step: '02', title: 'Proforma ou compte', text: 'Sans compte : demande de facture proforma (identité, diplôme, e-mail). Avec compte : préinscription complète.' },
-  { step: '03', title: 'Validation', text: 'Le staff de l’établissement examine votre demande et génère la facture (avec ou sans cachet).' },
-  { step: '04', title: 'Suivi', text: 'Facture par e-mail (sans compte) ou depuis votre tableau de bord candidat.' },
+  { step: '03', title: 'Validation', text: 'Le staff examine votre préinscription ; à l’acceptation, la facture proforma est générée automatiquement (sans choix cachet pour le candidat).' },
+  { step: '04', title: 'Suivi', text: 'Téléchargez facture, lettre et attestation depuis votre tableau de bord candidat.' },
 ]
 
 const TYPE_ETAB_COLORS = {

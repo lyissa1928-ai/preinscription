@@ -370,7 +370,7 @@ router.post('/inscription', inscriptionLimiter, async (req, res) => {
 
   if (needVerify && user.email_verify_token) {
     const url = `${publicAppUrl()}/verifier-email?token=${encodeURIComponent(user.email_verify_token)}`;
-    const ok = await sendMail({
+    const mailResult = await sendMail({
       to: emailNorm,
       subject: 'Confirmez votre adresse e-mail — UniPortail',
       text:
@@ -384,8 +384,9 @@ router.post('/inscription', inscriptionLimiter, async (req, res) => {
         `<p><a href="${url}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;border-radius:8px;text-decoration:none;">Confirmer mon e-mail</a></p>` +
         `<p style="font-size:12px;color:#64748b;">Ou copiez ce lien :<br/>${escapeHtml(url)}</p>` +
         `<p style="font-size:12px;color:#64748b;">Le lien expire dans 48 h.</p>`,
+      category: 'activation',
     });
-    if (!ok) {
+    if (!mailResult.ok) {
       logSecurityEvent(req, 'email_verification_send_failed', { user_id: id, email: emailNorm }, 'error');
       return res.status(503).json({
         message:
@@ -730,6 +731,7 @@ router.post('/renvoyer-email-verification', resendVerifyLimiter, async (req, res
       `<p>Bonjour ${escapeHtml(user.prenom)},</p>` +
       `<p><a href="${url}">Confirmer mon e-mail</a></p>` +
       `<p style="font-size:12px;color:#64748b;">Expire dans 48 h.</p>`,
+    category: 'activation',
   });
 
   res.json({

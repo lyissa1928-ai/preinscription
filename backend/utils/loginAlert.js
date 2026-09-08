@@ -50,6 +50,7 @@ async function notifySuccessfulLogin(user, req) {
 <p>Une connexion réussie a été détectée sur votre compte UniPortail.</p>
 <ul>${lines.map((l) => `<li>${l}</li>`).join('')}</ul>
 <p>Si vous ne reconnaissez pas cette connexion, changez immédiatement votre mot de passe.</p>`,
+      category: 'transactional',
     });
   } catch {
     /* best-effort */

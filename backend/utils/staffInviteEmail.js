@@ -75,13 +75,14 @@ async function sendStaffInviteEmail(user, opts = {}) {
     bodyHtml,
   });
 
-  return sendMail({
+  const result = await sendMail({
     to: user.email,
     subject,
     text,
     html,
     category: 'activation',
   });
+  return result.ok;
 }
 
 module.exports = {

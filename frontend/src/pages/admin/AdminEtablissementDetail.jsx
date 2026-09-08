@@ -196,11 +196,14 @@ function TabIdentite({ etab, onUpdated }) {
           <input className="input-field" value={form.adresse || ''} onChange={up('adresse')} />
         </div>
         <div className="md:col-span-2 border-t border-slate-200 pt-4">
-          <p className="mb-3 text-sm font-bold text-slate-800">Coordonnées FAD (formation à distance)</p>
+          <p className="mb-1 text-sm font-bold text-slate-800">Coordonnées FAD (formation à distance)</p>
+          <p className="mb-3 text-xs text-slate-500">
+            Sur les factures FAD : téléphone et e-mail FAD. NINEA, adresse et coordonnées bancaires restent ceux du présentiel.
+          </p>
         </div>
         <div className="md:col-span-2">
           <L>Adresse FAD</L>
-          <input className="input-field" value={form.adresse_fad || ''} onChange={up('adresse_fad')} />
+          <input className="input-field" value={form.adresse_fad || ''} onChange={up('adresse_fad')} placeholder="Optionnel (hors facture)" />
         </div>
         <div>
           <L>Téléphone FAD</L>
@@ -210,21 +213,26 @@ function TabIdentite({ etab, onUpdated }) {
           <L>Email contact FAD</L>
           <input className="input-field" type="email" value={form.email_contact_fad || ''} onChange={up('email_contact_fad')} />
         </div>
+        <div className="md:col-span-2">
+          <p className="text-xs text-slate-500">
+            Les champs banque FAD ci-dessous ne sont pas utilisés sur les factures (mêmes NINEA / compte que le présentiel).
+          </p>
+        </div>
         <div>
           <L>Banque FAD</L>
-          <input className="input-field" value={form.banque_fad || ''} onChange={up('banque_fad')} placeholder="Optionnel" />
+          <input className="input-field" value={form.banque_fad || ''} onChange={up('banque_fad')} placeholder="Non utilisé sur facture" />
         </div>
         <div>
           <L>Compte bancaire FAD</L>
-          <input className="input-field" value={form.compte_bancaire_fad || ''} onChange={up('compte_bancaire_fad')} placeholder="Optionnel" />
+          <input className="input-field" value={form.compte_bancaire_fad || ''} onChange={up('compte_bancaire_fad')} placeholder="Non utilisé sur facture" />
         </div>
         <div>
           <L>IBAN FAD</L>
-          <input className="input-field" value={form.iban_fad || ''} onChange={up('iban_fad')} placeholder="Optionnel" />
+          <input className="input-field" value={form.iban_fad || ''} onChange={up('iban_fad')} placeholder="Non utilisé sur facture" />
         </div>
         <div>
           <L>SWIFT FAD</L>
-          <input className="input-field" value={form.swift_fad || ''} onChange={up('swift_fad')} placeholder="Optionnel" />
+          <input className="input-field" value={form.swift_fad || ''} onChange={up('swift_fad')} placeholder="Non utilisé sur facture" />
         </div>
         <div className="md:col-span-2 border-t border-slate-200 pt-2">
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Conformité & présentiel</p>

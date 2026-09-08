@@ -40,11 +40,17 @@ function isStaffFactureRole(user) {
 }
 
 /**
- * Accès documentaire facture dossier : staff uniquement (pas l’étudiant propriétaire).
+ * Accès documentaire facture dossier :
+ * - staff de l’établissement
+ * - étudiant propriétaire (préinscription acceptée → facture auto, sans choix cachet côté UI)
  */
 function peutAccederFactureDocumentaire(user, dossier, db) {
   if (!user || !dossier) return false;
-  return staffEtabPeutVoirDossier(user, dossier, db);
+  if (staffEtabPeutVoirDossier(user, dossier, db)) return true;
+  if (user.role === 'etudiant' && Number(dossier.etudiant_id) === Number(user.id)) {
+    return true;
+  }
+  return false;
 }
 
 module.exports = {

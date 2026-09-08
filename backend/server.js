@@ -220,7 +220,7 @@ server.listen(PORT, () => {
   try {
     const { isSmtpConfigured, passwordResetEmailEnabled, verifySmtp, smtpMetaForLogs } = require('./utils/mail');
     if (!isSmtpConfigured()) {
-      console.warn('[mail] SMTP non configuré (SMTP_HOST + SMTP_FROM requis) — activation / mot de passe oublié par e-mail indisponibles.');
+      console.warn('[mail] SMTP non configuré (SMTP_HOST + SMTP_FROM + SMTP_USER + SMTP_PASS requis) — activation / mot de passe oublié par e-mail indisponibles.');
     } else {
       console.log('[mail] SMTP configuré:', smtpMetaForLogs(), '| reset e-mail:', passwordResetEmailEnabled() ? 'ON' : 'OFF');
       verifySmtp().then((r) => {

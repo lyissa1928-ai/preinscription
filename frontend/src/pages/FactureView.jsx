@@ -13,7 +13,8 @@ const STAFF_EMAIL_ROLES = [
   'agent_fad', 'comptable', 'agent_admin', 'controleur_qualite',
 ]
 
-function pickFadOrPres(live, fadKey, presKey, enLigne) {
+/** FAD : tél / e-mail FAD uniquement. Banque, NINEA, adresse = présentiel. */
+function pickFadPhoneOrEmail(live, fadKey, presKey, enLigne) {
   if (enLigne && live?.[fadKey]) return live[fadKey]
   return live?.[presKey] || ''
 }
@@ -47,6 +48,15 @@ export default function FactureView() {
           setLoadError('Dossier introuvable.')
           return
         }
+        // Étudiant : facture uniquement auto à l’acceptation — pas de génération manuelle
+        if (user?.role === 'etudiant') {
+          setLoadError(
+            msg === 'Aucune facture générée'
+              ? 'Aucune facture disponible pour le moment. Elle est générée automatiquement dès l’acceptation de votre préinscription.'
+              : (msg || 'Facture indisponible.'),
+          )
+          return
+        }
         setGenerating(true)
         axios.post(`/api/factures/generer/${dossierId}`)
           .then(({ data }) => {
@@ -61,7 +71,7 @@ export default function FactureView() {
           .finally(() => setGenerating(false))
       })
       .finally(() => setLoading(false))
-  }, [dossierId])
+  }, [dossierId, user?.role])
 
   useEffect(() => {
     const snap = facture?.etablissement_snapshot
@@ -91,20 +101,23 @@ export default function FactureView() {
     const enLigne = formationType === 'en_ligne'
     return {
       ...snap,
-      email_contact: snap.email_contact || pickFadOrPres(live, 'email_contact_fad', 'email_contact', enLigne) || '',
-      telephone: snap.telephone || pickFadOrPres(live, 'telephone_fad', 'telephone', enLigne) || '',
+      email_contact:
+        snap.email_contact
+        || pickFadPhoneOrEmail(live, 'email_contact_fad', 'email_contact', enLigne)
+        || '',
+      telephone:
+        snap.telephone
+        || pickFadPhoneOrEmail(live, 'telephone_fad', 'telephone', enLigne)
+        || '',
       rc: snap.rc || live?.rc || '',
       arrete: snap.arrete || live?.arrete || '',
-      compte_bancaire:
-        snap.compte_bancaire
-        || pickFadOrPres(live, 'compte_bancaire_fad', 'compte_bancaire', enLigne)
-        || live?.iban
-        || '',
-      iban: snap.iban || pickFadOrPres(live, 'iban_fad', 'iban', enLigne) || '',
-      swift: snap.swift || pickFadOrPres(live, 'swift_fad', 'swift', enLigne) || '',
+      // Banque / NINEA / adresse : toujours présentiel (identiques FAD et présentiel)
+      compte_bancaire: snap.compte_bancaire || live?.compte_bancaire || live?.iban || '',
+      iban: snap.iban || live?.iban || '',
+      swift: snap.swift || live?.swift || '',
       ninea: snap.ninea || live?.ninea || '',
-      adresse: snap.adresse || pickFadOrPres(live, 'adresse_fad', 'adresse', enLigne) || '',
-      banque: snap.banque || pickFadOrPres(live, 'banque_fad', 'banque', enLigne) || '',
+      adresse: snap.adresse || live?.adresse || '',
+      banque: snap.banque || live?.banque || '',
       cachet_url: snap.cachet_url || live?.cachet_url || null,
       logo_url: snap.logo_url || live?.logo_url || null,
       nom: snap.nom || live?.nom || '',
@@ -143,8 +156,10 @@ export default function FactureView() {
   const eb = mergeEtab(facture.etablissement_snapshot || {}, etabLive, fo.type)
   const primary = eb.couleur_primaire || '#1e40af'
   const { rows, totalAPayer } = buildDisplayRows(facture, fo)
+  const isEtudiant = user?.role === 'etudiant'
+  // Étudiant : pas de choix cachet — toujours avec cachet si disponible
   const showCachet =
-    avecCachet &&
+    (isEtudiant || avecCachet) &&
     facture.facture_avec_cachet !== false &&
     !!eb.cachet_url
 
@@ -165,17 +180,19 @@ export default function FactureView() {
         onSendEmail={canSendEmail ? sendFactureEmail : undefined}
       />
 
-      <div className="mx-auto mb-4 flex max-w-[210mm] flex-wrap items-center justify-end gap-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm">
-        <span className="font-semibold text-slate-700">Cachet sur le PDF :</span>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input type="radio" name="cachet_view" checked={avecCachet} onChange={() => setAvecCachet(true)} />
-          Avec cachet
-        </label>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input type="radio" name="cachet_view" checked={!avecCachet} onChange={() => setAvecCachet(false)} />
-          Sans cachet
-        </label>
-      </div>
+      {!isEtudiant && (
+        <div className="mx-auto mb-4 flex max-w-[210mm] flex-wrap items-center justify-end gap-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm">
+          <span className="font-semibold text-slate-700">Cachet sur le PDF :</span>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input type="radio" name="cachet_view" checked={avecCachet} onChange={() => setAvecCachet(true)} />
+            Avec cachet
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input type="radio" name="cachet_view" checked={!avecCachet} onChange={() => setAvecCachet(false)} />
+            Sans cachet
+          </label>
+        </div>
+      )}
 
       <div className="a4-preview-stage">
         <FactureDocument

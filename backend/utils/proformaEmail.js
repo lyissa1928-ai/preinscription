@@ -1,4 +1,4 @@
-const { sendMail, publicAppUrl } = require('./mail');
+const { sendMail, publicAppUrlForEmail } = require('./mail');
 
 /**
  * Envoie le lien de facture proforma au candidat (sans compte ou avec compte).
@@ -9,7 +9,7 @@ async function sendProformaFactureEmail(demande) {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
   if (!demande?.reference) return false;
 
-  const base = publicAppUrl();
+  const base = publicAppUrlForEmail();
   const url = `${base}/facture-publique/${encodeURIComponent(demande.reference)}`;
   const prenom = String(demande.prenom || '').trim();
   const etabNom = demande.etablissement_snapshot?.nom || 'votre établissement';
@@ -35,7 +35,8 @@ async function sendProformaFactureEmail(demande) {
     <p style="color:#64748b;font-size:12px;">Si le lien ne fonctionne pas, copiez cette adresse : ${url}</p>
   `;
 
-  return sendMail({ to: email, subject, text, html });
+  const result = await sendMail({ to: email, subject, text, html, category: 'transactional' });
+  return result.ok;
 }
 
 module.exports = { sendProformaFactureEmail };

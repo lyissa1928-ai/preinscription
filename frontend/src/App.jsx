@@ -156,7 +156,7 @@ function AppRoutes() {
         <Route path="/mes-acces" element={<PrivateRoute roles={['etudiant']}><MesAccesEtudiant /></PrivateRoute>} />
         <Route path="/preinscription" element={<PrivateRoute roles={['etudiant']}><Preinscription /></PrivateRoute>} />
         <Route path="/preinscription/:formationId" element={<PrivateRoute roles={['etudiant']}><Preinscription /></PrivateRoute>} />
-        <Route path="/facture/:dossierId" element={<PrivateRoute roles={['admin', 'directeur', 'admin_etablissement', 'responsable', 'responsable_fad', 'agent_fad', 'comptable', 'agent_admin', 'controleur_qualite']}><FactureView /></PrivateRoute>} />
+        <Route path="/facture/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'directeur', 'admin_etablissement', 'responsable', 'responsable_fad', 'agent_fad', 'comptable', 'agent_admin', 'controleur_qualite']}><FactureView /></PrivateRoute>} />
 
         {/* Lettre */}
         <Route path="/lettre/:dossierId" element={<PrivateRoute roles={['etudiant', 'admin', 'admin_etablissement', 'responsable', 'responsable_fad', 'agent_fad', 'agent_admin', 'comptable', 'controleur_qualite']}><LettrePreinscription /></PrivateRoute>} />

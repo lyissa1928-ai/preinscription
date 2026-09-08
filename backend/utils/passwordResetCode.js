@@ -123,13 +123,14 @@ async function sendResetCodeEmail(user, code, token) {
     bodyHtml,
   });
 
-  return sendMail({
+  const result = await sendMail({
     to: user.email,
     subject,
     text,
     html,
     category: 'reset',
   });
+  return result.ok;
 }
 
 module.exports = {

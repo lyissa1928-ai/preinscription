@@ -97,7 +97,7 @@ function ModalDetail({ open, onClose, type, payload }) {
             )}
             {!okDocs && d.statut !== 'refusee' && (
               <p className="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                L&apos;attestation de préinscription n&apos;est disponible qu&apos;après <strong>validation</strong> par le service pédagogique. La facture proforma est transmise par l&apos;établissement (téléchargement réservé au personnel).
+                L&apos;attestation de préinscription n&apos;est disponible qu&apos;après <strong>validation</strong> par le service pédagogique. La facture proforma est générée automatiquement à l&apos;acceptation.
               </p>
             )}
             {okDocs && (
@@ -112,12 +112,12 @@ function ModalDetail({ open, onClose, type, payload }) {
                       </p>
                     )}
                     <p className="mt-1 text-slate-600">
-                      Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                      Facture proforma générée automatiquement (cachet institutionnel — sans option de choix).
                     </p>
                   </div>
                 ) : (
                   <p className="text-xs text-slate-600">
-                    Facture proforma : document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                    Facture proforma en cours de mise à disposition par l&apos;établissement.
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2">
@@ -173,12 +173,14 @@ function ModalDetail({ open, onClose, type, payload }) {
                   {facture.montant_ttc != null && (
                     <p className="mt-0.5 font-semibold tabular-nums">{fmt(facture.montant_ttc)} FCFA</p>
                   )}
-                  <p className="mt-1 text-slate-600">
-                    Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
-                  </p>
                 </div>
               ) : null}
               <div className="flex flex-wrap gap-2">
+                {facture && (
+                  <Link to={`/facture/${dossier.id}`} className="text-xs font-bold bg-blue-700 text-white px-3 py-2 rounded-lg" onClick={onClose}>
+                    Voir / télécharger la facture
+                  </Link>
+                )}
                 <Link to={`/attestation/${dossier.id}`} className="text-xs font-bold bg-indigo-600 text-white px-3 py-2 rounded-lg" onClick={onClose}>
                   Attestation
                 </Link>
@@ -346,21 +348,25 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
         <h3 className="ui-section-title">Documents officiels</h3>
         {!accepted ? (
           <p className="text-sm leading-relaxed text-amber-950/90">
-            L&apos;attestation et la lettre de préinscription ne sont téléchargeables qu&apos;après{' '}
-            <strong>validation</strong> de cette candidature (statut « accepté »). La facture proforma est transmise par
-            l&apos;établissement.
+            L&apos;attestation, la lettre et la facture proforma ne sont disponibles qu&apos;après{' '}
+            <strong>validation</strong> de cette candidature (statut « accepté »). La facture est alors générée automatiquement.
           </p>
         ) : (
           <>
             <p className="ui-section-sub">
-              Candidature acceptée — téléchargez votre lettre et votre attestation. La facture proforma est transmise par l&apos;établissement.
+              Candidature acceptée — téléchargez votre facture, lettre et attestation. Aucun choix « avec / sans cachet » : le cachet institutionnel s&apos;applique.
             </p>
             <div className="ui-action-bar">
+              {facture && (
+                <Link to={`/facture/${dossier.id}`} className="ui-doc-btn-solid">
+                  Facture proforma
+                </Link>
+              )}
               <Link to={`/attestation/${dossier.id}`} className="ui-doc-btn">
                 Attestation de préinscription
               </Link>
               {showLettre && (
-                <Link to={`/lettre/${dossier.id}`} className="ui-doc-btn-solid">
+                <Link to={`/lettre/${dossier.id}`} className="ui-doc-btn">
                   Lettre de préinscription
                 </Link>
               )}
@@ -371,9 +377,6 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
                 <p className="font-mono text-sm font-bold text-slate-800">{facture.numero}</p>
                 <p className="mt-1 text-xl font-black tabular-nums text-slate-900">
                   {fmt(facture.montant_ttc)} <span className="text-sm font-semibold text-slate-500">FCFA</span>
-                </p>
-                <p className="mt-2 text-sm text-slate-600">
-                  Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
                 </p>
               </div>
             )}
@@ -558,7 +561,7 @@ export default function EtudiantDashboard() {
             <p className="px-5 pt-4 pb-2 text-xs text-slate-500">
               Après envoi des justificatifs prévus aux conditions d’admission, suivez le statut ici. Une fois la demande{' '}
               <strong>acceptée</strong>, l&apos;<strong>attestation</strong> est téléchargeable ; la facture proforma est
-              transmise par l&apos;établissement (téléchargement réservé au personnel).
+              communiquée par l&apos;établissement (lien / e-mail).
             </p>
             <div className="md:hidden divide-y divide-slate-100 border-t border-slate-100">
               {demandesProSorted.length === 0 ? (
@@ -605,12 +608,12 @@ export default function EtudiantDashboard() {
                                 <p className="font-semibold tabular-nums">{fmt(d.facture.montant_ttc)} FCFA</p>
                               )}
                               <p className="mt-1 text-slate-600">
-                                Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                                Facture proforma : transmise par e-mail / l&apos;établissement.
                               </p>
                             </div>
                           ) : (
                             <p className="text-xs text-slate-600">
-                              Facture proforma : document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                              Facture proforma : transmise par l&apos;établissement après validation.
                             </p>
                           )}
                           <Link
@@ -689,11 +692,11 @@ export default function EtudiantDashboard() {
                                       {d.facture.montant_ttc != null && (
                                         <> · <span className="font-semibold tabular-nums">{fmt(d.facture.montant_ttc)} FCFA</span></>
                                       )}
-                                      {' — '}Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                                      {' — '}transmise par e-mail / l&apos;établissement.
                                     </span>
                                   ) : (
                                     <span className="text-xs text-slate-600">
-                                      Facture : téléchargement réservé au personnel.
+                                      Facture : transmise par l&apos;établissement.
                                     </span>
                                   )}
                                   <Link
@@ -825,10 +828,18 @@ export default function EtudiantDashboard() {
                                   {row.facture.montant_ttc != null && (
                                     <> · <span className="font-semibold tabular-nums">{fmt(row.facture.montant_ttc)} FCFA</span></>
                                   )}
-                                  {' — '}Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
                                 </span>
                               ) : null}
                               <div className="flex flex-wrap gap-2">
+                                {row.facture && (
+                                  <Link
+                                    to={`/facture/${dossier.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center justify-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-800"
+                                  >
+                                    Facture
+                                  </Link>
+                                )}
                                 <Link
                                   to={`/attestation/${dossier.id}`}
                                   onClick={(e) => e.stopPropagation()}
