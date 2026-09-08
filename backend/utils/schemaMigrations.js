@@ -9,7 +9,7 @@ const { createBackup } = require('./dbBackup');
 const { getDureeMoisEffectif, computePrixAnnuel, normalizeFraisSupplementaires } = require('./formationTarifs');
 
 /** Version cible de l’application actuelle. */
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 function toNonNegInt(v, fallback = 0) {
   if (v === undefined || v === null || v === '') return fallback;
@@ -148,6 +148,22 @@ function migrateNiveauxEtudeV4(db) {
   return { niveaux_seeded: seed.seeded, niveaux_total: seed.total };
 }
 
+/** v5 — Activation par e-mail uniquement : retire la porte profil staff (naissance + photo). */
+function migrateDisableStaffProfileGateV5(db) {
+  const users = db.get('utilisateurs').value() || [];
+  let cleared = 0;
+  users.forEach((u) => {
+    if (u && u.must_complete_profile === true) {
+      db.get('utilisateurs').find({ id: u.id }).assign({
+        must_complete_profile: false,
+        updated_at: new Date().toISOString(),
+      }).write();
+      cleared += 1;
+    }
+  });
+  return { must_complete_profile_cleared: cleared };
+}
+
 const MIGRATIONS = [
   {
     version: 1,
@@ -172,6 +188,12 @@ const MIGRATIONS = [
     id: '2026_09_niveaux_etude_rapports',
     description: 'Seed niveaux d’étude dynamiques + méta rapports hebdomadaires.',
     up: migrateNiveauxEtudeV4,
+  },
+  {
+    version: 5,
+    id: '2026_09_activation_email_only',
+    description: 'Désactive must_complete_profile (activation par e-mail, profil libre).',
+    up: migrateDisableStaffProfileGateV5,
   },
 ];
 

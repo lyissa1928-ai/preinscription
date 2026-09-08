@@ -36,6 +36,9 @@ function buildFormationSnapshot(formation, tarif) {
     frais_epi: formation.frais_epi ?? 0,
     nombre_annees: formation.nombre_annees ?? null,
     libelles_champs: formation.libelles_champs || null,
+    elements_facturation: Array.isArray(formation.elements_facturation)
+      ? formation.elements_facturation
+      : null,
     description: formation.description || null,
     debouches: formation.debouches || null,
   };

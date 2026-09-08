@@ -672,7 +672,7 @@ router.post('/utilisateurs/bulk-action', adminSensitiveLimiter, (req, res) => {
 });
 
 // POST /api/admin/utilisateurs/:id/reinitialiser-mot-de-passe — mot de passe temporaire + changement obligatoire
-router.post('/utilisateurs/:id/reinitialiser-mot-de-passe', adminSensitiveLimiter, (req, res) => {
+router.post('/utilisateurs/:id/reinitialiser-mot-de-passe', adminSensitiveLimiter, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const target = db.get('utilisateurs').find({ id }).value();
   if (!target) return res.status(404).json({ message: 'Utilisateur introuvable.' });
@@ -681,6 +681,7 @@ router.post('/utilisateurs/:id/reinitialiser-mot-de-passe', adminSensitiveLimite
   db.get('utilisateurs').find({ id }).assign({
     mot_de_passe: hash,
     must_change_password: true,
+    must_complete_profile: false,
     login_attempts: 0,
     is_locked: false,
     lock_until: null,
@@ -689,16 +690,70 @@ router.post('/utilisateurs/:id/reinitialiser-mot-de-passe', adminSensitiveLimite
     updated_by: req.user.id,
   }).write();
 
+  let emailSent = false;
+  try {
+    const { sendStaffInviteEmail } = require('../utils/staffInviteEmail');
+    const updated = db.get('utilisateurs').find({ id }).value();
+    emailSent = await sendStaffInviteEmail(updated);
+  } catch (e) {
+    console.warn('[admin] invitation après reset non envoyée:', e.message);
+  }
+
   logAudit(req, 'admin_password_reset', 'utilisateur', id, {
     target_role: target.role,
     target_email: target.email,
+    email_invite_sent: emailSent,
   });
   logSecurityEvent(req, 'admin_password_reset', { target_user_id: id, target_role: target.role }, 'warning');
 
   res.json({
-    message:
-      'Mot de passe réinitialisé. L’utilisateur devra le changer à la prochaine connexion. Transmettez le mot de passe temporaire par un canal externe sécurisé (téléphone, messagerie, etc.).',
-    mot_de_passe_temporaire: plain,
+    message: emailSent
+      ? 'Mot de passe réinitialisé. Un e-mail d’activation (lien pour définir le mot de passe) a été envoyé.'
+      : 'Mot de passe réinitialisé. E-mail non envoyé (SMTP) — transmettez le mot de passe temporaire hors bande.',
+    mot_de_passe_temporaire: emailSent ? undefined : plain,
+    email_invite_sent: emailSent,
+  });
+});
+
+// POST /api/admin/utilisateurs/:id/renvoyer-invitation — renvoie le lien d’activation par e-mail
+router.post('/utilisateurs/:id/renvoyer-invitation', adminSensitiveLimiter, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const target = db.get('utilisateurs').find({ id }).value();
+  if (!target) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+  if (!target.email) {
+    return res.status(400).json({ message: 'Ce compte n’a pas d’adresse e-mail.' });
+  }
+  const { isSmtpConfigured } = require('../utils/mail');
+  if (!isSmtpConfigured()) {
+    return res.status(503).json({
+      message: 'SMTP non configuré sur le serveur — impossible d’envoyer l’e-mail d’activation.',
+      email_invite_sent: false,
+    });
+  }
+  db.get('utilisateurs').find({ id }).assign({
+    must_complete_profile: false,
+    must_change_password: true,
+    updated_at: new Date().toISOString(),
+    updated_by: req.user.id,
+  }).write();
+  let emailSent = false;
+  try {
+    const { sendStaffInviteEmail } = require('../utils/staffInviteEmail');
+    const updated = db.get('utilisateurs').find({ id }).value();
+    emailSent = await sendStaffInviteEmail(updated);
+  } catch (e) {
+    console.warn('[admin] renvoi invitation échoué:', e.message);
+  }
+  if (!emailSent) {
+    return res.status(502).json({
+      message: 'Échec d’envoi SMTP. Vérifiez les logs serveur.',
+      email_invite_sent: false,
+    });
+  }
+  logAudit(req, 'admin_staff_invite_resent', 'utilisateur', id, { target_email: target.email });
+  res.json({
+    message: `E-mail d’activation renvoyé à ${target.email}.`,
+    email_invite_sent: true,
   });
 });
 
@@ -783,7 +838,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, async (req, res) => {
     etablissement_id: isGlobalRole ? null : etabIdForUser,
     actif: true,
     must_change_password: true,
-    must_complete_profile: true,
+    must_complete_profile: false,
     photo_url: null,
     login_attempts: 0,
     is_locked: false,

@@ -106,7 +106,6 @@ function AppRoutes() {
   const homeRedirect = () => {
     if (!user) return '/'
     if (user.must_change_password) return '/changer-mot-de-passe-obligatoire'
-    if (user.must_complete_profile) return '/completer-profil-staff'
     if (user.role === 'admin' || user.role === 'directeur') return '/admin'
     if (user.role === 'admin_etablissement') return '/mon-etablissement'
     if (user.role === 'controleur_qualite') return '/qualite'

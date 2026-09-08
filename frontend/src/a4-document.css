@@ -23,12 +23,12 @@
   print-color-adjust: exact;
 }
 
-/* Documents officiels : une seule page A4 */
+/* Documents officiels : format A4, hauteur libre si le contenu dépasse (descriptions longues) */
 .a4-sheet--single {
-  height: 297mm !important;
   min-height: 297mm !important;
-  max-height: 297mm !important;
-  overflow: hidden;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible;
 }
 
 .a4-sheet,
@@ -80,10 +80,10 @@
   }
 
   .a4-sheet--single {
-    height: 297mm !important;
-    max-height: 297mm !important;
-    overflow: hidden;
-    page-break-after: avoid;
-    page-break-inside: avoid;
+    min-height: 297mm !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible;
+    page-break-inside: auto;
   }
 }

@@ -583,12 +583,10 @@ router.post('/changer-mot-de-passe-obligatoire', authMiddleware, (req, res) => {
   }
 
   const hash = bcrypt.hashSync(nouveau_mot_de_passe, 10);
-  const afterPwd = { ...user, must_change_password: false, mot_de_passe: hash };
-  const { staffNeedsProfileCompletion } = require('../utils/staffProfile');
   db.get('utilisateurs').find({ id: user.id }).assign({
     mot_de_passe: hash,
     must_change_password: false,
-    must_complete_profile: staffNeedsProfileCompletion(afterPwd) || user.must_complete_profile === true,
+    must_complete_profile: false,
     password_changed_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).write();
@@ -770,6 +768,7 @@ function applyNewPasswordAndLogin(req, res, user, nouveau_mot_de_passe) {
     password_reset_code_hash: null,
     password_reset_expires: null,
     must_change_password: false,
+    must_complete_profile: false,
     password_changed_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).write();

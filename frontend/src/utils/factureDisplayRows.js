@@ -1,7 +1,7 @@
 /**
- * Lignes facture — libellés administratifs clairs :
- * Inscription | Mensualité | Total mensualités (N × montant) | Bibliothèque | EPI | …
- * Le total à payer est affiché hors tableau (pied de tableau), pas comme « Frais par an ».
+ * Lignes facture — conserve les libellés exacts saisis (éléments de facturation).
+ * Si `facture.lignes` est présent : affichage fidèle (description / designation).
+ * Sinon : repli Inscription | Mensualité | Total mensualités | Bibliothèque | EPI.
  */
 export function buildDisplayRows(facture, fo = {}) {
   const labels = fo.libelles_champs && typeof fo.libelles_champs === 'object' ? fo.libelles_champs : {}
@@ -11,6 +11,84 @@ export function buildDisplayRows(facture, fo = {}) {
   }
   const fmt = (n) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0))
 
+  const rawSupp = facture?.lignes_supplementaires || []
+  const stored = Array.isArray(facture?.lignes) ? facture.lignes : []
+
+  if (stored.length > 0) {
+    const rows = []
+    let sum = 0
+
+    for (const l of stored) {
+      const designation = String(l.designation || l.description || '').trim()
+      if (!designation) continue
+      const kind = l.kind || null
+
+      if (kind === 'mensualite_unitaire') {
+        const unit =
+          Number(l.montant_unitaire ?? l.prix_unitaire ?? l.montant) || 0
+        const mois =
+          Number(l.duree_mois) > 0
+            ? Number(l.duree_mois)
+            : (Number(fo.duree_mois) > 0 ? Number(fo.duree_mois) : 0)
+        const totalMen =
+          Number(l.total_mensualites)
+          || (unit > 0 && mois > 0 ? unit * mois : 0)
+          || Number(l.total)
+          || 0
+
+        rows.push({
+          designation,
+          montant: unit,
+          isUnitMensualite: true,
+          kind: 'mensualite',
+        })
+        if (mois > 0 && unit > 0) {
+          rows.push({
+            designation: `Total — ${designation} (${mois} × ${fmt(unit)} FCFA)`,
+            montant: totalMen,
+            isTotalMensualites: true,
+            kind: 'solde',
+          })
+        } else if (totalMen > 0 && totalMen !== unit) {
+          rows.push({
+            designation: `Total — ${designation}`,
+            montant: totalMen,
+            isTotalMensualites: true,
+            kind: 'solde',
+          })
+        }
+        sum += totalMen > 0 ? totalMen : unit
+        continue
+      }
+
+      const montant =
+        Number(l.total ?? l.montant ?? l.prix_unitaire) || 0
+      rows.push({ designation, montant, kind })
+      sum += montant
+    }
+
+    for (const s of (Array.isArray(rawSupp) ? rawSupp : [])) {
+      const designation = String(s.designation || s.description || '').trim()
+      const montant = Number(s.montant || s.total) || 0
+      if (!designation || montant <= 0) continue
+      rows.push({ designation, montant, supplement: true })
+      sum += montant
+    }
+
+    const fromSnapshot =
+      Number(facture?.montant_total_a_payer) || Number(facture?.montant_ttc) || 0
+    return {
+      rows,
+      totalAPayer: fromSnapshot > 0 ? fromSnapshot : sum,
+      fraisParAn: sum,
+      solde: 0,
+      inscription: 0,
+      mensualite: 0,
+      supplementaires: [],
+    }
+  }
+
+  // ── Repli legacy (pas de lignes stockées) ──
   const moisFromLigne = Number(facture?.lignes?.find?.((l) => Number(l.duree_mois) > 0)?.duree_mois) || 0
   const mois = Number(fo.duree_mois) > 0 ? Number(fo.duree_mois) : moisFromLigne
   const fi = Number(fo.frais_inscription) || 0
@@ -37,7 +115,6 @@ export function buildDisplayRows(facture, fo = {}) {
   const mensualite = men
   const solde = mensualite * (mois > 0 ? mois : 0)
 
-  const rawSupp = facture?.lignes_supplementaires || []
   const supplementaires = (Array.isArray(rawSupp) ? rawSupp : [])
     .map((l) => ({
       designation: String(l.designation || l.description || '').trim(),

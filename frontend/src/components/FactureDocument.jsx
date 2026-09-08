@@ -55,6 +55,7 @@ export default function FactureDocument({
   const titreDoc = titreTypeDocument(facture?.type_document, { uppercase: true })
   const totalLettres = montantEnLettresCapitalise(totalAPayer)
   const description = String(formation.description || '').trim()
+  const debouches = String(formation.debouches || '').trim()
   const anneeAcad = facture?.annee_academique || formation?.annee_academique || ''
   const rgb = hexToRgb(primary)
   const headerTint = rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},0.07)` : 'rgba(30,58,138,0.07)'
@@ -218,15 +219,27 @@ export default function FactureDocument({
           </div>
         </section>
 
-        {/* Description — juste avant le tableau */}
+        {/* Description — texte complet (pas de troncature) */}
         {description ? (
           <section className="mt-[4mm] shrink-0">
             <SectionLabel color={primary}>Description de la formation</SectionLabel>
             <div
-              className="border-l-[3px] px-3 py-2 text-[11px] leading-relaxed text-slate-700"
+              className="border-l-[3px] whitespace-pre-wrap break-words px-3 py-2 text-[11px] leading-relaxed text-slate-700"
               style={{ borderColor: primary, background: softBg }}
             >
               {description}
+            </div>
+          </section>
+        ) : null}
+
+        {debouches ? (
+          <section className="mt-[3mm] shrink-0">
+            <SectionLabel color={primary}>Débouchés</SectionLabel>
+            <div
+              className="border-l-[3px] whitespace-pre-wrap break-words px-3 py-2 text-[11px] leading-relaxed text-slate-700"
+              style={{ borderColor: primary, background: softBg }}
+            >
+              {debouches}
             </div>
           </section>
         ) : null}

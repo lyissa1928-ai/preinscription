@@ -27,10 +27,6 @@ export default function AuthenticatedLayout() {
     return <Navigate to="/changer-mot-de-passe-obligatoire" replace />
   }
 
-  if (user.must_complete_profile) {
-    return <Navigate to="/completer-profil-staff" replace />
-  }
-
   return (
     <div className="app-shell-bg relative flex h-screen overflow-hidden">
       <Sidebar />

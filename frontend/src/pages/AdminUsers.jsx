@@ -282,17 +282,29 @@ export default function AdminUsers() {
 
   /* ── Toggle actif individuel ── */
   const handleResetPassword = async (u) => {
-    if (!window.confirm(`Réinitialiser le mot de passe de ${u.prenom} ${u.nom} ? Un mot de passe temporaire sera affiché une seule fois.`)) return
+    if (!window.confirm(`Réinitialiser le mot de passe de ${u.prenom} ${u.nom} ? Un e-mail d’activation sera renvoyé si SMTP est configuré.`)) return
     try {
       const { data } = await axios.post(`/api/admin/utilisateurs/${u.id}/reinitialiser-mot-de-passe`)
-      setResetResult({
-        label: `${u.prenom} ${u.nom}`,
-        password: data.mot_de_passe_temporaire,
-      })
+      if (data.mot_de_passe_temporaire) {
+        setResetResult({
+          label: `${u.prenom} ${u.nom}`,
+          password: data.mot_de_passe_temporaire,
+        })
+      }
       toast.success(data.message || 'Mot de passe réinitialisé.')
       loadUsers()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Erreur.')
+    }
+  }
+
+  const handleResendInvite = async (u) => {
+    if (!window.confirm(`Renvoyer l’e-mail d’activation à ${u.email} ?`)) return
+    try {
+      const { data } = await axios.post(`/api/admin/utilisateurs/${u.id}/renvoyer-invitation`)
+      toast.success(data.message || 'E-mail d’activation renvoyé.')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Envoi impossible.')
     }
   }
 
@@ -628,6 +640,7 @@ export default function AdminUsers() {
                     onToggleActif={handleToggleActif}
                     onDelete={confirmDelete}
                     onResetPassword={handleResetPassword}
+                    onResendInvite={handleResendInvite}
                     canDeletePermanently={isAdmin}
                   />
                 </div>
@@ -648,6 +661,7 @@ export default function AdminUsers() {
               onToggleActif={handleToggleActif}
               onDelete={confirmDelete}
               onResetPassword={handleResetPassword}
+              onResendInvite={handleResendInvite}
               canDeletePermanently={isAdmin}
             />
           </div>
@@ -955,7 +969,7 @@ export default function AdminUsers() {
 /* Sous-composants                                                            */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-function UserTable({ users, selected, currentUserId, allSelected, onToggleAll, onToggleOne, onEdit, onToggleActif, onDelete, onResetPassword, canDeletePermanently = true }) {
+function UserTable({ users, selected, currentUserId, allSelected, onToggleAll, onToggleOne, onEdit, onToggleActif, onDelete, onResetPassword, onResendInvite, canDeletePermanently = true }) {
   const rowSelectable = (u) => !(u.role === 'admin' && u.id === currentUserId)
   return (
     <div className="overflow-x-auto">
@@ -1012,6 +1026,12 @@ function UserTable({ users, selected, currentUserId, allSelected, onToggleAll, o
               </td>
               <td className="py-3 px-3">
                 <div className="flex items-center justify-end gap-1.5">
+                    {onResendInvite && u.email && (
+                      <button onClick={() => onResendInvite(u)} title="Renvoyer l’e-mail d’activation"
+                        className="p-1.5 rounded-lg text-sky-500 hover:bg-sky-50 hover:text-sky-700 transition-colors">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                      </button>
+                    )}
                     {onResetPassword && (
                       <button onClick={() => onResetPassword(u)} title="Réinitialiser le mot de passe"
                         className="p-1.5 rounded-lg text-violet-500 hover:bg-violet-50 hover:text-violet-700 transition-colors">

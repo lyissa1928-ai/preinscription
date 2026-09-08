@@ -221,7 +221,7 @@ async function importUsersRows({ rows, allowedRoles, forcedEtabId = null, dryRun
         etablissement_id: p.etablissement_id,
         actif: true,
         must_change_password: true,
-        must_complete_profile: true,
+        must_complete_profile: false,
         photo_url: null,
         login_attempts: 0,
         is_locked: false,

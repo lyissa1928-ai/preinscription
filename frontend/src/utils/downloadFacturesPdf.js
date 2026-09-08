@@ -74,6 +74,21 @@ export async function downloadFacturesPdfBatch(factures, opts = {}) {
       doc.text(meta, M, y)
       y += 5
     }
+    const descTxt = String(fo.description || '').trim()
+    if (descTxt) {
+      y += 2
+      doc.setTextColor(30, 40, 50)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.text('Description', M, y)
+      y += 5
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(60, 70, 80)
+      const descLines = doc.splitTextToSize(descTxt, W - 2 * M)
+      doc.text(descLines, M, y)
+      y += descLines.length * 4 + 3
+    }
 
     const tableRows = rows.length
       ? rows.map((r) => [r.designation, fmtPdfNumber(r.montant)])
