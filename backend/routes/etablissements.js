@@ -2672,7 +2672,7 @@ router.post('/:id/membres', etabMembresManageAccess, async (req, res) => {
     etablissement_id,
     actif: true,
     must_change_password: true,
-    must_complete_profile: false,
+    must_complete_profile: true,
     photo_url: null,
     login_attempts: 0,
     is_locked: false,

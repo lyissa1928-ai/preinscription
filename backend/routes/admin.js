@@ -783,7 +783,7 @@ router.post('/utilisateurs', adminSensitiveLimiter, async (req, res) => {
     etablissement_id: isGlobalRole ? null : etabIdForUser,
     actif: true,
     must_change_password: true,
-    must_complete_profile: false,
+    must_complete_profile: true,
     photo_url: null,
     login_attempts: 0,
     is_locked: false,

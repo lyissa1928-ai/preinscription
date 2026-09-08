@@ -194,7 +194,10 @@ function buildPublicUserPayload(user, req) {
     etablissement_logo: publicAssetUrl(req, etab?.logo_url) || null,
     etablissement: buildPublicEtablissementPayload(etab, req),
     must_change_password: user.must_change_password === true,
-    must_complete_profile: false,
+    must_complete_profile: (() => {
+      const { staffNeedsProfileCompletion } = require('../utils/staffProfile');
+      return staffNeedsProfileCompletion(user);
+    })(),
     photo_url: publicAssetUrl(req, user.photo_url) || null,
     service: user.service || user.fonction || '',
   };
@@ -580,10 +583,12 @@ router.post('/changer-mot-de-passe-obligatoire', authMiddleware, (req, res) => {
   }
 
   const hash = bcrypt.hashSync(nouveau_mot_de_passe, 10);
+  const afterPwd = { ...user, must_change_password: false, mot_de_passe: hash };
+  const { staffNeedsProfileCompletion } = require('../utils/staffProfile');
   db.get('utilisateurs').find({ id: user.id }).assign({
     mot_de_passe: hash,
     must_change_password: false,
-    must_complete_profile: false,
+    must_complete_profile: staffNeedsProfileCompletion(afterPwd) || user.must_complete_profile === true,
     password_changed_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).write();
@@ -962,7 +967,7 @@ const profilePhotoUpload = multer({
   },
 });
 
-// POST /api/auth/profil/photo — photo de profil (optionnelle, Mon profil)
+// POST /api/auth/profil/photo — photo de profil (Mon profil)
 router.post('/profil/photo', authMiddleware, (req, res) => {
   profilePhotoUpload.single('photo')(req, res, (err) => {
     if (err) {
@@ -974,10 +979,12 @@ router.post('/profil/photo', authMiddleware, (req, res) => {
     const user = db.get('utilisateurs').find({ id: req.user.id }).value();
     if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
 
+    const { staffNeedsProfileCompletion } = require('../utils/staffProfile');
     const rel = `/uploads/profils/${req.file.filename}`;
+    const merged = { ...user, photo_url: rel };
     db.get('utilisateurs').find({ id: user.id }).assign({
       photo_url: rel,
-      must_complete_profile: false,
+      must_complete_profile: staffNeedsProfileCompletion(merged),
       updated_at: new Date().toISOString(),
     }).write();
     const updated = db.get('utilisateurs').find({ id: user.id }).value();
@@ -989,7 +996,7 @@ router.post('/profil/photo', authMiddleware, (req, res) => {
   });
 });
 
-// Alias historique
+// POST /api/auth/completer-profil-staff/photo — photo obligatoire à l’activation
 router.post('/completer-profil-staff/photo', authMiddleware, (req, res) => {
   profilePhotoUpload.single('photo')(req, res, (err) => {
     if (err) {
@@ -1000,10 +1007,12 @@ router.post('/completer-profil-staff/photo', authMiddleware, (req, res) => {
     }
     const user = db.get('utilisateurs').find({ id: req.user.id }).value();
     if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
+
     const rel = `/uploads/profils/${req.file.filename}`;
+    const hasBirth = user.date_naissance && String(user.date_naissance).trim();
     db.get('utilisateurs').find({ id: user.id }).assign({
       photo_url: rel,
-      must_complete_profile: false,
+      must_complete_profile: !hasBirth,
       updated_at: new Date().toISOString(),
     }).write();
     const updated = db.get('utilisateurs').find({ id: user.id }).value();
@@ -1015,19 +1024,87 @@ router.post('/completer-profil-staff/photo', authMiddleware, (req, res) => {
   });
 });
 
-// POST /api/auth/completer-profil-staff — obsolète : n’impose plus naissance/photo
+// POST /api/auth/completer-profil-staff — première activation (naissance + photo)
 router.post('/completer-profil-staff', authMiddleware, (req, res) => {
+  const { staffNeedsProfileCompletion, isStaffRole } = require('../utils/staffProfile');
   const user = db.get('utilisateurs').find({ id: req.user.id }).value();
   if (!user) return res.status(404).json({ message: 'Utilisateur introuvable.' });
-  db.get('utilisateurs').find({ id: user.id }).assign({
-    must_complete_profile: false,
+  if (!isStaffRole(user.role)) {
+    return res.status(400).json({ message: 'Réservé aux comptes staff.' });
+  }
+  if (user.must_change_password === true) {
+    return res.status(403).json({
+      code: 'MUST_CHANGE_PASSWORD',
+      message: 'Changez d’abord votre mot de passe.',
+    });
+  }
+
+  const date_naissance = String(req.body?.date_naissance || '').trim();
+  if (!date_naissance) {
+    return res.status(400).json({ message: 'La date de naissance est obligatoire pour activer le compte.' });
+  }
+  const telephone = trimStr(req.body?.telephone);
+  const adresse = trimStr(req.body?.adresse);
+  const service = trimStr(req.body?.service || req.body?.fonction);
+
+  if (telephone) {
+    const telNorm = normalizeTelephoneForUniqueness(telephone);
+    if (telNorm.length < 8) {
+      return res.status(400).json({ message: 'Téléphone invalide.' });
+    }
+    if (telephoneTaken(telNorm, user.id)) {
+      return res.status(409).json({ message: 'Ce numéro de téléphone est déjà utilisé.' });
+    }
+  }
+
+  const patch = {
+    date_naissance,
+    telephone: telephone || user.telephone || '',
+    adresse: adresse || user.adresse || '',
+    service: service || user.service || '',
+    fonction: service || user.fonction || '',
     updated_at: new Date().toISOString(),
-  }).write();
-  const updated = db.get('utilisateurs').find({ id: user.id }).value();
+  };
+
+  const hasPhoto = !!(user.photo_url && String(user.photo_url).trim());
+  if (!hasPhoto && req.body?.require_photo !== '0' && req.body?.require_photo !== false) {
+    const merged = { ...user, ...patch };
+    const stillNeeds = !merged.date_naissance || !String(merged.date_naissance).trim() || !merged.photo_url;
+    patch.must_complete_profile = stillNeeds;
+    db.get('utilisateurs').find({ id: user.id }).assign(patch).write();
+    const updated = db.get('utilisateurs').find({ id: user.id }).value();
+    if (stillNeeds) {
+      return res.json({
+        message: 'Informations enregistrées. Ajoutez encore votre photo de profil pour finaliser l’activation.',
+        need_photo: true,
+        utilisateur: buildMeResponse(updated, req),
+      });
+    }
+  }
+
+  const merged = { ...user, ...patch, photo_url: user.photo_url };
+  const stillNeeds = staffNeedsProfileCompletion({
+    ...merged,
+    must_complete_profile: true,
+  });
+  patch.must_complete_profile = stillNeeds;
+  db.get('utilisateurs').find({ id: user.id }).assign(patch).write();
+
+  if (stillNeeds) {
+    const updated = db.get('utilisateurs').find({ id: user.id }).value();
+    return res.json({
+      message: 'Informations enregistrées. Ajoutez encore votre photo de profil pour finaliser l’activation.',
+      need_photo: true,
+      utilisateur: buildMeResponse(updated, req),
+    });
+  }
+
+  db.get('utilisateurs').find({ id: user.id }).assign({ must_complete_profile: false }).write();
+  const finalUser = db.get('utilisateurs').find({ id: user.id }).value();
   return res.json({
-    message: 'Vous pouvez accéder à la plateforme. Complétez votre profil depuis Mon profil si vous le souhaitez.',
-    utilisateur: buildMeResponse(updated, req),
-    ...buildAuthTokensResponse(updated, req),
+    message: 'Profil complété. Bienvenue sur la plateforme.',
+    utilisateur: buildMeResponse(finalUser, req),
+    ...buildAuthTokensResponse(finalUser, req),
   });
 });
 

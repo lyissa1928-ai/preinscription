@@ -86,6 +86,7 @@ export default function AdminUsers() {
   const [deleteEmailInput, setDeleteEmailInput] = useState('')
   const [bulkAction, setBulkAction] = useState(null)           // 'desactiver' | 'reactiver' | 'supprimer'
   const [bulkPhrase, setBulkPhrase] = useState('')
+  const [resetResult, setResetResult] = useState(null)         // { label, password }
   // Import Excel
   const [showImport, setShowImport] = useState(false)
   const [importFile, setImportFile] = useState(null)
@@ -700,15 +701,15 @@ export default function AdminUsers() {
             <Field label="Service / fonction" note="optionnel">
               <input className="input-field" value={createForm.service || ''} onChange={upCreate('service')} placeholder="Ex. Direction, Scolarité…" />
             </Field>
-            <Field label="Adresse" note="optionnel — complétable plus tard dans Mon profil">
+            <Field label="Adresse" note="optionnel — complété à l’activation si besoin">
               <input className="input-field" value={createForm.adresse} onChange={upCreate('adresse')} placeholder="Optionnel" />
             </Field>
             <Field label="Mot de passe initial" required><input type="password" className="input-field" value={createForm.mot_de_passe} onChange={upCreate('mot_de_passe')} required minLength={6} /></Field>
             <Field label="Confirmer le mot de passe" required>
               <input type="password" className="input-field" value={createForm.mot_de_passe_confirmation} onChange={upCreate('mot_de_passe_confirmation')} required minLength={6} />
             </Field>
-            <p className="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-              Un e-mail d’activation avec lien pour définir le mot de passe est envoyé automatiquement (SMTP). Pas de date de naissance ni de photo à la création : le collaborateur les complète librement dans « Mon profil ».
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              Première connexion : changement de mot de passe, puis complétion du profil (date de naissance, photo). Pas de date de naissance à saisir ici.
             </p>
             <Field label="Rôle" required>
               <select className="input-field" value={createForm.role} onChange={upCreate('role')} required>
