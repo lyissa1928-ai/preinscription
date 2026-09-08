@@ -15,7 +15,7 @@ export function isChunkLoadError(error) {
   )
 }
 
-const RELOAD_KEY = 'uniportail_chunk_reload_v1'
+const RELOAD_KEY = 'uniportail_chunk_reload_v2'
 
 /** Une seule tentative de hard-reload par session pour éviter une boucle. */
 export function tryReloadOnceForStaleChunk() {
@@ -29,9 +29,10 @@ export function tryReloadOnceForStaleChunk() {
   } catch {
     /* private mode */
   }
-  const url = new URL(window.location.href)
-  url.searchParams.set('_v', String(Date.now()))
-  window.location.replace(url.toString())
+  // Hard navigation (pas history) pour forcer un nouvel index.html
+  const path = `${window.location.pathname}${window.location.search || ''}${window.location.hash || ''}`
+  const sep = path.includes('?') ? '&' : '?'
+  window.location.href = `${path}${sep}_v=${Date.now()}`
   return true
 }
 

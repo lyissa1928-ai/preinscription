@@ -5,6 +5,9 @@ import { userMatchesRoles } from './utils/roles'
 import AuthenticatedLayout from './layouts/AuthenticatedLayout'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
+/** Pages auth critiques : import statique (évite Failed to fetch dynamically imported module après deploy). */
+import ForcePasswordChange from './pages/ForcePasswordChange'
+import StaffProfileCompletion from './pages/StaffProfileCompletion'
 import {
   Register,
   GuideConditionsAdmission,
@@ -43,8 +46,6 @@ import {
   PublicProformaPage,
   PublicEtablissementPage,
   PublicEtablissementsPage,
-  ForcePasswordChange,
-  StaffProfileCompletion,
   StaffEtabEquipe,
   StaffEtabIdentite,
   StaffEtabFlyers,

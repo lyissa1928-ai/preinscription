@@ -24,7 +24,7 @@ echo ""
 mkdir -p "$BACKUP_ROOT"
 
 # ─── 1. Sauvegarde complète avant toute modification ───
-echo ">>> 1/7 Sauvegarde des données..."
+echo ">>> 1/9 Sauvegarde des données..."
 DB_FILE="backend/database/preinscription.json"
 if [[ -f "$DB_FILE" ]]; then
   cp "$DB_FILE" "$BACKUP_ROOT/preinscription-$STAMP.json"
@@ -57,7 +57,7 @@ if [[ -f "$DB_FILE" ]]; then
 fi
 
 # ─── 2. Protection skip-worktree (idempotent) ───
-echo ">>> 2/7 Protection skip-worktree..."
+echo ">>> 2/9 Protection skip-worktree..."
 bash deploy/proteger-donnees-prod.sh
 
 # ─── 3. Copie de sécurité en mémoire locale ───
@@ -68,7 +68,7 @@ if [[ -f "$DB_FILE" ]]; then
 fi
 
 # ─── 4. Mise à jour du code ───
-echo ">>> 3/7 git fetch + pull ($BRANCH)..."
+echo ">>> 3/9 git fetch + pull ($BRANCH)..."
 # skip-worktree ne suffit pas si origin modifie aussi preinscription.json :
 # Git refuse le merge (« local changes would be overwritten »).
 # On aligne le fichier sur HEAD uniquement pour le pull ; TMP_DB / backup conservent la prod.
@@ -95,7 +95,7 @@ git fetch origin
 git pull origin "$BRANCH"
 
 # ─── 5. Toujours remettre la base prod (jamais celle du dépôt Git) ───
-echo ">>> 4/7 Restauration de la base de données prod..."
+echo ">>> 4/9 Restauration de la base de données prod..."
 if [[ -n "$TMP_DB" && -f "$TMP_DB" ]]; then
   cp "$TMP_DB" "$DB_FILE"
   git update-index --skip-worktree "$DB_FILE" 2>/dev/null || true
@@ -115,7 +115,7 @@ if [[ -f "$BACKUP_ROOT/config-site.js.$STAMP" ]]; then
 fi
 
 # ─── 6. Stats après ───
-echo ">>> 5/7 Compteurs après pull..."
+echo ">>> 5/9 Compteurs après pull..."
 if [[ -f "$DB_FILE" ]]; then
   STATS_AFTER="$(node -e "
     const d=require('./$DB_FILE');
@@ -140,7 +140,7 @@ if [[ -f "$DB_FILE" ]]; then
 fi
 
 # ─── 7. Build + restart ───
-echo ">>> 6/7 Dépendances + build frontend..."
+echo ">>> 6/9 Dépendances + build frontend..."
 npm run install:all
 npm run build
 
@@ -164,11 +164,21 @@ write_config_site frontend/public/config-site.js
 
 # index.html : cache-bust explicite (si reverse-proxy cache encore)
 if [[ -f frontend/dist/index.html ]]; then
+  # Empêche les navigateurs de garder un vieux index.html (chunks JS obsolètes)
+  if ! grep -q 'Cache-Control' frontend/dist/index.html 2>/dev/null; then
+    sed -i 's|<head>|<head>\n    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />\n    <meta http-equiv="Pragma" content="no-cache" />|' frontend/dist/index.html 2>/dev/null || true
+  fi
   touch frontend/dist/index.html
   echo "    index.html touché (évite cache CDN/proxy)"
 fi
 
-echo ">>> 7/8 Redémarrage API (migrations schéma au démarrage)..."
+echo ">>> 7/9 Purge traces utilisateurs orphelins..."
+(
+  cd backend
+  node scripts/purge-orphan-user-traces.js --apply || echo "    (purge orphelins : avertissement non bloquant)"
+)
+
+echo ">>> 8/9 Redémarrage API (migrations schéma au démarrage)..."
 if pm2 describe uniportail-api >/dev/null 2>&1; then
   pm2 restart uniportail-api
   sleep 2
@@ -177,7 +187,7 @@ else
 fi
 pm2 save 2>/dev/null || true
 
-echo ">>> 8/8 Vérification schéma base + API..."
+echo ">>> 9/9 Vérification schéma base + API..."
 if [[ -f "$DB_FILE" ]]; then
   SCHEMA_INFO="$(node -e "
     const d=require('./$DB_FILE');
