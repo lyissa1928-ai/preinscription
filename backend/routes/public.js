@@ -5,6 +5,8 @@ const router = express.Router();
 const db = require('../database/db');
 
 const { rateLimit, getClientIp } = require('../utils/rateLimit');
+const { optionalAuthMiddleware } = require('../middleware/auth');
+const { isStaffFactureRole } = require('../utils/factureAccess');
 
 
 
@@ -145,7 +147,15 @@ function buildSnapshot(etab, req) {
 
 // GET /api/public/facture-proforma/:reference
 
-router.get('/facture-proforma/:reference', publicProformaLimiter, (req, res) => {
+router.get('/facture-proforma/:reference', publicProformaLimiter, optionalAuthMiddleware, (req, res) => {
+  if (req.user && req.user.role === 'etudiant') {
+    return res.status(403).json({
+      code: 'FACTURE_STAFF_ONLY',
+      message: "Le document officiel de facture n'est pas accessible depuis l'espace étudiant. Le personnel de l'établissement vous le transmettra si nécessaire.",
+      can_download_document: false,
+    });
+  }
+
 
   const demande = db.get('demandes_proforma').find({ reference: req.params.reference }).value();
 
@@ -248,6 +258,9 @@ router.get('/facture-proforma/:reference', publicProformaLimiter, (req, res) => 
   }
 
 
+
+  // Téléchargement PDF réservé au personnel authentifié (pas aux étudiants / anonymes)
+  result.can_download_document = Boolean(isStaffFactureRole(req.user));
 
   res.json(result);
 

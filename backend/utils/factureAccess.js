@@ -1,5 +1,6 @@
 /**
  * Accès staff établissement aux factures / dossiers liés.
+ * Téléchargement / consultation documentaire officielle : réservé au personnel autorisé.
  */
 const STAFF_ETAB_FACTURE_ROLES = [
   'admin_etablissement',
@@ -10,6 +11,8 @@ const STAFF_ETAB_FACTURE_ROLES = [
   'agent_admin',
   'controleur_qualite',
 ];
+
+const ROLE_DIRECTEUR = 'directeur';
 
 function dossierDansEtablissementUtilisateur(dossier, user, db) {
   if (!user?.etablissement_id) return false;
@@ -24,13 +27,30 @@ function dossierDansEtablissementUtilisateur(dossier, user, db) {
 
 function staffEtabPeutVoirDossier(user, dossier, db) {
   if (!user || !dossier) return false;
-  if (user.role === 'admin') return true;
+  if (user.role === 'admin' || user.role === ROLE_DIRECTEUR) return true;
   if (!STAFF_ETAB_FACTURE_ROLES.includes(user.role)) return false;
   return dossierDansEtablissementUtilisateur(dossier, user, db);
+}
+
+/** Personnel autorisé à consulter / télécharger une facture officielle. */
+function isStaffFactureRole(user) {
+  if (!user) return false;
+  if (user.role === 'admin' || user.role === ROLE_DIRECTEUR) return true;
+  return STAFF_ETAB_FACTURE_ROLES.includes(user.role);
+}
+
+/**
+ * Accès documentaire facture dossier : staff uniquement (pas l’étudiant propriétaire).
+ */
+function peutAccederFactureDocumentaire(user, dossier, db) {
+  if (!user || !dossier) return false;
+  return staffEtabPeutVoirDossier(user, dossier, db);
 }
 
 module.exports = {
   STAFF_ETAB_FACTURE_ROLES,
   dossierDansEtablissementUtilisateur,
   staffEtabPeutVoirDossier,
+  isStaffFactureRole,
+  peutAccederFactureDocumentaire,
 };

@@ -4,14 +4,10 @@ import axios from 'axios'
 import Navbar from '../components/Navbar'
 import { mediaUrl } from '../utils/mediaUrl'
 import PreinscriptionConditionsBlock from '../components/PreinscriptionConditionsBlock'
-
-const TYPE_META = {
-  presentiel: { label: 'Présentiel', emoji: '🏫', short: 'Sur site' },
-  en_ligne: { label: 'À distance (FAD)', emoji: '🌐', short: 'En ligne' },
-}
+import FiliereFormationsModal from '../components/FiliereFormationsModal'
 
 /**
- * Catalogue public : filière → mode → formations, sans affichage des tarifs.
+ * Catalogue public : Établissement → cartes filières → modale formations (Présentiel / FAD).
  */
 export default function PublicEtablissementPage() {
   const { id } = useParams()
@@ -22,11 +18,8 @@ export default function PublicEtablissementPage() {
   const [flyers, setFlyers] = useState([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  /** 'all' | 'presentiel' | 'en_ligne' */
   const [filtreMode, setFiltreMode] = useState('all')
-  const [step, setStep] = useState('filieres')
-  const [selectedFiliereNom, setSelectedFiliereNom] = useState(null)
-  const [selectedType, setSelectedType] = useState(null)
+  const [modalFiliere, setModalFiliere] = useState(null)
 
   useEffect(() => {
     if (!Number.isFinite(etabId)) {
@@ -58,12 +51,6 @@ export default function PublicEtablissementPage() {
     }
   }, [etabId])
 
-  useEffect(() => {
-    setStep('filieres')
-    setSelectedFiliereNom(null)
-    setSelectedType(null)
-  }, [filtreMode])
-
   const primary = etab?.couleur_primaire || '#1e40af'
   const secondary = etab?.couleur_secondaire || '#3b82f6'
 
@@ -84,20 +71,22 @@ export default function PublicEtablissementPage() {
     for (const f of formationsFiltrees) {
       const key = (f.filiere_nom && String(f.filiere_nom).trim()) || 'Sans filière'
       if (!map.has(key)) {
-        map.set(key, { filiere_id: f.filiere_id || null, nom: key, formations: [] })
+        map.set(key, {
+          filiere_id: f.filiere_id || null,
+          nom: key,
+          duree_cycle: f.filiere_duree_cycle || null,
+          condition_acces: f.filiere_condition_acces || null,
+          formations: [],
+        })
       }
       const bloc = map.get(key)
       if (!bloc.filiere_id && f.filiere_id) bloc.filiere_id = f.filiere_id
+      if (!bloc.duree_cycle && f.filiere_duree_cycle) bloc.duree_cycle = f.filiere_duree_cycle
+      if (!bloc.condition_acces && f.filiere_condition_acces) bloc.condition_acces = f.filiere_condition_acces
       bloc.formations.push(f)
     }
     return [...map.values()].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
   }, [formationsFiltrees])
-
-  const filiereSelectionnee = selectedFiliereNom
-    ? formationsParFiliere.find((b) => b.nom === selectedFiliereNom) || null
-    : null
-
-  const listeFiliere = filiereSelectionnee?.formations || []
 
   const flyersPourFiliere = (filiereId, filiereNom) =>
     flyers.filter((fl) => {
@@ -107,27 +96,6 @@ export default function PublicEtablissementPage() {
       }
       return false
     })
-
-  const typesDispo = useMemo(() => {
-    const order = ['presentiel', 'en_ligne']
-    const st = new Set()
-    for (const f of listeFiliere) {
-      if (f.type === 'presentiel' || f.type === 'en_ligne') st.add(f.type)
-    }
-    return order.filter((t) => st.has(t))
-  }, [listeFiliere])
-
-  const formationsListe = listeFiliere.filter((f) => f.type === selectedType)
-
-  const goFilieres = () => {
-    setStep('filieres')
-    setSelectedFiliereNom(null)
-    setSelectedType(null)
-  }
-  const goTypes = () => {
-    setStep('types')
-    setSelectedType(null)
-  }
 
   if (loading) {
     return (
@@ -145,9 +113,7 @@ export default function PublicEtablissementPage() {
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <div className="mx-auto max-w-lg px-4 py-20 text-center">
-          <p className="text-4xl mb-4">🔍</p>
           <h1 className="text-xl font-bold text-gray-900">Établissement introuvable</h1>
-          <p className="mt-2 text-gray-500 text-sm">Ce lien n’est pas valide ou l’établissement n’est plus affiché.</p>
           <Link to="/" className="mt-6 inline-block font-semibold text-blue-700 hover:underline">
             ← Retour à l’accueil
           </Link>
@@ -161,9 +127,7 @@ export default function PublicEtablissementPage() {
       <Navbar />
       <div className="mx-auto w-full max-w-5xl overflow-x-hidden px-4 py-8 sm:px-6 sm:py-10">
         <nav className="mb-6 text-sm">
-          <Link to="/" className="font-medium text-blue-700 hover:underline">
-            Accueil
-          </Link>
+          <Link to="/" className="font-medium text-blue-700 hover:underline">Accueil</Link>
           <span className="mx-2 text-gray-300">/</span>
           <span className="text-gray-600">{etab.nom}</span>
         </nav>
@@ -175,9 +139,7 @@ export default function PublicEtablissementPage() {
               {etab.logo_url ? (
                 <img src={mediaUrl(etab.logo_url)} alt="" className="h-full w-full object-contain p-1" />
               ) : (
-                <span className="text-2xl font-black" style={{ color: primary }}>
-                  {etab.nom[0]}
-                </span>
+                <span className="text-2xl font-black" style={{ color: primary }}>{etab.nom[0]}</span>
               )}
             </div>
             <div className="min-w-0 flex-1">
@@ -195,71 +157,41 @@ export default function PublicEtablissementPage() {
         <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-sm text-blue-950">
           <span className="font-semibold">Candidature : </span>
           créez d’abord un{' '}
-          <Link to={`/inscription?etablissement_id=${etabId}`} className="font-bold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:text-blue-950">
+          <Link to={`/inscription?etablissement_id=${etabId}`} className="font-bold text-blue-800 underline underline-offset-2">
             compte candidat
           </Link>
-          {' '}
-          (sans cela, pas de préinscription ni de demande proforma). Ensuite, depuis votre espace :{' '}
-          <Link
-            to={`/demande-proforma?etablissement_id=${etabId}&tab=conditions`}
-            className="font-bold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:text-blue-950"
-          >
-            conditions d’admission et demande de facture proforma
-          </Link>
-          {' '}
-          ou{' '}
-          <Link to="/preinscription" className="font-bold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:text-blue-950">
-            préinscription
-          </Link>
-          .
+          , puis depuis votre espace : préinscription ou demande de facture proforma.
         </div>
 
         <div className="mb-4">
-          <h2 className="text-lg font-black text-gray-900 sm:text-xl">Filières et formations</h2>
+          <h2 className="text-lg font-black text-gray-900 sm:text-xl">Filières</h2>
           <p className="mt-1 text-xs text-gray-500 sm:text-sm">
-            Informations pédagogiques — les{' '}
-            <strong>tarifs ne sont pas affichés</strong> ici. Ils sont communiqués lors de l’inscription ou sur la facture
-            proforma.
+            Cliquez sur une filière pour voir ses formations (présentiel et/ou à distance). Les tarifs détaillés figurent sur la facture proforma.
           </p>
         </div>
 
         {formations.length > 0 && modesPresents.length > 0 && (
-          <div className="mb-5 flex flex-wrap gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
-            <span className="self-center text-[11px] font-semibold text-gray-400">Mode</span>
-            <button
-              type="button"
-              onClick={() => setFiltreMode('all')}
-              className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
-                filtreMode === 'all' ? 'border-transparent text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-              }`}
-              style={filtreMode === 'all' ? { background: secondary } : {}}
-            >
-              Tous
-            </button>
-            {modesPresents.includes('presentiel') && (
-              <button
-                type="button"
-                onClick={() => setFiltreMode('presentiel')}
-                className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
-                  filtreMode === 'presentiel' ? 'border-transparent text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                }`}
-                style={filtreMode === 'presentiel' ? { background: secondary } : {}}
-              >
-                Présentiel
-              </button>
-            )}
-            {modesPresents.includes('en_ligne') && (
-              <button
-                type="button"
-                onClick={() => setFiltreMode('en_ligne')}
-                className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
-                  filtreMode === 'en_ligne' ? 'border-transparent text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                }`}
-                style={filtreMode === 'en_ligne' ? { background: secondary } : {}}
-              >
-                Distance
-              </button>
-            )}
+          <div className="mb-5 flex flex-wrap gap-2">
+            <span className="self-center text-[11px] font-semibold text-gray-400">Filtrer</span>
+            {[
+              { id: 'all', label: 'Tous' },
+              modesPresents.includes('presentiel') && { id: 'presentiel', label: 'Présentiel' },
+              modesPresents.includes('en_ligne') && { id: 'en_ligne', label: 'Distance (FAD)' },
+            ]
+              .filter(Boolean)
+              .map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setFiltreMode(opt.id)}
+                  className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
+                    filtreMode === opt.id ? 'border-transparent text-white' : 'border-gray-200 bg-white text-gray-600'
+                  }`}
+                  style={filtreMode === opt.id ? { background: secondary } : {}}
+                >
+                  {opt.label}
+                </button>
+              ))}
           </div>
         )}
 
@@ -267,236 +199,73 @@ export default function PublicEtablissementPage() {
           <div className="rounded-2xl border border-dashed border-gray-200 bg-white py-14 text-center text-gray-500">
             {formations.length === 0
               ? 'Aucune formation publiée pour cet établissement pour le moment.'
-              : 'Aucune formation ne correspond au filtre (mode).'}
+              : 'Aucune formation ne correspond au filtre.'}
           </div>
         ) : (
-          <>
-            {step === 'filieres' && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {formationsParFiliere.map((bloc) => {
-                  const { nom, formations: liste, filiere_id: fid } = bloc
-                  const nP = liste.filter((x) => x.type === 'presentiel').length
-                  const nD = liste.filter((x) => x.type === 'en_ligne').length
-                  const flyersF = flyersPourFiliere(fid, nom)
-                  return (
-                    <button
-                      key={nom}
-                      type="button"
-                      onClick={() => {
-                        setSelectedFiliereNom(nom)
-                        setStep('types')
-                      }}
-                      className="rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm transition-all hover:border-blue-200 hover:shadow-md"
-                    >
-                      <p className="font-bold text-gray-900">{nom}</p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {liste.length} proposition{liste.length !== 1 ? 's' : ''}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {nP > 0 && (
-                          <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-800">
-                            🏫 Présentiel · {nP}
-                          </span>
-                        )}
-                        {nD > 0 && (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                            🌐 Distance · {nD}
-                          </span>
-                        )}
-                      </div>
-                      {flyersF.length > 0 && (
-                        <div
-                          className="mt-3 space-y-1 border-t border-slate-100 pt-2"
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => e.stopPropagation()}
-                        >
-                          <p className="text-[11px] font-semibold text-slate-600">Flyers</p>
-                          {flyersF.map((fl) => (
-                            <a
-                              key={fl.id}
-                              href={mediaUrl(fl.file_url)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block text-sm font-semibold text-blue-700 hover:underline"
-                            >
-                              ⬇ {fl.titre || 'Télécharger le flyer'}
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                      <p className="mt-4 text-xs font-bold text-blue-700">Voir les modes →</p>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            {step === 'types' && selectedFiliereNom && (
-              <div className="space-y-4">
-                <button type="button" onClick={goFilieres} className="text-sm font-semibold text-blue-700 hover:underline">
-                  ← Toutes les filières
+          <div className="grid gap-4 sm:grid-cols-2">
+            {formationsParFiliere.map((bloc) => {
+              const nP = bloc.formations.filter((x) => x.type === 'presentiel').length
+              const nD = bloc.formations.filter((x) => x.type === 'en_ligne').length
+              return (
+                <button
+                  key={bloc.nom}
+                  type="button"
+                  onClick={() => setModalFiliere(bloc)}
+                  className="rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm transition-all hover:border-blue-200 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                >
+                  <p className="font-bold text-gray-900">{bloc.nom}</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {bloc.formations.length} formation{bloc.formations.length !== 1 ? 's' : ''}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {nP > 0 && (
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                        Présentiel · {nP}
+                      </span>
+                    )}
+                    {nD > 0 && (
+                      <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-800">
+                        FAD · {nD}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-3 text-xs font-semibold" style={{ color: primary }}>
+                    Voir les formations →
+                  </p>
                 </button>
-                <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{selectedFiliereNom}</p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {typesDispo.map((t) => {
-                    const meta = TYPE_META[t]
-                    const count = listeFiliere.filter((f) => f.type === t).length
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => {
-                          setSelectedType(t)
-                          setStep('liste')
-                        }}
-                        className="rounded-2xl border border-gray-100 bg-white p-6 text-left shadow-sm transition-all hover:shadow-md"
-                      >
-                        <div className="text-3xl">{meta?.emoji}</div>
-                        <p className="mt-2 text-lg font-black text-gray-900">{meta?.label}</p>
-                        <p className="text-sm text-gray-500">{meta?.short}</p>
-                        <p className="mt-4 text-sm font-bold text-blue-700">
-                          {count} formation{count !== 1 ? 's' : ''} →
-                        </p>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {step === 'liste' && selectedFiliereNom && selectedType && (
-              <div className="space-y-4">
-                <button type="button" onClick={goTypes} className="text-sm font-semibold text-blue-700 hover:underline">
-                  ← Retour aux modes
-                </button>
-                <h3 className="text-base font-bold text-gray-900">
-                  {TYPE_META[selectedType]?.emoji} {TYPE_META[selectedType]?.label}
-                  <span className="font-normal text-gray-500"> — {selectedFiliereNom}</span>
-                </h3>
-                <ul className="space-y-4">
-                  {formationsListe.map((f) => (
-                    <li
-                      key={f.id}
-                      className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
-                    >
-                      <div className="h-1" style={{ background: `linear-gradient(90deg, ${primary}, ${secondary})` }} />
-                      <div className="p-4 sm:p-5">
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                              f.type === 'en_ligne' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
-                            }`}
-                          >
-                            {f.type === 'en_ligne' ? '🌐 FAD' : `🏫 ${f.ville || 'Présentiel'}`}
-                          </span>
-                          {f.niveau_requis && (
-                            <span className="text-[11px] text-gray-400">{f.niveau_requis}</span>
-                          )}
-                        </div>
-                        <h4 className="text-base font-bold text-gray-900">{f.titre}</h4>
-                        {f.filiere_duree_cycle && (
-                          <p className="mt-1 text-xs text-gray-600">
-                            Durée cycle : <span className="font-semibold">{f.filiere_duree_cycle}</span>
-                          </p>
-                        )}
-                        {f.filiere_condition_acces && (
-                          <p className="mt-1 text-xs text-gray-600">Accès : {f.filiere_condition_acces}</p>
-                        )}
-                        {f.niveau && <p className="mt-1 text-xs text-gray-600">Niveau : {f.niveau}</p>}
-                        {f.nombre_annees > 0 && (
-                          <p className="mt-1 text-xs text-gray-600">Durée : {f.nombre_annees} an(s)</p>
-                        )}
-                        {f.description && <p className="mt-2 text-xs text-gray-500 whitespace-pre-wrap">{f.description}</p>}
-                        {f.debouches && (
-                          <p className="mt-2 text-xs text-slate-600 whitespace-pre-wrap">
-                            <span className="font-semibold text-slate-700">Débouchés :</span> {f.debouches}
-                          </p>
-                        )}
-                        <details className="mt-3 text-xs">
-                          <summary className="cursor-pointer font-semibold text-blue-700">Conditions d&apos;entrée</summary>
-                          <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-gray-100 bg-slate-50 p-2">
-                            <PreinscriptionConditionsBlock formationNiveau={f.niveau} />
-                          </div>
-                        </details>
-                        {flyersPourFiliere(f.filiere_id, f.filiere_nom).length > 0 && (
-                          <div className="mt-3 space-y-1">
-                            <p className="text-[11px] font-semibold text-slate-600">Flyers de la filière</p>
-                            {flyersPourFiliere(f.filiere_id, f.filiere_nom).map((fl) => (
-                              <a
-                                key={fl.id}
-                                href={mediaUrl(fl.file_url)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="block text-sm font-semibold text-blue-700 hover:underline"
-                              >
-                                ⬇ {fl.titre || 'Télécharger le flyer'}
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                        <p className="mt-3 text-[10px] text-amber-800/90 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1.5">
-                          Tarifs non affichés sur cette page — communiqués après inscription ou sur demande de facture proforma.
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
+              )
+            })}
+          </div>
         )}
 
-        {flyers.length > 0 && (
-          <section className="mt-10 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-black text-gray-900">Flyers à télécharger</h2>
-            <p className="mt-1 text-xs text-gray-500">Documents publics — aucun compte requis.</p>
-            <ul className="mt-4 space-y-3">
-              {flyers.map((fl) => (
-                <li key={fl.id} className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                  <p className="font-bold text-slate-900">{fl.titre}</p>
-                  {fl.filiere_nom && (
-                    <p className="mt-0.5 text-[11px] font-semibold text-indigo-700">Filière : {fl.filiere_nom}</p>
-                  )}
-                  {fl.description && <p className="mt-1 text-xs text-slate-600 line-clamp-2">{fl.description}</p>}
-                  {fl.debouches && (
-                    <p className="mt-1 text-xs text-slate-500 line-clamp-2">
-                      <span className="font-semibold">Débouchés :</span> {fl.debouches}
-                    </p>
-                  )}
-                  <a
-                    href={mediaUrl(fl.file_url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-2 inline-block text-sm font-bold hover:underline"
-                    style={{ color: primary }}
-                  >
-                    ⬇ Télécharger
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        <div className="mt-10">
+          <PreinscriptionConditionsBlock etablissementId={etabId} />
+        </div>
 
         <div className="mt-10 flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
           <Link
             to={`/inscription?etablissement_id=${etabId}`}
-            className="inline-flex justify-center rounded-xl px-5 py-3 text-center text-sm font-bold text-white shadow-md transition-opacity hover:opacity-95"
+            className="inline-flex justify-center rounded-xl px-5 py-3 text-center text-sm font-bold text-white shadow-md"
             style={{ background: primary }}
           >
             Créer un compte — étape obligatoire
           </Link>
-          <Link
-            to={`/demande-proforma?etablissement_id=${etabId}&tab=conditions`}
-            className="inline-flex justify-center rounded-xl border-2 border-gray-200 bg-white px-5 py-3 text-center text-sm font-semibold text-gray-800 hover:border-gray-300"
-          >
-            Après connexion : facture proforma
-          </Link>
-          <Link to="/etablissements" className="inline-flex justify-center text-sm font-semibold text-blue-700 hover:underline py-2">
+          <Link to="/etablissements" className="inline-flex justify-center py-2 text-sm font-semibold text-blue-700 hover:underline">
             ← Autres établissements
           </Link>
         </div>
       </div>
+
+      <FiliereFormationsModal
+        open={Boolean(modalFiliere)}
+        onOpenChange={(o) => { if (!o) setModalFiliere(null) }}
+        filiere={modalFiliere}
+        formations={modalFiliere?.formations || []}
+        primary={primary}
+        hideTarifs
+        showCandidater={false}
+        flyers={modalFiliere ? flyersPourFiliere(modalFiliere.filiere_id, modalFiliere.nom) : []}
+      />
     </div>
   )
 }

@@ -97,20 +97,30 @@ function ModalDetail({ open, onClose, type, payload }) {
             )}
             {!okDocs && d.statut !== 'refusee' && (
               <p className="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                La facture proforma et l&apos;attestation de préinscription ne sont disponibles qu&apos;après <strong>validation</strong> par le service pédagogique.
+                L&apos;attestation de préinscription n&apos;est disponible qu&apos;après <strong>validation</strong> par le service pédagogique. La facture proforma est transmise par l&apos;établissement (téléchargement réservé au personnel).
               </p>
             )}
             {okDocs && (
               <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
-                <p className="text-xs font-bold text-emerald-800">Vos documents sont prêts (même page depuis le tableau) :</p>
+                <p className="text-xs font-bold text-emerald-800">Documents disponibles :</p>
+                {d.facture ? (
+                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                    <p className="font-mono font-bold text-slate-900">{d.facture.numero}</p>
+                    {d.facture.montant_ttc != null && (
+                      <p className="mt-0.5 font-semibold tabular-nums">
+                        {fmt(d.facture.montant_ttc)} FCFA
+                      </p>
+                    )}
+                    <p className="mt-1 text-slate-600">
+                      Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-600">
+                    Facture proforma : document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
-                  <Link
-                    to={`/facture-publique/${d.reference}`}
-                    className="text-xs font-bold bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 shadow-sm"
-                    onClick={onClose}
-                  >
-                    Facture proforma
-                  </Link>
                   <Link to={`/attestation-demande/${d.id}`} className="text-xs font-bold bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700" onClick={onClose}>
                     Attestation de préinscription
                   </Link>
@@ -156,18 +166,28 @@ function ModalDetail({ open, onClose, type, payload }) {
             </div>
           )}
           {isDossierAcceptePourDocuments(dossier.statut) && (
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-              <Link to={`/facture/${dossier.id}`} className="text-xs font-bold border border-blue-300 text-blue-700 px-3 py-2 rounded-lg" onClick={onClose}>
-                Facture
-              </Link>
-              <Link to={`/attestation/${dossier.id}`} className="text-xs font-bold bg-indigo-600 text-white px-3 py-2 rounded-lg" onClick={onClose}>
-                Attestation
-              </Link>
-              {canShowLettrePreinscription(dossier) && (
-                <Link to={`/lettre/${dossier.id}`} className="text-xs font-bold bg-emerald-600 text-white px-3 py-2 rounded-lg" onClick={onClose}>
-                  Lettre
+            <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+              {facture ? (
+                <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                  <p className="font-mono font-bold text-slate-900">{facture.numero}</p>
+                  {facture.montant_ttc != null && (
+                    <p className="mt-0.5 font-semibold tabular-nums">{fmt(facture.montant_ttc)} FCFA</p>
+                  )}
+                  <p className="mt-1 text-slate-600">
+                    Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                  </p>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <Link to={`/attestation/${dossier.id}`} className="text-xs font-bold bg-indigo-600 text-white px-3 py-2 rounded-lg" onClick={onClose}>
+                  Attestation
                 </Link>
-              )}
+                {canShowLettrePreinscription(dossier) && (
+                  <Link to={`/lettre/${dossier.id}`} className="text-xs font-bold bg-emerald-600 text-white px-3 py-2 rounded-lg" onClick={onClose}>
+                    Lettre
+                  </Link>
+                )}
+              </div>
             </div>
           )}
           {documents?.length > 0 && (
@@ -326,18 +346,16 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
         <h3 className="ui-section-title">Documents officiels</h3>
         {!accepted ? (
           <p className="text-sm leading-relaxed text-amber-950/90">
-            La facture proforma, l&apos;attestation et la lettre de préinscription ne sont téléchargeables qu&apos;après{' '}
-            <strong>validation</strong> de cette candidature (statut « accepté »).
+            L&apos;attestation et la lettre de préinscription ne sont téléchargeables qu&apos;après{' '}
+            <strong>validation</strong> de cette candidature (statut « accepté »). La facture proforma est transmise par
+            l&apos;établissement.
           </p>
         ) : (
           <>
             <p className="ui-section-sub">
-              Candidature acceptée — téléchargez vos documents administratifs (lettre, attestation, facture proforma).
+              Candidature acceptée — téléchargez votre lettre et votre attestation. La facture proforma est transmise par l&apos;établissement.
             </p>
             <div className="ui-action-bar">
-              <Link to={`/facture/${dossier.id}`} className="ui-doc-btn">
-                Facture proforma
-              </Link>
               <Link to={`/attestation/${dossier.id}`} className="ui-doc-btn">
                 Attestation de préinscription
               </Link>
@@ -348,17 +366,15 @@ function EtudiantDossierPanel({ dossier, documents, formation, facture, onReload
               )}
             </div>
             {facture && (
-              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-emerald-100 bg-white/90 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Facture émise</p>
-                  <p className="font-mono text-sm font-bold text-slate-800">{facture.numero}</p>
-                  <p className="mt-1 text-xl font-black tabular-nums text-slate-900">
-                    {fmt(facture.montant_ttc)} <span className="text-sm font-semibold text-slate-500">FCFA</span>
-                  </p>
-                </div>
-                <Link to={`/facture/${dossier.id}`} className="btn-primary inline-flex min-h-[44px] w-full items-center justify-center sm:w-auto">
-                  Voir et télécharger
-                </Link>
+              <div className="mt-4 rounded-xl border border-emerald-100 bg-white/90 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Facture émise</p>
+                <p className="font-mono text-sm font-bold text-slate-800">{facture.numero}</p>
+                <p className="mt-1 text-xl font-black tabular-nums text-slate-900">
+                  {fmt(facture.montant_ttc)} <span className="text-sm font-semibold text-slate-500">FCFA</span>
+                </p>
+                <p className="mt-2 text-sm text-slate-600">
+                  Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                </p>
               </div>
             )}
           </>
@@ -540,8 +556,9 @@ export default function EtudiantDashboard() {
             bodyClassName="p-0 overflow-hidden"
           >
             <p className="px-5 pt-4 pb-2 text-xs text-slate-500">
-              Après envoi des justificatifs prévus aux conditions d’admission, la <strong>facture proforma</strong> et
-              l&apos;<strong>attestation</strong> apparaissent ici dès que la demande est <strong>acceptée</strong>.
+              Après envoi des justificatifs prévus aux conditions d’admission, suivez le statut ici. Une fois la demande{' '}
+              <strong>acceptée</strong>, l&apos;<strong>attestation</strong> est téléchargeable ; la facture proforma est
+              transmise par l&apos;établissement (téléchargement réservé au personnel).
             </p>
             <div className="md:hidden divide-y divide-slate-100 border-t border-slate-100">
               {demandesProSorted.length === 0 ? (
@@ -578,23 +595,30 @@ export default function EtudiantDashboard() {
                           Voir le détail
                         </button>
                       </div>
-                      {accepted && d.reference && (
-                        <div className="rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50/90 to-teal-50/40 p-3">
-                          <p className="mb-2 text-xs font-bold text-emerald-900">Documents disponibles</p>
-                          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                            <Link
-                              to={`/facture-publique/${d.reference}`}
-                              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-bold text-white shadow-sm hover:bg-blue-700"
-                            >
-                              Facture proforma
-                            </Link>
-                            <Link
-                              to={`/attestation-demande/${d.id}`}
-                              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-indigo-600 px-3 text-sm font-bold text-white shadow-sm hover:bg-indigo-700"
-                            >
-                              Attestation de préinscription
-                            </Link>
-                          </div>
+                      {accepted && (
+                        <div className="rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50/90 to-teal-50/40 p-3 space-y-2">
+                          <p className="text-xs font-bold text-emerald-900">Documents disponibles</p>
+                          {d.facture ? (
+                            <div className="rounded-lg border border-emerald-100/80 bg-white/80 px-3 py-2 text-xs text-slate-700">
+                              <p className="font-mono font-bold">{d.facture.numero}</p>
+                              {d.facture.montant_ttc != null && (
+                                <p className="font-semibold tabular-nums">{fmt(d.facture.montant_ttc)} FCFA</p>
+                              )}
+                              <p className="mt-1 text-slate-600">
+                                Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-600">
+                              Facture proforma : document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                            </p>
+                          )}
+                          <Link
+                            to={`/attestation-demande/${d.id}`}
+                            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-indigo-600 px-3 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 sm:w-auto"
+                          >
+                            Attestation de préinscription
+                          </Link>
                         </div>
                       )}
                     </div>
@@ -654,27 +678,31 @@ export default function EtudiantDashboard() {
                               </button>
                             </td>
                           </tr>
-                          {accepted && d.reference && (
+                          {accepted && (
                             <tr className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50/90 to-teal-50/40">
                               <td colSpan={5} className="px-4 py-3">
                                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                                   <span className="text-xs font-bold text-emerald-900 shrink-0">Documents disponibles :</span>
-                                  <div className="flex flex-wrap gap-2">
-                                    <Link
-                                      to={`/facture-publique/${d.reference}`}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700"
-                                    >
-                                      Facture proforma
-                                    </Link>
-                                    <Link
-                                      to={`/attestation-demande/${d.id}`}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700"
-                                    >
-                                      Attestation de préinscription
-                                    </Link>
-                                  </div>
+                                  {d.facture ? (
+                                    <span className="text-xs text-slate-700">
+                                      <span className="font-mono font-bold">{d.facture.numero}</span>
+                                      {d.facture.montant_ttc != null && (
+                                        <> · <span className="font-semibold tabular-nums">{fmt(d.facture.montant_ttc)} FCFA</span></>
+                                      )}
+                                      {' — '}Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-slate-600">
+                                      Facture : téléchargement réservé au personnel.
+                                    </span>
+                                  )}
+                                  <Link
+                                    to={`/attestation-demande/${d.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700"
+                                  >
+                                    Attestation de préinscription
+                                  </Link>
                                 </div>
                               </td>
                             </tr>
@@ -791,14 +819,16 @@ export default function EtudiantDashboard() {
                           <td colSpan={5} className="px-4 py-3">
                             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                               <span className="text-xs font-bold text-emerald-900 shrink-0">Documents disponibles :</span>
+                              {row.facture ? (
+                                <span className="text-xs text-slate-700">
+                                  <span className="font-mono font-bold">{row.facture.numero}</span>
+                                  {row.facture.montant_ttc != null && (
+                                    <> · <span className="font-semibold tabular-nums">{fmt(row.facture.montant_ttc)} FCFA</span></>
+                                  )}
+                                  {' — '}Document officiel transmis par l&apos;établissement (téléchargement réservé au personnel).
+                                </span>
+                              ) : null}
                               <div className="flex flex-wrap gap-2">
-                                <Link
-                                  to={`/facture/${dossier.id}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700"
-                                >
-                                  Facture proforma
-                                </Link>
                                 <Link
                                   to={`/attestation/${dossier.id}`}
                                   onClick={(e) => e.stopPropagation()}

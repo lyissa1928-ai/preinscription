@@ -189,6 +189,35 @@ export default function Preinscription() {
     numero_passeport: '',
   })
   const [files, setFiles] = useState(emptyDossierFilesState)
+  /** Champs identité déjà présents sur le profil (affichage lecture seule). */
+  const [profileLocked, setProfileLocked] = useState({})
+
+  useEffect(() => {
+    if (authLoading || !user) return
+    const dn = user.date_naissance ? String(user.date_naissance).slice(0, 10) : ''
+    const tel = String(user.telephone || '').trim()
+    const adr = String(user.adresse || '').trim()
+    const lieu = String(user.lieu_naissance || '').trim()
+    const nat = String(user.nationalite || '').trim()
+    const pays = String(user.pays_origine || user.pays_residence || '').trim()
+    setForm((p) => ({
+      ...p,
+      date_naissance: p.date_naissance || dn,
+      telephone: p.telephone || tel,
+      adresse: p.adresse || adr,
+      lieu_naissance: p.lieu_naissance || lieu,
+      nationalite: p.nationalite || nat,
+      pays_origine: p.pays_origine || pays,
+    }))
+    setProfileLocked({
+      date_naissance: Boolean(dn),
+      telephone: Boolean(tel),
+      adresse: Boolean(adr),
+      lieu_naissance: Boolean(lieu),
+      nationalite: Boolean(nat),
+      pays_origine: Boolean(pays),
+    })
+  }, [authLoading, user?.id, user?.date_naissance, user?.telephone, user?.adresse, user?.lieu_naissance, user?.nationalite, user?.pays_origine])
 
   useEffect(() => {
     if (authLoading) return
@@ -646,8 +675,18 @@ export default function Preinscription() {
                   Identité &amp; coordonnées
                 </h2>
                 <p className="mt-1 text-sm text-slate-600 leading-relaxed">
-                  Les informations doivent correspondre à votre pièce d’identité. La <strong>nationalité</strong> est enregistrée dans le dossier administratif.
+                  Les informations déjà présentes sur votre compte sont reprises automatiquement.
+                  Seuls les champs manquants restent à compléter.
                 </p>
+                {(user?.prenom || user?.nom || user?.email) && (
+                  <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <p className="font-semibold text-slate-900">
+                      {[user.prenom, user.nom].filter(Boolean).join(' ')}
+                    </p>
+                    {user.email && <p className="text-slate-600">{user.email}</p>}
+                    <p className="mt-1 text-xs text-slate-500">Issu de votre compte — non redemandé ici.</p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-8">
@@ -664,11 +703,15 @@ export default function Preinscription() {
                       <input
                         id="prein-dob"
                         type="date"
-                        className="input-field"
+                        className={`input-field ${profileLocked.date_naissance ? 'bg-slate-50 text-slate-700' : ''}`}
                         value={form.date_naissance}
                         onChange={up('date_naissance')}
+                        readOnly={profileLocked.date_naissance}
                         required
                       />
+                      {profileLocked.date_naissance && (
+                        <p className="mt-1 text-xs text-slate-500">Issu de votre profil.</p>
+                      )}
                     </div>
                     <div>
                       <label htmlFor="prein-lieu" className="label-field">
@@ -677,12 +720,16 @@ export default function Preinscription() {
                       <input
                         id="prein-lieu"
                         type="text"
-                        className="input-field"
+                        className={`input-field ${profileLocked.lieu_naissance ? 'bg-slate-50 text-slate-700' : ''}`}
                         placeholder="Ville, pays"
                         value={form.lieu_naissance}
                         onChange={up('lieu_naissance')}
+                        readOnly={profileLocked.lieu_naissance}
                         required
                       />
+                      {profileLocked.lieu_naissance && (
+                        <p className="mt-1 text-xs text-slate-500">Issu de votre profil.</p>
+                      )}
                     </div>
                     <div>
                       <label htmlFor="prein-nationalite" className="label-field">
@@ -697,14 +744,18 @@ export default function Preinscription() {
                           id="prein-nationalite"
                           type="text"
                           list="nationalites-datalist-preinscription"
-                          className="input-field pl-9"
+                          className={`input-field pl-9 ${profileLocked.nationalite ? 'bg-slate-50 text-slate-700' : ''}`}
                           placeholder="Ex. Sénégalaise, Française…"
                           value={form.nationalite}
                           onChange={up('nationalite')}
                           autoComplete="off"
+                          readOnly={profileLocked.nationalite}
                           required
                         />
                       </div>
+                      {profileLocked.nationalite && (
+                        <p className="mt-1 text-xs text-slate-500">Issu de votre profil.</p>
+                      )}
                       <datalist id="nationalites-datalist-preinscription">
                         {NATIONALITES_SUGGESTIONS_FR.map((n) => (
                           <option key={n} value={n} />
@@ -718,12 +769,16 @@ export default function Preinscription() {
                       <input
                         id="prein-pays-origine"
                         type="text"
-                        className="input-field"
+                        className={`input-field ${profileLocked.pays_origine ? 'bg-slate-50 text-slate-700' : ''}`}
                         placeholder="Ex. Sénégal, France, Côte d’Ivoire…"
                         value={form.pays_origine}
                         onChange={up('pays_origine')}
+                        readOnly={profileLocked.pays_origine}
                         required
                       />
+                      {profileLocked.pays_origine && (
+                        <p className="mt-1 text-xs text-slate-500">Issu de votre profil.</p>
+                      )}
                     </div>
                     <div className="sm:col-span-2">
                       <label htmlFor="prein-passeport" className="label-field">
@@ -755,12 +810,16 @@ export default function Preinscription() {
                       <input
                         id="prein-tel"
                         type="tel"
-                        className="input-field"
+                        className={`input-field ${profileLocked.telephone ? 'bg-slate-50 text-slate-700' : ''}`}
                         placeholder="+221 77 000 00 00"
                         value={form.telephone}
                         onChange={up('telephone')}
+                        readOnly={profileLocked.telephone}
                         required
                       />
+                      {profileLocked.telephone && (
+                        <p className="mt-1 text-xs text-slate-500">Issu de votre profil.</p>
+                      )}
                     </div>
                     <div className="sm:col-span-2">
                       <label htmlFor="prein-adr" className="label-field">
@@ -768,13 +827,17 @@ export default function Preinscription() {
                       </label>
                       <textarea
                         id="prein-adr"
-                        className="input-field min-h-[100px] resize-y"
+                        className={`input-field min-h-[100px] resize-y ${profileLocked.adresse ? 'bg-slate-50 text-slate-700' : ''}`}
                         rows={3}
                         placeholder="Rue, quartier, code postal, ville, pays"
                         value={form.adresse}
                         onChange={up('adresse')}
+                        readOnly={profileLocked.adresse}
                         required
                       />
+                      {profileLocked.adresse && (
+                        <p className="mt-1 text-xs text-slate-500">Issu de votre profil.</p>
+                      )}
                     </div>
                   </div>
                 </section>

@@ -7,19 +7,35 @@ const { isFactureSupprimee } = require('../utils/factureVisibility');
 const { parsePagination, wantsPagination, paginateArray } = require('../utils/pagination');
 const {
   staffEtabPeutVoirDossier,
+  peutAccederFactureDocumentaire,
+  isStaffFactureRole,
 } = require('../utils/factureAccess');
 
-// POST /api/factures/generer/:dossierId - Générer une facture proforma
+const MSG_ETUDIANT_FACTURE =
+  'Le téléchargement et la consultation du document officiel de facture sont réservés au personnel autorisé. Consultez le statut de votre dossier dans votre espace étudiant.';
+
+function refuseEtudiantFacture(req, res) {
+  if (req.user?.role === 'etudiant') {
+    return res.status(403).json({
+      code: 'FACTURE_STAFF_ONLY',
+      message: MSG_ETUDIANT_FACTURE,
+    });
+  }
+  return null;
+}
+
+// POST /api/factures/generer/:dossierId — staff uniquement
 router.post('/generer/:dossierId', authMiddleware, (req, res) => {
-  const dossierId = parseInt(req.params.dossierId);
+  if (refuseEtudiantFacture(req, res)) return;
+
+  const dossierId = parseInt(req.params.dossierId, 10);
   const dossier = db.get('dossiers').find({ id: dossierId }).value();
   if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
 
-  const isOwner = dossier.etudiant_id === req.user.id;
-  const isAdmin = req.user.role === 'admin';
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'directeur';
   const isStaffEtab = staffEtabPeutVoirDossier(req.user, dossier, db);
 
-  if (!isOwner && !isAdmin && !isStaffEtab) {
+  if (!isAdmin && !isStaffEtab) {
     return res.status(403).json({ message: 'Accès refusé' });
   }
 
@@ -41,38 +57,55 @@ router.post('/generer/:dossierId', authMiddleware, (req, res) => {
   res.status(existed ? 200 : 201).json(facture);
 });
 
-// GET /api/factures/dossier/:dossierId
+// GET /api/factures/dossier/:dossierId — document officiel : staff uniquement
 router.get('/dossier/:dossierId', authMiddleware, (req, res) => {
-  const dossierId = parseInt(req.params.dossierId);
+  if (refuseEtudiantFacture(req, res)) return;
+
+  const dossierId = parseInt(req.params.dossierId, 10);
   const dossier = db.get('dossiers').find({ id: dossierId }).value();
   if (!dossier) return res.status(404).json({ message: 'Dossier non trouvé' });
-  const ok =
-    req.user.role === 'admin' ||
-    dossier.etudiant_id === req.user.id ||
-    staffEtabPeutVoirDossier(req.user, dossier, db);
-  if (!ok) return res.status(403).json({ message: 'Accès refusé' });
+  if (!peutAccederFactureDocumentaire(req.user, dossier, db)) {
+    return res.status(403).json({ message: 'Accès refusé' });
+  }
   const facture = db.get('factures').find({ dossier_id: dossierId }).value();
   if (!facture) return res.status(404).json({ message: 'Aucune facture générée' });
-  const isStaffView = req.user.role === 'admin' || staffEtabPeutVoirDossier(req.user, dossier, db);
-  if (isFactureSupprimee(facture) && !isStaffView) {
+  if (isFactureSupprimee(facture) && !staffEtabPeutVoirDossier(req.user, dossier, db)) {
     return res.status(404).json({ message: 'Aucune facture générée' });
   }
   const synced = genererOuRecupererFactureDossier(dossierId);
   res.json(synced || facture);
 });
 
-// GET /api/factures/:id
+// Alias legacy front PublicFactureView — délégation + refus étudiant authentifié
+router.get('/publique/:reference', authMiddleware, (req, res) => {
+  if (refuseEtudiantFacture(req, res)) return;
+  if (!isStaffFactureRole(req.user)) {
+    return res.status(403).json({
+      code: 'FACTURE_STAFF_ONLY',
+      message: MSG_ETUDIANT_FACTURE,
+    });
+  }
+  return res.status(400).json({
+    code: 'USE_PUBLIC_PROFORMA',
+    message: 'Utilisez /api/public/facture-proforma/:reference pour les liens publics (personnel uniquement pour le PDF).',
+  });
+});
+
+// GET /api/factures/:id — staff uniquement
 router.get('/:id', authMiddleware, (req, res) => {
-  const facture = db.get('factures').find({ id: parseInt(req.params.id) }).value();
+  if (refuseEtudiantFacture(req, res)) return;
+
+  const facture = db.get('factures').find({ id: parseInt(req.params.id, 10) }).value();
   if (!facture) return res.status(404).json({ message: 'Facture non trouvée' });
   const dossier = facture.dossier_id ? db.get('dossiers').find({ id: facture.dossier_id }).value() : null;
-  const isOwner = facture.etudiant_id === req.user.id;
   const isStaff =
-    req.user.role === 'admin' || (dossier && staffEtabPeutVoirDossier(req.user, dossier, db));
-  if (!isOwner && !isStaff) {
+    req.user.role === 'admin'
+    || req.user.role === 'directeur'
+    || (dossier && staffEtabPeutVoirDossier(req.user, dossier, db));
+  if (!isStaff) {
     return res.status(403).json({ message: 'Accès refusé' });
   }
-  if (isFactureSupprimee(facture) && !isStaff && isOwner) {
+  if (isFactureSupprimee(facture) && !isStaff) {
     return res.status(404).json({ message: 'Facture non trouvée' });
   }
   const synced = syncStoredFactureById(facture.id);

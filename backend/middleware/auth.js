@@ -47,6 +47,15 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+/** JWT optionnel : peuplé req.user si Bearer valide, sinon continue sans user. */
+const optionalAuthMiddleware = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+  return authMiddleware(req, res, next);
+};
+
 // Accepte le rôle principal OU une fonction supplémentaire (ex. responsable désigné).
 const roleGuard = (...roles) => (req, res, next) => {
   if (!roleAllows(req.user, roles)) {
@@ -142,6 +151,7 @@ const staffOnly = roleGuard(
 
 module.exports = {
   authMiddleware,
+  optionalAuthMiddleware,
   adminOnly, adminOrDirecteur, responsableOnly, agentAdminOnly, comptableOnly, controleurQualiteOnly,
   responsableOrAdmin, staffProformaView, staffProformaDecision, staffDossierDecision, staffGuichet, staffLettreAttestation,
   agentAdminOrAdmin, comptableOrAdmin, directeurOrAdmin,

@@ -286,6 +286,27 @@ router.post(
   const now = new Date().toISOString();
 
   const passeportTrim = numero_passeport != null ? String(numero_passeport).trim() : '';
+
+  // Enrichir le profil étudiant uniquement pour les champs encore vides (source de vérité)
+  const profilePatch = {};
+  if (!etudiantRow.date_naissance && date_naissance) profilePatch.date_naissance = String(date_naissance).trim();
+  if (!String(etudiantRow.telephone || '').trim() && telephone) profilePatch.telephone = String(telephone).trim();
+  if (!String(etudiantRow.adresse || '').trim() && adresse) profilePatch.adresse = String(adresse).trim();
+  if (!String(etudiantRow.lieu_naissance || '').trim() && lieu_naissance) {
+    profilePatch.lieu_naissance = String(lieu_naissance).trim();
+  }
+  if (!String(etudiantRow.nationalite || '').trim() && nationalite) {
+    profilePatch.nationalite = String(nationalite).trim();
+  }
+  const paysVal = (pays_origine || pays_residence || '').toString().trim();
+  if (!String(etudiantRow.pays_origine || '').trim() && paysVal) profilePatch.pays_origine = paysVal;
+  if (Object.keys(profilePatch).length) {
+    db.get('utilisateurs').find({ id: etudiantId }).assign({
+      ...profilePatch,
+      updated_at: now,
+    }).write();
+  }
+
   const dossier = {
     id, etudiant_id: etudiantId, numero_dossier: numeroDossier,
     formation_id: parseInt(formation_id),
@@ -335,13 +356,26 @@ function packDossierPayload(dossier) {
   const documents = db.get('documents').filter({ dossier_id: dossier.id }).value();
   const formation = db.get('formations').find({ id: dossier.formation_id }).value();
   const accepte = isDossierAcceptePourLettre(dossier.statut);
-  let facture = null;
+  let factureFull = null;
   if (accepte && dossier.formation_id) {
-    facture = genererOuRecupererFactureDossier(dossier.id);
+    factureFull = genererOuRecupererFactureDossier(dossier.id);
   } else {
     const factureRow = db.get('factures').find({ dossier_id: dossier.id }).value() || null;
-    if (factureRow) facture = genererOuRecupererFactureDossier(dossier.id);
+    if (factureRow) factureFull = genererOuRecupererFactureDossier(dossier.id);
   }
+  // Étudiant : résumé statut uniquement (pas le document officiel téléchargeable)
+  const facture = factureFull
+    ? {
+        id: factureFull.id,
+        numero: factureFull.numero,
+        montant_ttc: factureFull.montant_ttc,
+        montant_total_a_payer: factureFull.montant_total_a_payer,
+        date_emission: factureFull.date_emission,
+        statut: factureFull.statut || 'emise',
+        document_officiel_disponible: true,
+        telechargement_autorise: false,
+      }
+    : null;
   return {
     dossier,
     documents,

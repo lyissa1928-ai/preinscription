@@ -2,16 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
-import PreinscriptionConditionsBlock from '../components/PreinscriptionConditionsBlock'
-import { forfaitAnnuelFromFormation } from '../lib/formationTarifs'
+import FiliereFormationsModal from '../components/FiliereFormationsModal'
 import { mediaUrl } from '../utils/mediaUrl'
-
-const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n || 0)
-
-const TYPE_FORMATION_META = {
-  presentiel: { label: 'Présentiel', emoji: '🏫', desc: 'Cours en présentiel sur site' },
-  en_ligne: { label: 'À distance (FAD)', emoji: '🌐', desc: 'Formation à distance en ligne' },
-}
 
 const ROLE_LINKS = {
   admin_etablissement: { label: 'Identité établissement', path: '/mon-etablissement/identite', icon: '🏛️' },
@@ -22,107 +14,16 @@ const ROLE_LINKS = {
   controleur_qualite: { label: 'Qualité & conformité', path: '/qualite', icon: '✅' },
 }
 
-function FormationCatalogueCard({ f, primary, secondary, isEtudiant }) {
-  return (
-    <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <div className="h-1.5 shrink-0" style={{ background: `linear-gradient(90deg, ${primary}, ${secondary})` }} />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 sm:p-5">
-        <div className="mb-2 flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className={`max-w-full truncate text-[11px] font-bold sm:text-xs px-2.5 py-1 rounded-full ${f.type === 'en_ligne' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`} title={f.type === 'en_ligne' ? 'FAD' : (f.ville || 'Présentiel')}>
-            {f.type === 'en_ligne' ? '🌐 FAD' : `🏫 ${f.ville || 'Présentiel'}`}
-          </span>
-          {f.niveau_requis && (
-            <span className="max-w-[10rem] truncate text-[11px] text-gray-400 sm:text-xs" title={f.niveau_requis}>{f.niveau_requis}</span>
-          )}
-        </div>
-        <h3 className="mb-2 line-clamp-3 min-h-0 text-[15px] font-bold leading-snug text-gray-900 sm:text-base">{f.titre}</h3>
-        {f.filiere_duree_cycle && (
-          <p className="mb-1 line-clamp-2 text-xs text-gray-700">Durée cycle : <span className="font-semibold">{f.filiere_duree_cycle}</span></p>
-        )}
-        {f.filiere_condition_acces && (
-          <p className="mb-1 line-clamp-2 text-xs text-gray-700">Accès : {f.filiere_condition_acces}</p>
-        )}
-        {f.niveau && <p className="mb-1 text-xs text-gray-600">Niveau : {f.niveau}</p>}
-        {f.description && <p className="mb-2 line-clamp-2 text-xs text-gray-500">{f.description}</p>}
-        <details className="mb-2 min-w-0 text-xs">
-          <summary className="cursor-pointer font-semibold text-blue-700 hover:text-blue-800">Conditions d&apos;entrée</summary>
-          <div className="mt-2 max-h-36 overflow-y-auto rounded-lg border border-gray-100 bg-slate-50/90 p-2">
-            <PreinscriptionConditionsBlock formationNiveau={f.niveau} />
-          </div>
-        </details>
-        <div className="mt-auto border-t border-gray-100 pt-3">
-          {isEtudiant ? (
-            <div className="space-y-2">
-              {(f.places_restantes != null || (f.places != null && f.places !== '')) && (
-                <p className="text-center text-[11px] text-gray-500 sm:text-xs">
-                  {f.places_restantes != null ? (
-                    <>
-                      <span className="font-semibold text-gray-700">{f.places_restantes}</span>
-                      {' '}
-                      place{Number(f.places_restantes) !== 1 ? 's' : ''} restante
-                      {Number(f.places_restantes) !== 1 ? 's' : ''} (indicatif)
-                      {typeof f.candidatures_actives === 'number' && f.candidatures_actives > 0 && (
-                        <span className="mt-0.5 block text-[10px] text-gray-400">
-                          {f.candidatures_actives} candidature
-                          {f.candidatures_actives > 1 ? 's' : ''} active{f.candidatures_actives > 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-semibold text-gray-700">{f.places}</span> place
-                      {Number(f.places) > 1 ? 's' : ''} (indicatif)
-                    </>
-                  )}
-                </p>
-              )}
-              <Link
-                to={`/preinscription/${f.id}`}
-                className="block w-full rounded-xl py-2.5 text-center text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-95"
-                style={{ background: primary }}
-              >
-                Candidater
-              </Link>
-              <p className="text-[10px] leading-snug text-gray-400 text-center px-0.5">Montants communiqués sur la facture proforma après instruction.</p>
-            </div>
-          ) : (
-            <div className="flex min-w-0 flex-wrap items-end justify-between gap-2">
-              <div className="min-w-0">
-                <div className="font-black text-base" style={{ color: primary }}>{fmt(forfaitAnnuelFromFormation(f))} <span className="text-xs font-normal text-gray-400">FCFA/an</span></div>
-                <div className="text-xs text-gray-500 break-words">
-                  Inscription {fmt(f.frais_inscription)}
-                  {f.mensualite > 0 && (
-                    <> · {fmt(f.mensualite)}/mois{f.duree_mois ? ` × ${f.duree_mois} mois` : ''}</>
-                  )}
-                </div>
-              </div>
-              {f.places && (
-                <div className="shrink-0 text-center">
-                  <div className="text-sm font-black text-gray-700">{f.places}</div>
-                  <div className="text-xs text-gray-400">places</div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function EtablissementHome() {
   const { user } = useAuth()
   const [etab, setEtab] = useState(null)
   const [formations, setFormations] = useState([])
+  const [flyers, setFlyers] = useState([])
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   /** 'all' | 'presentiel' | 'en_ligne' — filtre par mode (pas par niveau diplôme) */
   const [filtreMode, setFiltreMode] = useState('all')
-  /** 'filieres' | 'types' | 'liste' */
-  const [catalogueStep, setCatalogueStep] = useState('filieres')
-  const [selectedFiliereNom, setSelectedFiliereNom] = useState(null)
-  /** 'presentiel' | 'en_ligne' */
-  const [selectedFormationType, setSelectedFormationType] = useState(null)
+  const [modalFiliere, setModalFiliere] = useState(null)
   const [exportingRapport, setExportingRapport] = useState(false)
 
   const etabId = user?.etablissement_id
@@ -132,21 +33,21 @@ export default function EtablissementHome() {
     Promise.all([
       axios.get(`/api/etablissements/${etabId}`),
       axios.get(`/api/formations?etablissement_id=${etabId}`),
+      axios.get(`/api/etablissements/${etabId}/flyers`).catch(() => ({ data: [] })),
       user.role === 'responsable' || user.role === 'admin_etablissement' || user.role === 'admin'
         ? axios.get('/api/responsable/statistiques').catch(() => ({ data: null }))
         : Promise.resolve({ data: null })
-    ]).then(([etabRes, formRes, statsRes]) => {
+    ]).then(([etabRes, formRes, flyersRes, statsRes]) => {
       setEtab(etabRes.data)
       setFormations(formRes.data)
+      setFlyers(Array.isArray(flyersRes.data) ? flyersRes.data : [])
       setStats(statsRes.data)
     }).catch(() => {})
       .finally(() => setLoading(false))
   }, [etabId])
 
   useEffect(() => {
-    setCatalogueStep('filieres')
-    setSelectedFiliereNom(null)
-    setSelectedFormationType(null)
+    setModalFiliere(null)
   }, [filtreMode])
 
   /** Administrateur global (sans rattachement) : tableau de bord unique. */
@@ -201,40 +102,36 @@ export default function EtablissementHome() {
     const map = new Map()
     for (const f of formationsFiltrees) {
       const key = (f.filiere_nom && String(f.filiere_nom).trim()) || 'Sans filière'
-      if (!map.has(key)) map.set(key, [])
-      map.get(key).push(f)
+      if (!map.has(key)) {
+        map.set(key, {
+          filiere_id: f.filiere_id || null,
+          nom: key,
+          duree_cycle: f.filiere_duree_cycle || null,
+          condition_acces: f.filiere_condition_acces || null,
+          formations: [],
+        })
+      }
+      const bloc = map.get(key)
+      if (!bloc.filiere_id && f.filiere_id) bloc.filiere_id = f.filiere_id
+      if (!bloc.duree_cycle && f.filiere_duree_cycle) bloc.duree_cycle = f.filiere_duree_cycle
+      if (!bloc.condition_acces && f.filiere_condition_acces) {
+        bloc.condition_acces = f.filiere_condition_acces
+      }
+      bloc.formations.push(f)
     }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'fr'))
+    return [...map.values()].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
   })()
 
-  const listeFiliereSelectionnee = selectedFiliereNom
-    ? (formationsParFiliere.find(([n]) => n === selectedFiliereNom)?.[1] || [])
-    : []
-
-  const typesDisponiblesPourFiliere = (() => {
-    const order = ['presentiel', 'en_ligne']
-    const set = new Set()
-    for (const f of listeFiliereSelectionnee) {
-      if (f.type === 'presentiel' || f.type === 'en_ligne') set.add(f.type)
-    }
-    return order.filter((t) => set.has(t))
-  })()
-
-  const formationsListeFinale = listeFiliereSelectionnee.filter(
-    (f) => f.type === selectedFormationType
-  )
+  const flyersPourFiliere = (filiereId, filiereNom) =>
+    flyers.filter((fl) => {
+      if (filiereId && Number(fl.filiere_id) === Number(filiereId)) return true
+      if (filiereNom && fl.filiere_nom && String(fl.filiere_nom).trim() === String(filiereNom).trim()) {
+        return true
+      }
+      return false
+    })
 
   const isEtudiant = user?.role === 'etudiant'
-
-  const goFilieres = () => {
-    setCatalogueStep('filieres')
-    setSelectedFiliereNom(null)
-    setSelectedFormationType(null)
-  }
-  const goTypes = () => {
-    setCatalogueStep('types')
-    setSelectedFormationType(null)
-  }
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden px-3 py-6 sm:px-4 sm:py-8 space-y-6 sm:space-y-8">
@@ -385,7 +282,7 @@ export default function EtablissementHome() {
             </p>
             {isEtudiant && (
               <p className="mt-2 max-w-2xl text-xs leading-relaxed text-gray-600 sm:text-sm">
-                Choisissez une filière, puis un mode (présentiel ou à distance), pour voir les formations. Les tarifs ne sont pas affichés ici — utilisez « Candidater » pour déposer un dossier.
+                Cliquez sur une filière pour voir ses formations (présentiel et/ou à distance). Les tarifs ne sont pas affichés ici — utilisez « Préinscription » pour déposer un dossier.
               </p>
             )}
           </div>
@@ -435,33 +332,6 @@ export default function EtablissementHome() {
           </div>
         )}
 
-        {/* Fil d'Ariane catalogue */}
-        {formationsFiltrees.length > 0 && catalogueStep !== 'filieres' && (
-          <nav className="mb-4 flex flex-wrap items-center gap-1.5 text-xs sm:text-sm" aria-label="Navigation catalogue">
-            <button type="button" onClick={goFilieres} className="font-semibold text-blue-700 hover:underline">
-              Filières
-            </button>
-            {selectedFiliereNom && (
-              <>
-                <span className="text-gray-300">/</span>
-                {catalogueStep === 'types' ? (
-                  <span className="font-bold text-gray-800 truncate max-w-[min(100%,12rem)] sm:max-w-none">{selectedFiliereNom}</span>
-                ) : (
-                  <button type="button" onClick={goTypes} className="font-semibold text-blue-700 hover:underline truncate max-w-[min(100%,12rem)] sm:max-w-none">
-                    {selectedFiliereNom}
-                  </button>
-                )}
-              </>
-            )}
-            {catalogueStep === 'liste' && selectedFormationType && (
-              <>
-                <span className="text-gray-300">/</span>
-                <span className="font-bold text-gray-800">{TYPE_FORMATION_META[selectedFormationType]?.label || selectedFormationType}</span>
-              </>
-            )}
-          </nav>
-        )}
-
         {formationsFiltrees.length === 0 ? (
           <div className="bg-gray-50 rounded-2xl p-12 text-center border-2 border-dashed border-gray-200">
             <div className="text-5xl mb-4">📚</div>
@@ -475,123 +345,39 @@ export default function EtablissementHome() {
             </p>
           </div>
         ) : (
-          <>
-            {/* Étape 1 : cartes filières */}
-            {catalogueStep === 'filieres' && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {formationsParFiliere.map(([filiereNom, liste]) => {
-                  const nPresentiel = liste.filter((x) => x.type === 'presentiel').length
-                  const nDistance = liste.filter((x) => x.type === 'en_ligne').length
-                  return (
-                    <button
-                      key={filiereNom}
-                      type="button"
-                      onClick={() => {
-                        setSelectedFiliereNom(filiereNom)
-                        setCatalogueStep('types')
-                      }}
-                      className="group min-h-0 min-w-0 text-left rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      <div className="mb-3 flex items-start gap-2">
-                        <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: primary }} aria-hidden />
-                        <span className="min-w-0 flex-1 text-base font-bold leading-snug text-gray-900 group-hover:text-blue-800 break-words">
-                          {filiereNom}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        {liste.length} formation{liste.length !== 1 ? 's' : ''}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
-                        {nPresentiel > 0 && (
-                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-800">🏫 Présentiel · {nPresentiel}</span>
-                        )}
-                        {nDistance > 0 && (
-                          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800">🌐 Distance · {nDistance}</span>
-                        )}
-                      </div>
-                      <p className="mt-4 text-xs font-bold text-blue-700 group-hover:underline">Voir les modes →</p>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Étape 2 : types présentiel / distance */}
-            {catalogueStep === 'types' && selectedFiliereNom && (
-              <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {formationsParFiliere.map((bloc) => {
+              const nPresentiel = bloc.formations.filter((x) => x.type === 'presentiel').length
+              const nDistance = bloc.formations.filter((x) => x.type === 'en_ligne').length
+              return (
                 <button
+                  key={bloc.nom}
                   type="button"
-                  onClick={goFilieres}
-                  className="text-sm font-semibold text-gray-600 hover:text-blue-700"
+                  onClick={() => setModalFiliere(bloc)}
+                  className="group min-h-0 min-w-0 text-left rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
-                  ← Retour aux filières
-                </button>
-                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">
-                  Mode de formation — {selectedFiliereNom}
-                </h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-3xl">
-                  {typesDisponiblesPourFiliere.map((t) => {
-                    const meta = TYPE_FORMATION_META[t]
-                    const count = listeFiliereSelectionnee.filter((f) => f.type === t).length
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => {
-                          setSelectedFormationType(t)
-                          setCatalogueStep('liste')
-                        }}
-                        className="rounded-2xl border-2 border-gray-100 bg-white p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      >
-                        <div className="text-3xl mb-2">{meta?.emoji}</div>
-                        <div className="text-lg font-black text-gray-900">{meta?.label}</div>
-                        <p className="mt-1 text-sm text-gray-500">{meta?.desc}</p>
-                        <p className="mt-4 text-sm font-bold text-blue-700">
-                          {count} formation{count !== 1 ? 's' : ''} →
-                        </p>
-                      </button>
-                    )
-                  })}
-                </div>
-                {typesDisponiblesPourFiliere.length === 0 && (
-                  <p className="text-sm text-gray-500">Aucun mode reconnu pour cette filière.</p>
-                )}
-              </div>
-            )}
-
-            {/* Étape 3 : liste des formations */}
-            {catalogueStep === 'liste' && selectedFiliereNom && selectedFormationType && (
-              <div className="space-y-4">
-                <button
-                  type="button"
-                  onClick={goTypes}
-                  className="text-sm font-semibold text-gray-600 hover:text-blue-700"
-                >
-                  ← Retour aux modes
-                </button>
-                <h3 className="text-base font-bold text-gray-900">
-                  {TYPE_FORMATION_META[selectedFormationType]?.emoji}{' '}
-                  {TYPE_FORMATION_META[selectedFormationType]?.label}
-                  <span className="font-normal text-gray-500"> — {selectedFiliereNom}</span>
-                </h3>
-                {formationsListeFinale.length === 0 ? (
-                  <p className="text-sm text-gray-500">Aucune formation dans cette catégorie.</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:gap-5">
-                    {formationsListeFinale.map((f) => (
-                      <FormationCatalogueCard
-                        key={f.id}
-                        f={f}
-                        primary={primary}
-                        secondary={secondary}
-                        isEtudiant={isEtudiant}
-                      />
-                    ))}
+                  <div className="mb-3 flex items-start gap-2">
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: primary }} aria-hidden />
+                    <span className="min-w-0 flex-1 text-base font-bold leading-snug text-gray-900 group-hover:text-blue-800 break-words">
+                      {bloc.nom}
+                    </span>
                   </div>
-                )}
-              </div>
-            )}
-          </>
+                  <p className="text-sm text-gray-500">
+                    {bloc.formations.length} formation{bloc.formations.length !== 1 ? 's' : ''}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
+                    {nPresentiel > 0 && (
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-800">🏫 Présentiel · {nPresentiel}</span>
+                    )}
+                    {nDistance > 0 && (
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800">🌐 Distance · {nDistance}</span>
+                    )}
+                  </div>
+                  <p className="mt-4 text-xs font-bold text-blue-700 group-hover:underline">Voir les formations →</p>
+                </button>
+              )
+            })}
+          </div>
         )}
       </div>
 
@@ -664,6 +450,17 @@ export default function EtablissementHome() {
           {etab.arrete  && <p>Arrêté : <span className="font-semibold text-gray-700">{etab.arrete}</span></p>}
         </div>
       )}
+
+      <FiliereFormationsModal
+        open={Boolean(modalFiliere)}
+        onOpenChange={(o) => { if (!o) setModalFiliere(null) }}
+        filiere={modalFiliere}
+        formations={modalFiliere?.formations || []}
+        primary={primary}
+        hideTarifs={isEtudiant}
+        showCandidater={isEtudiant}
+        flyers={modalFiliere ? flyersPourFiliere(modalFiliere.filiere_id, modalFiliere.nom) : []}
+      />
     </div>
   )
 }
